@@ -2,6 +2,8 @@ import http.server
 import os
 import subprocess
 import mimetypes
+import sys
+import time
 from urllib.parse import unquote, parse_qs, urlparse
 from arcade_scanner.app_config import (
     OPTIMIZER_SCRIPT, PREVIEW_DIR, IS_WIN, STATIC_DIR, REPORT_FILE, THUMB_DIR
@@ -97,7 +99,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             elif self.path.startswith("/compress?path="):
                 file_path = unquote(self.path.split("path=")[1])
                 if IS_WIN:
-                    cmd = f'start cmd.exe /k "{OPTIMIZER_SCRIPT}" "{file_path}"'
+                    cmd = f'start "Video Optimizer" cmd /k ""{sys.executable}" "{OPTIMIZER_SCRIPT}" "{file_path}""'
                     subprocess.run(cmd, shell=True)
                 else:
                     applescript = f'tell application "Terminal" to do script "{OPTIMIZER_SCRIPT} \\"{file_path}\\""'
@@ -109,7 +111,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 for p in paths:
                     if os.path.exists(p):
                         if IS_WIN:
-                            cmd = f'start cmd.exe /k "{OPTIMIZER_SCRIPT}" "{p}"'
+                            cmd = f'start "Video Optimizer" cmd /k ""{sys.executable}" "{OPTIMIZER_SCRIPT}" "{p}""'
                             subprocess.run(cmd, shell=True)
                         else:
                             applescript = f'tell application "Terminal" to do script "{OPTIMIZER_SCRIPT} \\"{p}\\""'
