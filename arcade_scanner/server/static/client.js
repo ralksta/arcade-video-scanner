@@ -112,6 +112,7 @@ function filterAndSort() {
         let matchesWorkspace = true;
         if (workspaceMode === 'lobby') matchesWorkspace = !isHidden;
         else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
+        else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
 
         const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
         if (ok) { vCount++; tSize += v.Size_MB; }
@@ -190,6 +191,9 @@ function createVideoCard(v) {
             <div class="archive-badge">ARCHIVIERT</div>
             <div class="checkbox-wrapper">
                 <input type="checkbox" onchange="updateBatchSelection()">
+                <div class="favorite-btn ${v.favorite ? 'active' : ''}" title="${v.favorite ? 'Favorit' : 'Zu Favoriten hinzufügen'}" onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))">
+                    <span class="material-icons">${v.favorite ? 'star' : 'star_border'}</span>
+                </div>
             </div>
             <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
                 <img src="thumbnails/${v.thumb}" class="thumb" loading="lazy">
@@ -269,6 +273,72 @@ function toggleHidden(card) {
         card.style.opacity = '0';
         card.style.transform = 'scale(0.8)';
         setTimeout(() => filterAndSort(), 300);
+    }
+}
+
+function toggleFavorite(card) {
+    const path = card.getAttribute('data-path');
+    const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
+    if (!video) return;
+
+    video.favorite = !video.favorite;
+    fetch(`http://localhost:${window.SERVER_PORT}/favorite?path=` + encodeURIComponent(path) + `&state=${video.favorite}`);
+
+    const starBtn = card.querySelector('.favorite-btn');
+    const starIcon = starBtn.querySelector('.material-icons');
+
+    if (video.favorite) {
+        starBtn.classList.add('active');
+        starIcon.innerText = 'star';
+        starBtn.title = 'Favorit';
+    } else {
+        starBtn.classList.remove('active');
+        starIcon.innerText = 'star_border';
+        starBtn.title = 'Zu Favoriten hinzufügen';
+    }
+
+    if (workspaceMode === 'favorites' && !video.favorite) {
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.8)';
+        setTimeout(() => filterAndSort(), 300);
+    }
+}
+
+function triggerBatchFavorite(state) {
+    const selected = document.querySelectorAll('.video-card-container input[type="checkbox"]:checked');
+    if (selected.length === 0) return;
+
+    const paths = Array.from(selected).map(cb => cb.closest('.video-card-container').getAttribute('data-path'));
+
+    // Update Local Data
+    paths.forEach(p => {
+        const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
+        if (v) v.favorite = state;
+    });
+
+    // Notify Server
+    fetch(`http://localhost:${window.SERVER_PORT}/batch_favorite?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
+
+    // Update UI
+    selected.forEach(cb => {
+        const card = cb.closest('.video-card-container');
+        const starBtn = card.querySelector('.favorite-btn');
+        const starIcon = starBtn.querySelector('.material-icons');
+
+        if (state) {
+            starBtn.classList.add('active');
+            starIcon.innerText = 'star';
+            starBtn.title = 'Favorit';
+        } else {
+            starBtn.classList.remove('active');
+            starIcon.innerText = 'star_border';
+            starBtn.title = 'Zu Favoriten hinzufügen';
+        }
+    });
+
+    clearSelection();
+    if (workspaceMode === 'favorites' && !state) {
+        setTimeout(() => filterAndSort(), 350);
     }
 }
 

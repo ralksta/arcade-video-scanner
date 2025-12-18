@@ -66,21 +66,26 @@ def generate_html_report(results, report_file):
                 </select>
 
                 <div style="flex-grow:1;"></div>
-
-                <div class="segmented-control">
-                    <button class="segment-btn active" id="m-lobby" onclick="setWorkspaceMode('lobby')">LOBBY</button>
-                    <button class="segment-btn" id="m-vault" onclick="setWorkspaceMode('vault')">VAULT</button>
-                </div>
                 
                 <div style="width:1px; height:24px; background:rgba(255,255,255,0.1); margin:0 8px;"></div>
 
                 <button class="filter-btn action-btn" id="toggleView" onclick="toggleLayout()"><span class="material-icons">view_list</span></button>
                 
-                <a href="javascript:location.reload()" class="filter-btn action-btn" title="Refresh">🔄 REFRESH</a>
+                <a href="javascript:location.reload()" class="filter-btn action-btn" title="Neu laden"><span class="material-icons">refresh</span></a>
 
                 <button class="filter-btn action-btn" id="folderBtn" onclick="toggleFolderSidebar()" title="Ordner Explorer">
                     <span class="material-icons">folder</span>
                 </button>
+            </div>
+        </div>
+
+        <div class="workspace-bar">
+            <div class="container">
+                <div class="segmented-control">
+                    <button class="segment-btn active" id="m-lobby" onclick="setWorkspaceMode('lobby')">LOBBY</button>
+                    <button class="segment-btn" id="m-favorites" onclick="setWorkspaceMode('favorites')">⭐ FAVORITEN</button>
+                    <button class="segment-btn" id="m-vault" onclick="setWorkspaceMode('vault')">VAULT</button>
+                </div>
             </div>
         </div>
 
@@ -110,6 +115,9 @@ def generate_html_report(results, report_file):
             {f'''<button class="filter-btn active" onclick="triggerBatchCompress()">
                 <span class="material-icons">bolt</span> OPTIMIEREN
             </button>''' if OPTIMIZER_AVAILABLE else ""}
+            <button class="filter-btn" onclick="triggerBatchFavorite(true)" style="background:var(--gold); color:#000; border-color:var(--gold);">
+                <span class="material-icons">star</span> FAVORISIEREN
+            </button>
             <button class="filter-btn" onclick="triggerBatchHide(true)" style="background:var(--deep-purple); border-color:var(--glass-border);">
                 <span class="material-icons">visibility_off</span> ALS GELESEN MARKIEREN
             </button>
