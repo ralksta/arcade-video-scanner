@@ -24,7 +24,15 @@ A visual analysis tool designed to find large video files on your local disks. I
 
 ---
 
-## 🛠 Installation
+## � Visual Overview
+
+| Main Dashboard | The Vault (Archival View) |
+| :---: | :---: |
+| ![Dashboard](screenshots/dashboard.png) | ![The Vault](screenshots/vault.png) |
+
+---
+
+## �🛠 Installation
 
 ### Prerequisites
 - **Python 3.10+**
