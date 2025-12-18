@@ -19,6 +19,11 @@ A visual analysis tool designed to find large video files on your local disks. I
 
 ---
 
+> [!IMPORTANT]
+> **Initial Start Performance**: The first time you scan your library, the process may take some time depending on the number of video files. The tool generates **high-quality thumbnails** and **short video-preview clips** for every file to provide a smooth visual experience. Subsequent starts will be nearly instant as it uses the cached data.
+
+---
+
 ## 🛠 Installation
 
 ### Prerequisites
