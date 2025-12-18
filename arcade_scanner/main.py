@@ -11,12 +11,12 @@ from .templates.dashboard_template import generate_html_report
 from .server.web_server import start_server
 
 def run_scanner(args_list=None):
-    parser = argparse.ArgumentParser(description="Arcade Video Scanner 4.8")
+    parser = argparse.ArgumentParser(description="Arcade Video Scanner 4.8.1")
     parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
     parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
     args, unknown = parser.parse_known_args(args_list)
 
-    print("--- Arcade Video Scanner 4.8 ---")
+    print("--- Arcade Video Scanner 4.8.1 ---")
     
     if args.rebuild:
         purge_media()

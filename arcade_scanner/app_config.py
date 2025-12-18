@@ -5,6 +5,19 @@ import sys
 IS_WIN = sys.platform == "win32"
 HOME_DIR = os.path.expanduser("~")
 
+
+# ==============================================================================
+# INTERNAL SETTINGS & PATHS
+# (Do not modify these unless you know what you are doing)
+# ==============================================================================
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HIDDEN_DATA_DIR = os.path.join(PROJECT_ROOT, "arcade_data")
+THUMB_DIR = os.path.join(HIDDEN_DATA_DIR, "thumbnails")
+PREVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "previews")
+CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
+REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
+
 # ==============================================================================
 # USER CONFIGURATION
 # You can change the settings below to customize the scan and application behavior.
@@ -13,6 +26,28 @@ HOME_DIR = os.path.expanduser("~")
 # Directories to scan for video files.
 # You can add absolute paths here.
 SCAN_TARGETS = [HOME_DIR] if IS_WIN else [HOME_DIR, "/Volumes/T5 Media"]
+
+# --- LOCAL TARGETS (NOT SYNCED TO GITHUB) ---
+def load_local_config(filename):
+    """Checks both PROJECT_ROOT and arcade_data for a config file."""
+    paths_to_check = [
+        os.path.join(PROJECT_ROOT, filename),
+        os.path.join(HIDDEN_DATA_DIR, filename)
+    ]
+    for p in paths_to_check:
+        if os.path.exists(p):
+            try:
+                # Use 'utf-8-sig' to handle BOM
+                with open(p, "r", encoding="utf-8-sig", errors="replace") as f:
+                    lines = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                    if lines:
+                        print(f"ℹ️  Loaded {len(lines)} paths from {os.path.relpath(p, PROJECT_ROOT)}")
+                        return lines
+            except Exception as e:
+                print(f"⚠️  Warning: Could not read {p}: {e}")
+    return []
+
+SCAN_TARGETS.extend(load_local_config("local_targets.txt"))
 
 # Minimum video size in Megabytes to include in the scan.
 MIN_SIZE_MB = 100
@@ -48,17 +83,9 @@ else:
         "Proton Drive Cloud Files"
     ]
 
-# ==============================================================================
-# INTERNAL SETTINGS & PATHS
-# (Do not modify these unless you know what you are doing)
-# ==============================================================================
+# --- LOCAL EXCLUDES (NOT SYNCED TO GITHUB) ---
+EXCLUDE_PATHS.extend(load_local_config("local_excludes.txt"))
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HIDDEN_DATA_DIR = os.path.join(PROJECT_ROOT, "arcade_data")
-THUMB_DIR = os.path.join(HIDDEN_DATA_DIR, "thumbnails")
-PREVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "previews")
-CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
-REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
 OPTIMIZER_SCRIPT = os.getenv("ARCADE_OPTIMIZER_PATH", os.path.join(HOME_DIR, "scripts", "video_optimizer.sh"))
 OPTIMIZER_AVAILABLE = os.path.exists(OPTIMIZER_SCRIPT)
 
