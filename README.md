@@ -2,6 +2,18 @@
 
 A visual analysis tool designed to find large video files on your local disks. It provides a clear overview of which files are consuming the most storage based on file size, bitrate, and older codecs (like H.264), helping you identify candidates for optimization or archival.
 
+## 🎯 What is Arcade Video Scanner?
+
+Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
+
+### Core Features:
+- **Visual Analysis**: Instantly see which videos are "High Bitrate" (candidates for compression) vs. "Optimized".
+- **Privacy-First**: No data ever leaves your computer. The scan, database, and web dashboard run 100% locally.
+- **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, or file size to pinpoint storage hogs.
+- **Interactive Previews**: Hover over any video to see a 5-second preview clip, making it easy to identify content without opening multiple video players.
+- **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
+- **GPU-Powered Optimization**: One-click optimization for Windows users with NVIDIA hardware, reducing file sizes by 50-80% with minimal quality loss.
+
 ## 🚀 Version 4.9.0 Highlights
 
 ### ⚡ Smart UI & Performance Optimization
