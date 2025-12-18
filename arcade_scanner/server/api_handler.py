@@ -1,10 +1,10 @@
 import http.server
 import os
 import subprocess
-import time
+import mimetypes
 from urllib.parse import unquote, parse_qs, urlparse
 from arcade_scanner.app_config import (
-    OPTIMIZER_SCRIPT, PREVIEW_DIR, IS_WIN
+    OPTIMIZER_SCRIPT, PREVIEW_DIR, IS_WIN, STATIC_DIR, REPORT_FILE, THUMB_DIR
 )
 from arcade_scanner.core.cache_manager import load_cache, save_cache
 from arcade_scanner.server.streaming_util import serve_file_range
@@ -12,27 +12,94 @@ from arcade_scanner.server.streaming_util import serve_file_range
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         try:
-            if self.path == "/" or self.path == "":
-                self.path = "/index.html"
-                return super().do_GET()
+            # 1. ROOT / INDEX -> Serve REPORT_FILE
+            if self.path == "/" or self.path == "/index.html" or self.path.startswith("/index.html?"):
+                self.send_response(200)
+                self.send_header("Content-type", "text/html; charset=utf-8")
+                
+                if os.path.exists(REPORT_FILE):
+                    fs = os.stat(REPORT_FILE)
+                    self.send_header("Content-Length", str(fs.st_size))
+                    self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
+                    self.end_headers()
+                    with open(REPORT_FILE, 'rb') as f:
+                        self.wfile.write(f.read())
+                else:
+                    self.send_error(404, "Report file not found")
+                return
+
+            # 2. THUMBNAILS -> Serve from THUMB_DIR
+            elif self.path.startswith("/thumbnails/"):
+                rel_path = unquote(self.path[12:]) # remove /thumbnails/
+                file_path = os.path.normpath(os.path.join(THUMB_DIR, rel_path))
+                
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    self.send_response(200)
+                    self.send_header("Content-type", "image/jpeg")
+                    fs = os.stat(file_path)
+                    self.send_header("Content-Length", str(fs.st_size))
+                    self.end_headers()
+                    with open(file_path, 'rb') as f:
+                        self.wfile.write(f.read())
+                    return
+                else:
+                    self.send_error(404)
+                    return
+
+            # 3. STATIC ASSETS -> Catch-all for any path containing /static/
+            elif "/static/" in self.path:
+                try:
+                    # Robustly extract relative path: get everything after the last "/static/"
+                    # This handles paths like /static/styles.css AND /arcade_scanner/server/static/styles.css
+                    rel_path = self.path.split("/static/")[-1].split('?')[0]
+                    file_path = os.path.normpath(os.path.join(STATIC_DIR, rel_path))
+                    
+                    # Security check: Ensure the resolved path is inside STATIC_DIR
+                    if not file_path.lower().startswith(os.path.normpath(STATIC_DIR).lower()):
+                        self.send_error(403)
+                        return
+
+                    if os.path.exists(file_path) and os.path.isfile(file_path):
+                        self.send_response(200)
+                        if file_path.lower().endswith(".css"):
+                            self.send_header("Content-type", "text/css")
+                        elif file_path.lower().endswith(".js"):
+                            self.send_header("Content-type", "application/javascript")
+                        else:
+                            mime, _ = mimetypes.guess_type(file_path)
+                            if mime:
+                                self.send_header("Content-type", mime)
+                        
+                        fs = os.stat(file_path)
+                        self.send_header("Content-Length", str(fs.st_size))
+                        self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
+                        self.end_headers()
+                        
+                        with open(file_path, 'rb') as f:
+                            self.wfile.write(f.read())
+                        return
+                    else:
+                        self.send_error(404)
+                        return
+                except Exception as e:
+                    self.send_error(500)
+                    return
+
+            # 4. API Endpoints
             elif self.path.startswith("/reveal?path="):
                 file_path = unquote(self.path.split("path=")[1])
                 if IS_WIN:
-                    # Windows: explorer /select,path
                     subprocess.run(["explorer", "/select,", os.path.normpath(file_path)])
                 else:
-                    # macOS: open -R path
                     subprocess.run(["open", "-R", file_path])
                 self.send_response(204)
                 self.end_headers()
             elif self.path.startswith("/compress?path="):
                 file_path = unquote(self.path.split("path=")[1])
                 if IS_WIN:
-                    # Windows: Launch cmd.exe and run the script
                     cmd = f'start cmd.exe /k "{OPTIMIZER_SCRIPT}" "{file_path}"'
                     subprocess.run(cmd, shell=True)
                 else:
-                    # macOS: Use AppleScript to open Terminal
                     applescript = f'tell application "Terminal" to do script "{OPTIMIZER_SCRIPT} \\"{file_path}\\""'
                     subprocess.run(["osascript", "-e", applescript])
                 self.send_response(204)
@@ -55,13 +122,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 path = params.get("path", [None])[0]
                 state = params.get("state", ["true"])[0].lower() == "true"
                 if path:
-                    # Normalize path for matching cache keys
                     abs_path = os.path.abspath(path)
                     c = load_cache()
                     if abs_path in c:
                         c[abs_path]["hidden"] = state
                     else:
-                        # Fallback: if not in cache, create a minimal entry
                         c[abs_path] = {"hidden": state, "FilePath": abs_path}
                     save_cache(c)
                     print(f"Updated vault state for: {os.path.basename(abs_path)} -> hidden={state}")
@@ -69,7 +134,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
             elif self.path.startswith("/batch_hide?paths="):
                 paths_str = unquote(self.path.split("paths=")[1])
-                # Filter out the state param if it was appended as &state=true
                 paths_list = paths_str.split("&state=")[0].split(",")
                 state = "state=false" not in self.path
                 c = load_cache()
@@ -93,7 +157,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 prev_path = os.path.join(PREVIEW_DIR, name)
                 serve_file_range(self, prev_path, method="GET")
             else:
-                super().do_GET()
+                # 404 for anything else
+                self.send_error(404)
         except Exception as e:
             print(f"Error handling request: {e}")
 
@@ -107,7 +172,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 prev_path = os.path.join(PREVIEW_DIR, name)
                 serve_file_range(self, prev_path, method="HEAD")
             else:
-                super().do_HEAD()
+                self.send_error(405)
         except Exception as e:
             print(f"Error handling HEAD request: {e}")
 

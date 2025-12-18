@@ -1,7 +1,5 @@
 import os
 from arcade_scanner.app_config import HIDDEN_DATA_DIR, PORT, OPTIMIZER_SCRIPT, OPTIMIZER_AVAILABLE
-from arcade_scanner.templates.styles import CSS_STYLES
-from arcade_scanner.templates.client_script import CLIENT_JS
 
 def generate_html_report(results, report_file):
     total_mb = sum(r["Size_MB"] for r in results)
@@ -25,7 +23,7 @@ def generate_html_report(results, report_file):
         <meta charset="UTF-8">
         <title>Arcade Video Dashboard</title>
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-        <style>{CSS_STYLES}</style>
+        <link rel="stylesheet" href="/static/styles.css">
     </head>
     <body data-port="{PORT}">
         <canvas id="starfield"></canvas>
@@ -33,7 +31,7 @@ def generate_html_report(results, report_file):
         
         <header class="arcade-header">
             <div class="grid-bg"></div>
-            <div class="logo-container">
+            <div class="logo-container" onclick="resetDashboard()" style="cursor:pointer">
                 <div class="glitch-wrapper">
                     <h1 class="video-scanner-text">ARCADE VIDEO SCANNER</h1>
                 </div>
@@ -127,8 +125,8 @@ def generate_html_report(results, report_file):
             window.FOLDERS_DATA = {folders_json};
             window.ALL_VIDEOS = {all_videos_json};
             window.OPTIMIZER_AVAILABLE = {'true' if OPTIMIZER_AVAILABLE else 'false'};
-            {CLIENT_JS}
         </script>
+        <script src="/static/client.js"></script>
     </body>
     </html>"""
 

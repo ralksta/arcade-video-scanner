@@ -17,6 +17,7 @@ THUMB_DIR = os.path.join(HIDDEN_DATA_DIR, "thumbnails")
 PREVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "previews")
 CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
 REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
+STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # ==============================================================================
 # USER CONFIGURATION

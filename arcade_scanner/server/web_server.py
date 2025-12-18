@@ -10,7 +10,7 @@ def start_server():
     Changes the working directory to HIDDEN_DATA_DIR to serve thumbnails smoothly.
     """
     global PORT_ACTUAL
-    os.chdir(HIDDEN_DATA_DIR)
+    # os.chdir(HIDDEN_DATA_DIR) # Removed to keep CWD at project root
     
     # Allow address reuse to prevent "Address already in use" errors if the script is restarted quickly
     server = socketserver.ThreadingTCPServer(("", PORT), FinderHandler, bind_and_activate=False)
@@ -33,4 +33,4 @@ def start_server():
     server_thread.start()
     
     print(f"Server started on port {PORT_ACTUAL}")
-    return PORT_ACTUAL
+    return server, PORT_ACTUAL
