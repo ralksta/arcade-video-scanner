@@ -19,6 +19,7 @@ venv/
 
 # Logs
 *.log
+server_log.txt
 
 # Scripts (Local paths)
 *.sh
