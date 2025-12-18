@@ -1,6 +1,6 @@
 # Arcade Video Scanner 4.8 (Reliability Edition)
 
-A professional-grade media management and video analysis tool designed for high-performance scanning and library maintenance.
+A visual analysis tool designed to find large video files on your local disks. It provides a clear overview of which files are consuming the most storage based on file size, bitrate, and older codecs (like H.264), helping you identify candidates for optimization or archival.
 
 ## 🚀 Version 4.8 Highlights
 
