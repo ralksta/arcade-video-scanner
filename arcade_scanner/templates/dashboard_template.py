@@ -17,6 +17,7 @@ def generate_html_report(results, report_file):
     
     import json
     folders_json = json.dumps(folders_data)
+    all_videos_json = json.dumps(results)
     
     html_content = f"""<!DOCTYPE html>
     <html lang="de">
@@ -46,7 +47,7 @@ def generate_html_report(results, report_file):
 
         <div class="top-bar">
             <div class="container controls">
-                <input type="text" id="searchBar" placeholder="Suchen..." oninput="filterAndSort()">
+                <input type="text" id="searchBar" placeholder="Suchen..." oninput="onSearchInput()">
                 
                 <div style="flex-shrink:0; height:24px; width:1px; background:rgba(255,255,255,0.1); margin:0 8px;"></div>
                 
@@ -94,72 +95,9 @@ def generate_html_report(results, report_file):
         </div>
 
         <div class="container">
-            <div id="videoGrid">"""
-
-    for item in results:
-        full_path = item["FilePath"]
-        status_class = item["Status"]
-        codec = item.get("codec", "unknown")
-        opt_path = os.path.splitext(full_path)[0] + "_opt.mp4"
-        opt_exists = os.path.exists(opt_path)
-        bar_w = min(100, (item["Bitrate_Mbps"] / 25) * 100)
-        is_hevc = "hevc" in codec or "h265" in codec
-        hidden_val = str(item.get('hidden', False)).lower()
-
-        html_content += f"""
-                <div class="video-card-container" data-status="{status_class}" data-codec="{codec}" data-bitrate="{item["Bitrate_Mbps"]}" data-size="{item["Size_MB"]}" data-path="{full_path}" data-hidden="{hidden_val}" data-folder="{os.path.dirname(full_path)}">
-                    <div class="content-card">
-                        <div class="archive-badge">ARCHIVIERT</div>
-                        <div class="checkbox-wrapper">
-                            <input type="checkbox" onchange="updateBatchSelection()">
-                        </div>
-                        <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
-                            <img src="thumbnails/{item["thumb"]}" class="thumb" loading="lazy">
-                            <video class="preview-video" muted loop preload="none" 
-                                   data-src="http://localhost:{PORT}/preview?name={item["preview"]}">
-                            </video>
-                            <div class="quick-actions-overlay">
-                                <a href="http://localhost:{PORT}/reveal?path={full_path}" target="h_frame" class="quick-action-btn" title="Im Finder zeigen" onclick="event.stopPropagation()">
-                                    <span class="material-icons">visibility</span>
-                                </a>
-                                <div class="quick-action-btn" title="Wiedergeben" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
-                                    <span class="material-icons">play_arrow</span>
-                                </div>
-                                <div class="quick-action-btn hide-toggle-btn" title="Als gesehen markieren" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
-                                    <span class="material-icons">{"visibility_off" if not item.get("hidden") else "visibility"}</span>
-                                </div>
-                                {f'''<a href="http://localhost:{PORT}/compress?path={full_path}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
-                                    <span class="material-icons">bolt</span>
-                                </a>''' if OPTIMIZER_AVAILABLE else ""}
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <h2 class="file-name">{os.path.basename(full_path)}</h2>
-                            <p class="file-dir">{os.path.dirname(full_path)}</p>
-                            <div class="bitrate-track">
-                                <div class="bitrate-fill" style="width: {bar_w}%"></div>
-                            </div>
-                            <div style="margin-top: 8px; font-size: 0.8rem; display: flex; justify-content: space-between;">
-                                <span>{item["Bitrate_Mbps"]:.1f} Mbps</span>
-                                <span style="color:#888;">{item["Size_MB"]:.0f} MB</span>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            <div style="display:flex; align-items:center;">
-                                <span class="badge {status_class}">{item["Status"]}</span>
-                                <span class="badge hevc">{"HEVC" if is_hevc else codec.upper()}</span>
-                            </div>
-                            <div style="display:flex; gap:8px;">
-                                <a href="http://localhost:{PORT}/reveal?path={full_path}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">visibility</span></a>
-                                {f'''<a href="http://localhost:{PORT}/compress?path={full_path}" target="h_frame" class="btn {"done" if opt_exists else "opt"}">
-                                    <span class="material-icons" style="font-size:18px;">{"check_circle" if opt_exists else "bolt"}</span>
-                                </a>''' if OPTIMIZER_AVAILABLE else ""}
-                            </div>
-                        </div>
-                    </div>
-                </div>"""
-
-    html_content += f"""
+            <div id="videoGrid"></div>
+            <div id="loadingSentinel" style="height: 100px; display: flex; align-items: center; justify-content: center; opacity: 0;">
+                 <span class="material-icons" style="animation: spin 1s linear infinite;">refresh</span>
             </div>
         </div>
         
@@ -187,6 +125,8 @@ def generate_html_report(results, report_file):
         <script>
             window.SERVER_PORT = {PORT};
             window.FOLDERS_DATA = {folders_json};
+            window.ALL_VIDEOS = {all_videos_json};
+            window.OPTIMIZER_AVAILABLE = {'true' if OPTIMIZER_AVAILABLE else 'false'};
             {CLIENT_JS}
         </script>
     </body>
