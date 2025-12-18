@@ -151,6 +151,39 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"Batch updated vault state for {updated_count} files -> hidden={state}")
                 self.send_response(204)
                 self.end_headers()
+            elif self.path.startswith("/favorite?"):
+                params = parse_qs(urlparse(self.path).query)
+                path = params.get("path", [None])[0]
+                state = params.get("state", ["true"])[0].lower() == "true"
+                if path:
+                    abs_path = os.path.abspath(path)
+                    c = load_cache()
+                    if abs_path in c:
+                        c[abs_path]["favorite"] = state
+                    else:
+                        c[abs_path] = {"favorite": state, "FilePath": abs_path}
+                    save_cache(c)
+                    print(f"Updated favorite state for: {os.path.basename(abs_path)} -> favorite={state}")
+                self.send_response(204)
+                self.end_headers()
+            elif self.path.startswith("/batch_favorite?"):
+                params = parse_qs(urlparse(self.path).query)
+                paths = params.get("paths", [""])[0].split(",")
+                state = params.get("state", ["true"])[0].lower() == "true"
+                c = load_cache()
+                updated_count = 0
+                for p in paths:
+                    if p:
+                        abs_path = os.path.abspath(p)
+                        if abs_path in c:
+                            c[abs_path]["favorite"] = state
+                        else:
+                            c[abs_path] = {"favorite": state, "FilePath": abs_path}
+                        updated_count += 1
+                save_cache(c)
+                print(f"Batch updated favorite state for {updated_count} files -> favorite={state}")
+                self.send_response(204)
+                self.end_headers()
             elif self.path.startswith("/stream?path="):
                 file_path = unquote(self.path.split("path=")[1])
                 serve_file_range(self, file_path, method="GET")

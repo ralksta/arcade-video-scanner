@@ -1,9 +1,5 @@
 # Arcade Video Scanner 4.9.0 (Customization Edition)
 
-A visual analysis tool designed to find large video files on your local disks. It provides a clear overview of which files are consuming the most storage based on file size, bitrate, and older codecs (like H.264), helping you identify candidates for optimization or archival.
-
-## 🎯 What is Arcade Video Scanner?
-
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
 ### Core Features:

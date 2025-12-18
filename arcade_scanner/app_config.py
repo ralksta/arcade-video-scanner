@@ -81,6 +81,7 @@ else:
         "iCloudDrive",
         "iCloud Photos",
         "Proton Drive",
+        "$RECYCLE.BIN",
         "Proton Drive Cloud Files"
     ]
 
