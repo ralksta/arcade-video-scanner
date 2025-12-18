@@ -9,6 +9,7 @@ def start_server():
     Initializes and starts the multi-threaded HTTP server.
     Changes the working directory to HIDDEN_DATA_DIR to serve thumbnails smoothly.
     """
+    global PORT_ACTUAL
     os.chdir(HIDDEN_DATA_DIR)
     
     # Allow address reuse to prevent "Address already in use" errors if the script is restarted quickly
@@ -24,7 +25,6 @@ def start_server():
         new_port = find_free_port(PORT + 1)
         print(f"Attempting fallback to port {new_port}...")
         server = socketserver.ThreadingTCPServer(("", new_port), FinderHandler)
-        global PORT_ACTUAL
         PORT_ACTUAL = new_port
     else:
         PORT_ACTUAL = PORT
