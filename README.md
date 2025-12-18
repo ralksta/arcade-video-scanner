@@ -56,6 +56,18 @@ python3 scan_videos_mit_shell.py --rebuild
 ## ⚙️ Configuration
 All settings (Scan targets, exclusions, thresholds) are centrally managed in `arcade_scanner/app_config.py`.
 
+### 🚫 Default Exclusions
+By default, several system and cloud-related directories are excluded to ensure performance, stability, and to prevent unwanted data downloads.
+
+| Platform | Excluded Directories | Reasoning |
+| :--- | :--- | :--- |
+| **All** | `@eaDir`, `#recycle`, `Temporary Items` | Skips NAS system folders and trash bins. |
+| **Windows** | `AppData/Local/Temp`, `Windows/Temp` | Avoids cluttering results with system temporary files. |
+| **Windows** | `iCloudDrive`, `Proton Drive` | Prevents triggering massive "on-demand" cloud downloads. |
+| **macOS** | `~/Library/CloudStorage/`, `~/Library/Mobile Documents/` | Prevents scanning iCloud/OneDrive sync folders that trigger downloads. |
+| **macOS** | `~/Pictures/Photos Library.photoslibrary` | Avoids scanning internal database files of the Photos app. |
+| **macOS** | `~/Library/Containers/` | Skips application-specific sandbox folders. |
+
 ### Environment Variables
 - `ARCADE_OPTIMIZER_PATH`: Override the default path to the video optimizer shell script (default: `~/scripts/video_optimizer.sh`).
 
