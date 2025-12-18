@@ -60,6 +60,7 @@ PREVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "previews")
 CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
 REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
 OPTIMIZER_SCRIPT = os.getenv("ARCADE_OPTIMIZER_PATH", os.path.join(HOME_DIR, "scripts", "video_optimizer.sh"))
+OPTIMIZER_AVAILABLE = os.path.exists(OPTIMIZER_SCRIPT)
 
 # Ensure directories exist
 for d in [HIDDEN_DATA_DIR, THUMB_DIR, PREVIEW_DIR]:
