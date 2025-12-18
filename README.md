@@ -7,7 +7,7 @@ A visual analysis tool designed to find large video files on your local disks. I
 ### ⚡ Smart UI & Performance Optimization
 - **Infinite Scrolling**: The dashboard now uses lazy loading to handle libraries with 2000+ videos without lag.
 - **Dynamic Action Buttons**: The "Optimize" buttons now automatically hide if the external optimization script is not found.
-- **Improved Feedback**: Better terminal logging for configuration loading and system status.
+- **High-Performance Optimizer**: Integrated support for a dedicated Python optimizer using NVIDIA hardware encoding (`hevc_nvenc`) for blazing-fast transcoding.
 
 ### 🌐 Robust Network Management
 - **Auto-Port Detection**: The server intelligently finds the next available port if the default 8000 is occupied.
@@ -60,6 +60,17 @@ python3 scan_videos_mit_shell.py --rebuild
 
 ---
 
+## ⚡ Video Optimizer
+
+The tool includes a specialized video optimizer (`scripts/video_optimizer.py`) designed for Windows users with NVIDIA GPUs.
+
+- **Hardware Acceleration**: Uses `hevc_nvenc` (NVIDIA 40-series optimized) for high-speed H.265/HEVC encoding.
+- **Intelligent Transcoding**: Automatically adjusts quality (CQ) and verifies results using **SSIM** (Structural Similarity Index) to ensure significant space savings without visible quality loss.
+- **Batch Processing**: Select multiple videos in the dashboard and trigger a sequence of optimization tasks.
+- **Interactive Output**: Opens in a separate terminal window, providing real-time progress bars and quality metrics.
+
+---
+
 ## ⚙️ Configuration
 All settings (Scan targets, exclusions, thresholds) are centrally managed in `arcade_scanner/app_config.py`.
 
@@ -84,9 +95,10 @@ If you want to customize your setup without committing changes to GitHub, you ca
 *Note: Lines starting with `#` are ignored. These files are automatically skipped by Git.*
 
 ### Environment Variables
-- `ARCADE_OPTIMIZER_PATH`: Override the default path to the video optimizer shell script (default: `~/scripts/video_optimizer.sh`).
+- `ARCADE_OPTIMIZER_PATH`: Override the default path to the video optimizer script (default: `scripts/video_optimizer.py`).
 
 ## 📂 Project Structure
 - `arcade_scanner/`: The core Python package.
 - `arcade_data/`: Internal storage for the database, thumbnails, and previews.
+- `scripts/`: Contains the `video_optimizer.py` and other utility scripts.
 - `scan_videos_mit_shell.py`: Main entry point wrapper.
