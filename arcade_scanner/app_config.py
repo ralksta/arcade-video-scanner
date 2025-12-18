@@ -87,7 +87,7 @@ else:
 # --- LOCAL EXCLUDES (NOT SYNCED TO GITHUB) ---
 EXCLUDE_PATHS.extend(load_local_config("local_excludes.txt"))
 
-OPTIMIZER_SCRIPT = os.getenv("ARCADE_OPTIMIZER_PATH", os.path.join(HOME_DIR, "scripts", "video_optimizer.sh"))
+OPTIMIZER_SCRIPT = os.getenv("ARCADE_OPTIMIZER_PATH", os.path.join(PROJECT_ROOT, "scripts", "video_optimizer.py"))
 OPTIMIZER_AVAILABLE = os.path.exists(OPTIMIZER_SCRIPT)
 
 # Ensure directories exist

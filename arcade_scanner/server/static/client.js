@@ -101,7 +101,8 @@ function filterAndSort() {
         const status = v.Status;
         const codec = v.codec || 'unknown';
         const isHidden = v.hidden || false;
-        const folder = v.FilePath.substring(0, v.FilePath.lastIndexOf(v.FilePath.includes('/') ? '/' : '\\\\'));
+        const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
+        const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
 
         const matchesFilter = (currentFilter === 'all' || status === currentFilter);
         const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
@@ -181,7 +182,8 @@ function createVideoCard(v) {
     const isHevc = (v.codec || '').includes('hevc') || (v.codec || '').includes('h265');
     const barW = Math.min(100, (v.Bitrate_Mbps / 25) * 100);
     const fileName = v.FilePath.split(/[\\\\/]/).pop();
-    const dirName = v.FilePath.substring(0, v.FilePath.lastIndexOf(v.FilePath.includes('/') ? '/' : '\\\\'));
+    const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
+    const dirName = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
 
     container.innerHTML = `
         <div class="content-card">
