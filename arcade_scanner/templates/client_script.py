@@ -5,6 +5,11 @@ CLIENT_JS = """
             let currentLayout = 'grid'; // grid or list
             let workspaceMode = 'lobby'; // lobby, mixed, vault
             let currentFolder = 'all';
+            let searchTerm = '';
+            
+            let filteredVideos = [];
+            let renderedCount = 0;
+            const BATCH_SIZE = 40;
 
             // --- STARFIELD ---
             const canvas = document.getElementById('starfield');
@@ -31,6 +36,16 @@ CLIENT_JS = """
             }
             animate();
 
+            // --- DEBOUNCED SEARCH ---
+            let searchTimeout;
+            function onSearchInput() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    searchTerm = document.getElementById('searchBar').value.toLowerCase();
+                    filterAndSort();
+                }, 250);
+            }
+
             // --- UI LOGIC ---
             function setFilter(f) {
                 currentFilter = f;
@@ -55,40 +70,11 @@ CLIENT_JS = """
 
             function setWorkspaceMode(mode) {
                 workspaceMode = mode;
-                
-                // Update buttons
                 document.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
                 document.getElementById('m-' + mode).classList.add('active');
-                
-                // Update theme
-                if (mode === 'vault') {
-                    document.body.classList.add('vault-mode');
-                } else {
-                    document.body.classList.remove('vault-mode');
-                }
-                
+                if (mode === 'vault') document.body.classList.add('vault-mode');
+                else document.body.classList.remove('vault-mode');
                 filterAndSort();
-            }
-
-            function toggleHidden(card) {
-                const isHidden = card.getAttribute('data-hidden') === 'true';
-                const newState = !isHidden;
-                const path = card.getAttribute('data-path');
-                
-                card.setAttribute('data-hidden', newState);
-                fetch(`http://localhost:${window.SERVER_PORT}/hide?path=` + encodeURIComponent(path) + `&state=${newState}`);
-                
-                const btn = card.querySelector('.hide-toggle-btn .material-icons');
-                btn.innerText = newState ? 'visibility' : 'visibility_off';
-                
-                // If the new state contradicts the current workspace mode, hide it with a fade
-                const shouldHide = (workspaceMode === 'lobby' && newState) || (workspaceMode === 'vault' && !newState);
-                
-                if (shouldHide) {
-                    card.style.opacity = '0';
-                    card.style.transform = 'scale(0.8)';
-                    setTimeout(() => filterAndSort(), 300);
-                }
             }
 
             function toggleLayout() {
@@ -103,9 +89,188 @@ CLIENT_JS = """
                     grid.classList.remove('list-view');
                     btn.innerHTML = '<span class="material-icons">view_list</span>';
                 }
+                // Re-render current set to apply layout classes
+                renderUI(false);
             }
 
-            // --- PREVIEW LOGIC (with Intent Delay) ---
+            // --- PERFORMANCE ENGINE: FILTER & SORT ---
+            function filterAndSort() {
+                let vCount = 0; let tSize = 0;
+                
+                filteredVideos = window.ALL_VIDEOS.filter(v => {
+                    const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
+                    const status = v.Status;
+                    const codec = v.codec || 'unknown';
+                    const isHidden = v.hidden || false;
+                    const folder = v.FilePath.substring(0, v.FilePath.lastIndexOf(v.FilePath.includes('/') ? '/' : '\\\\'));
+
+                    const matchesFilter = (currentFilter === 'all' || status === currentFilter);
+                    const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
+                    const matchesSearch = name.includes(searchTerm) || v.FilePath.toLowerCase().includes(searchTerm);
+                    const matchesFolder = (currentFolder === 'all' || folder === currentFolder);
+                    
+                    let matchesWorkspace = true;
+                    if (workspaceMode === 'lobby') matchesWorkspace = !isHidden;
+                    else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
+
+                    const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
+                    if(ok) { vCount++; tSize += v.Size_MB; }
+                    return ok;
+                });
+
+                // Sort
+                filteredVideos.sort((a, b) => {
+                    if (currentSort === 'bitrate') return b.Bitrate_Mbps - a.Bitrate_Mbps;
+                    if (currentSort === 'size') return b.Size_MB - a.Size_MB;
+                    if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
+                    return 0;
+                });
+
+                document.getElementById('count-total').innerText = vCount;
+                document.getElementById('size-total').innerText = formatSize(tSize);
+                
+                renderUI(true);
+            }
+
+            function formatSize(mb) {
+                if (mb > 1024 * 1024) return (mb / (1024 * 1024)).toFixed(2) + " TB";
+                if (mb > 1024) return (mb / 1024).toFixed(2) + " GB";
+                return mb.toFixed(0) + " MB";
+            }
+
+            // --- PERFORMANCE ENGINE: INFINITE SCROLL ---
+            function renderUI(reset) {
+                const grid = document.getElementById('videoGrid');
+                if (reset) {
+                    grid.innerHTML = '';
+                    renderedCount = 0;
+                    window.scrollTo(0, 0);
+                }
+                renderNextBatch();
+            }
+
+            function renderNextBatch() {
+                if (renderedCount >= filteredVideos.length) {
+                    document.getElementById('loadingSentinel').style.opacity = '0';
+                    return;
+                }
+
+                const grid = document.getElementById('videoGrid');
+                const fragment = document.createDocumentFragment();
+                const nextBatch = filteredVideos.slice(renderedCount, renderedCount + BATCH_SIZE);
+
+                nextBatch.forEach(video => {
+                    const card = createVideoCard(video);
+                    fragment.appendChild(card);
+                });
+
+                grid.appendChild(fragment);
+                renderedCount += BATCH_SIZE;
+                
+                if (renderedCount < filteredVideos.length) {
+                    document.getElementById('loadingSentinel').style.opacity = '1';
+                } else {
+                    document.getElementById('loadingSentinel').style.opacity = '0';
+                }
+            }
+
+            function createVideoCard(v) {
+                const container = document.createElement('div');
+                container.className = 'video-card-container';
+                container.setAttribute('data-path', v.FilePath);
+                
+                const isHevc = (v.codec || '').includes('hevc') || (v.codec || '').includes('h265');
+                const barW = Math.min(100, (v.Bitrate_Mbps / 25) * 100);
+                const fileName = v.FilePath.split(/[\\\\/]/).pop();
+                const dirName = v.FilePath.substring(0, v.FilePath.lastIndexOf(v.FilePath.includes('/') ? '/' : '\\\\'));
+
+                container.innerHTML = `
+                    <div class="content-card">
+                        <div class="archive-badge">ARCHIVIERT</div>
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" onchange="updateBatchSelection()">
+                        </div>
+                        <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
+                            <img src="thumbnails/${v.thumb}" class="thumb" loading="lazy">
+                            <video class="preview-video" muted loop preload="none" 
+                                   data-src="http://localhost:${window.SERVER_PORT}/preview?name=${v.preview}">
+                            </video>
+                            <div class="quick-actions-overlay">
+                                <a href="http://localhost:${window.SERVER_PORT}/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Im Finder zeigen" onclick="event.stopPropagation()">
+                                    <span class="material-icons">visibility</span>
+                                </a>
+                                <div class="quick-action-btn" title="Wiedergeben" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
+                                    <span class="material-icons">play_arrow</span>
+                                </div>
+                                <div class="quick-action-btn hide-toggle-btn" title="Status ändern" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
+                                    <span class="material-icons">${v.hidden ? 'visibility' : 'visibility_off'}</span>
+                                </div>
+                                ${window.OPTIMIZER_AVAILABLE ? `
+                                <a href="http://localhost:${window.SERVER_PORT}/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
+                                    <span class="material-icons">bolt</span>
+                                </a>` : ''}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h2 class="file-name" title="${fileName}">${fileName}</h2>
+                            <p class="file-dir" title="${v.FilePath}">${dirName}</p>
+                            <div class="bitrate-track">
+                                <div class="bitrate-fill" style="width: ${barW}%"></div>
+                            </div>
+                            <div style="margin-top: 8px; font-size: 0.8rem; display: flex; justify-content: space-between;">
+                                <span>${v.Bitrate_Mbps.toFixed(1)} Mbps</span>
+                                <span style="color:#888;">${v.Size_MB.toFixed(0)} MB</span>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div style="display:flex; align-items:center;">
+                                <span class="badge ${v.Status}">${v.Status}</span>
+                                <span class="badge hevc">${isHevc ? 'HEVC' : (v.codec || 'UNK').toUpperCase()}</span>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <a href="http://localhost:${window.SERVER_PORT}/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">visibility</span></a>
+                                ${window.OPTIMIZER_AVAILABLE ? `
+                                <a href="http://localhost:${window.SERVER_PORT}/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn">
+                                    <span class="material-icons" style="font-size:18px;">bolt</span>
+                                </a>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return container;
+            }
+
+            // --- SCROLL OBSERVER ---
+            const sentinel = document.getElementById('loadingSentinel');
+            const scrollObserver = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting) {
+                    renderNextBatch();
+                }
+            }, { rootMargin: '400px' });
+            scrollObserver.observe(sentinel);
+
+            // --- ACTIONS ---
+            function toggleHidden(card) {
+                const path = card.getAttribute('data-path');
+                const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
+                if (!video) return;
+
+                video.hidden = !video.hidden;
+                fetch(`http://localhost:${window.SERVER_PORT}/hide?path=` + encodeURIComponent(path) + `&state=${video.hidden}`);
+                
+                // Update specific card UI instantly
+                const btn = card.querySelector('.hide-toggle-btn .material-icons');
+                btn.innerText = video.hidden ? 'visibility' : 'visibility_off';
+                
+                // Animate out if no longer matching workspace
+                const shouldHide = (workspaceMode === 'lobby' && video.hidden) || (workspaceMode === 'vault' && !video.hidden);
+                if (shouldHide) {
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.8)';
+                    setTimeout(() => filterAndSort(), 300);
+                }
+            }
+
             function handleMouseEnter(container) {
                 const video = container.querySelector('video');
                 container.hoverTimeout = setTimeout(() => {
@@ -113,13 +278,9 @@ CLIENT_JS = """
                     if (src && !video.getAttribute('src')) {
                         video.src = src;
                         video.load(); 
-                        video.play().catch(e => {
-                            console.log("Preview play blocked, retrying once", e);
-                            video.src = src;
-                            video.play();
-                        });
+                        video.play().catch(() => {});
                     }
-                }, 450); // Intent delay
+                }, 400);
             }
 
             function handleMouseLeave(container) {
@@ -130,43 +291,20 @@ CLIENT_JS = """
                 video.load();
             }
 
-            // --- LAZY RENDERING (Intersection Observer) ---
-            const observerOptions = { root: null, rootMargin: '200px', threshold: 0.1 };
-            const revealObserver = new IntersectionObserver((entries, observer) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const card = entry.target;
-                        card.style.opacity = "1";
-                        card.style.transform = "translateY(0)";
-                        observer.unobserve(card);
-                    }
-                });
-            }, observerOptions);
-
-            function initLazyLoading() {
-                document.querySelectorAll('.video-card-container').forEach(card => {
-                    card.style.opacity = "0";
-                    card.style.transform = "translateY(20px)";
-                    card.style.transition = "0.5s cubic-bezier(0.2, 1, 0.2, 1)";
-                    revealObserver.observe(card);
-                });
-            }
-
-            // --- CINEMA MODE ---
+            // --- CINEMA ---
             function openCinema(container) {
                 const card = container.closest('.video-card-container');
                 const path = card.getAttribute('data-path');
-                const name = card.querySelector('.file-name').innerText;
+                const fileName = path.split(/[\\\\/]/).pop();
+                
                 const modal = document.getElementById('cinemaModal');
                 const video = document.getElementById('cinemaVideo');
-                const title = document.getElementById('cinemaTitle');
+                document.getElementById('cinemaTitle').innerText = fileName;
 
-                title.innerText = name;
                 video.src = `http://localhost:${window.SERVER_PORT}/stream?path=` + encodeURIComponent(path);
                 modal.classList.add('active');
                 video.load();
-                video.play().catch(e => {
-                    console.log("Playback failed, trying muted", e);
+                video.play().catch(() => {
                     video.muted = true;
                     video.play();
                 });
@@ -179,28 +317,15 @@ CLIENT_JS = """
                 video.pause();
                 video.src = '';
             }
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCinema(); });
 
-            // Closes on Escape key or clicking outside the video
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') closeCinema();
-            });
-
-            document.getElementById('cinemaModal').addEventListener('click', (e) => {
-                if (e.target.id === 'cinemaModal') closeCinema();
-            });
-
-            // --- BATCH ACTIONS ---
+            // --- BATCH ---
             function updateBatchSelection() {
-                const selected = document.querySelectorAll('.video-card-container input:checked');
+                const count = document.querySelectorAll('.video-card-container input:checked').length;
                 const bar = document.getElementById('batchBar');
-                const count = document.getElementById('batchCount');
-                
-                count.innerText = selected.length;
-                if(selected.length > 0) {
-                    bar.classList.add('active');
-                } else {
-                    bar.classList.remove('active');
-                }
+                document.getElementById('batchCount').innerText = count;
+                if(count > 0) bar.classList.add('active');
+                else bar.classList.remove('active');
             }
 
             function clearSelection() {
@@ -214,39 +339,29 @@ CLIENT_JS = """
                 
                 fetch(`http://localhost:${window.SERVER_PORT}/batch_hide?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
                 
-                selected.forEach(i => {
-                    const card = i.closest('.video-card-container');
-                    card.setAttribute('data-hidden', state);
-                    const contradictions = (workspaceMode === 'lobby' && state) || (workspaceMode === 'vault' && !state);
-                    if (contradictions) {
-                        card.style.opacity = '0';
-                    }
+                paths.forEach(p => {
+                    const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
+                    if(v) v.hidden = state;
                 });
                 
-                setTimeout(() => {
-                    clearSelection();
-                    filterAndSort();
-                }, 300);
+                filterAndSort();
+                clearSelection();
             }
 
             function triggerBatchCompress() {
                 const selected = document.querySelectorAll('.video-card-container input:checked');
                 const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
-                
-                if(confirm(`Möchtest du ${paths.length} Videos nacheinander optimieren? Dies kann eine Weile dauern.`)) {
+                if(confirm(`Möchtest du ${paths.length} Videos nacheinander optimieren?`)) {
                     fetch(`http://localhost:${window.SERVER_PORT}/batch_compress?paths=` + encodeURIComponent(paths.join(',')));
-                    alert("Batch Optimierung wurde im Terminal gestartet!");
+                    alert("Batch Optimierung gestartet!");
                     clearSelection();
                 }
             }
 
-            // --- FOLDER EXPLORER LOGIC ---
+            // --- FOLDER SIDEBAR ---
             function toggleFolderSidebar() {
-                const sidebar = document.getElementById('folderSidebar');
-                sidebar.classList.toggle('active');
-                if (sidebar.classList.contains('active')) {
-                    renderFolderSidebar();
-                }
+                document.getElementById('folderSidebar').classList.toggle('active');
+                renderFolderSidebar();
             }
 
             function setFolderFilter(folder) {
@@ -255,22 +370,14 @@ CLIENT_JS = """
                 renderFolderSidebar();
             }
 
-            function formatSize(mb) {
-                if (mb > 1024) return (mb/1024).toFixed(1) + " GB";
-                return mb.toFixed(0) + " MB";
-            }
-
             function renderFolderSidebar() {
                 const list = document.getElementById('folderList');
+                if (!list.parentElement.classList.contains('active')) return;
+                
                 list.innerHTML = '';
-                
-                const folders = Object.keys(window.FOLDERS_DATA).sort((a, b) => {
-                    return window.FOLDERS_DATA[b].size_mb - window.FOLDERS_DATA[a].size_mb;
-                });
-                
+                const folders = Object.keys(window.FOLDERS_DATA).sort((a, b) => window.FOLDERS_DATA[b].size_mb - window.FOLDERS_DATA[a].size_mb);
                 const maxSize = Math.max(...Object.values(window.FOLDERS_DATA).map(f => f.size_mb));
 
-                // Add "All Folders" item
                 const allItem = document.createElement('div');
                 allItem.className = `folder-item ${currentFolder === 'all' ? 'active' : ''}`;
                 allItem.onclick = () => setFolderFilter('all');
@@ -284,7 +391,7 @@ CLIENT_JS = """
                     item.onclick = () => setFolderFilter(path);
                     
                     const relWidth = (data.size_mb / maxSize) * 100;
-                    const folderName = path.split('/').pop() || path;
+                    const folderName = path.split(/[\\\\/]/).pop() || path;
                     
                     item.innerHTML = `
                         <div class="folder-name" title="${path}">${folderName}</div>
@@ -298,64 +405,8 @@ CLIENT_JS = """
                 });
             }
 
-            function filterAndSort() {
-                const search = document.getElementById('searchBar').value.toLowerCase();
-                const grid = document.getElementById('videoGrid');
-                const cards = Array.from(grid.querySelectorAll('.video-card-container'));
-                let vCount = 0; let tSize = 0;
-
-                // Dynamic Sorting Engine
-                cards.sort((a, b) => {
-                    if (currentSort === 'bitrate') {
-                        return parseFloat(b.getAttribute('data-bitrate')) - parseFloat(a.getAttribute('data-bitrate'));
-                    } else if (currentSort === 'size') {
-                        return parseFloat(b.getAttribute('data-size')) - parseFloat(a.getAttribute('data-size'));
-                    } else if (currentSort === 'name') {
-                        const nameA = a.querySelector('.file-name').innerText.toLowerCase();
-                        const nameB = b.querySelector('.file-name').innerText.toLowerCase();
-                        return nameA.localeCompare(nameB);
-                    }
-                    return 0;
-                });
-
-                cards.forEach(card => {
-                    const text = card.innerText.toLowerCase();
-                    const status = card.getAttribute('data-status');
-                    const codec = card.getAttribute('data-codec');
-                    
-                    const matchesFilter = (currentFilter === 'all' || status === currentFilter);
-                    const matchesCodec = (currentCodec === 'all' || codec === currentCodec);
-                    const matchesSearch = text.includes(search);
-                    const isHidden = card.getAttribute('data-hidden') === 'true';
-                    const videoFolder = card.getAttribute('data-folder');
-                    
-                    const matchesFolder = (currentFolder === 'all' || videoFolder === currentFolder);
-                    
-                    let matchesWorkspace = true;
-                    if (workspaceMode === 'lobby') matchesWorkspace = !isHidden;
-                    else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
-                    
-                    const matches = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
-                    
-                    card.style.display = matches ? '' : 'none';
-                    if(matches) { vCount++; tSize += parseFloat(card.getAttribute('data-size')); }
-                    // Re-append to maintain sorted order in the DOM
-                    grid.appendChild(card);
-                });
-
-                document.getElementById('count-total').innerText = vCount;
-                if (tSize > 1024 * 1024) {
-                    document.getElementById('size-total').innerText = (tSize / (1024 * 1024)).toFixed(2) + " TB";
-                } else if (tSize > 1024) {
-                    document.getElementById('size-total').innerText = (tSize / 1024).toFixed(2) + " GB";
-                } else {
-                    document.getElementById('size-total').innerText = tSize.toFixed(0) + " MB";
-                }
-                
-                initLazyLoading();
-            }
+            // Init
             window.onload = () => {
                 filterAndSort();
-                renderFolderSidebar();
             };
 """

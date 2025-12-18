@@ -290,4 +290,6 @@ CSS_STYLES = """
             .folder-progress { height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; margin-top: 10px; overflow: hidden; }
             .folder-progress-fill { height: 100%; background: var(--pink); border-radius: 2px; transition: width 0.6s ease; }
             .folder-item.active .folder-progress-fill { background: var(--gold); }
+
+            @keyframes spin { 100% { transform: rotate(360deg); } }
 """
