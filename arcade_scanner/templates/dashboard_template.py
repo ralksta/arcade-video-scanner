@@ -1,5 +1,5 @@
 import os
-from arcade_scanner.app_config import HIDDEN_DATA_DIR, PORT, OPTIMIZER_SCRIPT
+from arcade_scanner.app_config import HIDDEN_DATA_DIR, PORT, OPTIMIZER_SCRIPT, OPTIMIZER_AVAILABLE
 from arcade_scanner.templates.styles import CSS_STYLES
 from arcade_scanner.templates.client_script import CLIENT_JS
 
@@ -128,9 +128,9 @@ def generate_html_report(results, report_file):
                                 <div class="quick-action-btn hide-toggle-btn" title="Als gesehen markieren" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
                                     <span class="material-icons">{"visibility_off" if not item.get("hidden") else "visibility"}</span>
                                 </div>
-                                <a href="http://localhost:{PORT}/compress?path={full_path}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
+                                {f'''<a href="http://localhost:{PORT}/compress?path={full_path}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
                                     <span class="material-icons">bolt</span>
-                                </a>
+                                </a>''' if OPTIMIZER_AVAILABLE else ""}
                             </div>
                         </div>
                         <div class="card-body">
@@ -151,9 +151,9 @@ def generate_html_report(results, report_file):
                             </div>
                             <div style="display:flex; gap:8px;">
                                 <a href="http://localhost:{PORT}/reveal?path={full_path}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">visibility</span></a>
-                                <a href="http://localhost:{PORT}/compress?path={full_path}" target="h_frame" class="btn {"done" if opt_exists else "opt"}">
+                                {f'''<a href="http://localhost:{PORT}/compress?path={full_path}" target="h_frame" class="btn {"done" if opt_exists else "opt"}">
                                     <span class="material-icons" style="font-size:18px;">{"check_circle" if opt_exists else "bolt"}</span>
-                                </a>
+                                </a>''' if OPTIMIZER_AVAILABLE else ""}
                             </div>
                         </div>
                     </div>
@@ -171,9 +171,9 @@ def generate_html_report(results, report_file):
         
         <div id="batchBar" class="selection-bar">
             <span><strong id="batchCount">0</strong> Videos ausgewählt</span>
-            <button class="filter-btn active" onclick="triggerBatchCompress()">
+            {f'''<button class="filter-btn active" onclick="triggerBatchCompress()">
                 <span class="material-icons">bolt</span> OPTIMIEREN
-            </button>
+            </button>''' if OPTIMIZER_AVAILABLE else ""}
             <button class="filter-btn" onclick="triggerBatchHide(true)" style="background:var(--deep-purple); border-color:var(--glass-border);">
                 <span class="material-icons">visibility_off</span> ALS GELESEN MARKIEREN
             </button>
