@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "C:\Users\Ralf\git\arcade-video-scanner\arcade_scanner\app_config.py", line 45, in load_local_config
+    print(f"\u2139\ufe0f  Loaded {len(lines)} paths from {os.path.relpath(p, PROJECT_ROOT)}")
+  File "C:\Users\Ralf\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-1: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Ralf\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "C:\Users\Ralf\AppData\Local\Programs\Python\Python310\lib\runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "C:\Users\Ralf\git\arcade-video-scanner\arcade_scanner\main.py", line 6, in <module>
+    from .app_config import SCAN_TARGETS, VIDEO_EXTENSIONS, EXCLUDE_PATHS, CACHE_FILE, REPORT_FILE, MIN_SIZE_MB
+  File "C:\Users\Ralf\git\arcade-video-scanner\arcade_scanner\app_config.py", line 51, in <module>
+    SCAN_TARGETS.extend(load_local_config("local_targets.txt"))
+  File "C:\Users\Ralf\git\arcade-video-scanner\arcade_scanner\app_config.py", line 48, in load_local_config
+    print(f"\u26a0\ufe0f  Warning: Could not read {p}: {e}")
+  File "C:\Users\Ralf\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-1: character maps to <undefined>

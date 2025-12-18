@@ -1,21 +1,22 @@
-# Arcade Video Scanner 4.8.1 (Customization Edition)
+# Arcade Video Scanner 4.9.0 (Customization Edition)
 
 A visual analysis tool designed to find large video files on your local disks. It provides a clear overview of which files are consuming the most storage based on file size, bitrate, and older codecs (like H.264), helping you identify candidates for optimization or archival.
 
-## 🚀 Version 4.8.1 Highlights
+## 🚀 Version 4.9.0 Highlights
+
+### ⚡ Smart UI & Performance Optimization
+- **Infinite Scrolling**: The dashboard now uses lazy loading to handle libraries with 2000+ videos without lag.
+- **Dynamic Action Buttons**: The "Optimize" buttons now automatically hide if the external optimization script is not found.
+- **Improved Feedback**: Better terminal logging for configuration loading and system status.
+
+### 🌐 Robust Network Management
+- **Auto-Port Detection**: The server intelligently finds the next available port if the default 8000 is occupied.
+- **Socket Resilience**: Implemented `SO_REUSEADDR` to prevent "Address already in use" errors during quick restarts.
 
 ### 🔒 Private Configuration
 - **Local Settings**: Support for `local_excludes.txt` and `local_targets.txt` in the `arcade_data/` directory.
 - **Git-Safe**: These files are ignored by Git, allowing for private scan paths and exclusion lists.
-- **Flexible Path Discovery**: The scanner now checks both the project root and the internal data folder for configuration.
-
-### ⚡ Smart UI Optimization
-- **Dynamic Action Buttons**: The "Optimize" buttons now automatically hide if the external optimization script is not found, ensuring a cleaner experience for open-source users.
-- **Improved Feedback**: Better terminal logging for configuration loading and system status.
-
-### 🌐 Smart Network Management
-- **Auto-Port Detection**: The server intelligently finds the next available port if the default 8000 is occupied.
-- **Socket Resilience**: Implemented `SO_REUSEADDR` to prevent "Address already in use" errors.
+- **BOM Support**: Improved handling for configuration files saved with UTF-8 BOM.
 
 ---
 

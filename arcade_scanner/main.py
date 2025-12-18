@@ -11,12 +11,12 @@ from .templates.dashboard_template import generate_html_report
 from .server.web_server import start_server
 
 def run_scanner(args_list=None):
-    parser = argparse.ArgumentParser(description="Arcade Video Scanner 4.8.1")
+    parser = argparse.ArgumentParser(description="Arcade Video Scanner 4.9.0")
     parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
     parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
     args, unknown = parser.parse_known_args(args_list)
 
-    print("--- Arcade Video Scanner 4.8.1 ---")
+    print("--- Arcade Video Scanner 4.9.0 ---")
     
     if args.rebuild:
         purge_media()
@@ -103,7 +103,7 @@ def run_scanner(args_list=None):
     generate_html_report(results, REPORT_FILE)
     
     # 6. Start Server
-    port = start_server()
+    server, port = start_server()
     
     # 7. Open Browser
     url = f"http://localhost:{port}/"
@@ -116,6 +116,9 @@ def run_scanner(args_list=None):
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nStopping server...")
+        server.shutdown()
+        server.server_close()
+        print("Server stopped. Goodbye!")
 
 if __name__ == "__main__":
     run_scanner()

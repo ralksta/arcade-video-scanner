@@ -1,1 +1,1 @@
-from .main import run_scanner
+# Arcade Video Scanner package
