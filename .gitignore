@@ -1,0 +1,26 @@
+# Arcade Video Scanner - Git Ignore
+
+# User Data (CRITICAL - DO NOT UPLOAD)
+# This directory contains your local thumbnails, previews, and video cache
+arcade_data/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# macOS system files
+.DS_Store
+
+# Logs
+*.log
+
+# Scripts (Local paths)
+*.sh
+*.zip
+!scan_videos_mit_shell.py

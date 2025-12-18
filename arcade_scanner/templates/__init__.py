@@ -1,0 +1,1 @@
+# Arcade Scanner Templates Package

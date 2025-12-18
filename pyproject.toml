@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arcade_scanner"
+version = "4.8.0"
+authors = [
+  { name="Ralksta", email="ralksta@users.noreply.github.com" },
+]
+description = "A professional-grade modular Arcade Video Scanner with a polished Web UI."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+arcade-scanner = "arcade_scanner.main:run_scanner"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["arcade_scanner*"]
