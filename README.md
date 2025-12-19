@@ -105,6 +105,8 @@ By default, several system and cloud-related directories are excluded to ensure 
 ### ⚙️ Configuration
 All settings can be configured through the **Settings UI** (gear icon in the dashboard) or by editing `arcade_data/settings.json` directly.
 
+> **Note**: The `arcade_data/` directory and `settings.json` are automatically created on first run with default values.
+
 **Settings include:**
 - Scan targets (directories to scan)
 - Custom exclusions (additional paths to skip)
@@ -112,7 +114,7 @@ All settings can be configured through the **Settings UI** (gear icon in the das
 - Minimum file size (MB)
 - Bitrate threshold (kbps)
 
-*Note: Changes require an application restart to take effect.*
+*Changes require an application restart to take effect.*
 
 ### Environment Variables
 - `ARCADE_OPTIMIZER_PATH`: Override the default path to the video optimizer script (default: `scripts/video_optimizer.py`).
