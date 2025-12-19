@@ -64,8 +64,16 @@ def run_scanner(args_list=None):
                         continue
 
     print(f"Found {len(video_files)} video files.")
-
-    if args.cleanup:
+    
+    # 2.1 Prune Cache (Remove entries for files that no longer exist)
+    stale_keys = [k for k in cache.keys() if k not in video_files and os.path.isabs(k)]
+    if stale_keys:
+        print(f"🧹 Pruning {len(stale_keys)} stale entries from cache...")
+        for k in stale_keys:
+            del cache[k]
+    
+    # Always cleanup orphans if anything was pruned or if requested
+    if args.cleanup or stale_keys:
         cleanup_orphans(video_files)
 
     # 3. Process Videos (Multi-threaded)
