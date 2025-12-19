@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [5.1.1] - 2025-12-19
+
+### Added
+- **Cinema Mode Enhancements**: Full-screen video player now includes action buttons for Favorite, Vault, Locate, and Optimize.
+- **Cinema Info Panel**: Technical details panel in cinema mode showing codec, bitrate, file size, and status.
+- **Select All Button**: New "Select All Visible" button in batch mode to quickly select all filtered videos.
+- **Cache Statistics**: Settings modal now displays cache size statistics (thumbnails, previews, and total).
+- **Enhanced Treemap Gradients**: Improved visual design with gradient colors for both folder and file views.
+
+### Changed
+- **Cleaner Console Output**: Removed verbose "Purging broken media" messages, now only shows when files are actually cleaned.
+- **Cinema Mode UX**: Favorite and Vault buttons now show visual feedback when already applied (reduced opacity).
+- **Settings Modal Width**: Increased max-width to 800px to accommodate cache statistics.
+
+### Fixed
+- **Cinema Mode State Sync**: Favorite/Vault actions in cinema mode now properly update the grid view without requiring reload.
+
 ## [5.1.0] - 2025-12-19
 
 ### Added

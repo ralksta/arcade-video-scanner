@@ -37,12 +37,30 @@ animate();
 
 // --- DEBOUNCED SEARCH ---
 let searchTimeout;
+// Basic debounce utility (assuming it's not globally available)
+function debounce(func, delay) {
+    let timeout;
+    return function (...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
+const debouncedSearch = debounce(() => {
+    searchTerm = document.getElementById('searchBar').value.toLowerCase();
+
+    // Show/hide Select All button based on search term
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.style.display = searchTerm ? '' : 'none';
+    }
+
+    filterAndSort();
+}, 300);
+
 function onSearchInput() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        searchTerm = document.getElementById('searchBar').value.toLowerCase();
-        filterAndSort();
-    }, 250);
+    debouncedSearch();
 }
 
 // --- UI LOGIC ---
@@ -477,10 +495,19 @@ function handleMouseLeave(container) {
 }
 
 // --- CINEMA ---
+// --- CINEMA (VIDEO PLAYER) ---
+let currentCinemaPath = null;
+let currentCinemaVideo = null;
+
 function openCinema(container) {
     const card = container.closest('.video-card-container');
     const path = card.getAttribute('data-path');
-    const fileName = path.split(/[\\\\/]/).pop();
+    const fileName = path.split(/[\\\/]/).pop();
+
+    currentCinemaPath = path; // Store for action buttons
+
+    // Find the video object from allVideos
+    currentCinemaVideo = window.ALL_VIDEOS.find(v => v.FilePath === path);
 
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
@@ -493,14 +520,165 @@ function openCinema(container) {
         video.muted = true;
         video.play();
     });
+
+    // Update button states
+    updateCinemaButtons();
+
+    // Populate info panel
+    updateCinemaInfo();
 }
 
 function closeCinema() {
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
+    const infoPanel = document.getElementById('cinemaInfoPanel');
     modal.classList.remove('active');
+    infoPanel.classList.remove('active');
     video.pause();
     video.src = '';
+    currentCinemaPath = null;
+    currentCinemaVideo = null;
+}
+
+function toggleCinemaInfo() {
+    const panel = document.getElementById('cinemaInfoPanel');
+    panel.classList.toggle('active');
+}
+
+function updateCinemaInfo() {
+    if (!currentCinemaVideo) {
+        console.log('No currentCinemaVideo set');
+        return;
+    }
+
+    const v = currentCinemaVideo;
+    const content = document.getElementById('cinemaInfoContent');
+
+    if (!content) {
+        console.log('cinemaInfoContent element not found');
+        return;
+    }
+
+    console.log('Updating cinema info for:', v.FilePath);
+
+    // Format duration
+    const formatDuration = (seconds) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+    };
+
+    // Format file size
+    const formatSize = (mb) => {
+        return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(2)} MB`;
+    };
+
+    content.innerHTML = `
+        <div class="info-row">
+            <span class="info-label">Resolution</span>
+            <span class="info-value">${v.Width} × ${v.Height}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Duration</span>
+            <span class="info-value">${formatDuration(v.Duration)}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Frame Rate</span>
+            <span class="info-value">${v.FrameRate} fps</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Codec</span>
+            <span class="info-value">${v.Codec}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Bitrate</span>
+            <span class="info-value">${v.Bitrate.toLocaleString()} kbps</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">File Size</span>
+            <span class="info-value">${formatSize(v.SizeMB)}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Status</span>
+            <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
+        </div>
+    `;
+
+    console.log('Cinema info updated successfully');
+}
+
+function updateCinemaButtons() {
+    if (!currentCinemaVideo) return;
+
+    // Update Favorite button
+    const favBtn = document.querySelector('.cinema-action-btn[onclick="cinemaFavorite()"]');
+    if (favBtn) {
+        if (currentCinemaVideo.favorite) {
+            favBtn.style.opacity = '0.6';
+            favBtn.title = 'Already a Favorite';
+        } else {
+            favBtn.style.opacity = '1';
+            favBtn.title = 'Add to Favorites';
+        }
+    }
+
+    // Update Vault button
+    const vaultBtn = document.querySelector('.cinema-action-btn[onclick="cinemaVault()"]');
+    if (vaultBtn) {
+        if (currentCinemaVideo.hidden) {
+            vaultBtn.style.opacity = '0.6';
+            vaultBtn.title = 'Already in Vault';
+        } else {
+            vaultBtn.style.opacity = '1';
+            vaultBtn.title = 'Move to Vault';
+        }
+    }
+}
+
+function cinemaFavorite() {
+    if (!currentCinemaPath || !currentCinemaVideo) return;
+
+    // Toggle favorite state
+    const newState = !currentCinemaVideo.favorite;
+
+    fetch(`http://localhost:${window.SERVER_PORT}/favorite?path=` + encodeURIComponent(currentCinemaPath) + `&state=${newState}`)
+        .then(() => {
+            // Update local video object
+            currentCinemaVideo.favorite = newState;
+
+            // Update in ALL_VIDEOS array
+            const videoInArray = window.ALL_VIDEOS.find(v => v.FilePath === currentCinemaPath);
+            if (videoInArray) {
+                videoInArray.favorite = newState;
+            }
+
+            // Update button appearance
+            updateCinemaButtons();
+
+            // Re-filter and re-render the grid (this updates the favorites view)
+            filterAndSort();
+        });
+}
+
+function cinemaVault() {
+    if (!currentCinemaPath) return;
+
+    fetch(`http://localhost:${window.SERVER_PORT}/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`)
+        .then(() => {
+            closeCinema();
+            location.reload(); // Refresh to update UI
+        });
+}
+
+function cinemaLocate() {
+    if (!currentCinemaPath) return;
+    window.open(`http://localhost:${window.SERVER_PORT}/open_folder?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
+}
+
+function cinemaOptimize() {
+    if (!currentCinemaPath) return;
+    window.open(`http://localhost:${window.SERVER_PORT}/compress?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
 }
 // ESC handler moved to setupTreemapInteraction section
 
@@ -515,6 +693,18 @@ function updateBatchSelection() {
 
 function clearSelection() {
     document.querySelectorAll('.video-card-container input:checked').forEach(i => i.checked = false);
+    updateBatchSelection();
+}
+
+function selectAllVisible() {
+    // Select all videos in the current filtered list
+    filteredVideos.forEach(video => {
+        const container = document.querySelector(`.video-card-container[data-path="${CSS.escape(video.FilePath)}"]`);
+        if (container) {
+            const checkbox = container.querySelector('input[type="checkbox"]');
+            if (checkbox) checkbox.checked = true;
+        }
+    });
     updateBatchSelection();
 }
 
@@ -688,15 +878,24 @@ function renderFolderView(ctx, canvas) {
     // Sort and layout
     const blocks = squarify(folderData, 0, 0, canvas.width, canvas.height);
 
-    // Folder color palette
-    const folderColors = [
-        '#581c87', '#1e3a8a', '#7f1d1d', '#14532d', '#78350f', '#374151'
+    // Folder color gradients - darker tones to complement video gradients
+    const folderGradients = [
+        ['#4c1d95', '#6b21a8'], // Deep purple
+        ['#1e3a8a', '#3b82f6'], // Deep to bright blue
+        ['#7c2d12', '#dc2626'], // Brown to red
+        ['#14532d', '#16a34a'], // Dark to bright green
+        ['#78350f', '#d97706'], // Brown to amber
+        ['#1f2937', '#4b5563']  // Dark gray to gray
     ];
 
     // Render folder blocks
     blocks.forEach((block, idx) => {
-        // Base folder color
-        ctx.fillStyle = folderColors[idx % folderColors.length];
+        // Base folder gradient
+        const colors = folderGradients[idx % folderGradients.length];
+        const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y + block.height);
+        gradient.addColorStop(0, colors[0]);
+        gradient.addColorStop(1, colors[1]);
+        ctx.fillStyle = gradient;
         ctx.fillRect(block.x, block.y, block.width, block.height);
 
         // Status indicator bar at bottom (proportional HIGH vs OK)
@@ -705,12 +904,18 @@ function renderFolderView(ctx, canvas) {
             const highRatio = block.highCount / block.count;
             const highWidth = block.width * highRatio;
 
-            // Orange for HIGH
-            ctx.fillStyle = '#f59e0b';
+            // Gold gradient for HIGH
+            const highGradient = ctx.createLinearGradient(block.x, block.y + block.height - barHeight, block.x + highWidth, block.y + block.height);
+            highGradient.addColorStop(0, '#E3A857');
+            highGradient.addColorStop(1, '#E0D5A3');
+            ctx.fillStyle = highGradient;
             ctx.fillRect(block.x, block.y + block.height - barHeight, highWidth, barHeight);
 
-            // Green for OK
-            ctx.fillStyle = '#10b981';
+            // Olive-khaki gradient for OK
+            const okGradient = ctx.createLinearGradient(block.x + highWidth, block.y + block.height - barHeight, block.x + block.width, block.y + block.height);
+            okGradient.addColorStop(0, '#568203');
+            okGradient.addColorStop(1, '#F0E68C');
+            ctx.fillStyle = okGradient;
             ctx.fillRect(block.x + highWidth, block.y + block.height - barHeight, block.width - highWidth, barHeight);
         }
 
@@ -801,8 +1006,18 @@ function renderFileView(ctx, canvas, folderPath) {
     blocks.forEach(block => {
         const video = block.video;
 
-        // Flat color by status
-        ctx.fillStyle = video.Status === 'HIGH' ? '#f59e0b' : '#10b981';
+        // Color by status - gradient for HIGH, flat for OK
+        if (video.Status === 'HIGH') {
+            const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y + block.height);
+            gradient.addColorStop(0, '#E3A857');
+            gradient.addColorStop(1, '#E0D5A3');
+            ctx.fillStyle = gradient;
+        } else {
+            const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y);
+            gradient.addColorStop(0, '#568203');
+            gradient.addColorStop(1, '#F0E68C');
+            ctx.fillStyle = gradient;
+        }
         ctx.fillRect(block.x, block.y, block.width, block.height);
 
         // Border
@@ -1092,6 +1307,14 @@ async function openSettings() {
             `;
             container.appendChild(item);
         });
+
+        // Fetch cache statistics
+        const statsResponse = await fetch('/api/cache-stats');
+        const stats = await statsResponse.json();
+
+        document.getElementById('statThumbnails').textContent = `${stats.thumbnails_mb} MB`;
+        document.getElementById('statPreviews').textContent = `${stats.previews_mb} MB`;
+        document.getElementById('statTotal').textContent = `${stats.total_mb} MB`;
     } catch (e) {
         console.error('Failed to load settings:', e);
     }

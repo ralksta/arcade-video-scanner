@@ -89,7 +89,6 @@ def purge_previews():
 
 def purge_broken_media():
     """Removes media files that are 0 bytes or corrupted."""
-    print("🧹 Purging broken media (0-byte files)...")
     removed_count = 0
     targets = [
         (THUMB_DIR, "thumb_", ".jpg"),
@@ -106,7 +105,8 @@ def purge_broken_media():
                             removed_count += 1
                         except:
                             pass
-    print(f"✅ Broken media purge complete. Removed {removed_count} files.")
+    if removed_count > 0:
+        print(f"🧹 Cleaned up {removed_count} failed media generation(s)")
 
 def cleanup_orphans(video_files: List[str]):
     """Removes orphan media files with strict safety checks."""

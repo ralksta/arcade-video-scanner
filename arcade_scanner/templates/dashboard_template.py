@@ -47,6 +47,10 @@ def generate_html_report(results, report_file):
             <div class="container controls">
                 <input type="text" id="searchBar" placeholder="Suchen..." oninput="onSearchInput()">
                 
+                <button class="filter-btn" id="selectAllBtn" onclick="selectAllVisible()" title="Alle auswählen" style="display:none;">
+                    <span class="material-icons">done_all</span>
+                </button>
+                
                 <div style="flex-shrink:0; height:24px; width:1px; background:rgba(255,255,255,0.1); margin:0 8px;"></div>
                 
                 <select id="statusSelect" onchange="setFilter(this.value)">
@@ -130,7 +134,39 @@ def generate_html_report(results, report_file):
         <div id="cinemaModal">
             <span class="cinema-close" onclick="closeCinema()">&times;</span>
             <span id="cinemaTitle" class="cinema-title">MOVIE PLAYER</span>
+            
             <video id="cinemaVideo" controls preload="metadata"></video>
+            
+            <div id="cinemaInfoPanel" class="cinema-info-panel">
+                <div class="info-header">
+                    <span class="material-icons">info</span>
+                    <span>Technical Details</span>
+                </div>
+                <div id="cinemaInfoContent" class="info-content"></div>
+            </div>
+            
+            <div class="cinema-actions">
+                <button class="cinema-action-btn" onclick="toggleCinemaInfo()" title="Technical Details">
+                    <span class="material-icons">info</span>
+                    <span>INFO</span>
+                </button>
+                <button class="cinema-action-btn" onclick="cinemaFavorite()" title="Add to Favorites" style="background:var(--gold); color:#000; border-color:var(--gold);">
+                    <span class="material-icons">star</span>
+                    <span>FAVORITE</span>
+                </button>
+                <button class="cinema-action-btn" onclick="cinemaVault()" title="Move to Vault">
+                    <span class="material-icons">archive</span>
+                    <span>VAULT</span>
+                </button>
+                <button class="cinema-action-btn" onclick="cinemaLocate()" title="Locate in Filesystem">
+                    <span class="material-icons">folder_special</span>
+                    <span>LOCATE</span>
+                </button>
+                {f'''<button class="cinema-action-btn" onclick="cinemaOptimize()" title="Optimize Video">
+                    <span class="material-icons">bolt</span>
+                    <span>OPTIMIZE</span>
+                </button>''' if OPTIMIZER_AVAILABLE else ""}
+            </div>
         </div>
         
         <div id="batchBar" class="selection-bar">
@@ -182,6 +218,33 @@ def generate_html_report(results, report_file):
                         <div>
                             <label>Bitrate-Schwellwert (kbps)</label>
                             <input type="number" id="settingsBitrate" min="1000" value="15000">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <label>💾 Cache-Statistiken</label>
+                        <div class="cache-stats">
+                            <div class="stat-item">
+                                <span class="material-icons">image</span>
+                                <div class="stat-info">
+                                    <div class="stat-label">Thumbnails</div>
+                                    <div class="stat-value" id="statThumbnails">Laden...</div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <span class="material-icons">movie</span>
+                                <div class="stat-info">
+                                    <div class="stat-label">Preview Clips</div>
+                                    <div class="stat-value" id="statPreviews">Laden...</div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <span class="material-icons">storage</span>
+                                <div class="stat-info">
+                                    <div class="stat-label">Gesamt Cache</div>
+                                    <div class="stat-value" id="statTotal">Laden...</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
