@@ -209,6 +209,34 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(response).encode("utf-8"))
+            elif self.path == "/api/cache-stats":
+                # Calculate cache sizes
+                def get_dir_size(path):
+                    total = 0
+                    try:
+                        for entry in os.scandir(path):
+                            if entry.is_file():
+                                total += entry.stat().st_size
+                            elif entry.is_dir():
+                                total += get_dir_size(entry.path)
+                    except:
+                        pass
+                    return total
+                
+                thumb_size = get_dir_size(THUMB_DIR) / (1024 * 1024)  # MB
+                preview_size = get_dir_size(PREVIEW_DIR) / (1024 * 1024)  # MB
+                total_size = thumb_size + preview_size
+                
+                stats = {
+                    "thumbnails_mb": round(thumb_size, 2),
+                    "previews_mb": round(preview_size, 2),
+                    "total_mb": round(total_size, 2)
+                }
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(stats).encode("utf-8"))
             else:
                 # 404 for anything else
                 self.send_error(404)
