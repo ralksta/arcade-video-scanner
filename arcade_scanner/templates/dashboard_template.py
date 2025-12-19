@@ -49,9 +49,11 @@ def generate_html_report(results, report_file):
                 
                 <div style="flex-shrink:0; height:24px; width:1px; background:rgba(255,255,255,0.1); margin:0 8px;"></div>
                 
-                <button class="filter-btn active" id="f-all" onclick="setFilter('all')">ALL</button>
-                <button class="filter-btn" id="f-HIGH" onclick="setFilter('HIGH')">🚨 HIGH BITRATE</button>
-                <button class="filter-btn" id="f-OK" onclick="setFilter('OK')">✅ OPTIMIZED</button>
+                <select id="statusSelect" onchange="setFilter(this.value)">
+                    <option value="all">ALL VIDEOS</option>
+                    <option value="HIGH">🚨 HIGH BITRATE</option>
+                    <option value="OK">✅ OPTIMIZED</option>
+                </select>
                 
                 <select id="codecSelect" onchange="setCodecFilter(this.value)">
                     <option value="all">ALLE CODECS</option>
@@ -89,6 +91,22 @@ def generate_html_report(results, report_file):
             </div>
         </div>
 
+        <div id="treemapLegend" class="treemap-legend" style="display: none;">
+            <div class="container">
+                <div class="legend-content">
+                    <button id="treemapBackBtn" class="filter-btn" onclick="treemapZoomOut()" style="display: none; margin-right: 12px;">
+                        <span class="material-icons">arrow_back</span> ZURÜCK
+                    </button>
+                    <span class="legend-title">SPEICHER TREEMAP</span>
+                    <div class="legend-items">
+                        <span class="legend-item"><span class="legend-color high"></span> HIGH BITRATE</span>
+                        <span class="legend-item"><span class="legend-color ok"></span> OPTIMIZED</span>
+                    </div>
+                    <span class="legend-hint">Klicken zum Abspielen • Hover für Details</span>
+                </div>
+            </div>
+        </div>
+
         <div id="folderSidebar" class="folder-sidebar">
             <div class="sidebar-header">
                 <h3>ORDNER</h3>
@@ -99,6 +117,7 @@ def generate_html_report(results, report_file):
 
         <div class="container">
             <div id="videoGrid"></div>
+            <div id="treemapContainer" style="display: none;"></div>
             <div id="loadingSentinel" style="height: 100px; display: flex; align-items: center; justify-content: center; opacity: 0;">
                  <span class="material-icons" style="animation: spin 1s linear infinite;">refresh</span>
             </div>
@@ -134,6 +153,7 @@ def generate_html_report(results, report_file):
             window.ALL_VIDEOS = {all_videos_json};
             window.OPTIMIZER_AVAILABLE = {'true' if OPTIMIZER_AVAILABLE else 'false'};
         </script>
+        <script src="/static/treemap_layout.js"></script>
         <script src="/static/client.js"></script>
     </body>
     </html>"""

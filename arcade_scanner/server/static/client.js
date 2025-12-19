@@ -1,7 +1,7 @@
 let currentFilter = 'all';
 let currentCodec = 'all';
 let currentSort = 'bitrate';
-let currentLayout = 'grid'; // grid or list
+let currentLayout = 'grid'; // grid, list, or treemap
 let workspaceMode = 'lobby'; // lobby, mixed, vault
 let currentFolder = 'all';
 let searchTerm = '';
@@ -48,8 +48,7 @@ function onSearchInput() {
 // --- UI LOGIC ---
 function setFilter(f) {
     currentFilter = f;
-    document.querySelectorAll('[id^="f-"]').forEach(b => b.classList.remove('active'));
-    document.getElementById('f-' + f).classList.add('active');
+    // Reset codec filter when showing all videos
     if (f === 'all') {
         currentCodec = 'all';
         document.getElementById('codecSelect').value = 'all';
@@ -77,19 +76,75 @@ function setWorkspaceMode(mode) {
 }
 
 function toggleLayout() {
-    currentLayout = currentLayout === 'grid' ? 'list' : 'grid';
-    const grid = document.getElementById('videoGrid');
-    const btn = document.getElementById('toggleView');
+    const modes = ['grid', 'list', 'treemap'];
+    const icons = {
+        grid: 'view_list',      // Shows what's NEXT
+        list: 'dashboard',      // Shows what's NEXT  
+        treemap: 'view_module'  // Shows what's NEXT
+    };
 
-    if (currentLayout === 'list') {
-        grid.classList.add('list-view');
-        btn.innerHTML = '<span class="material-icons">view_module</span>';
+    const currentIndex = modes.indexOf(currentLayout);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    const nextMode = modes[nextIndex];
+
+    setLayout(nextMode);
+
+    // Update button icon to show what's next
+    const btn = document.getElementById('toggleView');
+    btn.innerHTML = `<span class="material-icons">${icons[nextMode]}</span>`;
+}
+
+function setLayout(layout) {
+    currentLayout = layout;
+
+    const grid = document.getElementById('videoGrid');
+    const treemap = document.getElementById('treemapContainer');
+    const sentinel = document.getElementById('loadingSentinel');
+    const batchBar = document.getElementById('batchBar');
+    const workspaceBar = document.querySelector('.workspace-bar');
+    const treemapLegend = document.getElementById('treemapLegend');
+
+    if (layout === 'treemap') {
+        grid.style.display = 'none';
+        sentinel.style.display = 'none';
+        treemap.style.display = 'block';
+
+        // Hide batch bar in treemap view (no checkboxes available)
+        if (batchBar) {
+            batchBar.style.display = 'none';
+        }
+
+        // Hide workspace bar, show treemap legend
+        if (workspaceBar) workspaceBar.style.display = 'none';
+        if (treemapLegend) treemapLegend.style.display = 'block';
+
+        renderTreemap();
+        setupTreemapInteraction();
     } else {
-        grid.classList.remove('list-view');
-        btn.innerHTML = '<span class="material-icons">view_list</span>';
+        grid.style.display = layout === 'list' ? 'flex' : 'grid';
+        sentinel.style.display = 'flex';
+        treemap.style.display = 'none';
+
+        // Reset treemap drill-down state
+        treemapCurrentFolder = null;
+
+        // Restore batch bar display (will show if items are selected)
+        if (batchBar) {
+            batchBar.style.display = '';
+        }
+
+        // Show workspace bar, hide treemap legend
+        if (workspaceBar) workspaceBar.style.display = '';
+        if (treemapLegend) treemapLegend.style.display = 'none';
+
+        if (layout === 'list') {
+            grid.classList.add('list-view');
+        } else {
+            grid.classList.remove('list-view');
+        }
+
+        renderUI(false);
     }
-    // Re-render current set to apply layout classes
-    renderUI(false);
 }
 
 // --- PERFORMANCE ENGINE: FILTER & SORT ---
@@ -388,7 +443,7 @@ function closeCinema() {
     video.pause();
     video.src = '';
 }
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCinema(); });
+// ESC handler moved to setupTreemapInteraction section
 
 // --- BATCH ---
 function updateBatchSelection() {
@@ -494,7 +549,404 @@ function resetDashboard() {
     renderFolderSidebar(); // This will refresh the folder list UI
 }
 
+// --- TREEMAP VISUALIZATION ---
+// State for drill-down navigation
+let treemapCurrentFolder = null; // null = show all folders, string = show files in that folder
+
+function renderTreemap() {
+    const container = document.getElementById('treemapContainer');
+    if (!container) return;
+
+    // Create or get canvas
+    let canvas = document.getElementById('treemapCanvas');
+    if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'treemapCanvas';
+        container.appendChild(canvas);
+    }
+
+    const ctx = canvas.getContext('2d');
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (filteredVideos.length === 0) {
+        ctx.fillStyle = '#666';
+        ctx.font = '20px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Keine Videos gefunden', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Update legend to show current path
+    updateTreemapLegend();
+
+    if (treemapCurrentFolder === null) {
+        // FOLDER-ONLY VIEW: Show only folder blocks
+        renderFolderView(ctx, canvas);
+    } else {
+        // DRILLED-DOWN VIEW: Show files in selected folder
+        renderFileView(ctx, canvas, treemapCurrentFolder);
+    }
+}
+
+function renderFolderView(ctx, canvas) {
+    // Group videos by folder
+    const folderMap = new Map();
+    filteredVideos.forEach(v => {
+        const path = v.FilePath;
+        const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
+
+        if (!folderMap.has(folder)) {
+            folderMap.set(folder, { items: [], totalSize: 0, highCount: 0, okCount: 0 });
+        }
+        const f = folderMap.get(folder);
+        f.items.push(v);
+        f.totalSize += v.Size_MB;
+        if (v.Status === 'HIGH') f.highCount++;
+        else f.okCount++;
+    });
+
+    // Create folder data for squarify
+    const folderData = [];
+    folderMap.forEach((value, key) => {
+        const parts = key.split(/[\\/]/);
+        const shortName = parts[parts.length - 1] || 'Root';
+        folderData.push({
+            folder: key,
+            shortName: shortName,
+            size: value.totalSize,
+            count: value.items.length,
+            highCount: value.highCount,
+            okCount: value.okCount
+        });
+    });
+
+    // Sort and layout
+    const blocks = squarify(folderData, 0, 0, canvas.width, canvas.height);
+
+    // Folder color palette
+    const folderColors = [
+        '#581c87', '#1e3a8a', '#7f1d1d', '#14532d', '#78350f', '#374151'
+    ];
+
+    // Render folder blocks
+    blocks.forEach((block, idx) => {
+        // Base folder color
+        ctx.fillStyle = folderColors[idx % folderColors.length];
+        ctx.fillRect(block.x, block.y, block.width, block.height);
+
+        // Status indicator bar at bottom (proportional HIGH vs OK)
+        const barHeight = Math.min(8, block.height * 0.1);
+        if (block.height > 30) {
+            const highRatio = block.highCount / block.count;
+            const highWidth = block.width * highRatio;
+
+            // Orange for HIGH
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(block.x, block.y + block.height - barHeight, highWidth, barHeight);
+
+            // Green for OK
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(block.x + highWidth, block.y + block.height - barHeight, block.width - highWidth, barHeight);
+        }
+
+        // Border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(block.x, block.y, block.width, block.height);
+
+        // Labels
+        if (block.width > 60 && block.height > 40) {
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const centerX = block.x + block.width / 2;
+            const centerY = block.y + block.height / 2 - 8;
+
+            // Folder name
+            ctx.font = 'bold 13px Inter, sans-serif';
+
+            const maxChars = Math.floor(block.width / 8);
+            let displayName = block.shortName;
+            if (displayName.length > maxChars && maxChars > 3) {
+                displayName = displayName.substring(0, maxChars - 3) + '...';
+            }
+            ctx.fillText(displayName, centerX, centerY);
+
+            // Count and size
+            ctx.font = '11px Inter, sans-serif';
+            ctx.fillStyle = '#ccc';
+            const sizeText = block.size > 1024
+                ? `${(block.size / 1024).toFixed(1)} GB`
+                : `${block.size.toFixed(0)} MB`;
+            ctx.fillText(`${block.count} Videos • ${sizeText}`, centerX, centerY + 18);
+        }
+    });
+
+    // Store for interaction
+    canvas.treemapBlocks = blocks;
+    canvas.treemapMode = 'folders';
+}
+
+function renderFileView(ctx, canvas, folderPath) {
+    // Get videos in this folder
+    const videosInFolder = filteredVideos.filter(v => {
+        const path = v.FilePath;
+        const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
+        return folder === folderPath;
+    });
+
+    if (videosInFolder.length === 0) {
+        treemapCurrentFolder = null;
+        renderTreemap();
+        return;
+    }
+
+    // Prepare data
+    const treemapData = videosInFolder.map(v => ({
+        video: v,
+        size: v.Size_MB,
+        name: v.FilePath.split(/[\\/]/).pop()
+    }));
+
+    // Layout
+    const blocks = squarify(treemapData, 0, 0, canvas.width, canvas.height);
+
+    // Render video tiles with FLAT colors (no gradients)
+    blocks.forEach(block => {
+        const video = block.video;
+
+        // Flat color by status
+        ctx.fillStyle = video.Status === 'HIGH' ? '#f59e0b' : '#10b981';
+        ctx.fillRect(block.x, block.y, block.width, block.height);
+
+        // Border
+        ctx.strokeStyle = '#1f2937';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(block.x, block.y, block.width, block.height);
+
+        // Labels
+        if (block.width > 80 && block.height > 50) {
+            // Use dark text on bright backgrounds (HIGH/yellow), white on dark (OK/green)
+            ctx.fillStyle = video.Status === 'HIGH' ? '#000' : '#fff';
+
+            // Dynamic font size based on tile dimensions - larger tiles get bigger text
+            const minDim = Math.min(block.width, block.height);
+            const titleFontSize = Math.max(14, Math.min(32, minDim / 4));
+            const subFontSize = Math.max(11, Math.min(22, minDim / 6));
+
+            ctx.font = `600 ${titleFontSize}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const centerX = block.x + block.width / 2;
+            const centerY = block.y + block.height / 2;
+
+            // Calculate max chars based on tile width and font size
+            const charWidth = titleFontSize * 0.55;
+            const maxChars = Math.floor((block.width - 20) / charWidth);
+            const displayName = block.name.length > maxChars
+                ? block.name.substring(0, maxChars - 3) + '...'
+                : block.name;
+
+            ctx.fillText(displayName, centerX, centerY - titleFontSize * 0.6);
+            ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+            ctx.fillStyle = video.Status === 'HIGH' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)';
+            ctx.fillText(`${video.Size_MB.toFixed(0)} MB`, centerX, centerY + subFontSize * 0.8);
+        }
+    });
+
+    // Store for interaction
+    canvas.treemapBlocks = blocks;
+    canvas.treemapMode = 'files';
+}
+
+function updateTreemapLegend() {
+    const legend = document.getElementById('treemapLegend');
+    if (!legend) return;
+
+    const titleEl = legend.querySelector('.legend-title');
+    const hintEl = legend.querySelector('.legend-hint');
+    const backBtn = document.getElementById('treemapBackBtn');
+
+    if (treemapCurrentFolder === null) {
+        titleEl.textContent = 'SPEICHER TREEMAP';
+        hintEl.textContent = 'Klicken zum Reinzoomen';
+        if (backBtn) backBtn.style.display = 'none';
+    } else {
+        const parts = treemapCurrentFolder.split(/[\\/]/);
+        const shortName = parts[parts.length - 1] || 'Root';
+        // Count videos in this folder
+        const count = filteredVideos.filter(v => {
+            const path = v.FilePath;
+            const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+            const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
+            return folder === treemapCurrentFolder;
+        }).length;
+        titleEl.innerHTML = `📁 ${shortName} <span style="opacity:0.6; font-size:0.85em;">(${count} Videos)</span>`;
+        hintEl.textContent = 'Klicken zum Abspielen';
+        if (backBtn) backBtn.style.display = 'inline-flex';
+    }
+}
+
+function treemapZoomOut() {
+    treemapCurrentFolder = null;
+    renderTreemap();
+}
+
+function setupTreemapInteraction() {
+    const canvas = document.getElementById('treemapCanvas');
+    if (!canvas || canvas.hasTreemapListeners) return;
+
+    // Create tooltip if it doesn't exist
+    let tooltip = document.getElementById('treemapTooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'treemapTooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const block = canvas.treemapBlocks?.find(b =>
+            x >= b.x && x <= b.x + b.width &&
+            y >= b.y && y <= b.y + b.height
+        );
+
+        if (block) {
+            canvas.style.cursor = 'pointer';
+            tooltip.style.opacity = '1';
+            tooltip.style.left = e.clientX + 15 + 'px';
+            tooltip.style.top = e.clientY + 15 + 'px';
+
+            if (canvas.treemapMode === 'folders') {
+                // Folder tooltip
+                const sizeText = block.size > 1024
+                    ? `${(block.size / 1024).toFixed(1)} GB`
+                    : `${block.size.toFixed(0)} MB`;
+                tooltip.innerHTML = `
+                    <strong>📁 ${block.shortName}</strong>
+                    Videos: ${block.count}<br>
+                    Größe: ${sizeText}<br>
+                    HIGH: ${block.highCount} • OK: ${block.okCount}
+                `;
+            } else {
+                // File tooltip with thumbnail
+                const video = block.video;
+                const thumbUrl = `thumbnails/${video.thumb}`;
+                const isHevc = (video.codec || '').includes('hevc') || (video.codec || '').includes('h265');
+                tooltip.innerHTML = `
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <img src="${thumbUrl}" style="width: 120px; height: 68px; object-fit: cover; border-radius: 4px; background: #333;" onerror="this.style.display='none'">
+                        <div>
+                            <strong style="display: block; margin-bottom: 6px;">${block.name}</strong>
+                            Größe: ${video.Size_MB.toFixed(1)} MB<br>
+                            Bitrate: ${video.Bitrate_Mbps.toFixed(1)} Mbps<br>
+                            Codec: ${isHevc ? 'HEVC' : (video.codec || 'Unknown').toUpperCase()}<br>
+                            Status: <span style="color: ${video.Status === 'HIGH' ? '#f59e0b' : '#10b981'}">${video.Status}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        } else {
+            canvas.style.cursor = 'default';
+            tooltip.style.opacity = '0';
+        }
+    });
+
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const block = canvas.treemapBlocks?.find(b =>
+            x >= b.x && x <= b.x + b.width &&
+            y >= b.y && y <= b.y + b.height
+        );
+
+        if (block) {
+            if (canvas.treemapMode === 'folders') {
+                // Drill down into folder
+                treemapCurrentFolder = block.folder;
+                renderTreemap();
+            } else {
+                // Open cinema for file
+                const mockContainer = {
+                    closest: () => ({
+                        getAttribute: () => block.video.FilePath
+                    })
+                };
+                openCinema(mockContainer);
+            }
+        }
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = '0';
+    });
+
+    canvas.hasTreemapListeners = true;
+
+    // Add legend click handler for zoom out
+    const legend = document.getElementById('treemapLegend');
+    if (legend && !legend.hasClickListener) {
+        legend.style.cursor = 'pointer';
+        legend.addEventListener('click', () => {
+            if (treemapCurrentFolder !== null) {
+                treemapZoomOut();
+            }
+        });
+        legend.hasClickListener = true;
+    }
+}
+
+// ESC key handler for treemap zoom out
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (currentLayout === 'treemap' && treemapCurrentFolder !== null) {
+            e.preventDefault();
+            treemapZoomOut();
+        } else {
+            closeCinema();
+        }
+    }
+});
+
+// Debounced resize handler for treemap
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        if (currentLayout === 'treemap') {
+            renderTreemap();
+        } else {
+            renderUI(true);
+        }
+    }, 250);
+});
+
 // Init
 window.onload = () => {
     filterAndSort();
+
+    // Add double-click handler to stats display for quick treemap access
+    const statsDisplay = document.querySelector('.stats-display');
+    if (statsDisplay) {
+        statsDisplay.addEventListener('dblclick', () => {
+            setLayout('treemap');
+            // Update toggle button icon
+            const btn = document.getElementById('toggleView');
+            btn.innerHTML = '<span class="material-icons">view_module</span>';
+        });
+    }
 };

@@ -279,6 +279,7 @@ body {
     box-shadow: 0 0 15px rgba(244, 179, 66, 0.3);
 }
 
+#statusSelect,
 #codecSelect,
 #sortSelect {
     background: rgba(255, 255, 255, 0.03);
@@ -297,6 +298,7 @@ body {
     letter-spacing: 1px;
 }
 
+#statusSelect:hover,
 #codecSelect:hover,
 #sortSelect:hover {
     background: rgba(255, 255, 255, 0.08);
@@ -892,4 +894,132 @@ body {
     100% {
         transform: rotate(360deg);
     }
+}
+
+/* --- TREEMAP VISUALIZATION --- */
+#treemapContainer {
+    width: 100%;
+    height: calc(100vh - 400px);
+    min-height: 600px;
+    position: relative;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 16px;
+    border: 2px solid var(--glass-border);
+    overflow: hidden;
+    margin: 30px 0;
+}
+
+#treemapCanvas {
+    width: 100%;
+    height: 100%;
+    cursor: default;
+}
+
+#treemapTooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.95);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10000;
+    border: 1px solid var(--pink);
+    box-shadow: 0 4px 20px rgba(222, 26, 88, 0.4);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    max-width: 300px;
+}
+
+#treemapTooltip strong {
+    color: var(--gold);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.stats-display {
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.stats-display:hover {
+    background: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 20px var(--gold);
+    transform: scale(1.02);
+}
+
+.stats-display::after {
+    content: ' (Doppelklick für Speicher-Übersicht)';
+    font-size: 0.7rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.stats-display:hover::after {
+    opacity: 0.7;
+}
+
+/* --- TREEMAP LEGEND --- */
+.treemap-legend {
+    background: rgba(13, 1, 26, 0.6);
+    backdrop-filter: blur(15px);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+    padding: 12px 0;
+}
+
+.legend-content {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+}
+
+.legend-title {
+    font-family: 'Arial Black', sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    color: var(--gold);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px var(--gold);
+}
+
+.legend-items {
+    display: flex;
+    gap: 25px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #ccc;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+
+.legend-color {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    box-shadow: 0 0 8px currentColor;
+}
+
+.legend-color.high {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 0 10px #f59e0b;
+}
+
+.legend-color.ok {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 0 10px #10b981;
+}
+
+.legend-hint {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: #666;
+    font-style: italic;
 }
