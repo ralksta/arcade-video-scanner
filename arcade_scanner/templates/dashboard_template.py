@@ -78,6 +78,10 @@ def generate_html_report(results, report_file):
                 <button class="filter-btn action-btn" id="folderBtn" onclick="toggleFolderSidebar()" title="Ordner Explorer">
                     <span class="material-icons">folder</span>
                 </button>
+
+                <button class="filter-btn action-btn" id="settingsBtn" onclick="openSettings()" title="Einstellungen">
+                    <span class="material-icons">settings</span>
+                </button>
             </div>
         </div>
 
@@ -143,6 +147,57 @@ def generate_html_report(results, report_file):
             <button class="filter-btn" onclick="clearSelection()" style="background:transparent; border-color:white;">
                 Abbrechen
             </button>
+        </div>
+        
+        <div id="settingsModal" class="settings-modal">
+            <div class="settings-content">
+                <div class="settings-header">
+                    <h2><span class="material-icons">settings</span> Einstellungen</h2>
+                    <span class="material-icons settings-close" onclick="closeSettings()">close</span>
+                </div>
+                
+                <div class="settings-body">
+                    <div class="settings-section">
+                        <label>📁 Scan-Ordner (einer pro Zeile)</label>
+                        <textarea id="settingsTargets" rows="5" placeholder="C:\\Videos\nD:\\Media"></textarea>
+                        <div class="settings-hint" id="defaultTargetsHint"></div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <label>🛡️ Standard-Ausschlüsse</label>
+                        <div class="settings-hint">Diese Ordner werden standardmäßig ignoriert. Deaktivieren Sie Checkboxen, um sie zu scannen.</div>
+                        <div id="defaultExclusionsContainer" class="exclusions-list"></div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <label>🚫 Zusätzliche Ausschlüsse (einer pro Zeile)</label>
+                        <textarea id="settingsExcludes" rows="3" placeholder="Eigene Ausschlüsse..."></textarea>
+                    </div>
+                    
+                    <div class="settings-section settings-row">
+                        <div>
+                            <label>Mindestgröße (MB)</label>
+                            <input type="number" id="settingsMinSize" min="1" value="100">
+                        </div>
+                        <div>
+                            <label>Bitrate-Schwellwert (kbps)</label>
+                            <input type="number" id="settingsBitrate" min="1000" value="15000">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-warning">
+                        <span class="material-icons">warning</span>
+                        Änderungen erfordern einen Neustart der App
+                    </div>
+                </div>
+                
+                <div class="settings-footer">
+                    <button class="filter-btn" onclick="closeSettings()">Abbrechen</button>
+                    <button class="filter-btn active" onclick="saveSettings()">
+                        <span class="material-icons">save</span> Speichern
+                    </button>
+                </div>
+            </div>
         </div>
         
         <iframe name='h_frame' style='display:none;'></iframe>

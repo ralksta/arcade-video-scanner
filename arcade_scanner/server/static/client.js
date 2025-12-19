@@ -94,7 +94,7 @@ function toggleLayout() {
     btn.innerHTML = `<span class="material-icons">${icons[nextMode]}</span>`;
 }
 
-function setLayout(layout) {
+function setLayout(layout, skipURLUpdate = false) {
     currentLayout = layout;
 
     const grid = document.getElementById('videoGrid');
@@ -113,6 +113,10 @@ function setLayout(layout) {
         if (batchBar) {
             batchBar.style.display = 'none';
         }
+
+        // Hide sort dropdown in treemap view (layout is always by size)
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) sortSelect.style.display = 'none';
 
         // Hide workspace bar, show treemap legend
         if (workspaceBar) workspaceBar.style.display = 'none';
@@ -137,6 +141,10 @@ function setLayout(layout) {
         if (workspaceBar) workspaceBar.style.display = '';
         if (treemapLegend) treemapLegend.style.display = 'none';
 
+        // Show sort dropdown in grid/list view
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) sortSelect.style.display = '';
+
         if (layout === 'list') {
             grid.classList.add('list-view');
         } else {
@@ -144,6 +152,51 @@ function setLayout(layout) {
         }
 
         renderUI(false);
+    }
+
+    // Update URL to reflect current view
+    if (!skipURLUpdate) {
+        updateURL();
+    }
+}
+
+// Update URL to reflect current state
+function updateURL() {
+    const params = new URLSearchParams();
+
+    // Add view mode
+    if (currentLayout !== 'grid') {
+        params.set('view', currentLayout);
+    }
+
+    // Add treemap folder if drilled down
+    if (currentLayout === 'treemap' && treemapCurrentFolder) {
+        params.set('folder', encodeURIComponent(treemapCurrentFolder));
+    }
+
+    // Build URL
+    const url = params.toString() ? `?${params.toString()}` : '/';
+    window.history.pushState({ layout: currentLayout, folder: treemapCurrentFolder }, '', url);
+}
+
+// Load state from URL on page load
+function loadFromURL() {
+    const params = new URLSearchParams(window.location.search);
+
+    const viewMode = params.get('view') || 'grid';
+    const folder = params.get('folder');
+
+    // Set layout without updating URL (to avoid duplicate history entry)
+    if (viewMode === 'treemap') {
+        currentLayout = 'treemap';
+        if (folder) {
+            treemapCurrentFolder = decodeURIComponent(folder);
+        }
+        setLayout('treemap', true);
+    } else if (viewMode === 'list') {
+        setLayout('list', true);
+    } else {
+        setLayout('grid', true);
     }
 }
 
@@ -196,6 +249,12 @@ function formatSize(mb) {
 
 // --- PERFORMANCE ENGINE: INFINITE SCROLL ---
 function renderUI(reset) {
+    // If in treemap mode, re-render treemap instead
+    if (currentLayout === 'treemap') {
+        renderTreemap();
+        return;
+    }
+
     const grid = document.getElementById('videoGrid');
     if (reset) {
         grid.innerHTML = '';
@@ -660,6 +719,25 @@ function renderFolderView(ctx, canvas) {
         ctx.lineWidth = 2;
         ctx.strokeRect(block.x, block.y, block.width, block.height);
 
+        // Search highlight - glow effect for folders containing matching files
+        if (searchTerm) {
+            const hasMatch = filteredVideos.some(v => {
+                const vPath = v.FilePath;
+                const vLastIdx = Math.max(vPath.lastIndexOf('/'), vPath.lastIndexOf('\\'));
+                const vFolder = vLastIdx >= 0 ? vPath.substring(0, vLastIdx) : 'Root';
+                return vFolder === block.folder && v.FilePath.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+            if (hasMatch) {
+                ctx.save();
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 20;
+                ctx.strokeRect(block.x + 2, block.y + 2, block.width - 4, block.height - 4);
+                ctx.restore();
+            }
+        }
+
         // Labels
         if (block.width > 60 && block.height > 40) {
             ctx.fillStyle = '#fff';
@@ -732,6 +810,17 @@ function renderFileView(ctx, canvas, folderPath) {
         ctx.lineWidth = 1;
         ctx.strokeRect(block.x, block.y, block.width, block.height);
 
+        // Search highlight - glow effect for matching files
+        if (searchTerm && block.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+            ctx.save();
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 15;
+            ctx.strokeRect(block.x + 2, block.y + 2, block.width - 4, block.height - 4);
+            ctx.restore();
+        }
+
         // Labels
         if (block.width > 80 && block.height > 50) {
             // Use dark text on bright backgrounds (HIGH/yellow), white on dark (OK/green)
@@ -799,6 +888,7 @@ function updateTreemapLegend() {
 function treemapZoomOut() {
     treemapCurrentFolder = null;
     renderTreemap();
+    updateURL();
 }
 
 function setupTreemapInteraction() {
@@ -879,6 +969,7 @@ function setupTreemapInteraction() {
                 // Drill down into folder
                 treemapCurrentFolder = block.folder;
                 renderTreemap();
+                updateURL();
             } else {
                 // Open cinema for file
                 const mockContainer = {
@@ -935,8 +1026,20 @@ window.addEventListener('resize', () => {
     }, 250);
 });
 
+// Handle browser back/forward buttons
+window.addEventListener('popstate', (event) => {
+    if (event.state) {
+        currentLayout = event.state.layout || 'grid';
+        treemapCurrentFolder = event.state.folder || null;
+        setLayout(currentLayout, true);
+    } else {
+        loadFromURL();
+    }
+});
+
 // Init
 window.onload = () => {
+    loadFromURL();
     filterAndSort();
 
     // Add double-click handler to stats display for quick treemap access
@@ -950,3 +1053,99 @@ window.onload = () => {
         });
     }
 };
+
+// --- SETTINGS MODAL ---
+async function openSettings() {
+    const modal = document.getElementById('settingsModal');
+    modal.classList.add('active');
+
+    try {
+        const response = await fetch('/api/settings');
+        const data = await response.json();
+
+        // Populate form fields
+        document.getElementById('settingsTargets').value = data.scan_targets.join('\n');
+        document.getElementById('settingsExcludes').value = data.exclude_paths.join('\n');
+        document.getElementById('settingsMinSize').value = data.min_size_mb;
+        document.getElementById('settingsBitrate').value = data.bitrate_threshold_kbps;
+
+        // Show default paths hint
+        document.getElementById('defaultTargetsHint').textContent =
+            `Standard: ${data.default_scan_targets.slice(0, 2).join(', ')}${data.default_scan_targets.length > 2 ? '...' : ''}`;
+
+        // Populate default exclusions with checkboxes
+        const container = document.getElementById('defaultExclusionsContainer');
+        container.innerHTML = '';
+
+        const disabledDefaults = data.disabled_defaults || [];
+
+        data.default_exclusions.forEach(exc => {
+            const isEnabled = !disabledDefaults.includes(exc.path);
+            const item = document.createElement('label');
+            item.className = 'exclusion-item';
+            item.innerHTML = `
+                <input type="checkbox" data-path="${exc.path}" ${isEnabled ? 'checked' : ''}>
+                <div class="exclusion-info">
+                    <div class="exclusion-path">${exc.path}</div>
+                    <div class="exclusion-desc">${exc.desc}</div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    } catch (e) {
+        console.error('Failed to load settings:', e);
+    }
+}
+
+function closeSettings() {
+    document.getElementById('settingsModal').classList.remove('active');
+}
+
+async function saveSettings() {
+    const targetsText = document.getElementById('settingsTargets').value;
+    const excludesText = document.getElementById('settingsExcludes').value;
+
+    // Collect disabled defaults (unchecked checkboxes)
+    const disabledDefaults = [];
+    document.querySelectorAll('#defaultExclusionsContainer input[type="checkbox"]').forEach(cb => {
+        if (!cb.checked) {
+            disabledDefaults.push(cb.dataset.path);
+        }
+    });
+
+    const settings = {
+        scan_targets: targetsText.split('\n').map(s => s.trim()).filter(s => s),
+        exclude_paths: excludesText.split('\n').map(s => s.trim()).filter(s => s),
+        disabled_defaults: disabledDefaults,
+        min_size_mb: parseInt(document.getElementById('settingsMinSize').value) || 100,
+        bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000
+    };
+
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+
+        if (response.ok) {
+            closeSettings();
+            // Show success feedback
+            const btn = document.getElementById('settingsBtn');
+            btn.style.color = 'var(--gold)';
+            setTimeout(() => { btn.style.color = ''; }, 2000);
+        } else {
+            alert('Fehler beim Speichern der Einstellungen');
+        }
+    } catch (e) {
+        console.error('Failed to save settings:', e);
+        alert('Fehler beim Speichern der Einstellungen');
+    }
+}
+
+// Close settings modal on ESC
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('settingsModal').classList.contains('active')) {
+        closeSettings();
+    }
+});
