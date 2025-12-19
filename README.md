@@ -102,13 +102,17 @@ By default, several system and cloud-related directories are excluded to ensure 
 | **macOS** | `~/Pictures/Photos Library.photoslibrary` | Avoids scanning internal database files of the Photos app. |
 | **macOS** | `~/Library/Containers/` | Skips application-specific sandbox folders. |
 
-### 🔒 Private Configuration
-If you want to customize your setup without committing changes to GitHub, you can use these files inside the `arcade_data/` directory:
+### ⚙️ Configuration
+All settings can be configured through the **Settings UI** (gear icon in the dashboard) or by editing `arcade_data/settings.json` directly.
 
-- **`local_excludes.txt`**: Add folders to skip (one per line).
-- **`local_targets.txt`**: Add extra directories to scan (one per line).
+**Settings include:**
+- Scan targets (directories to scan)
+- Custom exclusions (additional paths to skip)
+- Disabled default exclusions (toggle off specific defaults)
+- Minimum file size (MB)
+- Bitrate threshold (kbps)
 
-*Note: Lines starting with `#` are ignored. These files are automatically skipped by Git.*
+*Note: Changes require an application restart to take effect.*
 
 ### Environment Variables
 - `ARCADE_OPTIMIZER_PATH`: Override the default path to the video optimizer script (default: `scripts/video_optimizer.py`).
