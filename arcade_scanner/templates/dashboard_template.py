@@ -142,7 +142,7 @@ def generate_html_report(results, report_file):
                 <span class="material-icons">star</span> FAVORISIEREN
             </button>
             <button class="filter-btn" onclick="triggerBatchHide(true)" style="background:var(--deep-purple); border-color:var(--glass-border);">
-                <span class="material-icons">visibility_off</span> ALS GELESEN MARKIEREN
+                <span class="material-icons">archive</span> VAULT
             </button>
             <button class="filter-btn" onclick="clearSelection()" style="background:transparent; border-color:white;">
                 Abbrechen
