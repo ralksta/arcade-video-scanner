@@ -20,6 +20,10 @@ venv/
 # Logs
 *.log
 server_log.txt
+status.txt
+
+# Debug/Development files
+debug_scan.py
 
 # Scripts (Local paths)
 *.sh
