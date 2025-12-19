@@ -1,4 +1,4 @@
-# Arcade Video Scanner 5.0.0 (Batch & Multi-Platform Edition)
+# Arcade Video Scanner 5.1.0 (Settings & Performance Edition)
 
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
@@ -11,39 +11,27 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 - **GPU-Powered Optimization**: Cross-platform optimization supporting both NVIDIA (Windows) and Apple VideoToolbox (macOS) hardware acceleration, reducing file sizes by 50-80% with minimal quality loss.
 - **Batch Operations**: Select and favorite multiple videos at once with the new batch selection feature.
 
-## 🚀 Version 5.0.0 Highlights
+## 🚀 Version 5.1.0 Highlights
 
-### 🎯 Batch Operations
-- **Batch Favorites**: Select multiple videos and mark them all as favorites with a single click using the new "FAVORISIEREN" button in the batch selection bar.
-- **Streamlined Workflow**: Quickly organize large collections without clicking through individual videos.
+### ⚙️ Settings UI
+- **In-App Configuration**: New settings modal (gear icon) allows you to configure scan paths and exclusions directly from the dashboard.
+- **Default Exclusions with Toggles**: View all default exclusions with descriptions and enable/disable each one via checkboxes.
+- **JSON-Based Config**: Settings now stored in `settings.json` for easier management and future extensibility.
 
-### ⚡ Cross-Platform Video Optimizer
-- **Multi-Platform Support**: Automatically detects and uses the best hardware encoder for your system:
-  - **NVIDIA NVENC** (Windows/Linux with NVIDIA GPUs)
-  - **Apple VideoToolbox** (macOS with Apple Silicon or Intel)
-  - **Software Fallback** (CPU-based encoding for systems without hardware acceleration)
-- **Manual Override**: Use the `--encoder` flag to force a specific encoding method.
-- **Enhanced Progress Display**: Progress bar now shows the active encoding method and estimates total processing time.
-- **Fun Facts**: Learn gaming trivia while your videos optimize! The optimizer displays random arcade and gaming facts during processing.
+### ⚡ Hardware-Accelerated Preview Generation
+- **GPU-Powered Previews**: Preview clip generation now uses hardware encoding (NVIDIA NVENC, Apple VideoToolbox, Intel QuickSync) for 5-10x faster initial scans.
+- **Dynamic Worker Count**: Automatically detects your GPU VRAM and sets optimal parallel workers (e.g., 8 workers for RTX 4090).
+- **Improved Thumbnails**: Fixed aspect ratio distortion for vertical videos - now uses letterboxing/pillarboxing to preserve original proportions.
 
-### ⚡ Smart UI & Performance Optimization
-- **Infinite Scrolling**: The dashboard now uses lazy loading to handle libraries with 2000+ videos without lag.
-- **Dynamic Action Buttons**: The "Optimize" buttons now automatically hide if the external optimization script is not found.
-- **High-Performance Optimizer**: Integrated support for a dedicated Python optimizer using hardware encoding for blazing-fast transcoding.
-
-### 🌐 Robust Network Management
-- **Auto-Port Detection**: The server intelligently finds the next available port if the default 8000 is occupied.
-- **Socket Resilience**: Implemented `SO_REUSEADDR` to prevent "Address already in use" errors during quick restarts.
-
-### 🔒 Private Configuration
-- **Local Settings**: Support for `local_excludes.txt` and `local_targets.txt` in the `arcade_data/` directory.
-- **Git-Safe**: These files are ignored by Git, allowing for private scan paths and exclusion lists.
-- **BOM Support**: Improved handling for configuration files saved with UTF-8 BOM.
+### 🛠️ Improved Rebuild Commands
+- **`--rebuild-thumbs`**: Regenerate only thumbnails (fast for fixing distorted images).
+- **`--rebuild-previews`**: Regenerate only preview clips.
+- **Better Progress Messages**: Now shows what's being regenerated (thumbnails, previews, or full scan).
 
 ---
 
 > [!IMPORTANT]
-> **Initial Start Performance**: The first time you scan your library, the process may take some time depending on the number of video files. The tool generates **high-quality thumbnails** and **short video-preview clips** for every file to provide a smooth visual experience. Subsequent starts will be nearly instant as it uses the cached data.
+> **Initial Start Performance**: The first time you scan your library, the process may take some time depending on the number of video files. With hardware encoding enabled, this is now 5-10x faster than before!
 
 ---
 

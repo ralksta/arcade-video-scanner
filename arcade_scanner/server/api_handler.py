@@ -4,9 +4,11 @@ import subprocess
 import mimetypes
 import sys
 import time
+import json
 from urllib.parse import unquote, parse_qs, urlparse
 from arcade_scanner.app_config import (
-    OPTIMIZER_SCRIPT, PREVIEW_DIR, IS_WIN, STATIC_DIR, REPORT_FILE, THUMB_DIR
+    OPTIMIZER_SCRIPT, PREVIEW_DIR, IS_WIN, STATIC_DIR, REPORT_FILE, THUMB_DIR,
+    load_user_settings, save_user_settings, DEFAULT_SCAN_TARGETS, DEFAULT_EXCLUSIONS
 )
 from arcade_scanner.core.cache_manager import load_cache, save_cache
 from arcade_scanner.server.streaming_util import serve_file_range
@@ -191,6 +193,22 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 name = unquote(self.path.split("name=")[1])
                 prev_path = os.path.join(PREVIEW_DIR, name)
                 serve_file_range(self, prev_path, method="GET")
+            elif self.path == "/api/settings":
+                # Return current settings as JSON
+                settings = load_user_settings()
+                response = {
+                    "scan_targets": settings.get("scan_targets", []),
+                    "exclude_paths": settings.get("exclude_paths", []),
+                    "disabled_defaults": settings.get("disabled_defaults", []),
+                    "min_size_mb": settings.get("min_size_mb", 100),
+                    "bitrate_threshold_kbps": settings.get("bitrate_threshold_kbps", 15000),
+                    "default_scan_targets": DEFAULT_SCAN_TARGETS,
+                    "default_exclusions": DEFAULT_EXCLUSIONS  # With path + desc
+                }
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode("utf-8"))
             else:
                 # 404 for anything else
                 self.send_error(404)
@@ -213,3 +231,38 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         return
+
+    def do_POST(self):
+        try:
+            if self.path == "/api/settings":
+                # Read and parse JSON body
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8")
+                new_settings = json.loads(body)
+                
+                # Validate and save
+                settings_to_save = {
+                    "scan_targets": new_settings.get("scan_targets", []),
+                    "exclude_paths": new_settings.get("exclude_paths", []),
+                    "disabled_defaults": new_settings.get("disabled_defaults", []),
+                    "min_size_mb": new_settings.get("min_size_mb", 100),
+                    "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000)
+                }
+                
+                if save_user_settings(settings_to_save):
+                    print(f"✅ Settings saved: {len(settings_to_save['scan_targets'])} targets, {len(settings_to_save['exclude_paths'])} excludes")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                else:
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": False, "error": "Failed to save"}).encode("utf-8"))
+            else:
+                self.send_error(404)
+        except Exception as e:
+            print(f"Error handling POST request: {e}")
+            self.send_response(500)
+            self.end_headers()

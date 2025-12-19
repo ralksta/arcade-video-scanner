@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [5.1.0] - 2025-12-19
+
+### Added
+- **Settings UI**: New in-app settings modal (gear icon) to configure scan paths and exclusions directly from the dashboard.
+- **Default Exclusions Toggles**: Each default exclusion now shows a description and can be enabled/disabled via checkbox.
+- **Hardware-Accelerated Preview Generation**: Preview clips now use GPU encoding (NVENC, VideoToolbox, QuickSync) for 5-10x faster initial scans.
+- **Dynamic Worker Count**: Auto-detects GPU VRAM and sets optimal parallel workers (1 per 3GB, max 12).
+- **Separate Rebuild Commands**: `--rebuild-thumbs` and `--rebuild-previews` to regenerate media independently.
+- **Improved Progress Messages**: Shows "thumbnails...", "previews...", or "processed..." based on rebuild mode.
+
+### Changed
+- **Configuration**: Migrated from `local_targets.txt`/`local_excludes.txt` to unified `settings.json` format.
+- **Thumbnail Generation**: Now uses letterboxing/pillarboxing to preserve aspect ratio for vertical videos.
+- **Default Exclusions**: Now stored with descriptions for better UI presentation.
+
+### Fixed
+- Fixed distorted thumbnails for vertical (9:16) videos.
+- Improved cache handling to preserve favorite and hidden states during rebuilds.
+
+## [5.0.0] - 2025-12-18
+
+### Added
+- **Batch Favorites**: Select multiple videos and mark them all as favorites at once.
+- **Cross-Platform Video Optimizer**: NVIDIA NVENC, Apple VideoToolbox, and software fallback support.
+- **Fun Facts**: Gaming trivia displayed during optimization.
+
 ## [4.9.0] - 2025-12-18
 
 ### Added
