@@ -3,7 +3,7 @@ import time
 import webbrowser
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .app_config import SCAN_TARGETS, VIDEO_EXTENSIONS, EXCLUDE_PATHS, CACHE_FILE, REPORT_FILE, MIN_SIZE_MB
+from .app_config import SCAN_TARGETS, EXCLUDE_PATHS, CACHE_FILE, REPORT_FILE
 from .core.cache_manager import load_cache, save_cache
 from .core.video_processor import process_video, get_optimal_workers
 from .core.maintenance import purge_media, cleanup_orphans, purge_broken_media, purge_thumbnails, purge_previews
@@ -11,14 +11,14 @@ from .templates.dashboard_template import generate_html_report
 from .server.web_server import start_server
 
 def run_scanner(args_list=None):
-    parser = argparse.ArgumentParser(description="Arcade Video Scanner 5.1.1")
+    parser = argparse.ArgumentParser(description="Arcade Video Scanner 5.2.0")
     parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
     parser.add_argument("--rebuild-thumbs", action="store_true", help="Delete only thumbnails and regenerate them.")
     parser.add_argument("--rebuild-previews", action="store_true", help="Delete only preview clips and regenerate them.")
     parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
     args, unknown = parser.parse_known_args(args_list)
 
-    print("--- Arcade Video Scanner 5.1.1 ---")
+    print("--- Arcade Video Scanner 5.2.0 ---")
     
     if args.rebuild:
         purge_media()
@@ -35,39 +35,9 @@ def run_scanner(args_list=None):
     print(f"📦 Loaded {len(cache)} items from cache.")
     
     # 2. Scan Files
-    video_files = []
-    exclude_abs = [os.path.abspath(os.path.expanduser(p)) for p in EXCLUDE_PATHS]
-    
-    print("🔍 Scanning directories...")
-    for target in SCAN_TARGETS:
-        abs_t = os.path.abspath(os.path.expanduser(target))
-        if not os.path.exists(abs_t):
-            print(f"Warning: Scan target not found: {abs_t}")
-            continue
-            
-        print(f"Scanning: {abs_t}")
-        for root, dirs, files in os.walk(abs_t):
-            # Prune excluded directories
-            dirs[:] = [
-                d for d in dirs 
-                if not d.startswith(".") 
-                and os.path.abspath(os.path.join(root, d)) not in exclude_abs
-                and not any(ex in os.path.join(root, d) for ex in exclude_abs if "/" in ex) # Handle substring matches for specific names
-            ]
-            
-            # Additional substring check for common exclusion patterns
-            if any(ex in root for ex in EXCLUDE_PATHS if not ex.startswith("~")):
-                continue
-
-            for file in files:
-                if any(file.lower().endswith(ext) for ext in VIDEO_EXTENSIONS) and not file.endswith("_opt.mp4"):
-                    filepath = os.path.join(root, file)
-                    try:
-                        sz = os.path.getsize(filepath)
-                        if sz >= (MIN_SIZE_MB * 1024 * 1024):
-                            video_files.append(filepath)
-                    except:
-                        continue
+    from .core.scanner import VideoScanner
+    scanner = VideoScanner(SCAN_TARGETS, EXCLUDE_PATHS)
+    video_files = scanner.scan()
 
     print(f"Found {len(video_files)} video files.")
     
@@ -127,12 +97,12 @@ def run_scanner(args_list=None):
     # 4. Save Cache
     save_cache(cache, CACHE_FILE)
     
-    # 5. Generate Report
-    print(f"Generating report: {REPORT_FILE}")
-    generate_html_report(results, REPORT_FILE)
-    
-    # 6. Start Server
+    # 5. Start Server
     server, port = start_server()
+
+    # 6. Generate Report
+    print(f"Generating report: {REPORT_FILE}")
+    generate_html_report(results, REPORT_FILE, server_port=port)
     
     # 7. Open Browser
     url = f"http://localhost:{port}/"

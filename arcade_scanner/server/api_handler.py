@@ -5,13 +5,19 @@ import mimetypes
 import sys
 import time
 import json
-from urllib.parse import unquote, parse_qs, urlparse
+from pathlib import Path
+import socket
+from urllib.parse import unquote, urlparse, parse_qs
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from arcade_scanner.core.scanner import VideoScanner
+from arcade_scanner.core.video_processor import process_video, get_optimal_workers
 from arcade_scanner.app_config import (
-    OPTIMIZER_SCRIPT, PREVIEW_DIR, IS_WIN, STATIC_DIR, REPORT_FILE, THUMB_DIR,
+    OPTIMIZER_SCRIPT, PREVIEW_DIR, IS_WIN, STATIC_DIR, REPORT_FILE, THUMB_DIR, CACHE_FILE,
     load_user_settings, save_user_settings, DEFAULT_SCAN_TARGETS, DEFAULT_EXCLUSIONS
 )
 from arcade_scanner.core.cache_manager import load_cache, save_cache
 from arcade_scanner.server.streaming_util import serve_file_range
+from arcade_scanner.templates.dashboard_template import generate_html_report
 
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -91,32 +97,250 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
             # 4. API Endpoints
             elif self.path.startswith("/reveal?path="):
-                file_path = unquote(self.path.split("path=")[1])
-                if IS_WIN:
-                    subprocess.run(["explorer", "/select,", os.path.normpath(file_path)])
-                else:
-                    subprocess.run(["open", "-R", file_path])
+                try:
+                    file_path = unquote(self.path.split("path=")[1])
+                    print(f"🔍 Reveal requested for: {file_path}")
+                    
+                    if not os.path.exists(file_path):
+                        print(f"❌ Error: File does not exist: {file_path}")
+                        self.send_error(404, "File not found")
+                        return
+
+                    if IS_WIN:
+                        subprocess.run(["explorer", "/select,", os.path.normpath(file_path)])
+                    else:
+                        print(f"🚀 Running: open -R '{file_path}'")
+                        result = subprocess.run(["open", "-R", file_path], capture_output=True, text=True)
+                        if result.returncode != 0:
+                            print(f"❌ Error revealing file: {result.stderr}")
+                        else:
+                            print("✅ Reveal command successful")
+                            
+                    self.send_response(204)
+                    self.end_headers()
+                except Exception as e:
+                    print(f"❌ critical error in reveal endpoint: {e}")
+                    self.send_error(500, str(e))
+            elif self.path.startswith("/api/mark_optimized?"):
+                params = parse_qs(urlparse(self.path).query)
+                path = params.get("path", [None])[0]
+                if path:
+                    abs_path = os.path.abspath(path)
+                    c = load_cache()
+                    if abs_path in c:
+                        c[abs_path]["Status"] = "OK"  # Mark as optimized
+                        # Also update size if possible? Optimizer doesn't send size yet, but next scan will catch it.
+                    else:
+                        # Should exist, but if not, create simple entry with required fields
+                        size_mb = 0
+                        try:
+                            if os.path.exists(abs_path):
+                                size_mb = os.path.getsize(abs_path) / (1024 * 1024)
+                        except:
+                            pass
+                        c[abs_path] = {"Status": "OK", "FilePath": abs_path, "Size_MB": size_mb, "Bitrate_Mbps": 0}
+                    save_cache(c)
+                    
+                    # Regenerate HTML report so refresh works
+                    try:
+                        current_port = self.server.server_address[1]
+                        results = list(c.values())
+                        generate_html_report(results, REPORT_FILE, server_port=current_port)
+                        print(f"✅ Marked as optimized and report updated: {os.path.basename(abs_path)}")
+                    except Exception as e:
+                        print(f"⚠️ Cache updated but report gen failed: {e}")
+
                 self.send_response(204)
                 self.end_headers()
+
             elif self.path.startswith("/compress?path="):
                 file_path = unquote(self.path.split("path=")[1])
+                # Get current running port
+                current_port = self.server.server_address[1]
+                print(f"🔌 Current Server Port: {current_port}")
+                
                 if IS_WIN:
-                    cmd = f'start "Video Optimizer" cmd /k ""{sys.executable}" "{OPTIMIZER_SCRIPT}" "{file_path}""'
+                    cmd_str = f'"{sys.executable}" "{OPTIMIZER_SCRIPT}" "{file_path}" --port {current_port}'
+                    cmd = f'start "Video Optimizer" cmd /k "{cmd_str}"'
+                    print(f"🚀 Launching Optimizer (Win): {cmd}")
                     subprocess.run(cmd, shell=True)
                 else:
-                    applescript = f'tell application "Terminal" to do script "{OPTIMIZER_SCRIPT} \\"{file_path}\\""'
+                    cmd_str = f'{sys.executable} \\"{OPTIMIZER_SCRIPT}\\" \\"{file_path}\\" --port {current_port}'
+                    print(f"🚀 Launching Optimizer (Mac): {cmd_str}")
+                    applescript = f'tell application "Terminal" to do script "{cmd_str}"'
                     subprocess.run(["osascript", "-e", applescript])
                 self.send_response(204)
                 self.end_headers()
+
+            elif self.path.startswith("/api/keep_optimized?"):
+                try:
+                    params = parse_qs(urlparse(self.path).query)
+                    original_path = params.get("original", [None])[0]
+                    optimized_path = params.get("optimized", [None])[0]
+                    
+                    if original_path and optimized_path:
+                        orig_abs = os.path.abspath(original_path)
+                        opt_abs = os.path.abspath(optimized_path)
+                        
+                        if os.path.exists(opt_abs):
+                            # Move opt to original (replace)
+                            # We might want to handle extension changes if they differ, 
+                            # but "overwrite" usually implies keeping the original filename?
+                            # Actually, if we convert mkv -> mp4, "Keep" should probably keep the mp4 extension.
+                            # But for now, let's assume we replace the content of the original if same ext, 
+                            # or replace the file entirely if diff ext.
+                            
+                            # Safest: Remove original, move optimized to original name?
+                            # Wait, if we change ext, we should probably rename to original_stem.new_ext
+                            # But then we have a dangling original entry in cache.
+                            # Let's simple Rename optimized -> original_path (this forces original extension if we are not careful)
+                            
+                            # Better approach for mixed extensions:
+                            # 1. Delete original file.
+                            # 2. Rename optimized file to original_stem + optimized_ext.
+                            # 3. BUT user expects "Replace". If I have movie.mkv and movie_opt.mp4.
+                            #    If I keep opt, I expect movie.mp4? Or movie.mkv (container swap)?
+                            #    FFmpeg optimization usually keeps container or standardizes to mp4.
+                            #    Let's go with: Rename optimized to (original_dir / original_stem . optimized_ext).
+                            
+                            # However, to keep it simple and robust matching the user's "overwrite" mental model:
+                            # If we just replace the original file, we preserve the original entry in the DB/Cache key?
+                            # No, cache key is path.
+                            
+                            # Let's strictly follow: REPLACE original with optimized.
+                            # If extensions differ, we delete original, and rename optimized to original's stem + opt's extension.
+                            
+                            orig_path_obj = Path(orig_abs)
+                            opt_path_obj = Path(opt_abs)
+                            
+                            new_path = orig_path_obj.with_suffix(opt_path_obj.suffix)
+                            
+                            # Delete original
+                            if os.path.exists(orig_abs):
+                                os.remove(orig_abs)
+                            
+                            # Rename optimized to new path
+                            os.rename(opt_abs, new_path)
+                            
+                            # Update Cache
+                            c = load_cache()
+                            
+                            # Remove optimized entry
+                            if opt_abs in c:
+                                del c[opt_abs]
+                                
+                            # Remove old original entry if path changed (ext changed)
+                            if orig_abs != str(new_path) and orig_abs in c:
+                                del c[orig_abs]
+                                
+                            
+                            # Manually add the new "original" (which is the optimized file) to cache as OK?
+                            # Simplest is just to save and let next scan pick it up, 
+                            # OR we can just return 204 and let the frontend reload which might trigger a scan?
+                            # The frontend calls reload(), so if we just update cache it helps.
+                            # But scanning is safer.
+                            
+                            save_cache(c)
+                            
+                        else:
+                            print(f"❌ Optimized file not found: {opt_abs}")
+                        
+                    self.send_response(204)
+                    self.end_headers()
+                except Exception as e:
+                    print(f"❌ Error in keep_optimized: {e}")
+                    self.send_error(500, str(e))
+
+            elif self.path.startswith("/api/discard_optimized?"):
+                try:
+                    params = parse_qs(urlparse(self.path).query)
+                    path = params.get("path", [None])[0]
+                    
+                    if path:
+                        abs_path = os.path.abspath(path)
+                        if os.path.exists(abs_path):
+                            os.remove(abs_path)
+                            
+                            c = load_cache()
+                            if abs_path in c:
+                                del c[abs_path]
+                                save_cache(c)
+                                
+                            # Regenerate Report
+                            try:
+                                current_port = self.server.server_address[1]
+                                results = list(c.values())
+                                generate_html_report(results, REPORT_FILE, server_port=current_port)
+                            except Exception as e:
+                                print(f"⚠️ Report gen failed: {e}")
+                                
+                            print(f"🗑️ Discarded optimized: {os.path.basename(abs_path)}")
+                            
+                    self.send_response(204)
+                    self.end_headers()
+                except Exception as e:
+                    print(f"❌ Error in discard_optimized: {e}")
+                    self.send_error(500, str(e))
+
+            # --- RESCAN ---
+            elif self.path == "/api/rescan":
+                print("🔄 Scan requested via API...")
+                try:
+                    # 1. Scanner
+                    
+                    # Ensure VideoScanner is available (imported at top)
+                    # We must use DEFAULT_EXCLUDE_PATHS (strings) not DEFAULT_EXCLUSIONS (dicts)
+                    from arcade_scanner.app_config import DEFAULT_EXCLUDE_PATHS
+                    scanner = VideoScanner(DEFAULT_SCAN_TARGETS, DEFAULT_EXCLUDE_PATHS)
+                    video_files = scanner.scan()
+                    print(f"  Found {len(video_files)} files.")
+
+                    # 2. Load Cache
+                    cache = load_cache(CACHE_FILE)
+
+                    # 3. Process
+                    results = []
+                    num_workers = get_optimal_workers()
+                    
+                    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                        future_to_file = {executor.submit(process_video, f, cache, None): f for f in video_files}
+                        for future in as_completed(future_to_file):
+                            try:
+                                res = future.result()
+                                if res:
+                                    results.append(res)
+                                    cache[res["FilePath"]] = res
+                            except:
+                                pass
+                    
+                    # 4. Save Cache
+                    save_cache(cache, CACHE_FILE)
+
+                    # 5. Generate Report
+                    port = self.server.server_address[1]
+                    generate_html_report(results, REPORT_FILE, server_port=port)
+                    
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "complete", "count": len(results)}).encode())
+                    print("✅ Rescan complete.")
+                    
+                except Exception as e:
+                    print(f"❌ Rescan failed: {e}")
+                    self.send_error(500, str(e))
+
             elif self.path.startswith("/batch_compress?paths="):
                 paths = unquote(self.path.split("paths=")[1]).split(",")
+                current_port = self.server.server_address[1]
+                
                 for p in paths:
                     if os.path.exists(p):
                         if IS_WIN:
-                            cmd = f'start "Video Optimizer" cmd /k ""{sys.executable}" "{OPTIMIZER_SCRIPT}" "{p}""'
+                            cmd = f'start "Video Optimizer" cmd /k ""{sys.executable}" "{OPTIMIZER_SCRIPT}" "{p}" --port {current_port}""'
                             subprocess.run(cmd, shell=True)
                         else:
-                            applescript = f'tell application "Terminal" to do script "{OPTIMIZER_SCRIPT} \\"{p}\\""'
+                            applescript = f'tell application "Terminal" to do script "{sys.executable} \\"{OPTIMIZER_SCRIPT}\\" \\"{p}\\" --port {current_port}"'
                             subprocess.run(["osascript", "-e", applescript])
                         time.sleep(1)
                 self.send_response(204)
@@ -200,6 +424,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "scan_targets": settings.get("scan_targets", []),
                     "exclude_paths": settings.get("exclude_paths", []),
                     "disabled_defaults": settings.get("disabled_defaults", []),
+                    "saved_views": settings.get("saved_views", []),
                     "min_size_mb": settings.get("min_size_mb", 100),
                     "bitrate_threshold_kbps": settings.get("bitrate_threshold_kbps", 15000),
                     "default_scan_targets": DEFAULT_SCAN_TARGETS,
@@ -273,6 +498,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "scan_targets": new_settings.get("scan_targets", []),
                     "exclude_paths": new_settings.get("exclude_paths", []),
                     "disabled_defaults": new_settings.get("disabled_defaults", []),
+                    "saved_views": new_settings.get("saved_views", []),
                     "min_size_mb": new_settings.get("min_size_mb", 100),
                     "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000)
                 }

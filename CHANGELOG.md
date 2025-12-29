@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [5.2.0] - 2025-12-29
+
+### Added
+- **Saved Views**: Users can now save their current search queries, filters, and sort settings as named presets.
+- **Real-time Status**: The video optimizer script now notifies the running server when a file optimization completes, allowing the UI to update instantly.
+- **API Endpoints**: New `/api/settings` (POST) for saving user preferences and `/api/mark_optimized` for external status updates.
+
+### Changed
+- **Refactoring**: Extracted video scanning logic from `main.py` into a new dedicated module `core/scanner.py`.
+- **Optimizer**: Added `--port` argument to `video_optimizer.py` to enable server notifications.
+
+### Fixed
+- **Time Parsing**: Fixed `ValueError` in optimizer progress display when `out_time_ms` is invalid.
+- **Scan Logic**: Scanner now correctly identifies optimized files regardless of the minimum size threshold.
+
 ## [5.1.1] - 2025-12-19
 
 ### Added

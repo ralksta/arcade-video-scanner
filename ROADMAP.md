@@ -10,7 +10,7 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ---
 
-## Version 5.2.0 (Next Release)
+## Version 5.3.0 (Planned)
 
 ### 🟢 Performance & Optimization
 - [ ] Database migration from JSON to SQLite for better performance with large libraries
@@ -25,7 +25,7 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ### 🟢 Search & Filtering
 - [ ] Advanced search with multiple criteria (date range, resolution, duration)
-- [ ] Saved search filters/presets
+
 - [ ] Tag system for custom categorization
 - [ ] Smart collections (auto-updating based on criteria)
 
@@ -99,6 +99,12 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ## Completed Features
 
+### ✅ Version 5.2.0 (2025-12-29)
+- Saved search filters and presets
+- Real-time video optimization status updates
+- New core scanner module
+- API endpoints for settings and status
+
 ### ✅ Version 5.1.1 (2025-12-19)
 - Cinema mode with integrated action buttons
 - Technical info panel in video player
@@ -145,4 +151,4 @@ Features are prioritized based on:
 
 ---
 
-*Last updated: 2025-12-19*
+*Last updated: 2025-12-29*

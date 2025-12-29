@@ -37,30 +37,19 @@ animate();
 
 // --- DEBOUNCED SEARCH ---
 let searchTimeout;
-// Basic debounce utility (assuming it's not globally available)
-function debounce(func, delay) {
-    let timeout;
-    return function (...args) {
-        const context = this;
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(context, args), delay);
-    };
-}
-
-const debouncedSearch = debounce(() => {
-    searchTerm = document.getElementById('searchBar').value.toLowerCase();
-
-    // Show/hide Select All button based on search term
-    const selectAllBtn = document.getElementById('selectAllBtn');
-    if (selectAllBtn) {
-        selectAllBtn.style.display = searchTerm ? '' : 'none';
-    }
-
-    filterAndSort();
-}, 300);
-
 function onSearchInput() {
-    debouncedSearch();
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        searchTerm = document.getElementById('searchBar').value.toLowerCase();
+
+        // Show/Hide Save Button based on input
+        const saveBtn = document.getElementById('saveViewBtn');
+        if (saveBtn) {
+            saveBtn.style.display = searchTerm.length > 0 ? 'inline-flex' : 'none';
+        }
+
+        currentLayout === 'treemap' ? renderTreemap() : filterAndSort();
+    }, 300);
 }
 
 // --- UI LOGIC ---
@@ -222,36 +211,96 @@ function loadFromURL() {
 function filterAndSort() {
     let vCount = 0; let tSize = 0;
 
-    filteredVideos = window.ALL_VIDEOS.filter(v => {
-        const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
-        const status = v.Status;
-        const codec = v.codec || 'unknown';
-        const isHidden = v.hidden || false;
-        const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
-        const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
+    // Standard Filtering
+    if (workspaceMode === 'optimized') {
+        const pairs = [];
+        const map = new Map();
 
-        const matchesFilter = (currentFilter === 'all' || status === currentFilter);
-        const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
-        const matchesSearch = name.includes(searchTerm) || v.FilePath.toLowerCase().includes(searchTerm);
-        const matchesFolder = (currentFolder === 'all' || folder === currentFolder);
+        // 1. Map all files by stem (filename without extension)
+        window.ALL_VIDEOS.forEach(v => {
+            const fileName = v.FilePath.split(/[\\\\/]/).pop();
+            const lastDot = fileName.lastIndexOf('.');
+            const stem = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
 
-        let matchesWorkspace = true;
-        if (workspaceMode === 'lobby') matchesWorkspace = !isHidden;
-        else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
-        else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
+            // Normalize path to directory to ensure we only pair in same folder
+            const lastSlash = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
+            const dir = v.FilePath.substring(0, lastSlash);
 
-        const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
-        if (ok) { vCount++; tSize += v.Size_MB; }
-        return ok;
-    });
+            const key = dir + '|' + stem;
+            map.set(key, v);
+        });
+
+        // 2. Find pairs
+        // We look for any key that ends in "_opt". 
+        // If found, we check if corresponding "non-opt" key exists.
+
+        map.forEach((vOpt, key) => {
+            if (key.endsWith('_opt')) {
+                const baseKey = key.substring(0, key.length - 4); // Strip _opt
+
+                // Do we have the original?
+                // Note: This relies on the original having the exact same stem minus "_opt".
+                // Case A: movie.mkv -> movie_opt.mp4 (Stem: "movie" vs "movie_opt").
+                // map has "dir|movie" and "dir|movie_opt".
+
+                if (map.has(baseKey)) {
+                    const vOrig = map.get(baseKey);
+
+                    // Create a virtual pair object
+                    pairs.push({
+                        type: 'pair',
+                        original: vOrig,
+                        optimized: vOpt,
+                        diff: vOpt.Size_MB - vOrig.Size_MB
+                    });
+                }
+            }
+        });
+
+        filteredVideos = pairs;
+
+    } else {
+        filteredVideos = window.ALL_VIDEOS.filter(v => {
+            const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
+            const status = v.Status;
+            const codec = v.codec || 'unknown';
+            const isHidden = v.hidden || false;
+            const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
+            const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
+
+            let matchesFilter = false;
+            if (currentFilter === 'all') matchesFilter = true;
+            else if (currentFilter === 'optimized_files') matchesFilter = v.FilePath.includes('_opt');
+            else matchesFilter = (status === currentFilter);
+            const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
+            const matchesSearch = name.includes(searchTerm) || v.FilePath.toLowerCase().includes(searchTerm);
+            const matchesFolder = (currentFolder === 'all' || folder === currentFolder);
+
+            let matchesWorkspace = true;
+            if (workspaceMode === 'lobby') matchesWorkspace = !isHidden; // Show _opt files too!
+            else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
+            else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
+
+            const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
+            if (ok) { vCount++; tSize += v.Size_MB; }
+            return ok;
+        });
+    }
 
     // Sort
-    filteredVideos.sort((a, b) => {
-        if (currentSort === 'bitrate') return b.Bitrate_Mbps - a.Bitrate_Mbps;
-        if (currentSort === 'size') return b.Size_MB - a.Size_MB;
-        if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
-        return 0;
-    });
+    if (workspaceMode !== 'optimized') {
+        filteredVideos.sort((a, b) => {
+            if (currentSort === 'bitrate') return b.Bitrate_Mbps - a.Bitrate_Mbps;
+            if (currentSort === 'size') return b.Size_MB - a.Size_MB;
+            if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
+            if (currentSort === 'date') return (b.mtime || 0) - (a.mtime || 0); // Newest first
+            return 0;
+        });
+    } else {
+        // Sort pairs by date (newest first)? Or name?
+        // Default to name for now
+        filteredVideos.sort((a, b) => a.original.FilePath.localeCompare(b.original.FilePath));
+    }
 
     document.getElementById('count-total').innerText = vCount;
     document.getElementById('size-total').innerText = formatSize(tSize);
@@ -292,9 +341,14 @@ function renderNextBatch() {
     const fragment = document.createDocumentFragment();
     const nextBatch = filteredVideos.slice(renderedCount, renderedCount + BATCH_SIZE);
 
-    nextBatch.forEach(video => {
-        const card = createVideoCard(video);
-        fragment.appendChild(card);
+    nextBatch.forEach(item => {
+        if (item.type === 'pair') {
+            const card = createComparisonCard(item);
+            fragment.appendChild(card);
+        } else {
+            const card = createVideoCard(item);
+            fragment.appendChild(card);
+        }
     });
 
     grid.appendChild(fragment);
@@ -305,6 +359,110 @@ function renderNextBatch() {
     } else {
         document.getElementById('loadingSentinel').style.opacity = '0';
     }
+}
+
+function createComparisonCard(pair) {
+    const orig = pair.original;
+    const opt = pair.optimized;
+
+    // Calculate stats
+    const diffMB = opt.Size_MB - orig.Size_MB;
+    const diffPct = (diffMB / orig.Size_MB) * 100;
+    const isSmaller = diffMB < 0;
+
+    const container = document.createElement('div');
+    container.className = 'video-card-container comparison-card';
+    container.style.gridColumn = "span 2"; // Make it wider
+
+    // Format Display Stats
+    const formatSize = (mb) => mb.toFixed(1) + " MB";
+    const formatBitrate = (mbps) => mbps.toFixed(1) + " Mbps";
+
+    container.innerHTML = `
+        <div class="content-card" style="display:flex; flex-direction:row; height:auto; min-height:400px; padding:16px; gap:16px;">
+            
+            <!-- ORIGINAL -->
+            <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+                <div class="badge" style="align-self:flex-start; margin-bottom:8px; background:#444;">ORIGINAL</div>
+                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
+                    <img src="thumbnails/${orig.thumb}" class="thumb" loading="lazy">
+                    <video class="preview-video" muted loop preload="none" 
+                           data-src="http://localhost:${window.SERVER_PORT}/preview?name=${orig.preview}">
+                    </video>
+                </div>
+                <div style="margin-top:8px; overflow:hidden;">
+                    <div class="file-name" title="${orig.FilePath}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${orig.FilePath.split(/[\\\\/]/).pop()}</div>
+                    <div style="display:flex; justify-content:space-between; color:#bbb; font-size:0.9rem; margin-top:4px;">
+                        <span>${formatSize(orig.Size_MB)}</span>
+                        <span>${formatBitrate(orig.Bitrate_Mbps)}</span>
+                        <span>${orig.codec}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- STATS CENTER -->
+            <div style="width:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-left:1px solid #333; border-right:1px solid #333; padding:0 8px; flex-shrink:0;">
+                <div style="font-size:1.5rem; font-weight:bold; color:${isSmaller ? '#4cd964' : '#ff3b30'};">
+                    ${diffPct.toFixed(1)}%
+                </div>
+                <div style="color:#888; font-size:0.8rem; margin-bottom:24px;">
+                    ${diffMB.toFixed(1)} MB
+                </div>
+                
+                <button class="filter-btn active" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')" style="width:100%; margin-bottom:8px;">
+                    <span class="material-icons">check</span> KEEP
+                </button>
+                <button class="filter-btn" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')" style="width:100%; background:transparent; border:1px solid #444;">
+                    <span class="material-icons">delete</span> DISCARD
+                </button>
+            </div>
+
+            <!-- OPTIMIZED -->
+            <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+                <div class="badge ok" style="align-self:flex-start; margin-bottom:8px;">OPTIMIZED</div>
+                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
+                    <img src="thumbnails/${opt.thumb}" class="thumb" loading="lazy">
+                    <video class="preview-video" muted loop preload="none" 
+                           data-src="http://localhost:${window.SERVER_PORT}/preview?name=${opt.preview}">
+                    </video>
+                </div>
+                <div style="margin-top:8px; overflow:hidden;">
+                    <div class="file-name" title="${opt.FilePath}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${opt.FilePath.split(/[\\\\/]/).pop()}</div>
+                    <div style="display:flex; justify-content:space-between; color:#bbb; font-size:0.9rem; margin-top:4px;">
+                        <span>${formatSize(opt.Size_MB)}</span>
+                        <span>${formatBitrate(opt.Bitrate_Mbps)}</span>
+                        <span>${opt.codec}</span>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    `;
+
+    // Store data for interactions
+    container.setAttribute('data-path', orig.FilePath); // Proxy original
+    return container;
+}
+
+function keepOptimized(orig, opt) {
+    if (!confirm("Replace original with optimized version? This cannot be undone.")) return;
+    fetch(`http://localhost:${window.SERVER_PORT}/api/keep_optimized?original=${orig}&optimized=${opt}`)
+        .then(() => {
+            // Remove from view
+            setTimeout(() => {
+                location.reload(); // Simplest way to refresh state
+            }, 500);
+        });
+}
+
+function discardOptimized(opt) {
+    if (!confirm("Delete the optimized file?")) return;
+    fetch(`http://localhost:${window.SERVER_PORT}/api/discard_optimized?path=${opt}`)
+        .then(() => {
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+        });
 }
 
 function createVideoCard(v) {
@@ -334,7 +492,7 @@ function createVideoCard(v) {
                 </video>
                 <div class="quick-actions-overlay">
                     <a href="http://localhost:${window.SERVER_PORT}/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Im Finder zeigen" onclick="event.stopPropagation()">
-                        <span class="material-icons">visibility</span>
+                        <span class="material-icons">folder_open</span>
                     </a>
                     <div class="quick-action-btn" title="Wiedergeben" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
                         <span class="material-icons">play_arrow</span>
@@ -361,11 +519,12 @@ function createVideoCard(v) {
             </div>
             <div class="card-footer">
                 <div style="display:flex; align-items:center;">
-                    <span class="badge ${v.Status}">${v.Status}</span>
+                    <span class="badge ${v.Status.toLowerCase()}">${v.Status}</span>
                     <span class="badge hevc">${isHevc ? 'HEVC' : (v.codec || 'UNK').toUpperCase()}</span>
+                    ${fileName.includes('_opt.') ? '<span class="badge ok">OPTIMIZED</span>' : ''}
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <a href="http://localhost:${window.SERVER_PORT}/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">visibility</span></a>
+                    <a href="http://localhost:${window.SERVER_PORT}/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">folder_open</span></a>
                     ${window.OPTIMIZER_AVAILABLE ? `
                     <a href="http://localhost:${window.SERVER_PORT}/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn">
                         <span class="material-icons" style="font-size:18px;">bolt</span>
@@ -673,7 +832,7 @@ function cinemaVault() {
 
 function cinemaLocate() {
     if (!currentCinemaPath) return;
-    window.open(`http://localhost:${window.SERVER_PORT}/open_folder?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
+    window.open(`http://localhost:${window.SERVER_PORT}/reveal?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
 }
 
 function cinemaOptimize() {
@@ -1371,4 +1530,138 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.getElementById('settingsModal').classList.contains('active')) {
         closeSettings();
     }
+});
+// --- RESCAN ---
+function rescanLibrary() {
+    const btn = document.getElementById('refreshBtn');
+    const originalContent = btn.innerHTML;
+
+    btn.innerHTML = '<span class="material-icons spin">sync</span> SCANNEN...';
+    btn.style.pointerEvents = 'none';
+    document.body.style.opacity = '0.5';
+
+    fetch('/api/rescan')
+        .then(response => {
+            if (response.ok) return response.json();
+            throw new Error('Scan failed');
+        })
+        .then(data => {
+            console.log('Rescan complete', data);
+            location.reload();
+        })
+        .catch(e => {
+            console.error(e);
+            alert('Fehler beim Scannen: ' + e.message);
+            btn.innerHTML = originalContent;
+            btn.style.pointerEvents = 'auto';
+            document.body.style.opacity = '1';
+        });
+}
+
+// --- SAVED VIEWS & CUSTOM FILTERS ---
+
+function renderSavedViews() {
+    const container = document.getElementById('savedViewsContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const views = userSettings.saved_views || [];
+
+    views.forEach(view => {
+        const chip = document.createElement('button');
+        chip.className = 'view-chip';
+        // highlight if currently active? (complex to strict match, skip for now)
+
+        chip.innerHTML = `
+            <span onclick="loadView('${view.id}')">${view.name}</span>
+            <span class="material-icons chip-delete" onclick="deleteView('${view.id}', event)">close</span>
+        `;
+        container.appendChild(chip);
+    });
+}
+
+function saveCurrentView() {
+    const name = prompt("Name für diese Ansicht:", "");
+    if (!name) return;
+
+    if (!userSettings.saved_views) userSettings.saved_views = [];
+
+    const newView = {
+        id: 'view_' + Date.now(),
+        name: name,
+        search: searchTerm,
+        filter: currentFilter,
+        codec: currentCodec,
+        sort: currentSort,
+        mode: workspaceMode,
+        folder: currentFolder
+    };
+
+    userSettings.saved_views.push(newView);
+    saveSettingsWithoutReload(); // We need a version that doesn't just print console
+    renderSavedViews();
+}
+
+function loadView(id) {
+    const view = (userSettings.saved_views || []).find(v => v.id === id);
+    if (!view) return;
+
+    // Apply settings
+    searchTerm = view.search || "";
+    document.getElementById('searchBar').value = searchTerm;
+
+    currentFilter = view.filter || "all";
+    document.getElementById('statusSelect').value = currentFilter;
+
+    currentCodec = view.codec || "all";
+    if (document.getElementById('codecSelect'))
+        document.getElementById('codecSelect').value = currentCodec;
+
+    currentSort = view.sort || "bitrate";
+    document.getElementById('sortSelect').value = currentSort;
+
+    if (view.mode) {
+        setWorkspaceMode(view.mode); // Handles filterAndSort internally if changed
+    }
+
+    // If we rely on stored vars, we must call update
+    filterAndSort();
+
+    // Update visuals
+    updateURL();
+}
+
+function deleteView(id, event) {
+    if (event) event.stopPropagation();
+    if (!confirm("Ansicht löschen?")) return;
+
+    if (userSettings.saved_views) {
+        userSettings.saved_views = userSettings.saved_views.filter(v => v.id !== id);
+        saveSettingsWithoutReload();
+        renderSavedViews();
+    }
+}
+
+// reusing the logic from closeSettings but without closing UI
+function saveSettingsWithoutReload() {
+    fetch(`http://localhost:${window.SERVER_PORT}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userSettings)
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            console.log("Settings saved (views)");
+        }
+    });
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    // ... existing init logic ...
+    // But we need to call renderSavedViews AFTER settings are loaded? 
+    // Settings are loaded via template injection in index.html usually or fetch.
+    // userSettings global var is populated in index.html from python?
+    // Let's assume userSettings is available.
+    setTimeout(renderSavedViews, 500); // Small delay to ensure init
 });

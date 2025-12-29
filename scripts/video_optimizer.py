@@ -277,7 +277,7 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     if copy_audio:
         cmd.extend(['-c:a', 'copy'])
     else:
-        cmd.extend(['-c:a', 'aac', '-b:a', '256k', '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11'])
+        cmd.extend(['-c:a', 'aac', '-b:a', '256k', '-af', 'loudnorm=I=-20:TP=-1.5:LRA=11'])
     
     cmd.extend([
         '-tag:v', 'hvc1',
@@ -289,7 +289,7 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     
     return cmd
 
-def process_file(input_path, profile, min_size_mb=50, copy_audio=False):
+def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None):
     """Process a single video file. Returns (success, bytes_saved)."""
     input_path = Path(input_path)
     
@@ -357,9 +357,14 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False):
                 elif 'speed=' in line:
                     cur_stats["speed"] = line.split('=')[1].strip()
                 elif 'out_time_ms=' in line:
-                    ms = int(line.split('=')[1])
-                    elapsed = time.time() - encode_start
-                    show_progress(ms / 1000000, info['duration'], profile['codec'], cur_stats["bitrate"], cur_stats["speed"], elapsed)
+                    val = line.split('=')[1].strip()
+                    if val != 'N/A':
+                        try:
+                            ms = int(val)
+                            elapsed = time.time() - encode_start
+                            show_progress(ms / 1000000, info['duration'], profile['codec'], cur_stats["bitrate"], cur_stats["speed"], elapsed)
+                        except ValueError:
+                            pass
             
             process.wait()
             print()
@@ -394,9 +399,13 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False):
                (saved_pct >= 50.0 and ssim >= 0.945):
                 file_time = time.time() - file_start_time
                 print(f" {BG}>>> SUCCESS! {format_size(saved_bytes)} saved in {format_time(file_time)}.{NC}")
-                batch_stats['success'] += 1
                 batch_stats['total_saved_bytes'] += saved_bytes
                 batch_stats['total_time'] += file_time
+                batch_stats['success'] += 1
+                
+                if port:
+                    notify_server(port, input_path)
+                    
                 return (True, saved_bytes)
             
             if ssim < 0.940:
@@ -439,7 +448,13 @@ def main():
                         help=f'Skip files smaller than N MB (default: {DEFAULT_MIN_SIZE_MB})')
     parser.add_argument('--copy-audio', action='store_true',
                         help='Copy audio without re-encoding (faster, preserves original audio)')
+    parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     args = parser.parse_args()
+    
+    if args.port:
+        print(f"🔌 Notification Port: {args.port}")
+    else:
+        print(f"⚠️ No notification port provided. Status updates will be disabled.")
 
     # Select encoder
     if args.encoder == 'auto':
@@ -469,12 +484,12 @@ def main():
     
     for f in files:
         batch_stats['processed'] += 1
-        process_file(f, profile, min_size_mb=args.min_size, copy_audio=args.copy_audio)
+        process_file(f, profile, min_size_mb=args.min_size, copy_audio=args.copy_audio, port=args.port)
 
     # Print batch summary if multiple files
     if len(files) > 1:
         print_batch_summary()
-
+    
     # Open folder and play sound
     if files:
         last_path = files[-1]
@@ -493,6 +508,25 @@ def main():
         winsound.MessageBeep()
     except:
         pass
+
+def notify_server(port, file_path):
+    """Notify the local server that a file has been optimized."""
+    if not port:
+        return
+    
+    try:
+        import urllib.request
+        from urllib.parse import quote
+        
+        encoded_path = quote(str(Path(file_path).resolve()))
+        url = f"http://localhost:{port}/api/mark_optimized?path={encoded_path}"
+        
+        # Simple fire and forget request with short timeout
+        with urllib.request.urlopen(url, timeout=2):
+            pass
+        print(f"{G}Server notified of optimization.{NC}")
+    except Exception as e:
+        print(f"{Y}Could not notify server: {e}{NC}")
 
 if __name__ == "__main__":
     main()

@@ -71,6 +71,7 @@ def load_user_settings():
         "scan_targets": [],
         "exclude_paths": [],
         "disabled_defaults": [],  # Default exclusions user has turned off
+        "saved_views": [],
         "min_size_mb": 100,
         "bitrate_threshold_kbps": 15000
     }

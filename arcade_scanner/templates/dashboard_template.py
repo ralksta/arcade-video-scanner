@@ -1,7 +1,8 @@
 import os
+import time
 from arcade_scanner.app_config import HIDDEN_DATA_DIR, PORT, OPTIMIZER_SCRIPT, OPTIMIZER_AVAILABLE
 
-def generate_html_report(results, report_file):
+def generate_html_report(results, report_file, server_port=PORT):
     total_mb = sum(r["Size_MB"] for r in results)
     
     # Aggregate Folder Data
@@ -14,8 +15,10 @@ def generate_html_report(results, report_file):
         folders_data[fdir]["size_mb"] += r["Size_MB"]
     
     import json
+    from arcade_scanner.app_config import USER_SETTINGS
     folders_json = json.dumps(folders_data)
     all_videos_json = json.dumps(results)
+    user_settings_json = json.dumps(USER_SETTINGS)
     
     html_content = f"""<!DOCTYPE html>
     <html lang="de">
@@ -24,8 +27,11 @@ def generate_html_report(results, report_file):
         <title>Arcade Video Dashboard</title>
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
         <link rel="stylesheet" href="/static/styles.css">
+        <script>
+            window.userSettings = {user_settings_json};
+        </script>
     </head>
-    <body data-port="{PORT}">
+    <body data-port="{server_port}">
         <canvas id="starfield"></canvas>
         <div class="scanlines"></div>
         
@@ -47,6 +53,10 @@ def generate_html_report(results, report_file):
             <div class="container controls">
                 <input type="text" id="searchBar" placeholder="Suchen..." oninput="onSearchInput()">
                 
+                <button class="view-chip add-view-btn" id="saveViewBtn" onclick="saveCurrentView()" title="Ansicht speichern" style="height:48px; padding:0 16px; border-radius:12px; margin-right:8px; display:none;">
+                    <span class="material-icons">bookmark_add</span>
+                </button>
+
                 <button class="filter-btn" id="selectAllBtn" onclick="selectAllVisible()" title="Alle auswählen" style="display:none;">
                     <span class="material-icons">done_all</span>
                 </button>
@@ -56,7 +66,8 @@ def generate_html_report(results, report_file):
                 <select id="statusSelect" onchange="setFilter(this.value)">
                     <option value="all">ALL VIDEOS</option>
                     <option value="HIGH">🚨 HIGH BITRATE</option>
-                    <option value="OK">✅ OPTIMIZED</option>
+                    <option value="OK">✅ NORMAL BITRATE</option>
+                    <option value="optimized_files">⚡ OPTIMIZED</option>
                 </select>
                 
                 <select id="codecSelect" onchange="setCodecFilter(this.value)">
@@ -69,6 +80,7 @@ def generate_html_report(results, report_file):
                     <option value="bitrate">SORT: BITRATE</option>
                     <option value="size">SORT: DATEIGRÖSSE</option>
                     <option value="name">SORT: NAME</option>
+                    <option value="date">SORT: DATUM (NEU)</option>
                 </select>
 
                 <div style="flex-grow:1;"></div>
@@ -77,7 +89,7 @@ def generate_html_report(results, report_file):
 
                 <button class="filter-btn action-btn" id="toggleView" onclick="toggleLayout()"><span class="material-icons">view_list</span></button>
                 
-                <a href="javascript:location.reload()" class="filter-btn action-btn" title="Neu laden"><span class="material-icons">refresh</span></a>
+                <button class="filter-btn action-btn" id="refreshBtn" onclick="rescanLibrary()" title="Bibliothek neu scannen"><span class="material-icons">refresh</span></button>
 
                 <button class="filter-btn action-btn" id="folderBtn" onclick="toggleFolderSidebar()" title="Ordner Explorer">
                     <span class="material-icons">folder</span>
@@ -87,6 +99,11 @@ def generate_html_report(results, report_file):
                     <span class="material-icons">settings</span>
                 </button>
             </div>
+            
+            <!-- SAVED VIEWS CHIPS -->
+            <div class="container" id="savedViewsContainer" style="display:flex; gap:8px; padding:0 24px 12px 24px; flex-wrap:wrap; align-items:center;">
+                <!-- Chips will be injected here -->
+            </div>
         </div>
 
         <div class="workspace-bar">
@@ -94,6 +111,7 @@ def generate_html_report(results, report_file):
                 <div class="segmented-control">
                     <button class="segment-btn active" id="m-lobby" onclick="setWorkspaceMode('lobby')">LOBBY</button>
                     <button class="segment-btn" id="m-favorites" onclick="setWorkspaceMode('favorites')">⭐ FAVORITEN</button>
+                    <button class="segment-btn" id="m-optimized" onclick="setWorkspaceMode('optimized')">⚡ REVIEW</button>
                     <button class="segment-btn" id="m-vault" onclick="setWorkspaceMode('vault')">VAULT</button>
                 </div>
             </div>
@@ -266,13 +284,14 @@ def generate_html_report(results, report_file):
         <iframe name='h_frame' style='display:none;'></iframe>
 
         <script>
-            window.SERVER_PORT = {PORT};
+            window.SERVER_PORT = {server_port};
             window.FOLDERS_DATA = {folders_json};
             window.ALL_VIDEOS = {all_videos_json};
+            window.userSettings = {user_settings_json};
             window.OPTIMIZER_AVAILABLE = {'true' if OPTIMIZER_AVAILABLE else 'false'};
         </script>
-        <script src="/static/treemap_layout.js"></script>
-        <script src="/static/client.js"></script>
+        <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
+        <script src="/static/client.js?v={int(time.time())}"></script>
     </body>
     </html>"""
 

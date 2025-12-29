@@ -233,6 +233,70 @@ body {
     box-shadow: 0 0 25px var(--accent-glow);
 }
 
+/* --- SAVED VIEW CHIPS --- */
+.view-chip {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    /* Squarer, more like a button */
+    padding: 6px 12px;
+    color: #ddd;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.view-chip:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.view-chip.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent-glow);
+    box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.add-view-btn {
+    background: transparent;
+    border: 1px dashed rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.add-view-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--gold);
+    color: var(--gold);
+}
+
+.chip-label {
+    margin-right: 4px;
+}
+
+.chip-delete {
+    font-size: 16px;
+    opacity: 0.4;
+    transition: opacity 0.2s, color 0.2s;
+    border-radius: 50%;
+    padding: 2px;
+}
+
+.chip-delete:hover {
+    opacity: 1;
+    background: rgba(255, 59, 48, 0.2);
+    color: #ff3b30;
+}
+
 /* Segmented Control */
 .segmented-control {
     display: flex;
@@ -855,9 +919,10 @@ body {
 }
 
 .badge.ok {
-    background: #222;
-    color: #888;
-    border: 1px solid #444;
+    background: #1b3a1b;
+    color: #4cd964;
+    border: 1px solid #2e7d32;
+    box-shadow: 0 0 5px #2e7d32;
 }
 
 .badge.hevc {

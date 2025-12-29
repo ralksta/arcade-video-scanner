@@ -1,4 +1,4 @@
-# Arcade Video Scanner 5.1.1 (Cinema Mode Edition)
+# Arcade Video Scanner 5.2.0 (Cinema Mode Edition)
 
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
@@ -10,6 +10,22 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform optimization supporting both NVIDIA (Windows) and Apple VideoToolbox (macOS) hardware acceleration, reducing file sizes by 50-80% with minimal quality loss.
 - **Batch Operations**: Select and favorite multiple videos at once with the new batch selection feature.
+
+## 🚀 Version 5.2.0 Highlights
+
+### 💾 Saved Views & Filters
+- **Smart Presets**: Save your current combination of search terms, filters, sorting, and view mode (grid/list) as a custom preset.
+- **One-Click Recall**: Instantly switch between "Large Files", "Unoptimized 4K", or any other custom view you create.
+
+### ⚡ Real-Time Optimization Updates
+- **Live Status**: The Dashboard now receives real-time notifications from the external video optimizer script.
+- **Instant Refresh**: Optimized videos are marked as finished in the UI immediately upon completion, without needing a refresh.
+
+### 🔧 Core Improvements
+- **Refactored Scanner**: The core scanning engine has been extracted to a dedicated module for better maintainability and testing.
+- **Robust Pairing**: Improved logic for pairing original and optimized video files.
+
+---
 
 ## 🚀 Version 5.1.1 Highlights
 
