@@ -387,7 +387,7 @@ function createComparisonCard(pair) {
                 <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
                     <img src="thumbnails/${orig.thumb}" class="thumb" loading="lazy">
                     <video class="preview-video" muted loop preload="none" 
-                           data-src="http://localhost:${window.SERVER_PORT}/preview?name=${orig.preview}">
+                           data-src="/preview?name=${orig.preview}">
                     </video>
                 </div>
                 <div style="margin-top:8px; overflow:hidden;">
@@ -423,7 +423,7 @@ function createComparisonCard(pair) {
                 <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
                     <img src="thumbnails/${opt.thumb}" class="thumb" loading="lazy">
                     <video class="preview-video" muted loop preload="none" 
-                           data-src="http://localhost:${window.SERVER_PORT}/preview?name=${opt.preview}">
+                           data-src="/preview?name=${opt.preview}">
                     </video>
                 </div>
                 <div style="margin-top:8px; overflow:hidden;">
@@ -446,7 +446,7 @@ function createComparisonCard(pair) {
 
 function keepOptimized(orig, opt) {
     if (!confirm("Replace original with optimized version? This cannot be undone.")) return;
-    fetch(`http://localhost:${window.SERVER_PORT}/api/keep_optimized?original=${orig}&optimized=${opt}`)
+    fetch(`/api/keep_optimized?original=${orig}&optimized=${opt}`)
         .then(() => {
             // Remove from view
             setTimeout(() => {
@@ -457,7 +457,7 @@ function keepOptimized(orig, opt) {
 
 function discardOptimized(opt) {
     if (!confirm("Delete the optimized file?")) return;
-    fetch(`http://localhost:${window.SERVER_PORT}/api/discard_optimized?path=${opt}`)
+    fetch(`/api/discard_optimized?path=${opt}`)
         .then(() => {
             setTimeout(() => {
                 location.reload();
@@ -488,10 +488,10 @@ function createVideoCard(v) {
             <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
                 <img src="thumbnails/${v.thumb}" class="thumb" loading="lazy">
                 <video class="preview-video" muted loop preload="none" 
-                       data-src="http://localhost:${window.SERVER_PORT}/preview?name=${v.preview}">
+                       data-src="/preview?name=${v.preview}">
                 </video>
                 <div class="quick-actions-overlay">
-                    <a href="http://localhost:${window.SERVER_PORT}/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Im Finder zeigen" onclick="event.stopPropagation()">
+                    <a href="/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Im Finder zeigen" onclick="event.stopPropagation()">
                         <span class="material-icons">folder_open</span>
                     </a>
                     <div class="quick-action-btn" title="Wiedergeben" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
@@ -501,7 +501,7 @@ function createVideoCard(v) {
                         <span class="material-icons">${v.hidden ? 'visibility' : 'visibility_off'}</span>
                     </div>
                     ${window.OPTIMIZER_AVAILABLE ? `
-                    <a href="http://localhost:${window.SERVER_PORT}/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
+                    <a href="/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
                         <span class="material-icons">bolt</span>
                     </a>` : ''}
                 </div>
@@ -524,9 +524,9 @@ function createVideoCard(v) {
                     ${fileName.includes('_opt.') ? '<span class="badge ok">OPTIMIZED</span>' : ''}
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <a href="http://localhost:${window.SERVER_PORT}/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">folder_open</span></a>
+                    <a href="/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">folder_open</span></a>
                     ${window.OPTIMIZER_AVAILABLE ? `
-                    <a href="http://localhost:${window.SERVER_PORT}/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn">
+                    <a href="/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn">
                         <span class="material-icons" style="font-size:18px;">bolt</span>
                     </a>` : ''}
                 </div>
@@ -552,7 +552,7 @@ function toggleHidden(card) {
     if (!video) return;
 
     video.hidden = !video.hidden;
-    fetch(`http://localhost:${window.SERVER_PORT}/hide?path=` + encodeURIComponent(path) + `&state=${video.hidden}`);
+    fetch(`/hide?path=` + encodeURIComponent(path) + `&state=${video.hidden}`);
 
     // Update specific card UI instantly
     const btn = card.querySelector('.hide-toggle-btn .material-icons');
@@ -573,7 +573,7 @@ function toggleFavorite(card) {
     if (!video) return;
 
     video.favorite = !video.favorite;
-    fetch(`http://localhost:${window.SERVER_PORT}/favorite?path=` + encodeURIComponent(path) + `&state=${video.favorite}`);
+    fetch(`/favorite?path=` + encodeURIComponent(path) + `&state=${video.favorite}`);
 
     const starBtn = card.querySelector('.favorite-btn');
     const starIcon = starBtn.querySelector('.material-icons');
@@ -608,7 +608,7 @@ function triggerBatchFavorite(state) {
     });
 
     // Notify Server
-    fetch(`http://localhost:${window.SERVER_PORT}/batch_favorite?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
+    fetch(`/batch_favorite?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
 
     // Update UI
     selected.forEach(cb => {
@@ -672,7 +672,7 @@ function openCinema(container) {
     const video = document.getElementById('cinemaVideo');
     document.getElementById('cinemaTitle').innerText = fileName;
 
-    video.src = `http://localhost:${window.SERVER_PORT}/stream?path=` + encodeURIComponent(path);
+    video.src = `/stream?path=` + encodeURIComponent(path);
     modal.classList.add('active');
     video.load();
     video.play().catch(() => {
@@ -801,7 +801,7 @@ function cinemaFavorite() {
     // Toggle favorite state
     const newState = !currentCinemaVideo.favorite;
 
-    fetch(`http://localhost:${window.SERVER_PORT}/favorite?path=` + encodeURIComponent(currentCinemaPath) + `&state=${newState}`)
+    fetch(`/favorite?path=` + encodeURIComponent(currentCinemaPath) + `&state=${newState}`)
         .then(() => {
             // Update local video object
             currentCinemaVideo.favorite = newState;
@@ -823,7 +823,7 @@ function cinemaFavorite() {
 function cinemaVault() {
     if (!currentCinemaPath) return;
 
-    fetch(`http://localhost:${window.SERVER_PORT}/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`)
+    fetch(`/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`)
         .then(() => {
             closeCinema();
             location.reload(); // Refresh to update UI
@@ -832,12 +832,12 @@ function cinemaVault() {
 
 function cinemaLocate() {
     if (!currentCinemaPath) return;
-    window.open(`http://localhost:${window.SERVER_PORT}/reveal?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
+    window.open(`/reveal?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
 }
 
 function cinemaOptimize() {
     if (!currentCinemaPath) return;
-    window.open(`http://localhost:${window.SERVER_PORT}/compress?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
+    window.open(`/compress?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
 }
 // ESC handler moved to setupTreemapInteraction section
 
@@ -871,7 +871,7 @@ function triggerBatchHide(state) {
     const selected = document.querySelectorAll('.video-card-container input:checked');
     const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
 
-    fetch(`http://localhost:${window.SERVER_PORT}/batch_hide?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
+    fetch(`/batch_hide?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
 
     paths.forEach(p => {
         const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
@@ -886,7 +886,7 @@ function triggerBatchCompress() {
     const selected = document.querySelectorAll('.video-card-container input:checked');
     const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
     if (confirm(`Möchtest du ${paths.length} Videos nacheinander optimieren?`)) {
-        fetch(`http://localhost:${window.SERVER_PORT}/batch_compress?paths=` + encodeURIComponent(paths.join(',')));
+        fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join(',')));
         alert("Batch Optimierung gestartet!");
         clearSelection();
     }
@@ -1645,7 +1645,7 @@ function deleteView(id, event) {
 
 // reusing the logic from closeSettings but without closing UI
 function saveSettingsWithoutReload() {
-    fetch(`http://localhost:${window.SERVER_PORT}/api/settings`, {
+    fetch(`/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userSettings)
