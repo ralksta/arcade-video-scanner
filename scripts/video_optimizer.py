@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Video Optimizer V2.1 - Multi-Platform Hardware Encoder
-Supports: NVIDIA NVENC (RTX 4090) and Apple VideoToolbox (M4 Max)
+Video Optimizer V2.2 - Multi-Platform Hardware Encoder
+Supports: NVIDIA NVENC (RTX 4090), Apple VideoToolbox (M4 Max), Intel QuickSync (QSV)
 """
 import os
 import sys
@@ -57,6 +57,19 @@ ENCODER_PROFILES = {
             '-allow_sw', '0',  # Disable software fallback
         ],
         'quality_flag': '-q:v',
+        'video_filter': 'format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2',
+    },
+    'qsv': {
+        'name': 'Intel QuickSync (QSV)',
+        'codec': 'hevc_qsv',
+        'quality_range': (20, 32, 2),  # ICQ: lower is better quality
+        'quality_direction': 1,        # +1 means increase val = worse quality
+        'hwaccel_input': ['-hwaccel', 'auto'],
+        'encoder_args': [
+            '-preset', 'medium',
+            '-look_ahead', '1',
+        ],
+        'quality_flag': '-global_quality',
         'video_filter': 'format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2',
     },
     'libx265': {
@@ -124,6 +137,10 @@ def detect_encoder():
         except:
             pass
     # Linux or fallback
+    except:
+        pass
+
+    # Generic Linux/Windows Detection
     try:
         result = subprocess.run(
             ['ffmpeg', '-hide_banner', '-encoders'],
@@ -131,6 +148,8 @@ def detect_encoder():
         )
         if 'hevc_nvenc' in result.stdout:
             return 'nvenc'
+        if 'hevc_qsv' in result.stdout:
+            return 'qsv'
         if 'hevc_videotoolbox' in result.stdout:
             return 'videotoolbox'
     except:
@@ -442,7 +461,7 @@ def print_batch_summary():
 def main():
     parser = argparse.ArgumentParser(description='Multi-Platform Video Optimizer V2.1')
     parser.add_argument('files', nargs='*', help='Video files to optimize')
-    parser.add_argument('--encoder', choices=['auto', 'nvenc', 'videotoolbox', 'libx265'], default='auto',
+    parser.add_argument('--encoder', choices=['auto', 'nvenc', 'videotoolbox', 'qsv', 'libx265'], default='auto',
                         help='Encoder to use (default: auto-detect)')
     parser.add_argument('--min-size', type=int, default=DEFAULT_MIN_SIZE_MB,
                         help=f'Skip files smaller than N MB (default: {DEFAULT_MIN_SIZE_MB})')
