@@ -177,19 +177,23 @@ def detect_hw_encoder() -> tuple:
                     "-c:v", "h264_vaapi",
                     "-f", "null", "-", "-y", "-loglevel", "quiet"
                 ]
-                test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
-                if test_result.returncode == 0:
-                    return ("h264_vaapi", [
-                        "-vaapi_device", "/dev/dri/renderD128", 
-                        "-vf", "format=nv12,hwupload"
-                    ])
-            except:
-                pass
-                
+            test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
+            if test_result.returncode == 0:
+                print("✅ VAAPI Test Passed")
+                return ("h264_vaapi", [
+                    "-vaapi_device", "/dev/dri/renderD128", 
+                    "-vf", "format=nv12,hwupload"
+                ])
+            else:
+                print(f"⚠️ VAAPI Test Failed: {test_result.stderr.decode().strip()}")
+        else:
+             print("ℹ️ h264_vaapi not found in ffmpeg encoders")
+            
     except Exception as e:
-        print(f"⚠️ Encoder detection error: {e}")
+        print(f"⚠️ Encoder detection critical error: {e}")
     
     # Fallback to software encoder
+    print("⚠️ Falling back to software encoding (libx264)")
     return ("libx264", ["-preset", "ultrafast", "-crf", "28"])
 
 
