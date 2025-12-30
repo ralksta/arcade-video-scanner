@@ -1480,3 +1480,142 @@ body {
     color: var(--gold);
     margin-top: 2px;
 }
+
+/* --- MOBILE OPTIMIZATIONS --- */
+@media (max-width: 768px) {
+
+    /* Single Column Grid */
+    .video-grid {
+        grid-template-columns: 1fr !important;
+        padding: 10px;
+        gap: 20px;
+    }
+
+    /* Hide hover overlay to allow direct click-to-play */
+    .quick-actions-overlay {
+        display: none !important;
+    }
+
+    /* Hide Reveal and Optimize buttons in footer on mobile */
+    .card-footer .btn {
+        display: none !important;
+    }
+
+    /* Adjust modal size for mobile */
+    .cinema-modal-content {
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        max-height: none !important;
+        max-width: none !important;
+    }
+
+    /* Adjust optimize panel height for mobile */
+    #optimizePanel {
+        height: 85vh;
+        z-index: 20000;
+    }
+
+    /* Ensure buttons are reachable */
+    .cinema-actions {
+        bottom: 120px;
+        /* Push up to avoid potential bottom nav bars */
+        gap: 20px;
+    }
+
+    .cinema-action-btn {
+        width: 50px;
+        height: 50px;
+        background: rgba(0, 0, 0, 0.8);
+        /* More contrast */
+    }
+
+    /* Ensure close button is easy to hit */
+    .cinema-close {
+        top: 20px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        line-height: 44px;
+        font-size: 28px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+    }
+
+    /* Stack list view vertically on mobile */
+    #videoGrid.list-view .content-card {
+        flex-direction: column;
+        height: auto;
+        padding: 15px;
+        gap: 15px;
+    }
+
+    #videoGrid.list-view .card-media {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16/9;
+        margin-bottom: 10px;
+    }
+
+    #videoGrid.list-view .card-body {
+        width: 100%;
+    }
+
+    #videoGrid.list-view .bitrate-track {
+        width: 100%;
+    }
+
+    #videoGrid.list-view .card-footer {
+        width: 100%;
+        flex-direction: row;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+
+    /* Info Panel on mobile - Slide up from bottom */
+    #cinemaInfoPanel {
+        width: 100%;
+        left: 0;
+        top: auto;
+        bottom: 0;
+        height: auto;
+        border-radius: 20px 20px 0 0;
+        transform: translateY(100%);
+        z-index: 10060;
+    }
+
+    #cinemaInfoPanel.active {
+        transform: translateY(0);
+    }
+
+    /* Mobile Header Fixes */
+    .arcade-header {
+        height: auto;
+        padding: 50px 20px 60px 20px;
+        text-align: center;
+    }
+
+    .video-scanner-text {
+        font-size: 10vw;
+        /* Scales with screen width */
+        line-height: 1.1;
+        width: 100%;
+    }
+
+    .stats-display {
+        position: relative;
+        bottom: auto;
+        right: auto;
+        margin-top: 20px;
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 0.65rem;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.4;
+    }
+
+    .logo-container {
+        width: 100%;
+    }
+}

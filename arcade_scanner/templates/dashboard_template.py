@@ -25,9 +25,10 @@ def generate_html_report(results, report_file, server_port=PORT):
     <html lang="de">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Arcade Video Dashboard</title>
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-        <link rel="stylesheet" href="/static/styles.css">
+        <link rel="stylesheet" href="/static/styles.css?v={int(time.time())}">
         <script>
             window.userSettings = {user_settings_json};
         </script>
