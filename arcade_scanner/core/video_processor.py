@@ -168,15 +168,14 @@ def detect_hw_encoder() -> tuple:
         
         # Check for VAAPI (Linux Intel/AMD standard)
         if "h264_vaapi" in encoders_output:
-            try:
-                # Check if we can actually open the device (often /dev/dri/renderD128)
-                test_cmd = [
-                    "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
-                    "-vaapi_device", "/dev/dri/renderD128",
-                    "-vf", "format=nv12,hwupload",
-                    "-c:v", "h264_vaapi",
-                    "-f", "null", "-", "-y", "-loglevel", "quiet"
-                ]
+            # Check if we can actually open the device (often /dev/dri/renderD128)
+            test_cmd = [
+                "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
+                "-vaapi_device", "/dev/dri/renderD128",
+                "-vf", "format=nv12,hwupload",
+                "-c:v", "h264_vaapi",
+                "-f", "null", "-", "-y", "-loglevel", "quiet"
+            ]
             test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
             if test_result.returncode == 0:
                 print("✅ VAAPI Test Passed")
