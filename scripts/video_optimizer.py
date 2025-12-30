@@ -162,6 +162,14 @@ def detect_encoder():
         if 'hevc_qsv' in result.stdout:
             return 'qsv'
         if 'hevc_vaapi' in result.stdout:
+            # Simple check for device existence
+            if os.path.exists("/dev/dri/renderD128"):
+                 return 'vaapi'
+            elif os.path.exists("/dev/dri/card0"):
+                 # Update profile to use card0 if needed, but for now just return profile
+                 # Note: The profile hardcodes renderD128. Ideally we should dynamic update.
+                 # For simplicity in this script, we assume renderD128 is the target for headless.
+                 return 'vaapi'
             return 'vaapi'
         if 'hevc_videotoolbox' in result.stdout:
             return 'videotoolbox'

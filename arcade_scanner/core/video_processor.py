@@ -168,23 +168,36 @@ def detect_hw_encoder() -> tuple:
         
         # Check for VAAPI (Linux Intel/AMD standard)
         if "h264_vaapi" in encoders_output:
-            # Check if we can actually open the device (often /dev/dri/renderD128)
-            test_cmd = [
-                "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
-                "-vaapi_device", "/dev/dri/renderD128",
-                "-vf", "format=nv12,hwupload",
-                "-c:v", "h264_vaapi",
-                "-f", "null", "-", "-y", "-loglevel", "error"
-            ]
-            test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
-            if test_result.returncode == 0:
-                print("✅ VAAPI Test Passed")
-                return ("h264_vaapi", [
-                    "-vaapi_device", "/dev/dri/renderD128", 
-                    "-vf", "format=nv12,hwupload"
-                ])
-            else:
-                print(f"⚠️ VAAPI Test Failed: {test_result.stderr.decode().strip()}")
+            # Try multiple common VAAPI devices
+            vaapi_devices = ["/dev/dri/renderD128", "/dev/dri/card0"]
+            found_device = None
+            
+            for dev in vaapi_devices:
+                if not os.path.exists(dev):
+                    continue
+                    
+                print(f"🕵️ Testing VAAPI on {dev}...")
+                test_cmd = [
+                    "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
+                    "-vaapi_device", dev,
+                    "-vf", "format=nv12,hwupload",
+                    "-c:v", "h264_vaapi",
+                    "-f", "null", "-", "-y", "-loglevel", "error"
+                ]
+                
+                test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
+                if test_result.returncode == 0:
+                    print(f"✅ VAAPI Working on {dev}")
+                    return ("h264_vaapi", [
+                        "-vaapi_device", dev, 
+                        "-vf", "format=nv12,hwupload"
+                    ])
+                else:
+                     print(f"❌ Failed on {dev}: {test_result.stderr.decode().strip()}")
+            
+            print("⚠️ VAAPI failed on all devices. Possible fixes:")
+            print("  1. Install drivers: sudo apt-get install intel-media-va-driver-non-free")
+            print("  2. Fix permissions: sudo usermod -aG render $USER")
         else:
              print("ℹ️ h264_vaapi not found in ffmpeg encoders")
             
