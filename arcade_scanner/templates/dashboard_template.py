@@ -1,4 +1,5 @@
 import os
+import socket
 import time
 from arcade_scanner.app_config import HIDDEN_DATA_DIR, PORT, OPTIMIZER_SCRIPT, OPTIMIZER_AVAILABLE
 
@@ -30,6 +31,101 @@ def generate_html_report(results, report_file, server_port=PORT):
         <script>
             window.userSettings = {user_settings_json};
         </script>
+        <style>
+            /* OPTIMIZE PANEL */
+            #optimizePanel {{
+                position: absolute;
+                bottom: 0px; 
+                left: 0; 
+                right: 0;
+                background: rgba(16, 16, 24, 0.95);
+                backdrop-filter: blur(10px);
+                border-top: 1px solid rgba(255,255,255,0.1);
+                padding: 16px 24px 24px 24px;
+                transform: translateY(110%);
+                transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+                z-index: 10100;
+                box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+            }}
+            #optimizePanel.active {{
+                transform: translateY(0);
+            }}
+            .opt-row {{
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                flex-wrap: wrap;
+            }}
+            .opt-label {{
+                font-size: 0.8rem;
+                color: #888;
+                font-weight: 600;
+                width: 60px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }}
+            .opt-segmented {{
+                display: flex;
+                background: rgba(255,255,255,0.05);
+                border-radius: 8px;
+                padding: 2px;
+            }}
+            .opt-option {{
+                padding: 6px 16px;
+                font-size: 0.9rem;
+                cursor: pointer;
+                border-radius: 6px;
+                color: #aaa;
+                transition: all 0.2s;
+            }}
+            .opt-option.selected {{
+                background: #333;
+                color: #fff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }}
+            .opt-input {{
+                background: rgba(0,0,0,0.3);
+                border: 1px solid rgba(255,255,255,0.1);
+                color: #fff;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-family: monospace;
+                width: 100px;
+                text-align: center;
+            }}
+            .opt-btn-small {{
+                background: transparent;
+                border: 1px solid rgba(255,255,255,0.1);
+                color: #ccc;
+                width: 30px;
+                height: 30px;
+                border-radius: 6px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }}
+            .opt-btn-small:hover {{
+                background: rgba(255,255,255,0.1);
+                color: #fff;
+            }}
+            .opt-action-btn {{
+                flex: 1;
+                padding: 10px;
+                border: none;
+                border-radius: 8px;
+                font-weight: bold;
+                cursor: pointer;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }}
+        </style>
     </head>
     <body data-port="{server_port}">
         <canvas id="starfield"></canvas>
@@ -43,7 +139,7 @@ def generate_html_report(results, report_file, server_port=PORT):
                 </div>
             </div>
             <div class="stats-display">
-                STATUS: READY // 
+                SERVER: {socket.gethostname().upper()} // 
                 TOTAL: <span id="count-total">{len(results)}</span> VIDEOS // 
                 VOLUME: <span id="size-total">{total_mb/1024:.1f} GB</span>
             </div>
@@ -184,6 +280,35 @@ def generate_html_report(results, report_file, server_port=PORT):
                     <span class="material-icons">bolt</span>
                     <span>OPTIMIZE</span>
                 </button>''' if OPTIMIZER_AVAILABLE else ""}
+            </div>
+            
+             <div id="optimizePanel">
+                <div class="opt-row">
+                    <div class="opt-label">AUDIO</div>
+                    <div class="opt-segmented">
+                        <div class="opt-option selected" id="optAudioEnhanced" onclick="setOptAudio('enhanced')">Enhanced</div>
+                        <div class="opt-option" id="optAudioStandard" onclick="setOptAudio('standard')">Standard</div>
+                    </div>
+                    <div style="flex:1;"></div>
+                    <span style="font-size:0.8rem; color:#666;" id="optAudioDesc">Smart normalization & noise reduction</span>
+                </div>
+                
+                <div class="opt-row">
+                    <div class="opt-label">TRIM</div>
+                    <input type="text" class="opt-input" id="optTrimStart" placeholder="00:00:00">
+                    <button class="opt-btn-small" onclick="setTrimFromHead('start')" title="Set Start to Current Pos"><span class="material-icons" style="font-size:16px;">arrow_downward</span></button>
+                    <div style="width:10px; text-align:center; color:#555;">-</div>
+                    <input type="text" class="opt-input" id="optTrimEnd" placeholder="END">
+                    <button class="opt-btn-small" onclick="setTrimFromHead('end')" title="Set End to Current Pos"><span class="material-icons" style="font-size:16px;">arrow_downward</span></button>
+                    <button class="opt-btn-small" onclick="clearTrim()" title="Clear Trim"><span class="material-icons" style="font-size:16px;">close</span></button>
+                </div>
+                
+                <div class="opt-row" style="margin-top:8px;">
+                    <button class="opt-action-btn" onclick="closeOptimize()" style="background:rgba(255,255,255,0.05); color:#ccc; max-width:100px;">Cancel</button>
+                    <button class="opt-action-btn" onclick="triggerOptimization()" style="background:var(--neon-blue); color:#fff; box-shadow: 0 0 15px rgba(0,243,255,0.3);">
+                        <span class="material-icons">bolt</span> START OPTIMIZATION
+                    </button>
+                </div>
             </div>
         </div>
         

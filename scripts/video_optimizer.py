@@ -280,12 +280,18 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     
     sys.stdout.flush()
 
-def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False):
+def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None):
     """Build the ffmpeg command based on encoder profile."""
     cmd = ['ffmpeg', '-y']
     
+    # Trim input if needed (fast seek)
+    if ss: cmd.extend(['-ss', str(ss)])
+    if to: cmd.extend(['-to', str(to)])
+    
     cmd.extend(profile['hwaccel_input'])
     cmd.extend(['-i', str(input_path)])
+    
+    # Map video codec
     cmd.extend(['-c:v', profile['codec']])
     cmd.extend(profile['encoder_args'])
     cmd.extend([profile['quality_flag'], str(quality_value)])
@@ -294,11 +300,11 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     # Audio settings
     if copy_audio:
         cmd.extend(['-c:a', 'copy'])
+    elif audio_mode == 'standard':
+        # Standard AAC re-encode without normalization (flat)
+        cmd.extend(['-c:a', 'aac', '-b:a', '192k'])
     else:
-        # Audio Pipeline: 
-        # 1. High-pass (100Hz): Remove low rumble
-        # 2. Gate (below -55dB): Silence hiss/noise so it doesn't get boosted
-        # 3. Loudnorm: Normalize volume
+        # Enhanced: High-pass + Gate + Loudnorm
         audio_filters = 'highpass=f=100,agate=threshold=-55dB:range=0.05:ratio=2,loudnorm=I=-20:TP=-1.5:LRA=11'
         cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-af', audio_filters])
     
@@ -312,32 +318,40 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     
     return cmd
 
-def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None):
+def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None):
     """Process a single video file. Returns (success, bytes_saved)."""
     input_path = Path(input_path)
+    is_trim = ss is not None or to is not None
     
     if not input_path.exists():
         return (False, 0)
 
-    # Skip already optimized or marked files
-    if "_opt.mp4" in input_path.name or "NO-OPT" in input_path.name:
+    # Skip already optimized or marked files (UNLESS trimming is active, then we allow re-processing)
+    if not is_trim and ("_opt.mp4" in input_path.name or "NO-OPT" in input_path.name):
         print(f"{Y}Skipping:{NC} {input_path.name} (already optimized marker)")
         batch_stats['skipped'] += 1
         return (False, 0)
 
-    output_path = input_path.parent / f"{input_path.stem}_opt.mp4"
-    
-    # Skip if output already exists
-    if output_path.exists():
-        print(f"{Y}Skipping:{NC} {input_path.name} (_opt.mp4 already exists)")
-        batch_stats['skipped'] += 1
-        return (False, 0)
+    # Determine Output Path
+    if is_trim:
+        # For trim, we always create a new file, maybe with _trim suffix?
+        # Or standard _opt but allow overwrite?
+        # Use standard suffix for consistency
+        output_path = input_path.parent / f"{input_path.stem}_opt.mp4"
+    else:
+        output_path = input_path.parent / f"{input_path.stem}_opt.mp4"
+        
+        # Skip if output already exists (Skip check if trimming)
+        if output_path.exists():
+            print(f"{Y}Skipping:{NC} {input_path.name} (_opt.mp4 already exists)")
+            batch_stats['skipped'] += 1
+            return (False, 0)
     
     size_before = input_path.stat().st_size
     size_mb = size_before / (1024 * 1024)
     
-    # Skip small files
-    if size_mb < min_size_mb:
+    # Skip small files (UNLESS trimming)
+    if not is_trim and size_mb < min_size_mb:
         print(f"{Y}Skipping:{NC} {input_path.name} ({size_mb:.1f} MB < {min_size_mb} MB min)")
         batch_stats['skipped'] += 1
         return (False, 0)
@@ -363,7 +377,7 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     while should_continue(quality):
         print(f"{G}Pass:{NC} Q={quality}")
         
-        cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio)
+        cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}
@@ -399,6 +413,16 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
                 return (False, 0)
 
             size_after = output_path.stat().st_size
+            
+            # If trimming, we cannot compare size properly against original or do SSIM easily (durations differ)
+            if is_trim:
+                file_time = time.time() - file_start_time
+                print(f" {BG}>>> SUCCESS (TRIM)! Saved to {output_path.name} in {format_time(file_time)}.{NC}")
+                batch_stats['total_time'] += file_time
+                batch_stats['success'] += 1
+                if port: notify_server(port, input_path)
+                return (True, 0)
+
             if size_after >= size_before:
                 print(f" {R}-> File larger. Adjusting quality...{NC}")
                 quality += step
@@ -471,6 +495,10 @@ def main():
                         help=f'Skip files smaller than N MB (default: {DEFAULT_MIN_SIZE_MB})')
     parser.add_argument('--copy-audio', action='store_true',
                         help='Copy audio without re-encoding (faster, preserves original audio)')
+    parser.add_argument('--audio-mode', choices=['enhanced', 'standard'], default='enhanced',
+                        help='Audio processing mode (default: enhanced)')
+    parser.add_argument('--ss', type=str, help='Start time (e.g. 00:00:10 or 10)')
+    parser.add_argument('--to', type=str, help='End time (e.g. 00:00:20 or 20)')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     args = parser.parse_args()
     
@@ -489,8 +517,14 @@ def main():
     print(f"{BG}VIDEO OPTIMIZER V2.1{NC} - {G}{profile['name']}{NC}")
     if args.copy_audio:
         print(f"{Y}Audio: Copy (passthrough){NC}")
+    elif args.audio_mode:
+        print(f"{Y}Audio Mode: {args.audio_mode}{NC}")
+
     if args.min_size != DEFAULT_MIN_SIZE_MB:
         print(f"{Y}Min size: {args.min_size} MB{NC}")
+        
+    if args.ss or args.to:
+        print(f"{Y}Trim Active: {args.ss} -> {args.to}{NC}")
     
     files = args.files
     if not files:
@@ -507,7 +541,7 @@ def main():
     
     for f in files:
         batch_stats['processed'] += 1
-        process_file(f, profile, min_size_mb=args.min_size, copy_audio=args.copy_audio, port=args.port)
+        process_file(f, profile, min_size_mb=args.min_size, copy_audio=args.copy_audio, port=args.port, audio_mode=args.audio_mode, ss=args.ss, to=args.to)
 
     # Print batch summary if multiple files
     if len(files) > 1:

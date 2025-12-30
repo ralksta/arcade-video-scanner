@@ -159,24 +159,52 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_response(204)
                 self.end_headers()
 
-            elif self.path.startswith("/compress?path="):
-                file_path = unquote(self.path.split("path=")[1])
-                # Get current running port
-                current_port = self.server.server_address[1]
-                print(f"🔌 Current Server Port: {current_port}")
-                
-                if IS_WIN:
-                    cmd_str = f'"{sys.executable}" "{OPTIMIZER_SCRIPT}" "{file_path}" --port {current_port}'
-                    cmd = f'start "Video Optimizer" cmd /k "{cmd_str}"'
-                    print(f"🚀 Launching Optimizer (Win): {cmd}")
-                    subprocess.run(cmd, shell=True)
-                else:
-                    cmd_str = f'{sys.executable} \\"{OPTIMIZER_SCRIPT}\\" \\"{file_path}\\" --port {current_port}'
-                    print(f"🚀 Launching Optimizer (Mac): {cmd_str}")
-                    applescript = f'tell application "Terminal" to do script "{cmd_str}"'
-                    subprocess.run(["osascript", "-e", applescript])
-                self.send_response(204)
-                self.end_headers()
+            elif self.path.startswith("/compress?"):
+                try:
+                    params = parse_qs(urlparse(self.path).query)
+                    file_path = params.get("path", [None])[0]
+                    
+                    if not file_path:
+                         print("❌ No path provided for compression")
+                         self.send_error(400, "Missing path parameter")
+                         return
+
+                    audio_mode = params.get("audio", ["enhanced"])[0]
+                    ss = params.get("ss", [None])[0]
+                    to = params.get("to", [None])[0]
+                    
+                    # Get current running port
+                    current_port = self.server.server_address[1]
+                    print(f"🔌 Current Server Port: {current_port}")
+                    print(f"⚡ Optimize: {file_path} | Audio: {audio_mode} | Trim: {ss}-{to}")
+                    
+                    cmd_parts = []
+                    if IS_WIN:
+                        cmd_parts = [sys.executable, OPTIMIZER_SCRIPT, file_path, "--port", str(current_port), "--audio-mode", audio_mode]
+                        if ss: cmd_parts.extend(["--ss", ss])
+                        if to: cmd_parts.extend(["--to", to])
+                        
+                        # Join for cmd.exe
+                        cmd_str = " ".join(f'"{p}"' for p in cmd_parts)
+                        cmd = f'start "Video Optimizer" cmd /k "{cmd_str}"'
+                        print(f"🚀 Launching Optimizer (Win): {cmd}")
+                        subprocess.run(cmd, shell=True)
+                    else:
+                        # Construct argument string manually for Applescript
+                        # We need to quote the path and script path
+                        cmd_str = f'{sys.executable} \\"{OPTIMIZER_SCRIPT}\\" \\"{file_path}\\" --port {current_port} --audio-mode {audio_mode}'
+                        if ss: cmd_str += f' --ss {ss}'
+                        if to: cmd_str += f' --to {to}'
+                        
+                        print(f"🚀 Launching Optimizer (Mac): {cmd_str}")
+                        applescript = f'tell application "Terminal" to do script "{cmd_str}"'
+                        subprocess.run(["osascript", "-e", applescript])
+                        
+                    self.send_response(204)
+                    self.end_headers()
+                except Exception as e:
+                    print(f"❌ Error in compress endpoint: {e}")
+                    self.send_error(500, str(e))
 
             elif self.path.startswith("/api/keep_optimized?"):
                 try:

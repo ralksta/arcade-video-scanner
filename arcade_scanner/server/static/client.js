@@ -169,24 +169,25 @@ function setLayout(layout, skipURLUpdate = false) {
 }
 
 // Update URL to reflect current state
+// Update URL to reflect current state
 function updateURL() {
     let path = '/';
 
-    // Map workspace mode to path
-    if (workspaceMode === 'optimized') path = '/review';
-    else if (workspaceMode === 'favorites') path = '/favorites';
-    else if (workspaceMode === 'vault') path = '/vault';
-    else path = '/lobby';
-
-    // Preserve treemap context if active
+    // Special handling for Treemap
     if (currentLayout === 'treemap') {
+        path = '/treeview';
         const params = new URLSearchParams();
-        params.set('view', 'treemap');
         if (treemapCurrentFolder) {
             params.set('folder', encodeURIComponent(treemapCurrentFolder));
         }
         const qs = params.toString();
         if (qs) path += `?${qs}`;
+    } else {
+        // Map workspace mode to path
+        if (workspaceMode === 'optimized') path = '/review';
+        else if (workspaceMode === 'favorites') path = '/favorites';
+        else if (workspaceMode === 'vault') path = '/vault';
+        else path = '/lobby';
     }
 
     // Only push if changed
@@ -200,26 +201,27 @@ function loadFromURL() {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
 
-    // RESTORE MODE FROM PATH
+    // Default
     let mode = 'lobby';
-    if (path.startsWith('/review')) mode = 'optimized';
-    else if (path.startsWith('/favorites')) mode = 'favorites';
-    else if (path.startsWith('/vault')) mode = 'vault';
+    let layout = 'grid';
 
-    if (mode !== 'lobby') {
-        setWorkspaceMode(mode);
+    if (path === '/favorites') mode = 'favorites';
+    else if (path === '/review') mode = 'optimized';
+    else if (path === '/vault') mode = 'vault';
+    else if (path === '/treeview') {
+        mode = 'lobby';
+        layout = 'treemap';
     }
 
-    // RESTORE LAYOUT (Treemap)
-    const viewMode = params.get('view');
-    const folder = params.get('folder');
+    // Overrides from params
+    if (params.get('view') === 'treemap') layout = 'treemap';
+    if (params.get('folder')) treemapCurrentFolder = decodeURIComponent(params.get('folder'));
 
-    if (viewMode === 'treemap') {
-        currentLayout = 'treemap';
-        if (folder) {
-            treemapCurrentFolder = decodeURIComponent(folder);
-        }
-        setLayout('treemap', true);
+    setWorkspaceMode(mode);
+
+    // Force layout if treeview
+    if (layout === 'treemap') {
+        setLayout('treemap');
     }
 }
 
@@ -1377,10 +1379,10 @@ function setupTreemapInteraction() {
                 updateURL();
             } else {
                 // Open cinema for file
+                // Open cinema for file
                 const mockContainer = {
-                    closest: () => ({
-                        getAttribute: () => block.video.FilePath
-                    })
+                    getAttribute: (attr) => attr === 'data-path' ? block.video.FilePath : null,
+                    closest: () => null
                 };
                 openCinema(mockContainer);
             }
@@ -1687,12 +1689,116 @@ function saveSettingsWithoutReload() {
     });
 }
 
-// Initialize on load
+// --- OPTIMIZATION PANEL LOGIC ---
+let currentOptAudio = 'enhanced';
+
+function cinemaOptimize() {
+    // Open the panel
+    const panel = document.getElementById('optimizePanel');
+    const infoContent = document.getElementById('cinemaInfoContent');
+
+    // Check if we are already seeing it
+    if (panel.classList.contains('active')) {
+        closeOptimize();
+        return;
+    }
+
+    // Populate Initial State
+    currentOptAudio = 'enhanced'; // Reset to default
+    updateOptAudioUI();
+    clearTrim(); // Reset trim
+
+    // Show panel
+    panel.classList.add('active');
+    document.querySelector('.cinema-actions').style.display = 'none';
+}
+
+function closeOptimize() {
+    document.getElementById('optimizePanel').classList.remove('active');
+    document.querySelector('.cinema-actions').style.display = 'flex';
+}
+
+function setOptAudio(mode) {
+    currentOptAudio = mode;
+    updateOptAudioUI();
+}
+
+function updateOptAudioUI() {
+    document.getElementById('optAudioEnhanced').classList.toggle('selected', currentOptAudio === 'enhanced');
+    document.getElementById('optAudioStandard').classList.toggle('selected', currentOptAudio === 'standard');
+
+    const desc = document.getElementById('optAudioDesc');
+    if (currentOptAudio === 'enhanced') desc.innerText = "Smart normalization & noise reduction";
+    else desc.innerText = "Standard encoding (no filters)";
+}
+
+function setTrimFromHead(type) {
+    const video = document.getElementById('cinemaVideo');
+    const time = new Date(video.currentTime * 1000).toISOString().substr(11, 8);
+
+    if (type === 'start') {
+        document.getElementById('optTrimStart').value = time;
+    } else {
+        document.getElementById('optTrimEnd').value = time;
+    }
+}
+
+function clearTrim() {
+    document.getElementById('optTrimStart').value = "";
+    document.getElementById('optTrimEnd').value = "";
+}
+
+function triggerOptimization() {
+    if (!currentCinemaPath) return;
+
+    const ss = document.getElementById('optTrimStart').value;
+    const to = document.getElementById('optTrimEnd').value;
+
+    // Simple validation
+    // (Could add regex check for HH:MM:SS here but backend/ffmpeg handles partials well usually)
+
+    const params = new URLSearchParams();
+    params.set('path', currentCinemaPath);
+    params.set('audio', currentOptAudio);
+    if (ss) params.set('ss', ss);
+    if (to) params.set('to', to);
+
+    fetch(`/compress?${params.toString()}`)
+        .then(() => {
+            closeOptimize();
+            // Show feedback?
+            alert("Optimization started! Check the console or dashboard for progress.");
+        })
+        .catch(err => alert("Error starting optimization: " + err));
+}
+
+// --- GLOBAL UTILS ---
+window.toggleLayout = toggleLayout;
+// Expose for HTML access
+window.cinemaOptimize = cinemaOptimize;
+window.setOptAudio = setOptAudio;
+window.setTrimFromHead = setTrimFromHead;
+window.clearTrim = clearTrim;
+window.closeOptimize = closeOptimize;
+window.triggerOptimization = triggerOptimization;
+
+// --- RUN ON LOAD ---
 document.addEventListener('DOMContentLoaded', () => {
-    // ... existing init logic ...
-    // But we need to call renderSavedViews AFTER settings are loaded? 
-    // Settings are loaded via template injection in index.html usually or fetch.
-    // userSettings global var is populated in index.html from python?
-    // Let's assume userSettings is available.
-    setTimeout(renderSavedViews, 500); // Small delay to ensure init
+    // Check optimized status on backend
+    // fetch('/status')...
+
+    // Initial Filter
+    if (document.getElementById('statusSelect'))
+        setFilter(document.getElementById('statusSelect').value);
+
+    // Handle URL Back/Forward
+    window.onpopstate = (event) => {
+        loadFromURL();
+    };
+
+    // Initial Load
+    loadFromURL();
+
+    // Render views
+    setTimeout(renderSavedViews, 500);
 });
