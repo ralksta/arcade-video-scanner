@@ -80,6 +80,7 @@ function setWorkspaceMode(mode) {
     if (mode === 'vault') document.body.classList.add('vault-mode');
     else document.body.classList.remove('vault-mode');
     filterAndSort();
+    updateURL();
 }
 
 function toggleLayout() {
@@ -169,41 +170,56 @@ function setLayout(layout, skipURLUpdate = false) {
 
 // Update URL to reflect current state
 function updateURL() {
-    const params = new URLSearchParams();
+    let path = '/';
 
-    // Add view mode
-    if (currentLayout !== 'grid') {
-        params.set('view', currentLayout);
+    // Map workspace mode to path
+    if (workspaceMode === 'optimized') path = '/review';
+    else if (workspaceMode === 'favorites') path = '/favorites';
+    else if (workspaceMode === 'vault') path = '/vault';
+    else path = '/lobby';
+
+    // Preserve treemap context if active
+    if (currentLayout === 'treemap') {
+        const params = new URLSearchParams();
+        params.set('view', 'treemap');
+        if (treemapCurrentFolder) {
+            params.set('folder', encodeURIComponent(treemapCurrentFolder));
+        }
+        const qs = params.toString();
+        if (qs) path += `?${qs}`;
     }
 
-    // Add treemap folder if drilled down
-    if (currentLayout === 'treemap' && treemapCurrentFolder) {
-        params.set('folder', encodeURIComponent(treemapCurrentFolder));
+    // Only push if changed
+    if (window.location.pathname !== path) {
+        window.history.pushState({ layout: currentLayout, folder: treemapCurrentFolder, mode: workspaceMode }, '', path);
     }
-
-    // Build URL
-    const url = params.toString() ? `?${params.toString()}` : '/';
-    window.history.pushState({ layout: currentLayout, folder: treemapCurrentFolder }, '', url);
 }
 
 // Load state from URL on page load
 function loadFromURL() {
+    const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
 
-    const viewMode = params.get('view') || 'grid';
+    // RESTORE MODE FROM PATH
+    let mode = 'lobby';
+    if (path.startsWith('/review')) mode = 'optimized';
+    else if (path.startsWith('/favorites')) mode = 'favorites';
+    else if (path.startsWith('/vault')) mode = 'vault';
+
+    if (mode !== 'lobby') {
+        setWorkspaceMode(mode);
+    }
+
+    // RESTORE LAYOUT (Treemap)
+    const viewMode = params.get('view');
     const folder = params.get('folder');
 
-    // Set layout without updating URL (to avoid duplicate history entry)
     if (viewMode === 'treemap') {
         currentLayout = 'treemap';
         if (folder) {
             treemapCurrentFolder = decodeURIComponent(folder);
         }
         setLayout('treemap', true);
-    } else if (viewMode === 'list') {
-        setLayout('list', true);
-    } else {
-        setLayout('grid', true);
     }
 }
 
@@ -384,7 +400,7 @@ function createComparisonCard(pair) {
             <!-- ORIGINAL -->
             <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
                 <div class="badge" style="align-self:flex-start; margin-bottom:8px; background:#444;">ORIGINAL</div>
-                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
+                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)" data-path="${orig.FilePath}">
                     <img src="thumbnails/${orig.thumb}" class="thumb" loading="lazy">
                     <video class="preview-video" muted loop preload="none" 
                            data-src="/preview?name=${orig.preview}">
@@ -398,10 +414,13 @@ function createComparisonCard(pair) {
                         <span>${orig.codec}</span>
                     </div>
                 </div>
+                <a href="/reveal?path=${encodeURIComponent(orig.FilePath)}" target="h_frame" class="btn" style="margin-top:10px; width:100%; text-align:center; display:block; padding:8px; background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.9); text-decoration:none; border-radius:4px; transition: background 0.2s;">
+                    <span class="material-icons" style="vertical-align:middle; font-size:18px; margin-right:4px;">folder_open</span> Reveal
+                </a>
             </div>
             
             <!-- STATS CENTER -->
-            <div style="width:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-left:1px solid #333; border-right:1px solid #333; padding:0 8px; flex-shrink:0;">
+            <div style="width:160px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-left:1px solid #333; border-right:1px solid #333; padding:0 8px; flex-shrink:0;">
                 <div style="font-size:1.5rem; font-weight:bold; color:${isSmaller ? '#4cd964' : '#ff3b30'};">
                     ${diffPct.toFixed(1)}%
                 </div>
@@ -420,7 +439,7 @@ function createComparisonCard(pair) {
             <!-- OPTIMIZED -->
             <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
                 <div class="badge ok" style="align-self:flex-start; margin-bottom:8px;">OPTIMIZED</div>
-                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
+                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)" data-path="${opt.FilePath}">
                     <img src="thumbnails/${opt.thumb}" class="thumb" loading="lazy">
                     <video class="preview-video" muted loop preload="none" 
                            data-src="/preview?name=${opt.preview}">
@@ -434,6 +453,9 @@ function createComparisonCard(pair) {
                         <span>${opt.codec}</span>
                     </div>
                 </div>
+                <a href="/reveal?path=${encodeURIComponent(opt.FilePath)}" target="h_frame" class="btn" style="margin-top:10px; width:100%; text-align:center; display:block; padding:8px; background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.9); text-decoration:none; border-radius:4px; transition: background 0.2s;">
+                    <span class="material-icons" style="vertical-align:middle; font-size:18px; margin-right:4px;">folder_open</span> Reveal
+                </a>
             </div>
             
         </div>
@@ -659,8 +681,17 @@ let currentCinemaPath = null;
 let currentCinemaVideo = null;
 
 function openCinema(container) {
-    const card = container.closest('.video-card-container');
-    const path = card.getAttribute('data-path');
+    // 1. Try to find path on the clicked container itself (for specific video overrrides)
+    let path = container.getAttribute('data-path');
+
+    // 2. If not found, fall back to the main card container (default behavior)
+    if (!path) {
+        const card = container.closest('.video-card-container');
+        if (card) path = card.getAttribute('data-path');
+    }
+
+    if (!path) return;
+
     const fileName = path.split(/[\\\/]/).pop();
 
     currentCinemaPath = path; // Store for action buttons

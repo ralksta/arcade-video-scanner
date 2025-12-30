@@ -23,7 +23,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         try:
             # 1. ROOT / INDEX -> Serve REPORT_FILE
-            if self.path == "/" or self.path == "/index.html" or self.path.startswith("/index.html?"):
+            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault"]
+            if self.path in spa_routes or self.path.startswith("/index.html?"):
                 self.send_response(200)
                 self.send_header("Content-type", "text/html; charset=utf-8")
                 

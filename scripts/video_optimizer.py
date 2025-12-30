@@ -137,8 +137,7 @@ def detect_encoder():
         except:
             pass
     # Linux or fallback
-    except:
-        pass
+
 
     # Generic Linux/Windows Detection
     try:
@@ -296,7 +295,12 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     if copy_audio:
         cmd.extend(['-c:a', 'copy'])
     else:
-        cmd.extend(['-c:a', 'aac', '-b:a', '256k', '-af', 'loudnorm=I=-20:TP=-1.5:LRA=11'])
+        # Audio Pipeline: 
+        # 1. High-pass (100Hz): Remove low rumble
+        # 2. Gate (below -55dB): Silence hiss/noise so it doesn't get boosted
+        # 3. Loudnorm: Normalize volume
+        audio_filters = 'highpass=f=100,agate=threshold=-55dB:range=0.05:ratio=2,loudnorm=I=-20:TP=-1.5:LRA=11'
+        cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-af', audio_filters])
     
     cmd.extend([
         '-tag:v', 'hvc1',
