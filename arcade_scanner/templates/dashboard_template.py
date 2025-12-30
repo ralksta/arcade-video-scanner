@@ -21,6 +21,10 @@ def generate_html_report(results, report_file, server_port=PORT):
     all_videos_json = json.dumps(results)
     user_settings_json = json.dumps(USER_SETTINGS)
     
+    # Logic for enabled state: Must be installed AND enabled in settings
+    opt_avail_str = 'true' if OPTIMIZER_AVAILABLE else 'false'
+    opt_enabled_str = 'true' if (OPTIMIZER_AVAILABLE and USER_SETTINGS.get("enable_optimizer", True)) else 'false'
+    
     html_content = f"""<!DOCTYPE html>
     <html lang="de">
     <head>
@@ -31,6 +35,9 @@ def generate_html_report(results, report_file, server_port=PORT):
         <link rel="stylesheet" href="/static/styles.css?v={int(time.time()) + 1}">
         <script>
             window.userSettings = {user_settings_json};
+            window.OPTIMIZER_AVAILABLE = {opt_avail_str};
+            window.ENABLE_OPTIMIZER = {opt_enabled_str};
+            window.FOLDERS_DATA = {folders_json};
         </script>
         <style>
             /* OPTIMIZE PANEL */
@@ -51,6 +58,11 @@ def generate_html_report(results, report_file, server_port=PORT):
                 flex-direction: column;
                 gap: 16px;
             }}
+            .switch input {{ opacity: 0; width: 0; height: 0; }}
+            .switch input:checked + .slider {{ background-color: #2196F3; }}
+            .switch input:focus + .slider {{ box-shadow: 0 0 1px #2196F3; }}
+            .switch input:checked ~ .slider-knob {{ transform: translateX(14px); }}
+            #optimizePanel.active {{
             #optimizePanel.active {{
                 transform: translateY(0);
             }}
@@ -224,6 +236,15 @@ def generate_html_report(results, report_file, server_port=PORT):
                     <div class="legend-items">
                         <span class="legend-item"><span class="legend-color high"></span> HIGH BITRATE</span>
                         <span class="legend-item"><span class="legend-color ok"></span> OPTIMIZED</span>
+                        <!-- LOG SCALE TOGGLE -->
+                        <div style="display:flex; align-items:center; margin-left:16px; gap:8px;">
+                             <label class="switch" style="position:relative; display:inline-block; width:34px; height:20px;">
+                                <input type="checkbox" id="treemapLogToggle" onchange="toggleTreemapScale()">
+                                <span class="slider round" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px;"></span>
+                                <span class="slider-knob" style="position:absolute; content:''; height:14px; width:14px; left:3px; bottom:3px; background-color:white; transition:.4s; border-radius:50%;"></span>
+                             </label>
+                             <span style="font-size:0.8rem; color:#aaa;">LOG SCALE</span>
+                        </div>
                     </div>
                     <span class="legend-hint">Klicken zum Abspielen • Hover für Details</span>
                 </div>
@@ -280,7 +301,7 @@ def generate_html_report(results, report_file, server_port=PORT):
                 {f'''<button class="cinema-action-btn" onclick="cinemaOptimize()" title="Optimize Video">
                     <span class="material-icons">bolt</span>
                     <span>OPTIMIZE</span>
-                </button>''' if OPTIMIZER_AVAILABLE else ""}
+                </button>''' if (OPTIMIZER_AVAILABLE and USER_SETTINGS.get("enable_optimizer", True)) else ""}
             </div>
             
              <div id="optimizePanel">
@@ -362,6 +383,16 @@ def generate_html_report(results, report_file, server_port=PORT):
                         <div>
                             <label>Bitrate-Schwellwert (kbps)</label>
                             <input type="number" id="settingsBitrate" min="1000" value="15000">
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <label>🎨 Interface & Features</label>
+                        <div class="settings-row" style="align-items:center; gap:20px; margin-top:8px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <input type="checkbox" id="settingsFunFacts" style="width:20px; height:20px;">
+                                <label for="settingsFunFacts" style="margin:0; font-weight:normal;">Optimizer Fun Facts</label>
+                            </div>
                         </div>
                     </div>
                     

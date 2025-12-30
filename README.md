@@ -1,4 +1,4 @@
-# Arcade Video Scanner 5.2.0 (Cinema Mode Edition)
+# Arcade Video Scanner 5.4.0 (Dev)
 
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
@@ -6,155 +6,106 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 - **Visual Analysis**: Instantly see which videos are "High Bitrate" (candidates for compression) vs. "Optimized".
 - **Privacy-First**: No data ever leaves your computer. The scan, database, and web dashboard run 100% locally.
 - **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, or file size to pinpoint storage hogs.
-- **Interactive Previews**: Hover over any video to see a 5-second preview clip, making it easy to identify content without opening multiple video players.
+- **Interactive Previews**: Hover over any video to see a 5-second preview clip.
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
-- **GPU-Powered Optimization**: Cross-platform optimization supporting both NVIDIA (Windows) and Apple VideoToolbox (macOS) hardware acceleration, reducing file sizes by 50-80% with minimal quality loss.
-- **Batch Operations**: Select and favorite multiple videos at once with the new batch selection feature.
+- **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 5.2.0 Highlights
+## 🚀 Version 5.4.0 (Performance & Visualization)
 
-### 💾 Saved Views & Filters
-- **Smart Presets**: Save your current combination of search terms, filters, sorting, and view mode (grid/list) as a custom preset.
-- **One-Click Recall**: Instantly switch between "Large Files", "Unoptimized 4K", or any other custom view you create.
+### 📊 Treemap Logarithmic Scale
+- **Toggle View**: Switch between **Linear** (size-accurate) and **Logarithmic** (structure-visible) treemap modes.
+- **Fixes Power Laws**: Easily visualize folder structures even when one directory (e.g., "Archive") is 100x larger than others.
 
-### ⚡ Real-Time Optimization Updates
-- **Live Status**: The Dashboard now receives real-time notifications from the external video optimizer script.
-- **Instant Refresh**: Optimized videos are marked as finished in the UI immediately upon completion, without needing a refresh.
+### ⚡ Master Optimizer Toggle
+- **Resource Control**: Disable the entire optimization suite via `settings.json` (`"enable_optimizer": false`).
+- **Clean UI**: Hides all "Optimize" buttons, lightning bolt icons, and batch actions when disabled—perfect for low-power servers.
 
-### 🔧 Core Improvements
-- **Refactored Scanner**: The core scanning engine has been extracted to a dedicated module for better maintainability and testing.
-- **Robust Pairing**: Improved logic for pairing original and optimized video files.
+### 🐧 Linux Hardware Acceleration (VAAPI)
+- **Native VAAPI Support**: Now supports hardware transcoding on Linux for Intel and AMD GPUs.
+- **Performance Boost**: Uses hardware acceleration for both **startup scanning** (preview generation) and **video optimization**.
+- **Smart Detection**: Automatically detects `/dev/dri/renderD128` or `/dev/dri/card0` and provides driver guidance if needed.
 
----
+### 📱 Mobile Experience Overhaul
+- **Mobile-First Layout**: Fully responsive single-column design optimized for mobile devices.
+- **Touch Interactions**: "Click-to-Play" interface replaces hover menus on touchscreens.
+- **Stability**: Fixed layout shifts and scrolling issues for a buttery-smooth mobile experience.
 
-## 🚀 Version 5.1.1 Highlights
-
-### 🎬 Cinema Mode Enhancements
-- **Full-Featured Video Player**: Cinema mode now includes integrated action buttons (Favorite, Vault, Locate, Optimize) directly in the player interface.
-- **Technical Info Panel**: Slide-out panel displaying codec, bitrate, file size, and optimization status while watching videos.
-- **Smart Button States**: Visual feedback shows when a video is already favorited or archived.
-
-### 📊 Cache Management
-- **Cache Statistics**: Settings modal now displays real-time cache size breakdown (thumbnails, previews, total).
-- **Visual Monitoring**: Track storage usage of generated media assets at a glance.
-
-### 🎨 UI Polish
-- **Enhanced Treemap**: Improved gradient colors for better visual hierarchy in folder and file views.
-- **Select All Visible**: New batch operation button to quickly select all filtered videos.
-- **Cleaner Console**: Reduced verbose logging for a cleaner terminal experience.
+### ✂️ Advanced Optimization Controls
+- **Audio Modes**: Choose between "Standard" (AAC) or "Enhanced" (High-pass + Gate + Norm) audio processing.
+- **Video Trimming**: Select specific start and end times directly in the optimization panel.
 
 ---
 
-## 🚀 Version 5.1.0 Highlights
+## 🚀 Previous Highlights
 
-### ⚙️ Settings UI
-- **In-App Configuration**: New settings modal (gear icon) allows you to configure scan paths and exclusions directly from the dashboard.
-- **Default Exclusions with Toggles**: View all default exclusions with descriptions and enable/disable each one via checkboxes.
-- **JSON-Based Config**: Settings now stored in `settings.json` for easier management and future extensibility.
+### v5.2.0 - Cinema Mode Edition
+- **Cinema Player**: Full-featured in-browser player with integrated "Favorite", "Vault", and "Optimize" actions.
+- **Deep Linking**: Direct links to specific views (`/treeview`, `/review`) supported.
+- **Saved Views**: Create custom presets for "Large Files", "Unoptimized 4K", etc.
 
-### ⚡ Hardware-Accelerated Preview Generation
-- **GPU-Powered Previews**: Preview clip generation now uses hardware encoding (NVIDIA NVENC, Apple VideoToolbox, Intel QuickSync) for 5-10x faster initial scans.
-- **Dynamic Worker Count**: Automatically detects your GPU VRAM and sets optimal parallel workers (e.g., 8 workers for RTX 4090).
-- **Improved Thumbnails**: Fixed aspect ratio distortion for vertical videos - now uses letterboxing/pillarboxing to preserve original proportions.
-
-### 🛠️ Improved Rebuild Commands
-- **`--rebuild-thumbs`**: Regenerate only thumbnails (fast for fixing distorted images).
-- **`--rebuild-previews`**: Regenerate only preview clips.
-- **Better Progress Messages**: Now shows what's being regenerated (thumbnails, previews, or full scan).
+### v5.1.0 - Hardware Preview Generation
+- **GPU Previews**: Initial scans are 5-10x faster using hardware encoding for thumbnail/preview generation.
+- **Settings UI**: Configure scan targets, exclusions, and thresholds directly from the dashboard.
 
 ---
 
-> [!IMPORTANT]
-> **Initial Start Performance**: The first time you scan your library, the process may take some time depending on the number of video files. With hardware encoding enabled, this is now 5-10x faster than before!
+## ⚡Video Optimizer
 
----
-
-## � Visual Overview
-
-| Main Dashboard | The Vault (Archival View) |
-| :---: | :---: |
-| ![Dashboard](screenshots/dashboard.png) | ![The Vault](screenshots/vault.png) |
-
----
-
-## �🛠 Installation
-
-### Prerequisites
-- **Python 3.10+**
-- **FFmpeg & FFprobe**: Required for media analysis and thumbnail generation.
-  ```bash
-  brew install ffmpeg
-  ```
-
-## ⌨️ Usage
-
-### Standard Launch
-```bash
-python3 scan_videos_mit_shell.py
-```
-
-### Maintenance Mode
-```bash
-# Cleanup old/orphan cache files
-python3 scan_videos_mit_shell.py --cleanup
-
-# Force regenerate all thumbnails
-python3 scan_videos_mit_shell.py --rebuild
-```
-
----
-
-## ⚡ Video Optimizer
-
-The tool includes a specialized cross-platform video optimizer (`scripts/video_optimizer.py`) designed to work on both Windows and macOS.
+The tool includes a specialized cross-platform video optimizer (`scripts/video_optimizer.py`).
 
 - **Cross-Platform Hardware Acceleration**: 
-  - **NVIDIA NVENC** for Windows/Linux systems with NVIDIA GPUs (40-series optimized)
-  - **Apple VideoToolbox** for macOS systems (Apple Silicon and Intel)
-  - **Software Fallback** for systems without hardware acceleration
-- **Automatic Detection**: Intelligently detects your system's capabilities and selects the best encoder.
-- **Manual Override**: Use `--encoder nvenc|videotoolbox|software` to force a specific encoding method.
-- **Intelligent Transcoding**: Automatically adjusts quality (CQ) and verifies results using **SSIM** (Structural Similarity Index) to ensure significant space savings without visible quality loss.
-- **Batch Processing**: Select multiple videos in the dashboard and trigger a sequence of optimization tasks.
-- **Interactive Output**: Opens in a separate terminal window, providing real-time progress bars, quality metrics, and estimated completion time.
-- **Fun Facts**: Displays random arcade and gaming trivia during the optimization process to keep you entertained!
+  - **NVIDIA NVENC**: Windows/Linux (RTX 40-series optimized)
+  - **Apple VideoToolbox**: macOS (Apple Silicon and Intel)
+  - **Intel/AMD VAAPI**: Linux (Native hardware support)
+  - **Software Fallback**: Robust CPU encoding if no hardware is found.
+- **Intelligent Transcoding**: Automatically adjusts quality (CQ) and verifies results using **SSIM** to ensure quality.
+- **Batch Processing**: Select multiple videos in the dashboard to queue them up.
+- **Interactive Terminal**: Real-time progress bars, quality metrics, and fun facts during processing.
 
 ---
 
 ## ⚙️ Configuration
-All settings (Scan targets, exclusions, thresholds) are centrally managed in `arcade_scanner/app_config.py`.
 
-### 🚫 Default Exclusions
-By default, several system and cloud-related directories are excluded to ensure performance, stability, and to prevent unwanted data downloads.
-
-| Platform | Excluded Directories | Reasoning |
-| :--- | :--- | :--- |
-| **All** | `@eaDir`, `#recycle`, `Temporary Items` | Skips NAS system folders and trash bins. |
-| **Windows** | `AppData/Local/Temp`, `Windows/Temp` | Avoids cluttering results with system temporary files. |
-| **Windows** | `iCloudDrive`, `Proton Drive` | Prevents triggering massive "on-demand" cloud downloads. |
-| **macOS** | `~/Library/CloudStorage/`, `~/Library/Mobile Documents/` | Prevents scanning iCloud/OneDrive sync folders that trigger downloads. |
-| **macOS** | `~/Pictures/Photos Library.photoslibrary` | Avoids scanning internal database files of the Photos app. |
-| **macOS** | `~/Library/Containers/` | Skips application-specific sandbox folders. |
-
-### ⚙️ Configuration
-All settings can be configured through the **Settings UI** (gear icon in the dashboard) or by editing `arcade_data/settings.json` directly.
-
-> **Note**: The `arcade_data/` directory and `settings.json` are automatically created on first run with default values.
+All settings can be configured through the **Settings UI** (gear icon) or by editing `arcade_data/settings.json`.
 
 **Settings include:**
-- Scan targets (directories to scan)
-- Custom exclusions (additional paths to skip)
-- Disabled default exclusions (toggle off specific defaults)
-- Minimum file size (MB)
-- Bitrate threshold (kbps)
+- **Scan targets**: Directories to scan.
+- **enable_optimizer**: Master toggle for optimization features (true/false).
+- **enable_previews**: Toggle hover preview generation (CPU/disk usage).
+- **Custom exclusions**: Paths to skip.
 
-*Changes require an application restart to take effect.*
+### Default Exclusions
+| Platform | Excluded Directories |
+| :--- | :--- |
+| **All** | `@eaDir`, `#recycle`, `Temporary Items` |
+| **Windows** | `AppData/Local/Temp`, `Windows/Temp`, `iCloudDrive` |
+| **macOS** | `~/Library/CloudStorage/`, `~/Pictures/Photos Library.photoslibrary` |
 
-### Environment Variables
-- `ARCADE_OPTIMIZER_PATH`: Override the default path to the video optimizer script (default: `scripts/video_optimizer.py`).
+---
 
-## 📂 Project Structure
-- `arcade_scanner/`: The core Python package.
-- `arcade_data/`: Internal storage for the database, thumbnails, and previews.
-- `scripts/`: Contains the `video_optimizer.py` and other utility scripts.
-- `scan_videos_mit_shell.py`: Main entry point wrapper.
+## 🛠 Installation & Usage
+
+### Prerequisites
+- **Python 3.10+**
+- **FFmpeg & FFprobe**: Required.
+  ```bash
+  # macOS
+  brew install ffmpeg
+
+  # Linux (Ubuntu/Debian) - For VAAPI support
+  sudo apt-get install ffmpeg intel-media-va-driver-non-free
+  ```
+
+### Run the Scanner
+```bash
+python3 scan_videos_mit_shell.py
+```
+
+### Maintenance Commands
+```bash
+# Cleanup orphan files
+python3 scan_videos_mit_shell.py --cleanup
+
+# Force regenerate all thumbnails & previews (Useful after upgrading to VAAPI)
+python3 scan_videos_mit_shell.py --rebuild
+```

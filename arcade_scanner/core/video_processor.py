@@ -4,7 +4,8 @@ import os
 import subprocess
 from typing import Any, Dict, Optional
 from arcade_scanner.app_config import (
-    THUMB_DIR, PREVIEW_DIR, BITRATE_THRESHOLD_KBPS
+    THUMB_DIR, PREVIEW_DIR, BITRATE_THRESHOLD_KBPS,
+    ENABLE_PREVIEWS
 )
 
 def get_video_metadata(filepath: str) -> Dict[str, Any]:
@@ -346,10 +347,10 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
             preview = existing_preview
         elif rebuild_mode == 'previews':
             thumb = existing_thumb
-            preview = create_preview_clip(filepath)
+            preview = create_preview_clip(filepath) if ENABLE_PREVIEWS else ""
         else:
             thumb = create_thumbnail(filepath)
-            preview = create_preview_clip(filepath)
+            preview = create_preview_clip(filepath) if ENABLE_PREVIEWS else ""
 
         # Preserve the hidden state if it exists in the cache
         is_hidden = cached_entry.get("hidden", False)

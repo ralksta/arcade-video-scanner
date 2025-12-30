@@ -17,8 +17,8 @@ MIN_SAVINGS = 20.0
 MIN_QUALITY = 0.960
 SAMPLE_DURATION = 5
 DEFAULT_MIN_SIZE_MB = 50  # Skip files smaller than this
-ENABLE_FUNFACTS = True    # Show fun facts during long encodes (>5 min)
 FUNFACT_INTERVAL = 30     # Seconds between fun facts
+ENABLE_FUNFACTS = True    # Default, overridden by main args
 FUNFACT_THRESHOLD = 300   # Start showing facts after 5 minutes (300 seconds)
 
 # Quality ranges differ per encoder
@@ -521,9 +521,13 @@ def main():
                         help='Audio processing mode (default: enhanced)')
     parser.add_argument('--ss', type=str, help='Start time (e.g. 00:00:10 or 10)')
     parser.add_argument('--to', type=str, help='End time (e.g. 00:00:20 or 20)')
+    parser.add_argument('--no-fun-facts', action='store_true', help='Disable fun facts display')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     args = parser.parse_args()
     
+    global ENABLE_FUNFACTS
+    ENABLE_FUNFACTS = not args.no_fun_facts
+
     if args.port:
         print(f"🔌 Notification Port: {args.port}")
     else:

@@ -524,7 +524,7 @@ function createVideoCard(v) {
                     <div class="quick-action-btn hide-toggle-btn" title="Status ändern" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
                         <span class="material-icons">${v.hidden ? 'visibility' : 'visibility_off'}</span>
                     </div>
-                    ${window.OPTIMIZER_AVAILABLE ? `
+                    ${window.ENABLE_OPTIMIZER ? `
                     <a href="/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
                         <span class="material-icons">bolt</span>
                     </a>` : ''}
@@ -549,7 +549,7 @@ function createVideoCard(v) {
                 </div>
                 <div style="display:flex; gap:8px;">
                     <a href="/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">folder_open</span></a>
-                    ${window.OPTIMIZER_AVAILABLE ? `
+                    ${window.ENABLE_OPTIMIZER ? `
                     <a href="/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn">
                         <span class="material-icons" style="font-size:18px;">bolt</span>
                     </a>` : ''}
@@ -658,6 +658,11 @@ function triggerBatchFavorite(state) {
 }
 
 function handleMouseEnter(container) {
+    // Check global settings
+    if (window.userSettings && window.userSettings.enable_previews === false) {
+        return;
+    }
+
     const video = container.querySelector('video');
     container.hoverTimeout = setTimeout(() => {
         const src = video.getAttribute('data-src');
@@ -993,6 +998,12 @@ function resetDashboard() {
 // --- TREEMAP VISUALIZATION ---
 // State for drill-down navigation
 let treemapCurrentFolder = null; // null = show all folders, string = show files in that folder
+let treemapUseLog = false; // Log scale toggle
+
+function toggleTreemapScale() {
+    treemapUseLog = document.getElementById('treemapLogToggle').checked;
+    renderTreemap();
+}
 
 function renderTreemap() {
     const container = document.getElementById('treemapContainer');
@@ -1068,7 +1079,8 @@ function renderFolderView(ctx, canvas) {
     });
 
     // Sort and layout
-    const blocks = squarify(folderData, 0, 0, canvas.width, canvas.height);
+    // Sort and layout
+    const blocks = squarify(folderData, 0, 0, canvas.width, canvas.height, treemapUseLog);
 
     // Folder color gradients - darker tones to complement video gradients
     const folderGradients = [
@@ -1192,7 +1204,7 @@ function renderFileView(ctx, canvas, folderPath) {
     }));
 
     // Layout
-    const blocks = squarify(treemapData, 0, 0, canvas.width, canvas.height);
+    const blocks = squarify(treemapData, 0, 0, canvas.width, canvas.height, treemapUseLog);
 
     // Render video tiles with FLAT colors (no gradients)
     blocks.forEach(block => {
@@ -1459,6 +1471,9 @@ window.onload = () => {
             btn.innerHTML = '<span class="material-icons">view_module</span>';
         });
     }
+
+    // Load fresh settings from API to ensure sync
+    loadSettings();
 };
 
 // --- SETTINGS MODAL ---
@@ -1474,7 +1489,11 @@ async function openSettings() {
         document.getElementById('settingsTargets').value = data.scan_targets.join('\n');
         document.getElementById('settingsExcludes').value = data.exclude_paths.join('\n');
         document.getElementById('settingsMinSize').value = data.min_size_mb;
+        document.getElementById('settingsMinSize').value = data.min_size_mb;
         document.getElementById('settingsBitrate').value = data.bitrate_threshold_kbps;
+
+        // New Features
+        document.getElementById('settingsFunFacts').checked = data.enable_fun_facts !== false;
 
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
@@ -1533,7 +1552,9 @@ async function saveSettings() {
         exclude_paths: excludesText.split('\n').map(s => s.trim()).filter(s => s),
         disabled_defaults: disabledDefaults,
         min_size_mb: parseInt(document.getElementById('settingsMinSize').value) || 100,
-        bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000
+        bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000,
+        enable_previews: window.userSettings.enable_previews, // Keep existing value (hidden setting)
+        enable_fun_facts: document.getElementById('settingsFunFacts').checked
     };
 
     try {
@@ -1549,12 +1570,35 @@ async function saveSettings() {
             const btn = document.getElementById('settingsBtn');
             btn.style.color = 'var(--gold)';
             setTimeout(() => { btn.style.color = ''; }, 2000);
+
+            // Update local state immediately
+            window.userSettings = {
+                ...window.userSettings,
+                ...settings
+            };
         } else {
             alert('Fehler beim Speichern der Einstellungen');
         }
     } catch (e) {
         console.error('Failed to save settings:', e);
         alert('Fehler beim Speichern der Einstellungen');
+    }
+}
+
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/settings');
+        if (response.ok) {
+            const data = await response.json();
+            // Merge with existing to keep any static generated data
+            window.userSettings = {
+                ...window.userSettings,
+                ...data
+            };
+            console.log("Settings loaded:", window.userSettings);
+        }
+    } catch (e) {
+        console.error("Failed to load settings:", e);
     }
 }
 
@@ -1702,6 +1746,8 @@ function cinemaOptimize() {
         closeOptimize();
         return;
     }
+
+    if (window.ENABLE_OPTIMIZER !== true) return;
 
     // Populate Initial State
     currentOptAudio = 'enhanced'; // Reset to default

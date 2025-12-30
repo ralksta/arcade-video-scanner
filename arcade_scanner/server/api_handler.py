@@ -23,7 +23,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         try:
             # 1. ROOT / INDEX -> Serve REPORT_FILE
-            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault"]
+            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview"]
             if self.path in spa_routes or self.path.startswith("/index.html?"):
                 self.send_response(200)
                 self.send_header("Content-type", "text/html; charset=utf-8")
@@ -178,11 +178,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"🔌 Current Server Port: {current_port}")
                     print(f"⚡ Optimize: {file_path} | Audio: {audio_mode} | Trim: {ss}-{to}")
                     
+                    # Load latest settings to check fun facts preference
+                    current_settings = load_user_settings()
+                    enable_fun_facts = current_settings.get("enable_fun_facts", True)
+
                     cmd_parts = []
                     if IS_WIN:
                         cmd_parts = [sys.executable, OPTIMIZER_SCRIPT, file_path, "--port", str(current_port), "--audio-mode", audio_mode]
                         if ss: cmd_parts.extend(["--ss", ss])
                         if to: cmd_parts.extend(["--to", to])
+                        if not enable_fun_facts: cmd_parts.append("--no-fun-facts")
                         
                         # Join for cmd.exe
                         cmd_str = " ".join(f'"{p}"' for p in cmd_parts)
@@ -195,6 +200,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         cmd_str = f'{sys.executable} \\"{OPTIMIZER_SCRIPT}\\" \\"{file_path}\\" --port {current_port} --audio-mode {audio_mode}'
                         if ss: cmd_str += f' --ss {ss}'
                         if to: cmd_str += f' --to {to}'
+                        if not enable_fun_facts: cmd_str += ' --no-fun-facts'
                         
                         print(f"🚀 Launching Optimizer (Mac): {cmd_str}")
                         applescript = f'tell application "Terminal" to do script "{cmd_str}"'
@@ -460,7 +466,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "disabled_defaults": settings.get("disabled_defaults", []),
                     "saved_views": settings.get("saved_views", []),
                     "min_size_mb": settings.get("min_size_mb", 100),
+                    "min_size_mb": settings.get("min_size_mb", 100),
                     "bitrate_threshold_kbps": settings.get("bitrate_threshold_kbps", 15000),
+                    "enable_previews": settings.get("enable_previews", True),
+                    "enable_fun_facts": settings.get("enable_fun_facts", True),
+                    "enable_optimizer": settings.get("enable_optimizer", True),
                     "default_scan_targets": DEFAULT_SCAN_TARGETS,
                     "default_exclusions": DEFAULT_EXCLUSIONS  # With path + desc
                 }
@@ -527,18 +537,24 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 body = self.rfile.read(content_length).decode("utf-8")
                 new_settings = json.loads(body)
                 
-                # Validate and save
-                settings_to_save = {
+                # Load existing settings to preserve keys like _help_*
+                current_settings = load_user_settings()
+                
+                # Update with new values
+                current_settings.update({
                     "scan_targets": new_settings.get("scan_targets", []),
                     "exclude_paths": new_settings.get("exclude_paths", []),
                     "disabled_defaults": new_settings.get("disabled_defaults", []),
                     "saved_views": new_settings.get("saved_views", []),
                     "min_size_mb": new_settings.get("min_size_mb", 100),
-                    "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000)
-                }
+                    "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000),
+                    "enable_previews": new_settings.get("enable_previews", False),
+                    "enable_fun_facts": new_settings.get("enable_fun_facts", True),
+                    "enable_optimizer": new_settings.get("enable_optimizer", True)
+                })
                 
-                if save_user_settings(settings_to_save):
-                    print(f"✅ Settings saved: {len(settings_to_save['scan_targets'])} targets, {len(settings_to_save['exclude_paths'])} excludes")
+                if save_user_settings(current_settings):
+                    print(f"✅ Settings saved: {len(current_settings['scan_targets'])} targets, {len(current_settings['exclude_paths'])} excludes")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()

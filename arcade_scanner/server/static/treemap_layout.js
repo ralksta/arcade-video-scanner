@@ -1,22 +1,27 @@
 // Squarified Treemap Layout Algorithm
 // Based on the algorithm by Bruls, Huizing, and van Wijk
 
-function squarify(data, x, y, width, height) {
+function squarify(data, x, y, width, height, useLog = false) {
     if (!data || data.length === 0) return [];
 
-    // Sort by size descending for better layout
-    const sorted = [...data].sort((a, b) => b.size - a.size);
-    const totalSize = sorted.reduce((sum, item) => sum + item.size, 0);
+    // Helper to get effective size
+    const getSize = (item) => useLog ? Math.log(Math.max(item.size, 1)) : item.size;
+
+    // Sort by effective size descending
+    const sorted = [...data].sort((a, b) => getSize(b) - getSize(a));
+    const totalSize = sorted.reduce((sum, item) => sum + getSize(item), 0);
 
     if (totalSize === 0) return [];
 
     const blocks = [];
 
-    // Normalize sizes to area
+    // Normalize sizes to area for creating rectangles
     const scale = (width * height) / totalSize;
     const normalized = sorted.map(item => ({
         ...item,
-        normalizedSize: item.size * scale
+        normalizedSize: getSize(item) * scale,
+        // Keep original size for display/metadata if needed, 
+        // though ...item should already have it.
     }));
 
     function worstAspectRatio(row, length) {
@@ -136,7 +141,7 @@ function squarify(data, x, y, width, height) {
 }
 
 // Hierarchical Squarified Treemap - Groups by folder path
-function squarifyHierarchical(data, x, y, width, height) {
+function squarifyHierarchical(data, x, y, width, height, useLog = false) {
     if (!data || data.length === 0) return { folders: [], blocks: [] };
 
     // Group by parent folder
@@ -147,10 +152,16 @@ function squarifyHierarchical(data, x, y, width, height) {
         const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
 
         if (!folderMap.has(folder)) {
-            folderMap.set(folder, { items: [], totalSize: 0 });
+            folderMap.set(folder, { items: [], totalSize: 0, totalLogSize: 0 });
         }
-        folderMap.get(folder).items.push(item);
-        folderMap.get(folder).totalSize += item.size;
+        const fEntry = folderMap.get(folder);
+        fEntry.items.push(item);
+        fEntry.totalSize += item.size;
+        // For hierarchical log scale, we need to sum the log sizes of items? 
+        // Or log the total folder size? 
+        // Usually, treemap area corresponds to sum of children areas.
+        // So we should sum Math.log(item.size).
+        fEntry.totalLogSize += Math.log(Math.max(item.size, 1));
     });
 
     // Create folder data for layout
@@ -164,16 +175,17 @@ function squarifyHierarchical(data, x, y, width, height) {
             folder: key,
             shortName: shortName,
             size: value.totalSize,
+            effectiveSize: useLog ? value.totalLogSize : value.totalSize,
             items: value.items,
             count: value.items.length
         });
     });
 
-    // Sort folders by size descending
-    folderData.sort((a, b) => b.size - a.size);
-    const totalSize = folderData.reduce((sum, f) => sum + f.size, 0);
+    // Sort folders by effective size descending
+    folderData.sort((a, b) => b.effectiveSize - a.effectiveSize);
+    const totalEffectiveSize = folderData.reduce((sum, f) => sum + f.effectiveSize, 0);
 
-    if (totalSize === 0) return { folders: [], blocks: [] };
+    if (totalEffectiveSize === 0) return { folders: [], blocks: [] };
 
     const folderBlocks = [];
     const videoBlocks = [];
@@ -188,17 +200,21 @@ function squarifyHierarchical(data, x, y, width, height) {
         let remainingHeight = fh;
 
         folders.forEach((folder, idx) => {
-            const ratio = folder.size / totalSize;
+            const ratio = folder.effectiveSize / totalEffectiveSize;
             let blockWidth, blockHeight;
+
+            // Re-calculate remaining scale based on remaining items
+            const remainingEffectiveSize = folders.slice(idx).reduce((s, f) => s + f.effectiveSize, 0);
+            const currentShare = folder.effectiveSize / remainingEffectiveSize;
 
             // Alternate between horizontal and vertical splits
             if (remainingWidth >= remainingHeight) {
-                blockWidth = remainingWidth * ratio / (folders.slice(idx).reduce((s, f) => s + f.size, 0) / totalSize);
+                blockWidth = remainingWidth * currentShare;
                 blockHeight = remainingHeight;
                 if (idx === folders.length - 1) blockWidth = remainingWidth;
             } else {
                 blockWidth = remainingWidth;
-                blockHeight = remainingHeight * ratio / (folders.slice(idx).reduce((s, f) => s + f.size, 0) / totalSize);
+                blockHeight = remainingHeight * currentShare;
                 if (idx === folders.length - 1) blockHeight = remainingHeight;
             }
 
@@ -210,7 +226,7 @@ function squarifyHierarchical(data, x, y, width, height) {
                 y: Math.round(currentY),
                 width: Math.round(blockWidth),
                 height: Math.round(blockHeight),
-                totalSize: folder.size,
+                totalSize: folder.size, // Always keep real size for display
                 count: folder.count
             });
 
@@ -223,7 +239,8 @@ function squarifyHierarchical(data, x, y, width, height) {
             const innerH = blockHeight - labelHeight - padding * 2;
 
             if (innerW > 0 && innerH > 0) {
-                const innerBlocks = squarify(folder.items, innerX, innerY, innerW, innerH);
+                // Pass useLog down to children
+                const innerBlocks = squarify(folder.items, innerX, innerY, innerW, innerH, useLog);
                 innerBlocks.forEach(b => {
                     b.folderPath = folder.folder;
                     b.folderIdx = folderBlocks.length - 1;

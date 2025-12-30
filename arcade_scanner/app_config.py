@@ -68,12 +68,30 @@ def load_user_settings():
     import json
     
     default_settings = {
+        # Documentation Keys (JSON does not support comments)
+        "_comment_scan_targets": "List of absolute paths to scan for videos.",
         "scan_targets": [],
+        
+        "_comment_exclude_paths": "List of paths to ignore during scan.",
         "exclude_paths": [],
+        
         "disabled_defaults": [],  # Default exclusions user has turned off
         "saved_views": [],
+        
+        "_comment_min_size_mb": "Ignore videos smaller than this size.",
         "min_size_mb": 100,
-        "bitrate_threshold_kbps": 15000
+        
+        "_comment_bitrate": "Mark videos above this kbps as HIGH bitrate.",
+        "bitrate_threshold_kbps": 15000,
+        
+        "_comment_previews": "Set to true to generate hover previews (CPU intensive).",
+        "enable_previews": False,  # Default OFF
+        
+        "_comment_fun_facts": "Show educational overlays during optimization.",
+        "enable_fun_facts": True,
+        
+        "_comment_optimizer": "Master toggle for optimization features.",
+        "enable_optimizer": True
     }
     
     if os.path.exists(SETTINGS_FILE):
@@ -81,9 +99,21 @@ def load_user_settings():
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                 settings = json.load(f)
                 # Merge with defaults for any missing keys
+                dirty = False
                 for key, value in default_settings.items():
                     if key not in settings:
                         settings[key] = value
+                        dirty = True
+                
+                # If we added new keys (like documentation), save back to disk
+                if dirty:
+                    try:
+                        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                            json.dump(settings, f, indent=2, ensure_ascii=False)
+                        print(f"✅ Updated settings.json with new defaults")
+                    except Exception as e:
+                        print(f"⚠️ Failed to update settings.json: {e}")
+
                 return settings
         except Exception as e:
             print(f"⚠️  Warning: Could not read settings.json: {e}")
@@ -113,6 +143,9 @@ SCAN_TARGETS = DEFAULT_SCAN_TARGETS + USER_SETTINGS.get("scan_targets", [])
 EXCLUDE_PATHS = ACTIVE_DEFAULT_EXCLUDES + USER_SETTINGS.get("exclude_paths", [])
 MIN_SIZE_MB = USER_SETTINGS.get("min_size_mb", 100)
 BITRATE_THRESHOLD_KBPS = USER_SETTINGS.get("bitrate_threshold_kbps", 15000)
+ENABLE_PREVIEWS = USER_SETTINGS.get("enable_previews", False)
+ENABLE_FUN_FACTS = USER_SETTINGS.get("enable_fun_facts", True)
+ENABLE_OPTIMIZER = USER_SETTINGS.get("enable_optimizer", True)
 
 # Print loaded user paths
 if USER_SETTINGS.get("scan_targets"):
