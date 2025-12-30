@@ -1496,6 +1496,13 @@ body {
         display: none !important;
     }
 
+    /* Enforce aspect ratio on ALL cards to prevent layout jumps on scroll */
+    .card-media {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16/9;
+    }
+
     /* Hide Reveal and Optimize buttons in footer on mobile */
     .card-footer .btn {
         display: none !important;

@@ -72,6 +72,18 @@ ENCODER_PROFILES = {
         'quality_flag': '-global_quality',
         'video_filter': 'format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2',
     },
+    'vaapi': {
+        'name': 'Intel/AMD VAAPI (Linux)',
+        'codec': 'hevc_vaapi',
+        'quality_range': (24, 34, 2),  # QP: lower is better quality
+        'quality_direction': 1,        # +1 means increase QP = worse quality
+        'hwaccel_input': ['-hwaccel', 'vaapi', '-hwaccel_output_format', 'vaapi', '-vaapi_device', '/dev/dri/renderD128'],
+        'encoder_args': [
+            '-compression_level', '20',  # Slower preset for better compression
+        ],
+        'quality_flag': '-qp',
+        'video_filter': 'scale_vaapi=w=iw:h=ih:format=nv12',  # VAAPI needs NV12 surface
+    },
     'libx265': {
         'name': 'Software (libx265 CPU)',
         'codec': 'libx265',
@@ -149,6 +161,8 @@ def detect_encoder():
             return 'nvenc'
         if 'hevc_qsv' in result.stdout:
             return 'qsv'
+        if 'hevc_vaapi' in result.stdout:
+            return 'vaapi'
         if 'hevc_videotoolbox' in result.stdout:
             return 'videotoolbox'
     except:

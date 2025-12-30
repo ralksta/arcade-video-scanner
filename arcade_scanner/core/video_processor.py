@@ -165,6 +165,26 @@ def detect_hw_encoder() -> tuple:
             test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
             if test_result.returncode == 0:
                 return ("h264_qsv", ["-preset", "veryfast"])
+        
+        # Check for VAAPI (Linux Intel/AMD standard)
+        if "h264_vaapi" in encoders_output:
+            try:
+                # Check if we can actually open the device (often /dev/dri/renderD128)
+                test_cmd = [
+                    "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
+                    "-vaapi_device", "/dev/dri/renderD128",
+                    "-vf", "format=nv12,hwupload",
+                    "-c:v", "h264_vaapi",
+                    "-f", "null", "-", "-y", "-loglevel", "quiet"
+                ]
+                test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
+                if test_result.returncode == 0:
+                    return ("h264_vaapi", [
+                        "-vaapi_device", "/dev/dri/renderD128", 
+                        "-vf", "format=nv12,hwupload"
+                    ])
+            except:
+                pass
                 
     except Exception as e:
         print(f"⚠️ Encoder detection error: {e}")
@@ -241,6 +261,12 @@ def get_optimal_workers() -> int:
         # Intel QuickSync: moderate parallelism
         _cached_workers = 4
         print(f"🔵 Intel QuickSync detected → using 4 parallel workers")
+        return 4
+
+    elif encoder == "h264_vaapi":
+        # VAAPI: moderate parallelism
+        _cached_workers = 4
+        print(f"🐧 VAAPI Hardware Acceleration detected → using 4 parallel workers")
         return 4
     
     else:
