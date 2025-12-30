@@ -174,7 +174,7 @@ def detect_hw_encoder() -> tuple:
                 "-vaapi_device", "/dev/dri/renderD128",
                 "-vf", "format=nv12,hwupload",
                 "-c:v", "h264_vaapi",
-                "-f", "null", "-", "-y", "-loglevel", "quiet"
+                "-f", "null", "-", "-y", "-loglevel", "error"
             ]
             test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
             if test_result.returncode == 0:
