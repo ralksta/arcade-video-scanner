@@ -1,0 +1,13 @@
+{
+  "scan_targets": [
+    "/Volumes/T5 Media",
+    "/mnt/media_drive"
+  ],
+  "exclude_paths": [
+    "/Users/username/Private",
+    "private_folder"
+  ],
+  "disabled_defaults": [],
+  "min_size_mb": 100,
+  "bitrate_threshold_kbps": 15000
+}

@@ -108,13 +108,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     if IS_WIN:
                         subprocess.run(["explorer", "/select,", os.path.normpath(file_path)])
-                    else:
+                    elif sys.platform == "darwin":
                         print(f"🚀 Running: open -R '{file_path}'")
                         result = subprocess.run(["open", "-R", file_path], capture_output=True, text=True)
                         if result.returncode != 0:
                             print(f"❌ Error revealing file: {result.stderr}")
                         else:
                             print("✅ Reveal command successful")
+                    else:
+                        # Linux / Other: Open parent directory since standard reveal is non-standard
+                        parent_dir = os.path.dirname(file_path)
+                        print(f"🚀 Running: xdg-open '{parent_dir}'")
+                        subprocess.run(["xdg-open", parent_dir])
                             
                     self.send_response(204)
                     self.end_headers()

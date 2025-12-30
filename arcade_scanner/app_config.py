@@ -26,7 +26,7 @@ STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # Directories to scan for video files.
 # You can add absolute paths here.
-DEFAULT_SCAN_TARGETS = [HOME_DIR] if IS_WIN else [HOME_DIR, "/Volumes/T5 Media"]
+DEFAULT_SCAN_TARGETS = [HOME_DIR]
 
 # Default folders to exclude from scanning - with descriptions for UI
 DEFAULT_EXCLUSIONS = [
