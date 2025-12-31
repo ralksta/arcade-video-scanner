@@ -151,10 +151,12 @@ def run_optimizer(args_tuple):
         )
         
         success = False
+        failed = False  # Track explicit failures
         last_quality = None
         last_ssim = None
         last_saved_pct = None
         last_saved_bytes = None
+        failure_reason = None
         
         for line in process.stdout:
             line = line.strip()
@@ -201,6 +203,11 @@ def run_optimizer(args_tuple):
                     else:
                         last_saved_bytes = int(val * 1024)
             
+            # Detect explicit failures
+            if 'Quality too low' in line or 'Aborting' in line:
+                failed = True
+                failure_reason = 'Quality too low (SSIM check failed)'
+            
             # Handle skipped files
             if 'Skipping' in line:
                 result["status"] = "skipped"
@@ -216,7 +223,8 @@ def run_optimizer(args_tuple):
         result["duration"] = time.time() - file_start
         
         with display_lock:
-            if success or process.returncode == 0:
+            # Only mark as success if explicit SUCCESS marker was found AND no failure detected
+            if success and not failed:
                 worker_status[worker_id]["status"] = "done"
                 worker_status[worker_id]["progress"] = 100
                 result["status"] = "success"
@@ -229,6 +237,9 @@ def run_optimizer(args_tuple):
             else:
                 worker_status[worker_id]["status"] = "failed"
                 result["status"] = "failed"
+                result["quality"] = last_quality
+                result["ssim"] = last_ssim
+                result["reason"] = failure_reason or "Encoding failed"
                 file_results.append(result)
                 return (file_path, False, result)
             
