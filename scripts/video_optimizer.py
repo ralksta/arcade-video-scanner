@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video Optimizer V2.2 - Multi-Platform Hardware Encoder
+Video Optimizer V2.3 - Multi-Platform Hardware Encoder with Logging
 Supports: NVIDIA NVENC (RTX 4090), Apple VideoToolbox (M4 Max), Intel QuickSync (QSV)
 """
 import os
@@ -11,6 +11,11 @@ import json
 import re
 import time
 from pathlib import Path
+from datetime import datetime
+
+# Logs directory
+LOG_DIR = Path.home() / ".arcade-scanner" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- CONFIGURATION ---
 MIN_SAVINGS = 20.0
@@ -114,6 +119,18 @@ batch_stats = {
     'failed': 0,
     'total_saved_bytes': 0,
     'total_time': 0
+}
+
+# --- LAST ENCODE RESULT (for logging) ---
+last_encode_result = {
+    'filename': None,
+    'status': None,
+    'quality': None,
+    'ssim': None,
+    'saved_pct': None,
+    'saved_bytes': None,
+    'duration': 0,
+    'reason': None
 }
 
 # --- FUN FACTS ---
@@ -352,6 +369,10 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     if not is_trim and ("_opt.mp4" in input_path.name or "NO-OPT" in input_path.name):
         print(f"{Y}Skipping:{NC} {input_path.name} (already optimized marker)")
         batch_stats['skipped'] += 1
+        last_encode_result['filename'] = input_path.name
+        last_encode_result['status'] = 'skipped'
+        last_encode_result['reason'] = 'Already optimized marker'
+        last_encode_result['duration'] = 0
         return (False, 0)
 
     # Determine Output Path
@@ -367,6 +388,10 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
         if output_path.exists():
             print(f"{Y}Skipping:{NC} {input_path.name} (_opt.mp4 already exists)")
             batch_stats['skipped'] += 1
+            last_encode_result['filename'] = input_path.name
+            last_encode_result['status'] = 'skipped'
+            last_encode_result['reason'] = 'Output file already exists'
+            last_encode_result['duration'] = 0
             return (False, 0)
     
     size_before = input_path.stat().st_size
@@ -376,6 +401,10 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     if not is_trim and size_mb < min_size_mb:
         print(f"{Y}Skipping:{NC} {input_path.name} ({size_mb:.1f} MB < {min_size_mb} MB min)")
         batch_stats['skipped'] += 1
+        last_encode_result['filename'] = input_path.name
+        last_encode_result['status'] = 'skipped'
+        last_encode_result['reason'] = f'File too small ({size_mb:.1f} MB < {min_size_mb} MB)'
+        last_encode_result['duration'] = 0
         return (False, 0)
     
     print(f"\n{G}Target:{NC} {input_path.name} ({format_size(size_before)})")
@@ -472,6 +501,16 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
                 batch_stats['total_time'] += file_time
                 batch_stats['success'] += 1
                 
+                # Populate result for logging
+                last_encode_result['filename'] = input_path.name
+                last_encode_result['status'] = 'success'
+                last_encode_result['quality'] = quality
+                last_encode_result['ssim'] = ssim
+                last_encode_result['saved_pct'] = saved_pct
+                last_encode_result['saved_bytes'] = saved_bytes
+                last_encode_result['duration'] = file_time
+                last_encode_result['reason'] = None
+                
                 if port:
                     notify_server(port, input_path)
                     
@@ -481,6 +520,13 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
                 print(f" {R}   -> Quality too low. Aborting.{NC}")
                 if output_path.exists(): output_path.unlink()
                 batch_stats['failed'] += 1
+                file_time = time.time() - file_start_time
+                last_encode_result['filename'] = input_path.name
+                last_encode_result['status'] = 'failed'
+                last_encode_result['quality'] = quality
+                last_encode_result['ssim'] = ssim
+                last_encode_result['reason'] = f'Quality too low (SSIM {ssim:.4f} < 0.940)'
+                last_encode_result['duration'] = file_time
                 return (False, 0)
 
             print(f" {R}   -> Not optimal. Next pass...{NC}")
@@ -493,6 +539,11 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
             sys.exit(1)
     
     batch_stats['failed'] += 1
+    file_time = time.time() - file_start_time
+    last_encode_result['filename'] = input_path.name
+    last_encode_result['status'] = 'failed'
+    last_encode_result['reason'] = 'Exhausted all quality levels without meeting targets'
+    last_encode_result['duration'] = file_time
     return (False, 0)
 
 def print_batch_summary():
@@ -507,6 +558,38 @@ def print_batch_summary():
     print(f" {BG}Saved:{NC}     {format_size(batch_stats['total_saved_bytes'])}")
     print(f" {G}Time:{NC}      {format_time(batch_stats['total_time'])}")
     print(f"{'='*52}")
+
+
+def write_encode_log(filename, status, encoder_name, quality=None, ssim=None, 
+                     saved_pct=None, saved_bytes=None, duration=0, reason=None):
+    """Write encoding result to a persistent log file. Appends to daily log."""
+    log_date = datetime.now().strftime("%Y-%m-%d")
+    log_file = LOG_DIR / f"encode_{log_date}.log"
+    
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    
+    with open(log_file, 'a', encoding='utf-8') as f:
+        f.write(f"\n[{timestamp}] {filename}\n")
+        f.write(f"  Status:   {status.upper()}\n")
+        f.write(f"  Encoder:  {encoder_name}\n")
+        
+        if status == 'success':
+            if quality:
+                f.write(f"  Quality:  Q={quality}\n")
+            if ssim:
+                f.write(f"  SSIM:     {ssim:.4f}\n")
+            if saved_pct:
+                f.write(f"  Savings:  {saved_pct:.1f}%\n")
+            if saved_bytes:
+                f.write(f"  Saved:    {format_size(saved_bytes)}\n")
+        elif reason:
+            f.write(f"  Reason:   {reason}\n")
+        
+        f.write(f"  Duration: {format_time(duration)}\n")
+        f.write("-" * 50 + "\n")
+    
+    return log_file
+
 
 def main():
     parser = argparse.ArgumentParser(description='Multi-Platform Video Optimizer V2.1')
@@ -567,11 +650,31 @@ def main():
     
     for f in files:
         batch_stats['processed'] += 1
-        process_file(f, profile, min_size_mb=args.min_size, copy_audio=args.copy_audio, port=args.port, audio_mode=args.audio_mode, ss=args.ss, to=args.to)
+        success, saved_bytes = process_file(f, profile, min_size_mb=args.min_size, copy_audio=args.copy_audio, port=args.port, audio_mode=args.audio_mode, ss=args.ss, to=args.to)
+        
+        # Write to encode log (for both batch controller and single-file calls)
+        if last_encode_result['filename']:
+            log_file = write_encode_log(
+                filename=last_encode_result['filename'],
+                status=last_encode_result['status'],
+                encoder_name=profile['name'],
+                quality=last_encode_result['quality'],
+                ssim=last_encode_result['ssim'],
+                saved_pct=last_encode_result['saved_pct'],
+                saved_bytes=last_encode_result['saved_bytes'],
+                duration=last_encode_result['duration'],
+                reason=last_encode_result['reason']
+            )
 
     # Print batch summary if multiple files
     if len(files) > 1:
         print_batch_summary()
+    
+    # Show log file location
+    if files and last_encode_result['filename']:
+        log_date = datetime.now().strftime("%Y-%m-%d")
+        log_path = LOG_DIR / f"encode_{log_date}.log"
+        print(f"\n{G}📝 Log:{NC} {log_path}")
     
     # Open folder and play sound
     if files:
