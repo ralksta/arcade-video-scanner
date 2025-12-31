@@ -650,6 +650,25 @@ body {
     padding: 30px 0;
 }
 
+/* Smooth transitions when changing workspace modes */
+#videoGrid.animating,
+#treemapContainer.animating {
+    animation: fadeInContent 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+}
+
+@keyframes fadeInGrid {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Enhanced List View (Accessible & Readable) */
 #videoGrid.list-view {
     display: flex;

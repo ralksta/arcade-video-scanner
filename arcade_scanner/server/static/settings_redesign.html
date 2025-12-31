@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings Redesign - Arcade Video Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        /* ===========================================
+           Design System - Inspired by Apple/Linear/Stripe
+           =========================================== */
+        
+        :root {
+            /* Colors */
+            --color-bg-primary: #000000;
+            --color-bg-secondary: #0A0A0A;
+            --color-bg-tertiary: #141414;
+            --color-bg-elevated: #1C1C1E;
+            
+            --color-surface: rgba(255, 255, 255, 0.05);
+            --color-surface-hover: rgba(255, 255, 255, 0.08);
+            --color-surface-active: rgba(255, 255, 255, 0.12);
+            
+            --color-text-primary: #FFFFFF;
+            --color-text-secondary: rgba(255, 255, 255, 0.7);
+            --color-text-tertiary: rgba(255, 255, 255, 0.4);
+            --color-text-disabled: rgba(255, 255, 255, 0.25);
+            
+            --color-accent-blue: #0A84FF;
+            --color-accent-blue-hover: #0969D3;
+            --color-accent-green: #30D158;
+            --color-accent-red: #FF453A;
+            --color-accent-orange: #FF9F0A;
+            --color-accent-purple: #BF5AF2;
+            
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-border-hover: rgba(255, 255, 255, 0.2);
+            
+            /* Spacing Scale (8px base) */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+            --space-2xl: 48px;
+            
+            /* Border Radius */
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            
+            /* Typography */
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-size-xs: 11px;
+            --font-size-sm: 13px;
+            --font-size-base: 15px;
+            --font-size-lg: 17px;
+            --font-size-xl: 20px;
+            --font-size-2xl: 24px;
+            --font-size-3xl: 32px;
+            
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+            
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* ===========================================
+           Reset & Base Styles
+           =========================================== */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font-family);
+            font-size: var(--font-size-base);
+            line-height: 1.5;
+            color: var(--color-text-primary);
+            background: var(--color-bg-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* ===========================================
+           Layout: Sidebar + Content (Desktop/Tablet)
+           Mobile: Tabs + Content
+           =========================================== */
+        
+        .settings-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(20px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-lg);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity var(--transition-base), visibility var(--transition-base);
+        }
+        
+        .settings-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .settings-container {
+            width: 100%;
+            max-width: 1080px;
+            height: 85vh;
+            max-height: 800px;
+            background: var(--color-bg-secondary);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--color-border);
+            overflow: hidden;
+            display: flex;
+            flex-direction: row;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        /* Sidebar Navigation */
+        .settings-sidebar {
+            width: 240px;
+            background: var(--color-bg-tertiary);
+            border-right: 1px solid var(--color-border);
+            padding: var(--space-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+        
+        .settings-logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding-bottom: var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+            margin-bottom: var(--space-sm);
+        }
+        
+        .settings-logo .material-icons {
+            font-size: 24px;
+            color: var(--color-accent-blue);
+        }
+        
+        .settings-logo h2 {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+        
+        .settings-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            border: 1px solid transparent;
+        }
+        
+        .nav-item:hover {
+            background: var(--color-surface-hover);
+            color: var(--color-text-primary);
+        }
+        
+        .nav-item.active {
+            background: var(--color-surface-active);
+            color: var(--color-text-primary);
+            border-color: var(--color-border-hover);
+        }
+        
+        .nav-item .material-icons {
+            font-size: 20px;
+            opacity: 0.8;
+        }
+        
+        .nav-divider {
+            height: 1px;
+            background: var(--color-border);
+            margin: var(--space-sm) 0;
+        }
+        
+        /* Main Content Area */
+        .settings-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .settings-header {
+            padding: var(--space-lg) var(--space-xl);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .settings-title {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .settings-title h1 {
+            font-size: var(--font-size-2xl);
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+        
+        .settings-title p {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-tertiary);
+        }
+        
+        .settings-header-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+        
+        .settings-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-xl);
+        }
+        
+        /* Smooth scrolling */
+        .settings-body::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .settings-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .settings-body::-webkit-scrollbar-thumb {
+            background: var(--color-surface);
+            border-radius: 4px;
+        }
+        
+        .settings-body::-webkit-scrollbar-thumb:hover {
+            background: var(--color-surface-hover);
+        }
+        
+        /* Content Sections */
+        .settings-section {
+            margin-bottom: var(--space-2xl);
+        }
+        
+        .section-header {
+            margin-bottom: var(--space-md);
+        }
+        
+        .section-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .section-description {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-tertiary);
+            line-height: 1.6;
+        }
+        
+        .settings-group {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+        
+        .settings-item {
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-md);
+            transition: background var(--transition-fast);
+        }
+        
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+        
+        .settings-item:hover {
+            background: var(--color-surface-hover);
+        }
+        
+        .settings-item-label {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .settings-item-title {
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+        
+        .settings-item-description {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-tertiary);
+            line-height: 1.5;
+        }
+        
+        /* Form Controls */
+        
+        /* Toggle Switch (iOS Style) */
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--color-surface-active);
+            border-radius: 14px;
+            transition: background var(--transition-base);
+        }
+        
+        .toggle-slider:before {
+            content: "";
+            position: absolute;
+            height: 24px;
+            width: 24px;
+            left: 2px;
+            bottom: 2px;
+            background: white;
+            border-radius: 50%;
+            transition: transform var(--transition-base);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--color-accent-blue);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+        
+        /* Text Input */
+        .input-field {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            color: var(--color-text-primary);
+            font-size: var(--font-size-base);
+            font-family: var(--font-family);
+            transition: all var(--transition-fast);
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: var(--color-accent-blue);
+            box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.1);
+        }
+        
+        .input-field::placeholder {
+            color: var(--color-text-disabled);
+        }
+        
+        /* Textarea */
+        .textarea-field {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            color: var(--color-text-primary);
+            font-size: var(--font-size-base);
+            font-family: var(--font-family);
+            resize: vertical;
+            min-height: 120px;
+            transition: all var(--transition-fast);
+        }
+        
+        .textarea-field:focus {
+            outline: none;
+            border-color: var(--color-accent-blue);
+            box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.1);
+        }
+        
+        /* Number Input with Stepper */
+        .number-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+            background: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            width: fit-content;
+        }
+        
+        .number-input-wrapper input {
+            width: 80px;
+            background: transparent;
+            border: none;
+            color: var(--color-text-primary);
+            font-size: var(--font-size-base);
+            text-align: center;
+            padding: 6px;
+        }
+        
+        .number-input-wrapper input:focus {
+            outline: none;
+        }
+        
+        .number-stepper {
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            background: var(--color-surface);
+            border: none;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+        }
+        
+        .number-stepper:hover {
+            background: var(--color-surface-hover);
+            color: var(--color-text-primary);
+        }
+        
+        .number-stepper .material-icons {
+            font-size: 18px;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-base);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-family: var(--font-family);
+        }
+        
+        .btn-primary {
+            background: var(--color-accent-blue);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--color-accent-blue-hover);
+            box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3);
+        }
+        
+        .btn-secondary {
+            background: var(--color-surface);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--color-surface-hover);
+        }
+        
+        .btn-danger {
+            background: transparent;
+            color: var(--color-accent-red);
+            border: 1px solid var(--color-accent-red);
+        }
+        
+        .btn-danger:hover {
+            background: rgba(255, 69, 58, 0.1);
+        }
+        
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 50%;
+            background: transparent;
+            border: none;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+        }
+        
+        .btn-icon:hover {
+            background: var(--color-surface-hover);
+            color: var(--color-text-primary);
+        }
+        
+        /* Footer with Actions */
+        .settings-footer {
+            padding: var(--space-lg) var(--space-xl);
+            border-top: 1px solid var(--color-border);
+            background: var(--color-bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .footer-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+        
+        /* Alerts & Status */
+        .alert {
+            padding: var(--space-md);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-md);
+        }
+        
+        .alert .material-icons {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        
+        .alert-info {
+            background: rgba(10, 132, 255, 0.1);
+            border: 1px solid rgba(10, 132, 255, 0.3);
+            color: var(--color-accent-blue);
+        }
+        
+        .alert-warning {
+            background: rgba(255, 159, 10, 0.1);
+            border: 1px solid rgba(255, 159, 10, 0.3);
+            color: var(--color-accent-orange);
+        }
+        
+        .alert-danger {
+            background: rgba(255, 69, 58, 0.1);
+            border: 1px solid rgba(255, 69, 58, 0.3);
+            color: var(--color-accent-red);
+        }
+        
+        .alert-success {
+            background: rgba(48, 209, 88, 0.1);
+            border: 1px solid rgba(48, 209, 88, 0.3);
+            color: var(--color-accent-green);
+        }
+        
+        /* Save Indicator */
+        .save-indicator {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .save-indicator.unsaved {
+            color: var(--color-accent-orange);
+        }
+        
+        .save-indicator.saving {
+            color: var(--color-accent-blue);
+        }
+        
+        .save-indicator.saved {
+            color: var(--color-accent-green);
+        }
+        
+        .save-indicator .material-icons {
+            font-size: 16px;
+        }
+        
+        /* Cache Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--space-md);
+            margin-top: var(--space-md);
+        }
+        
+        .stat-card {
+            background: var(--color-bg-elevated);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+        
+        .stat-card-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            color: var(--color-text-tertiary);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+        }
+        
+        .stat-card-header .material-icons {
+            font-size: 20px;
+        }
+        
+        .stat-card-value {
+            font-size: var(--font-size-2xl);
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+        
+        /* Checkbox List for Exclusions */
+        .checkbox-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-sm);
+            padding: var(--space-sm);
+            border-radius: var(--radius-sm);
+            transition: background var(--transition-fast);
+            cursor: pointer;
+        }
+        
+        .checkbox-item:hover {
+            background: var(--color-surface-hover);
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            margin-top: 2px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--color-accent-blue);
+        }
+        
+        .checkbox-item-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .checkbox-item-title {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--color-text-primary);
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+        }
+        
+        .checkbox-item-description {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-tertiary);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-2xl);
+            color: var(--color-text-tertiary);
+        }
+        
+        .empty-state .material-icons {
+            font-size: 48px;
+            margin-bottom: var(--space-md);
+            opacity: 0.4;
+        }
+        
+        /* Loading State */
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--color-surface);
+            border-top-color: var(--color-accent-blue);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .settings-container {
+                flex-direction: column;
+                height: 100vh;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+            
+            .settings-sidebar {
+                width: 100%;
+                padding: var(--space-md);
+                border-right: none;
+                border-bottom: 1px solid var(--color-border);
+            }
+            
+            .settings-nav {
+                flex-direction: row;
+                overflow-x: auto;
+                gap: var(--space-sm);
+            }
+            
+            .nav-item {
+                white-space: nowrap;
+            }
+            
+            .settings-header {
+                padding: var(--space-md);
+            }
+            
+            .settings-body {
+                padding: var(--space-md);
+            }
+            
+            .settings-footer {
+                padding: var(--space-md);
+                flex-direction: column-reverse;
+                gap: var(--space-sm);
+            }
+            
+            .footer-actions {
+                width: 100%;
+            }
+            
+            .footer-actions .btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- Settings Modal -->
+    <div class="settings-modal active">
+        <div class="settings-container">
+            
+            <!-- Sidebar Navigation -->
+            <aside class="settings-sidebar">
+                <div class="settings-logo">
+                    <span class="material-icons">settings</span>
+                    <h2>Settings</h2>
+                </div>
+                
+                <nav class="settings-nav">
+                    <div class="nav-item active" data-section="scanning">
+                        <span class="material-icons">folder_open</span>
+                        <span>Scanning</span>
+                    </div>
+                    <div class="nav-item" data-section="performance">
+                        <span class="material-icons">speed</span>
+                        <span>Performance</span>
+                    </div>
+                    <div class="nav-item" data-section="interface">
+                        <span class="material-icons">palette</span>
+                        <span>Interface</span>
+                    </div>
+                    
+                    <div class="nav-divider"></div>
+                    
+                    <div class="nav-item" data-section="storage">
+                        <span class="material-icons">storage</span>
+                        <span>Storage</span>
+                    </div>
+                    <div class="nav-item" data-section="advanced">
+                        <span class="material-icons">tune</span>
+                        <span>Advanced</span>
+                    </div>
+                </nav>
+            </aside>
+            
+            <!-- Main Content -->
+            <main class="settings-main">
+                
+                <!-- Header -->
+                <header class="settings-header">
+                    <div class="settings-title">
+                        <h1 id="section-title">Scanning</h1>
+                        <p id="section-subtitle">Configure video library scanning behavior</p>
+                    </div>
+                    <div class="settings-header-actions">
+                        <button class="btn-icon" title="Close Settings" onclick="closeSettings()">
+                            <span class="material-icons">close</span>
+                        </button>
+                    </div>
+                </header>
+                
+                <!-- Scrollable Body -->
+                <div class="settings-body">
+                    
+                    <!-- SCANNING SECTION -->
+                    <div class="content-section" id="content-scanning">
+                        
+                        <!-- Scan Targets -->
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">Scan Directories</h3>
+                                <p class="section-description">Add directories that should be scanned for video files. One path per line.</p>
+                            </div>
+                            
+                            <textarea class="textarea-field" id="settingsTargets" placeholder="/Users/username/Videos&#10;/Volumes/Media/Movies" rows="5"></textarea>
+                            
+                            <div class="alert alert-info" style="margin-top: var(--space-md); font-size: var(--font-size-sm);">
+                                <span class="material-icons">info</span>
+                                <div>
+                                    <strong>Default:</strong> System home directory
+                                    <br><span id="defaultTargetsHint" style="opacity: 0.7;"></span>
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <!-- Default Exclusions -->
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">System Exclusions</h3>
+                                <p class="section-description">Default paths that are automatically excluded. Uncheck to include them in the scan.</p>
+                            </div>
+                            
+                            <div class="settings-group">
+                                <div class="checkbox-list" id="defaultExclusionsContainer">
+                                    <!-- Dynamically populated -->
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <!-- Custom Exclusions -->
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">Custom Exclusions</h3>
+                                <p class="section-description">Additional paths to exclude from scanning. One path per line.</p>
+                            </div>
+                            
+                            <textarea class="textarea-field" id="settingsExcludes" placeholder="/Users/username/Private&#10;/Volumes/Backup" rows="3"></textarea>
+                        </section>
+                    </div>
+                    
+                    <!-- PERFORMANCE SECTION -->
+                    <div class="content-section" id="content-performance" style="display: none;">
+                        
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">File Size Threshold</h3>
+                                <p class="section-description">Ignore videos smaller than this size (in MB).</p>
+                            </div>
+                            
+                            <div class="settings-group">
+                                <div class="settings-item">
+                                    <div class="settings-item-label">
+                                        <div class="settings-item-title">Minimum File Size</div>
+                                        <div class="settings-item-description">Files below this size will be excluded from the scan</div>
+                                    </div>
+                                    <div class="number-input-wrapper">
+                                        <button class="number-stepper" onclick="adjustNumber('settingsMinSize', -10)">
+                                            <span class="material-icons">remove</span>
+                                        </button>
+                                        <input type="number" id="settingsMinSize" value="100" min="1">
+                                        <button class="number-stepper" onclick="adjustNumber('settingsMinSize', 10)">
+                                            <span class="material-icons">add</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">Bitrate Classification</h3>
+                                <p class="section-description">Videos exceeding this bitrate will be marked as HIGH.</p>
+                            </div>
+                            
+                            <div class="settings-group">
+                                <div class="settings-item">
+                                    <div class="settings-item-label">
+                                        <div class="settings-item-title">Bitrate Threshold</div>
+                                        <div class="settings-item-description">Threshold in kbps (1000-50000)</div>
+                                    </div>
+                                    <div class="number-input-wrapper">
+                                        <button class="number-stepper" onclick="adjustNumber('settingsBitrate', -1000)">
+                                            <span class="material-icons">remove</span>
+                                        </button>
+                                        <input type="number" id="settingsBitrate" value="15000" min="1000" max="50000">
+                                        <button class="number-stepper" onclick="adjustNumber('settingsBitrate', 1000)">
+                                            <span class="material-icons">add</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                    
+                    <!-- INTERFACE SECTION -->
+                    <div class="content-section" id="content-interface" style="display: none;">
+                        
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">Visual Features</h3>
+                                <p class="section-description">Customize the dashboard appearance and behavior.</p>
+                            </div>
+                            
+                            <div class="settings-group">
+                                <div class="settings-item">
+                                    <div class="settings-item-label">
+                                        <div class="settings-item-title">Fun Facts</div>
+                                        <div class="settings-item-description">Show educational overlays during video optimization</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="settingsFunFacts" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                
+                                <div class="settings-item">
+                                    <div class="settings-item-label">
+                                        <div class="settings-item-title">Video Previews</div>
+                                        <div class="settings-item-description">Generate and show hover preview clips (CPU intensive)</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="settingsPreviews" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                    
+                    <!-- STORAGE SECTION -->
+                    <div class="content-section" id="content-storage" style="display: none;">
+                        
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">Cache Statistics</h3>
+                                <p class="section-description">Overview of disk space used by thumbnails and preview clips.</p>
+                            </div>
+                            
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-card-header">
+                                        <span class="material-icons">image</span>
+                                        <span>Thumbnails</span>
+                                    </div>
+                                    <div class="stat-card-value" id="statThumbnails">—</div>
+                                </div>
+                                
+                                <div class="stat-card">
+                                    <div class="stat-card-header">
+                                        <span class="material-icons">movie</span>
+                                        <span>Preview Clips</span>
+                                    </div>
+                                    <div class="stat-card-value" id="statPreviews">—</div>
+                                </div>
+                                
+                                <div class="stat-card">
+                                    <div class="stat-card-header">
+                                        <span class="material-icons">storage</span>
+                                        <span>Total Cache</span>
+                                    </div>
+                                    <div class="stat-card-value" id="statTotal">—</div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-warning" style="margin-top: var(--space-lg); font-size: var(--font-size-sm);">
+                                <span class="material-icons">warning</span>
+                                <div>
+                                    Clearing the cache will delete all thumbnails and preview clips. They will be regenerated on the next scan.
+                                </div>
+                            </div>
+                            
+                            <button class="btn btn-danger" style="margin-top: var(--space-md);">
+                                <span class="material-icons">delete_sweep</span>
+                                Clear Cache
+                            </button>
+                        </section>
+                    </div>
+                    
+                    <!-- ADVANCED SECTION -->
+                    <div class="content-section" id="content-advanced" style="display: none;">
+                        
+                        <section class="settings-section">
+                            <div class="section-header">
+                                <h3 class="section-title">Developer Options</h3>
+                                <p class="section-description">Advanced settings for debugging and development.</p>
+                            </div>
+                            
+                            <div class="alert alert-danger" style="font-size: var(--font-size-sm);">
+                                <span class="material-icons">warning</span>
+                                <div>
+                                    <strong>Warning:</strong> These settings are for advanced users only. Incorrect configuration may cause unexpected behavior.
+                                </div>
+                            </div>
+                            
+                            <div class="settings-group" style="margin-top: var(--space-md);">
+                                <div class="settings-item">
+                                    <div class="settings-item-label">
+                                        <div class="settings-item-title">Debug Mode</div>
+                                        <div class="settings-item-description">Enable verbose logging in console</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="settingsDebug">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                    
+                </div>
+                
+                <!-- Footer with Actions -->
+                <footer class="settings-footer">
+                    <div class="save-indicator saved">
+                        <span class="material-icons">check_circle</span>
+                        <span>All changes saved</span>
+                    </div>
+                    <div class="footer-actions">
+                        <button class="btn btn-secondary" onclick="closeSettings()">
+                            Cancel
+                        </button>
+                        <button class="btn btn-primary" onclick="saveSettings()">
+                            <span class="material-icons">save</span>
+                            Save Changes
+                        </button>
+                    </div>
+                </footer>
+                
+            </main>
+            
+        </div>
+    </div>
+    
+    <script>
+        // Navigation Logic
+        const navItems = document.querySelectorAll('.nav-item');
+        const contentSections = document.querySelectorAll('.content-section');
+        
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const sectionId = item.dataset.section;
+                
+                // Update active nav item
+                navItems.forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+                
+                // Show corresponding content
+                contentSections.forEach(section => {
+                    section.style.display = 'none';
+                });
+                document.getElementById(`content-${sectionId}`).style.display = 'block';
+                
+                // Update header
+                updateHeader(sectionId);
+            });
+        });
+        
+        function updateHeader(sectionId) {
+            const headers = {
+                'scanning': {
+                    title: 'Scanning',
+                    subtitle: 'Configure video library scanning behavior'
+                },
+                'performance': {
+                    title: 'Performance',
+                    subtitle: 'Optimize scan performance and file filtering'
+                },
+                'interface': {
+                    title: 'Interface',
+                    subtitle: 'Customize dashboard appearance and features'
+                },
+                'storage': {
+                    title: 'Storage',
+                    subtitle: 'Manage cache and disk space usage'
+                },
+                'advanced': {
+                    title: 'Advanced',
+                    subtitle: 'Developer options and debugging tools'
+                }
+            };
+            
+            document.getElementById('section-title').textContent = headers[sectionId].title;
+            document.getElementById('section-subtitle').textContent = headers[sectionId].subtitle;
+        }
+        
+        // Number Input Adjustment
+        function adjustNumber(inputId, delta) {
+            const input = document.getElementById(inputId);
+            const current = parseInt(input.value) || 0;
+            const min = parseInt(input.min) || 0;
+            const max = parseInt(input.max) || Infinity;
+            const newValue = Math.max(min, Math.min(max, current + delta));
+            input.value = newValue;
+            markUnsaved();
+        }
+        
+        // Save State Indicator
+        function markUnsaved() {
+            const indicator = document.querySelector('.save-indicator');
+            indicator.className = 'save-indicator unsaved';
+            indicator.innerHTML = '<span class="material-icons">warning</span><span>Unsaved changes</span>';
+        }
+        
+        function markSaving() {
+            const indicator = document.querySelector('.save-indicator');
+            indicator.className = 'save-indicator saving';
+            indicator.innerHTML = '<div class="loading-spinner"></div><span>Saving...</span>';
+        }
+        
+        function markSaved() {
+            const indicator = document.querySelector('.save-indicator');
+            indicator.className = 'save-indicator saved';
+            indicator.innerHTML = '<span class="material-icons">check_circle</span><span>All changes saved</span>';
+        }
+        
+        // Add change listeners
+        document.querySelectorAll('input, textarea').forEach(el => {
+            el.addEventListener('input', markUnsaved);
+        });
+        
+        // Mock Save Function (replace with actual API call)
+        function saveSettings() {
+            markSaving();
+            
+            // Simulate API call
+            setTimeout(() => {
+                markSaved();
+                console.log('Settings saved successfully');
+            }, 1000);
+        }
+        
+        function closeSettings() {
+            document.querySelector('.settings-modal').classList.remove('active');
+        }
+        
+        // Load Settings (Mock Data)
+        function loadSettings() {
+            // Mock data - replace with actual API call
+            const mockSettings = {
+                scan_targets: ['/Users/demo/Videos', '/Volumes/Media'],
+                exclude_paths: ['/Users/demo/Private'],
+                min_size_mb: 100,
+                bitrate_threshold_kbps: 15000,
+                enable_fun_facts: true,
+                enable_previews: true,
+                default_scan_targets: ['/Users/demo'],
+                default_exclusions: [
+                    { path: '~/Pictures/Photos Library.photoslibrary', desc: 'Apple Photos library' },
+                    { path: '~/Library/CloudStorage/', desc: 'iCloud & cloud services' },
+                    { path: '@eaDir', desc: 'Synology NAS metadata' }
+                ]
+            };
+            
+            // Populate fields
+            document.getElementById('settingsTargets').value = mockSettings.scan_targets.join('\n');
+            document.getElementById('settingsExcludes').value = mockSettings.exclude_paths.join('\n');
+            document.getElementById('settingsMinSize').value = mockSettings.min_size_mb;
+            document.getElementById('settingsBitrate').value = mockSettings.bitrate_threshold_kbps;
+            document.getElementById('settingsFunFacts').checked = mockSettings.enable_fun_facts;
+            document.getElementById('settingsPreviews').checked = mockSettings.enable_previews;
+            
+            // Show default hint
+            document.getElementById('defaultTargetsHint').textContent = 
+                `Standard: ${mockSettings.default_scan_targets.join(', ')}`;
+            
+            // Populate exclusions
+            const container = document.getElementById('defaultExclusionsContainer');
+            container.innerHTML = '';
+            mockSettings.default_exclusions.forEach(exc => {
+                const item = document.createElement('label');
+                item.className = 'checkbox-item';
+                item.innerHTML = `
+                    <input type="checkbox" checked data-path="${exc.path}">
+                    <div class="checkbox-item-content">
+                        <div class="checkbox-item-title">${exc.path}</div>
+                        <div class="checkbox-item-description">${exc.desc}</div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+            
+            // Load cache stats
+            fetch('/api/cache-stats')
+                .then(res => res.json())
+                .then(stats => {
+                    document.getElementById('statThumbnails').textContent = `${stats.thumbnails_mb} MB`;
+                    document.getElementById('statPreviews').textContent = `${stats.previews_mb} MB`;
+                    document.getElementById('statTotal').textContent = `${stats.total_mb} MB`;
+                })
+                .catch(() => {
+                    document.getElementById('statThumbnails').textContent = '—';
+                    document.getElementById('statPreviews').textContent = '—';
+                    document.getElementById('statTotal').textContent = '—';
+                });
+        }
+        
+        // Initialize
+        loadSettings();
+    </script>
+    
+</body>
+</html>

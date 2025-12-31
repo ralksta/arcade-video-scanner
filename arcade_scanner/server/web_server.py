@@ -1,7 +1,7 @@
 import socketserver
 import threading
 import os
-from arcade_scanner.app_config import HIDDEN_DATA_DIR, PORT
+from arcade_scanner.config import config, PORT, find_free_port
 from arcade_scanner.server.api_handler import FinderHandler
 
 def start_server():
@@ -21,7 +21,7 @@ def start_server():
     except OSError as e:
         print(f"Error binding to port {PORT}: {e}")
         # fallback: find another port if PORT is somehow still taken
-        from arcade_scanner.app_config import find_free_port
+        # from arcade_scanner.app_config import find_free_port
         new_port = find_free_port(PORT + 1)
         print(f"Attempting fallback to port {new_port}...")
         server = socketserver.ThreadingTCPServer(("", new_port), FinderHandler)

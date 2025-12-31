@@ -3,10 +3,7 @@ import json
 import os
 import subprocess
 from typing import Any, Dict, Optional
-from arcade_scanner.app_config import (
-    THUMB_DIR, PREVIEW_DIR, BITRATE_THRESHOLD_KBPS,
-    ENABLE_PREVIEWS
-)
+from arcade_scanner.config import config
 
 def get_video_metadata(filepath: str) -> Dict[str, Any]:
     cmd = [
@@ -35,7 +32,7 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
 def create_thumbnail(video_path: str) -> str:
     file_hash = hashlib.md5(video_path.encode()).hexdigest()
     thumb_name = f"thumb_{file_hash}.jpg"
-    thumb_path = os.path.join(THUMB_DIR, thumb_name)
+    thumb_path = os.path.join(config.thumb_dir, thumb_name)
     
     if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
         # Get duration for smart seeking
@@ -83,7 +80,7 @@ def create_thumbnail(video_path: str) -> str:
 def create_preview_clip(video_path: str) -> str:
     file_hash = hashlib.md5(video_path.encode()).hexdigest()
     prev_name = f"prev_{file_hash}.mp4"
-    prev_path = os.path.join(PREVIEW_DIR, prev_name)
+    prev_path = os.path.join(config.preview_dir, prev_name)
     
     if not os.path.exists(prev_path) or os.path.getsize(prev_path) < 1000:
         duration = 0
@@ -229,9 +226,6 @@ _cached_workers = None
 def get_optimal_workers() -> int:
     """
     Detect optimal worker count based on hardware.
-    - NVIDIA GPUs: Based on VRAM (more VRAM = more concurrent encodes)
-    - Apple Silicon: Based on CPU cores
-    - Software fallback: Based on CPU cores / 2
     """
     global _cached_workers
     if _cached_workers is not None:
@@ -252,42 +246,34 @@ def get_optimal_workers() -> int:
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
-                # Get first GPU's memory in MB
                 vram_mb = int(result.stdout.strip().split('\n')[0])
-                # RTX 4090 = 24GB, 3090 = 24GB, 3080 = 10GB, 3060 = 12GB
-                # Rule: 1 worker per 3GB of VRAM, max 12, min 4
                 workers = max(4, min(12, vram_mb // 3000))
                 _cached_workers = workers
                 print(f"🎮 Detected {vram_mb}MB GPU VRAM → using {workers} parallel workers")
                 return workers
         except Exception:
             pass
-        # NVENC default fallback
         _cached_workers = 6
         print(f"🎮 NVIDIA GPU detected → using 6 parallel workers")
         return 6
     
     elif encoder == "h264_videotoolbox":
-        # Apple Silicon: use more workers, it handles it well
         workers = min(8, cpu_cores)
         _cached_workers = workers
         print(f"🍎 Apple Silicon detected → using {workers} parallel workers")
         return workers
     
     elif encoder == "h264_qsv":
-        # Intel QuickSync: moderate parallelism
         _cached_workers = 4
         print(f"🔵 Intel QuickSync detected → using 4 parallel workers")
         return 4
 
     elif encoder == "h264_vaapi":
-        # VAAPI: moderate parallelism
         _cached_workers = 4
         print(f"🐧 VAAPI Hardware Acceleration detected → using 4 parallel workers")
         return 4
     
     else:
-        # Software encoding: CPU bound, use half the cores
         workers = max(2, cpu_cores // 2)
         _cached_workers = workers
         print(f"💻 Using {workers} parallel workers (CPU-based)")
@@ -295,14 +281,7 @@ def get_optimal_workers() -> int:
 
 def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None) -> Optional[Dict[str, Any]]:
     """
-    Process a video file and generate metadata, thumbnail, and preview.
-    
-    Args:
-        filepath: Path to the video file
-        cache: The cache dictionary
-        rebuild_mode: 'thumbs' to only regenerate thumbnails, 
-                      'previews' to only regenerate previews,
-                      None for normal operation (generate missing only)
+    Legacy method kept for compatibility if needed, but updated to use new config.
     """
     filepath = os.path.abspath(filepath)
     try:
@@ -310,23 +289,18 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
         size_mb = stats.st_size / (1024 * 1024)
         mtime = stats.st_mtime
 
-        # Check cache for existing data
         cached_entry = cache.get(filepath, {})
         
-        # For rebuild modes, use cached values for the other type
         if rebuild_mode == 'thumbs':
-            # Only regenerate thumbnail, keep existing preview from cache
             existing_preview = cached_entry.get("preview", "")
         elif rebuild_mode == 'previews':
-            # Only regenerate preview, keep existing thumbnail from cache
             existing_thumb = cached_entry.get("thumb", "")
         else:
-            # Normal mode - check if fully cached and files exist
             if filepath in cache:
                 entry = cached_entry
                 if entry.get("mtime") == mtime and entry.get("size_mb") == size_mb and "codec" in entry and "preview" in entry:
-                    thumb_path = os.path.join(THUMB_DIR, entry["thumb"])
-                    prev_path = os.path.join(PREVIEW_DIR, entry["preview"])
+                    thumb_path = os.path.join(config.thumb_dir, entry["thumb"])
+                    prev_path = os.path.join(config.preview_dir, entry["preview"])
                     if os.path.exists(thumb_path) and os.path.exists(prev_path) and os.path.getsize(prev_path) > 1000:
                         if "hidden" not in entry:
                             entry["hidden"] = False
@@ -341,23 +315,21 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
             if "streams" in meta and len(meta["streams"]) > 0:
                 codec = meta["streams"][0].get("codec_name", "unknown")
 
-        # Generate media based on rebuild mode
         if rebuild_mode == 'thumbs':
             thumb = create_thumbnail(filepath)
             preview = existing_preview
         elif rebuild_mode == 'previews':
             thumb = existing_thumb
-            preview = create_preview_clip(filepath) if ENABLE_PREVIEWS else ""
+            preview = create_preview_clip(filepath) if config.settings.enable_previews else ""
         else:
             thumb = create_thumbnail(filepath)
-            preview = create_preview_clip(filepath) if ENABLE_PREVIEWS else ""
+            preview = create_preview_clip(filepath) if config.settings.enable_previews else ""
 
-        # Preserve the hidden state if it exists in the cache
         is_hidden = cached_entry.get("hidden", False)
         is_favorite = cached_entry.get("favorite", False)
 
         result = {
-            "Status": "HIGH" if (mbps * 1000) > BITRATE_THRESHOLD_KBPS else "OK",
+            "Status": "HIGH" if (mbps * 1000) > config.settings.bitrate_threshold_kbps else "OK",
             "Bitrate_Mbps": mbps,
             "Size_MB": size_mb,
             "FilePath": filepath,

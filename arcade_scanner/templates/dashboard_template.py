@@ -1,9 +1,9 @@
 import os
 import socket
 import time
-from arcade_scanner.app_config import HIDDEN_DATA_DIR, PORT, OPTIMIZER_SCRIPT, OPTIMIZER_AVAILABLE
+from arcade_scanner.config import config
 
-def generate_html_report(results, report_file, server_port=PORT):
+def generate_html_report(results, report_file, server_port=8000):
     total_mb = sum(r["Size_MB"] for r in results)
     
     # Aggregate Folder Data
@@ -16,14 +16,14 @@ def generate_html_report(results, report_file, server_port=PORT):
         folders_data[fdir]["size_mb"] += r["Size_MB"]
     
     import json
-    from arcade_scanner.app_config import USER_SETTINGS
+    
     folders_json = json.dumps(folders_data)
     all_videos_json = json.dumps(results)
-    user_settings_json = json.dumps(USER_SETTINGS)
+    user_settings_json = json.dumps(config.settings.model_dump())
     
     # Logic for enabled state: Must be installed AND enabled in settings
-    opt_avail_str = 'true' if OPTIMIZER_AVAILABLE else 'false'
-    opt_enabled_str = 'true' if (OPTIMIZER_AVAILABLE and USER_SETTINGS.get("enable_optimizer", True)) else 'false'
+    opt_avail_str = 'true' if config.optimizer_available else 'false'
+    opt_enabled_str = 'true' if (config.optimizer_available and config.settings.enable_optimizer) else 'false'
     
     html_content = f"""<!DOCTYPE html>
     <html lang="de">
@@ -32,7 +32,9 @@ def generate_html_report(results, report_file, server_port=PORT):
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Arcade Video Dashboard</title>
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-        <link rel="stylesheet" href="/static/styles.css?v={int(time.time()) + 1}">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/static/styles.css?v={int(time.time()) + 10}">
+        <link rel="stylesheet" href="/static/settings.css?v={int(time.time()) + 20}">
         <script>
             window.userSettings = {user_settings_json};
             window.OPTIMIZER_AVAILABLE = {opt_avail_str};
@@ -301,7 +303,7 @@ def generate_html_report(results, report_file, server_port=PORT):
                 {f'''<button class="cinema-action-btn" onclick="cinemaOptimize()" title="Optimize Video">
                     <span class="material-icons">bolt</span>
                     <span>OPTIMIZE</span>
-                </button>''' if (OPTIMIZER_AVAILABLE and USER_SETTINGS.get("enable_optimizer", True)) else ""}
+                </button>''' if (config.optimizer_available and config.settings.enable_optimizer) else ""}
             </div>
             
              <div id="optimizePanel">
@@ -338,7 +340,7 @@ def generate_html_report(results, report_file, server_port=PORT):
             <span><strong id="batchCount">0</strong> Videos ausgewählt</span>
             {f'''<button class="filter-btn active" onclick="triggerBatchCompress()">
                 <span class="material-icons">bolt</span> OPTIMIEREN
-            </button>''' if OPTIMIZER_AVAILABLE else ""}
+            </button>''' if config.optimizer_available else ""}
             <button class="filter-btn" onclick="triggerBatchFavorite(true)" style="background:var(--gold); color:#000; border-color:var(--gold);">
                 <span class="material-icons">star</span> FAVORISIEREN
             </button>
@@ -350,93 +352,255 @@ def generate_html_report(results, report_file, server_port=PORT):
             </button>
         </div>
         
-        <div id="settingsModal" class="settings-modal">
-            <div class="settings-content">
-                <div class="settings-header">
-                    <h2><span class="material-icons">settings</span> Einstellungen</h2>
-                    <span class="material-icons settings-close" onclick="closeSettings()">close</span>
-                </div>
+        
+        <div id="settingsModal" class="settings-modal redesign">
+            <div class="settings-container">
                 
-                <div class="settings-body">
-                    <div class="settings-section">
-                        <label>📁 Scan-Ordner (einer pro Zeile)</label>
-                        <textarea id="settingsTargets" rows="5" placeholder="C:\\Videos\nD:\\Media"></textarea>
-                        <div class="settings-hint" id="defaultTargetsHint"></div>
+                <!-- Sidebar Navigation -->
+                <aside class="settings-sidebar">
+                    <div class="settings-logo">
+                        <span class="material-icons">settings</span>
+                        <h2>Settings</h2>
                     </div>
                     
-                    <div class="settings-section">
-                        <label>🛡️ Standard-Ausschlüsse</label>
-                        <div class="settings-hint">Diese Ordner werden standardmäßig ignoriert. Deaktivieren Sie Checkboxen, um sie zu scannen.</div>
-                        <div id="defaultExclusionsContainer" class="exclusions-list"></div>
-                    </div>
-                    
-                    <div class="settings-section">
-                        <label>🚫 Zusätzliche Ausschlüsse (einer pro Zeile)</label>
-                        <textarea id="settingsExcludes" rows="3" placeholder="Eigene Ausschlüsse..."></textarea>
-                    </div>
-                    
-                    <div class="settings-section settings-row">
-                        <div>
-                            <label>Mindestgröße (MB)</label>
-                            <input type="number" id="settingsMinSize" min="1" value="100">
+                    <nav class="settings-nav">
+                        <div class="nav-item active" data-section="scanning">
+                            <span class="material-icons">folder_open</span>
+                            <span>Scanning</span>
                         </div>
-                        <div>
-                            <label>Bitrate-Schwellwert (kbps)</label>
-                            <input type="number" id="settingsBitrate" min="1000" value="15000">
+                        <div class="nav-item" data-section="performance">
+                            <span class="material-icons">speed</span>
+                            <span>Performance</span>
                         </div>
-                    </div>
-
-                    <div class="settings-section">
-                        <label>🎨 Interface & Features</label>
-                        <div class="settings-row" style="align-items:center; gap:20px; margin-top:8px;">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <input type="checkbox" id="settingsFunFacts" style="width:20px; height:20px;">
-                                <label for="settingsFunFacts" style="margin:0; font-weight:normal;">Optimizer Fun Facts</label>
-                            </div>
+                        <div class="nav-item" data-section="interface">
+                            <span class="material-icons">palette</span>
+                            <span>Interface</span>
                         </div>
-                    </div>
-                    
-                    <div class="settings-section">
-                        <label>💾 Cache-Statistiken</label>
-                        <div class="cache-stats">
-                            <div class="stat-item">
-                                <span class="material-icons">image</span>
-                                <div class="stat-info">
-                                    <div class="stat-label">Thumbnails</div>
-                                    <div class="stat-value" id="statThumbnails">Laden...</div>
-                                </div>
-                            </div>
-                            <div class="stat-item">
-                                <span class="material-icons">movie</span>
-                                <div class="stat-info">
-                                    <div class="stat-label">Preview Clips</div>
-                                    <div class="stat-value" id="statPreviews">Laden...</div>
-                                </div>
-                            </div>
-                            <div class="stat-item">
-                                <span class="material-icons">storage</span>
-                                <div class="stat-info">
-                                    <div class="stat-label">Gesamt Cache</div>
-                                    <div class="stat-value" id="statTotal">Laden...</div>
-                                </div>
-                            </div>
+                        
+                        <div class="nav-divider"></div>
+                        
+                        <div class="nav-item" data-section="storage">
+                            <span class="material-icons">storage</span>
+                            <span>Storage</span>
                         </div>
-                    </div>
-                    
-                    <div class="settings-warning">
-                        <span class="material-icons">warning</span>
-                        Änderungen erfordern einen Neustart der App
-                    </div>
-                </div>
+                    </nav>
+                </aside>
                 
-                <div class="settings-footer">
-                    <button class="filter-btn" onclick="closeSettings()">Abbrechen</button>
-                    <button class="filter-btn active" onclick="saveSettings()">
-                        <span class="material-icons">save</span> Speichern
-                    </button>
-                </div>
+                <!-- Main Content -->
+                <main class="settings-main">
+                    
+                    <!-- Header -->
+                    <header class="settings-header">
+                        <div class="settings-title">
+                            <h1 id="section-title">Scanning</h1>
+                            <p id="section-subtitle">Configure video library scanning behavior</p>
+                        </div>
+                        <div class="settings-header-actions">
+                            <button class="btn-icon" title="Close Settings" onclick="closeSettings()">
+                                <span class="material-icons">close</span>
+                            </button>
+                        </div>
+                    </header>
+                    
+                    <!-- Scrollable Body -->
+                    <div class="settings-body">
+                        
+                        <!-- SCANNING SECTION -->
+                        <div class="content-section active" id="content-scanning">
+                            
+                            <!-- Scan Targets -->
+                            <section class="settings-section">
+                                <div class="section-header">
+                                    <h3 class="section-title">📁 Scan Directories</h3>
+                                    <p class="section-description">Add directories that should be scanned for video files. One path per line.</p>
+                                </div>
+                                
+                                <textarea class="textarea-field" id="settingsTargets" placeholder="/Users/username/Videos&#10;/Volumes/Media/Movies" rows="5"></textarea>
+                                
+                                <div class="alert alert-info">
+                                    <span class="material-icons">info</span>
+                                    <div>
+                                        <strong>Default:</strong> System home directory
+                                        <br><span id="defaultTargetsHint" style="opacity: 0.7;"></span>
+                                    </div>
+                                </div>
+                            </section>
+                            
+                            <!-- Default Exclusions -->
+                            <section class="settings-section">
+                                <div class="section-header">
+                                    <h3 class="section-title">🛡️ System Exclusions</h3>
+                                    <p class="section-description">Default paths that are automatically excluded. Uncheck to include them in the scan.</p>
+                                </div>
+                                
+                                <div class="settings-group">
+                                    <div class="checkbox-list" id="defaultExclusionsContainer">
+                                        <!-- Dynamically populated -->
+                                    </div>
+                                </div>
+                            </section>
+                            
+                            <!-- Custom Exclusions -->
+                            <section class="settings-section">
+                                <div class="section-header">
+                                    <h3 class="section-title">🚫 Custom Exclusions</h3>
+                                    <p class="section-description">Additional paths to exclude from scanning. One path per line.</p>
+                                </div>
+                                
+                                <textarea class="textarea-field" id="settingsExcludes" placeholder="/Users/username/Private&#10;/Volumes/Backup" rows="3"></textarea>
+                            </section>
+                        </div>
+                        
+                        <!-- PERFORMANCE SECTION -->
+                        <div class="content-section" id="content-performance">
+                            
+                            <section class="settings-section">
+                                <div class="section-header">
+                                    <h3 class="section-title">File Size Threshold</h3>
+                                    <p class="section-description">Ignore videos smaller than this size (in MB).</p>
+                                </div>
+                                
+                                <div class="settings-group">
+                                    <div class="settings-item">
+                                        <div class="settings-item-label">
+                                            <div class="settings-item-title">Minimum File Size</div>
+                                            <div class="settings-item-description">Files below this size will be excluded from the scan</div>
+                                        </div>
+                                        <div class="number-input-wrapper">
+                                            <button class="number-stepper" onclick="adjustSettingsNumber('settingsMinSize', -10)">
+                                                <span class="material-icons">remove</span>
+                                            </button>
+                                            <input type="number" id="settingsMinSize" value="100" min="1">
+                                            <button class="number-stepper" onclick="adjustSettingsNumber('settingsMinSize', 10)">
+                                                <span class="material-icons">add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                            
+                            <section class="settings-section">
+                                <div class="section-header">
+                                    <h3 class="section-title">Bitrate Classification</h3>
+                                    <p class="section-description">Videos exceeding this bitrate will be marked as HIGH.</p>
+                                </div>
+                                
+                                <div class="settings-group">
+                                    <div class="settings-item">
+                                        <div class="settings-item-label">
+                                            <div class="settings-item-title">Bitrate Threshold</div>
+                                            <div class="settings-item-description">Threshold in kbps (1000-50000)</div>
+                                        </div>
+                                        <div class="number-input-wrapper">
+                                            <button class="number-stepper" onclick="adjustSettingsNumber('settingsBitrate', -1000)">
+                                                <span class="material-icons">remove</span>
+                                            </button>
+                                            <input type="number" id="settingsBitrate" value="15000" min="1000" max="50000">
+                                            <button class="number-stepper" onclick="adjustSettingsNumber('settingsBitrate', 1000)">
+                                                <span class="material-icons">add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                        
+                        <!-- INTERFACE SECTION -->
+                        <div class="content-section" id="content-interface">
+                            
+                            <section class="settings-section">
+                                <div class="section-header">
+                                    <h3 class="section-title">🎨 Visual Features</h3>
+                                    <p class="section-description">Customize the dashboard appearance and behavior.</p>
+                                </div>
+                                
+                                <div class="settings-group">
+                                    <div class="settings-item">
+                                        <div class="settings-item-label">
+                                            <div class="settings-item-title">Fun Facts</div>
+                                            <div class="settings-item-description">Show educational overlays during video optimization</div>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="settingsFunFacts" onchange="markSettingsUnsaved()">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                        
+                        <!-- STORAGE SECTION -->
+                        <div class="content-section" id="content-storage">
+                            
+                            <section class="settings-section">
+                                <div class="section-header">
+                                    <h3 class="section-title">💾 Cache Statistics</h3>
+                                    <p class="section-description">Overview of disk space used by thumbnails and preview clips.</p>
+                                </div>
+                                
+                                <div class="stats-grid">
+                                    <div class="stat-card">
+                                        <div class="stat-card-header">
+                                            <span class="material-icons">image</span>
+                                            <span>Thumbnails</span>
+                                        </div>
+                                        <div class="stat-card-value" id="statThumbnails">—</div>
+                                    </div>
+                                    
+                                    <div class="stat-card">
+                                        <div class="stat-card-header">
+                                            <span class="material-icons">movie</span>
+                                            <span>Preview Clips</span>
+                                        </div>
+                                        <div class="stat-card-value" id="statPreviews">—</div>
+                                    </div>
+                                    
+                                    <div class="stat-card">
+                                        <div class="stat-card-header">
+                                            <span class="material-icons">storage</span>
+                                            <span>Total Cache</span>
+                                        </div>
+                                        <div class="stat-card-value" id="statTotal">—</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning">
+                                    <span class="material-icons">warning</span>
+                                    <div>
+                                        Änderungen erfordern einen Neustart der App
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- Footer with Actions -->
+                    <footer class="settings-footer">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <div class="save-indicator saved">
+                                <span class="material-icons">check_circle</span>
+                                <span>All changes saved</span>
+                            </div>
+                            <div style="font-size:11px; color:rgba(255,255,255,0.4); display:flex; gap:8px;">
+                                <span><kbd style="padding:2px 6px; background:rgba(255,255,255,0.05); border-radius:4px; font-family:monospace;">⌘S</kbd> to save</span>
+                                <span>•</span>
+                                <span><kbd style="padding:2px 6px; background:rgba(255,255,255,0.05); border-radius:4px; font-family:monospace;">ESC</kbd> to close</span>
+                            </div>
+                        </div>
+                        <div class="footer-actions">
+                            <button class="filter-btn" onclick="closeSettings()">Abbrechen</button>
+                            <button class="filter-btn active" onclick="saveSettings()">
+                                <span class="material-icons">save</span> Speichern
+                            </button>
+                        </div>
+                    </footer>
+                    
+                </main>
+                
             </div>
         </div>
+        
         
         <iframe name='h_frame' style='display:none;'></iframe>
 
@@ -445,7 +609,7 @@ def generate_html_report(results, report_file, server_port=PORT):
             window.FOLDERS_DATA = {folders_json};
             window.ALL_VIDEOS = {all_videos_json};
             window.userSettings = {user_settings_json};
-            window.OPTIMIZER_AVAILABLE = {'true' if OPTIMIZER_AVAILABLE else 'false'};
+            window.OPTIMIZER_AVAILABLE = {'true' if config.optimizer_available else 'false'};
         </script>
         <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
         <script src="/static/client.js?v={int(time.time())}"></script>

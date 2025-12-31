@@ -2,7 +2,7 @@ import os
 import shutil
 import hashlib
 from typing import List
-from arcade_scanner.app_config import HIDDEN_DATA_DIR, THUMB_DIR, PREVIEW_DIR
+from arcade_scanner.config import config
 
 def is_safe_to_delete(path: str, expected_parent: str, prefix: str, ext: str) -> bool:
     """Strict check to ensure the file is where we expect and named correctly."""
@@ -22,16 +22,16 @@ def is_safe_to_delete(path: str, expected_parent: str, prefix: str, ext: str) ->
 
 def purge_media():
     """Deletes all files in the thumbnail and preview directories with safety checks."""
-    print(f"🧹 Purging media in {HIDDEN_DATA_DIR}...")
+    print(f"🧹 Purging media in {config.hidden_data_dir}...")
     
-    # Double check that HIDDEN_DATA_DIR is what we think it is (should be inside project)
-    if "arcade_data" not in HIDDEN_DATA_DIR:
+    # Double check that hidden_data_dir is what we think it is (should be inside project)
+    if "arcade_data" not in config.hidden_data_dir:
         print("❌ [Safety] HIDDEN_DATA_DIR looks suspicious. Aborting purge.")
         return
 
     targets = [
-        (THUMB_DIR, "thumb_", ".jpg"),
-        (PREVIEW_DIR, "prev_", ".mp4")
+        (config.thumb_dir, "thumb_", ".jpg"),
+        (config.preview_dir, "prev_", ".mp4")
     ]
 
     for folder, prefix, ext in targets:
@@ -51,15 +51,15 @@ def purge_thumbnails():
     """Deletes all thumbnail files only."""
     print(f"🧹 Purging thumbnails...")
     
-    if "arcade_data" not in HIDDEN_DATA_DIR:
+    if "arcade_data" not in config.hidden_data_dir:
         print("❌ [Safety] HIDDEN_DATA_DIR looks suspicious. Aborting purge.")
         return
 
-    if os.path.exists(THUMB_DIR):
+    if os.path.exists(config.thumb_dir):
         count = 0
-        for filename in os.listdir(THUMB_DIR):
-            file_path = os.path.join(THUMB_DIR, filename)
-            if is_safe_to_delete(file_path, THUMB_DIR, "thumb_", ".jpg"):
+        for filename in os.listdir(config.thumb_dir):
+            file_path = os.path.join(config.thumb_dir, filename)
+            if is_safe_to_delete(file_path, config.thumb_dir, "thumb_", ".jpg"):
                 try:
                     os.remove(file_path)
                     count += 1
@@ -71,15 +71,15 @@ def purge_previews():
     """Deletes all preview clip files only."""
     print(f"🧹 Purging preview clips...")
     
-    if "arcade_data" not in HIDDEN_DATA_DIR:
+    if "arcade_data" not in config.hidden_data_dir:
         print("❌ [Safety] HIDDEN_DATA_DIR looks suspicious. Aborting purge.")
         return
 
-    if os.path.exists(PREVIEW_DIR):
+    if os.path.exists(config.preview_dir):
         count = 0
-        for filename in os.listdir(PREVIEW_DIR):
-            file_path = os.path.join(PREVIEW_DIR, filename)
-            if is_safe_to_delete(file_path, PREVIEW_DIR, "prev_", ".mp4"):
+        for filename in os.listdir(config.preview_dir):
+            file_path = os.path.join(config.preview_dir, filename)
+            if is_safe_to_delete(file_path, config.preview_dir, "prev_", ".mp4"):
                 try:
                     os.remove(file_path)
                     count += 1
@@ -91,8 +91,8 @@ def purge_broken_media():
     """Removes media files that are 0 bytes or corrupted."""
     removed_count = 0
     targets = [
-        (THUMB_DIR, "thumb_", ".jpg"),
-        (PREVIEW_DIR, "prev_", ".mp4")
+        (config.thumb_dir, "thumb_", ".jpg"),
+        (config.preview_dir, "prev_", ".mp4")
     ]
     for folder, prefix, ext in targets:
         if os.path.exists(folder):
@@ -118,8 +118,8 @@ def cleanup_orphans(video_files: List[str]):
     
     removed_count = 0
     targets = [
-        (THUMB_DIR, "thumb_", ".jpg"),
-        (PREVIEW_DIR, "prev_", ".mp4")
+        (config.thumb_dir, "thumb_", ".jpg"),
+        (config.preview_dir, "prev_", ".mp4")
     ]
     
     for folder, prefix, ext in targets:

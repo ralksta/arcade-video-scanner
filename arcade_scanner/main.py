@@ -1,25 +1,26 @@
-import os
+import asyncio
 import time
 import webbrowser
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from .app_config import SCAN_TARGETS, EXCLUDE_PATHS, CACHE_FILE, REPORT_FILE
-from .core.cache_manager import load_cache, save_cache
-from .core.video_processor import process_video, get_optimal_workers
-from .core.maintenance import purge_media, cleanup_orphans, purge_broken_media, purge_thumbnails, purge_previews
-from .templates.dashboard_template import generate_html_report
-from .server.web_server import start_server
+import os
+from arcade_scanner.config import config
+from arcade_scanner.database import db
+from arcade_scanner.scanner import get_scanner_manager
+from arcade_scanner.templates.dashboard_template import generate_html_report
+from arcade_scanner.server.web_server import start_server
+from arcade_scanner.core.maintenance import purge_media, cleanup_orphans, purge_broken_media, purge_thumbnails, purge_previews
 
 def run_scanner(args_list=None):
-    parser = argparse.ArgumentParser(description="Arcade Video Scanner 5.2.0")
+    parser = argparse.ArgumentParser(description="Arcade Video Scanner 6.0")
     parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
     parser.add_argument("--rebuild-thumbs", action="store_true", help="Delete only thumbnails and regenerate them.")
     parser.add_argument("--rebuild-previews", action="store_true", help="Delete only preview clips and regenerate them.")
     parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
     args, unknown = parser.parse_known_args(args_list)
 
-    print("--- Arcade Video Scanner 5.2.0 ---")
+    print("--- Arcade Video Scanner 6.0 (Refactored) ---")
     
+    # 0. Maintenance
     if args.rebuild:
         purge_media()
     elif args.rebuild_thumbs:
@@ -27,89 +28,45 @@ def run_scanner(args_list=None):
     elif args.rebuild_previews:
         purge_previews()
     
-    # Always cleanup zero-byte files to allow regeneration
     purge_broken_media()
     
-    # 1. Load Cache
-    cache = load_cache(CACHE_FILE)
-    print(f"📦 Loaded {len(cache)} items from cache.")
-    
-    # 2. Scan Files
-    from .core.scanner import VideoScanner
-    scanner = VideoScanner(SCAN_TARGETS, EXCLUDE_PATHS)
-    video_files = scanner.scan()
-
-    print(f"Found {len(video_files)} video files.")
-    
-    # 2.1 Prune Cache (Remove entries for files that no longer exist)
-    stale_keys = [k for k in cache.keys() if k not in video_files and os.path.isabs(k)]
-    if stale_keys:
-        print(f"🧹 Pruning {len(stale_keys)} stale entries from cache...")
-        for k in stale_keys:
-            del cache[k]
-    
-    # Always cleanup orphans if anything was pruned or if requested
-    if args.cleanup or stale_keys:
-        cleanup_orphans(video_files)
-
-    # 3. Determine rebuild mode
-    rebuild_mode = None
-    if args.rebuild:
-        rebuild_mode = None  # Full rebuild - regenerate everything
-        print(f"📊 Regenerating {len(video_files)} videos (thumbnails + previews)...")
-    elif args.rebuild_thumbs:
-        rebuild_mode = 'thumbs'
-        print(f"🖼️  Regenerating thumbnails only for {len(video_files)} videos...")
-    elif args.rebuild_previews:
-        rebuild_mode = 'previews'
-        print(f"🎬 Regenerating preview clips only for {len(video_files)} videos...")
-    else:
-        print(f"📊 Analyzing {len(video_files)} videos...")
-    
-    # 4. Process Videos (Multi-threaded)
-    results = []
-    
+    # 1. Run Async Scan
     try:
-        num_workers = get_optimal_workers()
-        with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            future_to_file = {executor.submit(process_video, f, cache, rebuild_mode): f for f in video_files}
-            count = 0
-            for future in as_completed(future_to_file):
-                try:
-                    res = future.result()
-                    if res:
-                        results.append(res)
-                        # CRITICAL: Update cache so progress is saved
-                        cache[res["FilePath"]] = res
-                except Exception as e:
-                    filename = os.path.basename(future_to_file[future])
-                    print(f"\n  [Error] Failed to process {filename}: {e}")
-                
-                count += 1
-                if count % 10 == 0 or count == len(video_files):
-                    action = "thumbnails" if rebuild_mode == 'thumbs' else "previews" if rebuild_mode == 'previews' else "processed"
-                    print(f"  [{count}/{len(video_files)}] {action}...")
+        # Run the metadata scan
+        print("🚀 Starting Library Scan...")
+        mgr = get_scanner_manager()
+        
+        should_force = args.rebuild or args.rebuild_thumbs or args.rebuild_previews
+        if should_force:
+            print("Usage of rebuild flags will force a re-scan of metadata and assets.")
+            
+        asyncio.run(mgr.run_scan(
+            progress_callback=lambda x: print(f"  {x}"),
+            force_rescan=should_force
+        ))
+        
+        # 2. Asset Generation (Thumbs/Previews)
+        pass # Handled in run_scan now
     except KeyboardInterrupt:
-        print("\n\n⚠️  Scan interrupted by user. Saving progress...")
+        print("\n⚠️ Scan interrupted.")
     except Exception as e:
-        print(f"\n\n❌ Unexpected error during scan: {e}")
+        print(f"❌ Error: {e}")
 
-    # 4. Save Cache
-    save_cache(cache, CACHE_FILE)
+    # 3. Report Generation
+    print("📊 Generating Report...")
+    results = [e.model_dump(by_alias=True) for e in db.get_all()]
     
-    # 5. Start Server
+    # Start Server first to know port
     server, port = start_server()
-
-    # 6. Generate Report
-    print(f"Generating report: {REPORT_FILE}")
-    generate_html_report(results, REPORT_FILE, server_port=port)
     
-    # 7. Open Browser
+    generate_html_report(results, config.report_file, server_port=port)
+    
+    # 4. Open Browser
     url = f"http://localhost:{port}/"
     print(f"Opening dashboard: {url}")
     webbrowser.open(url)
     
-    # Keep main thread alive
+    # Keep alive
     try:
         while True:
             time.sleep(1)

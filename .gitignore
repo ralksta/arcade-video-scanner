@@ -29,3 +29,4 @@ debug_scan.py
 *.sh
 *.zip
 !scan_videos_mit_shell.py
+!run.sh

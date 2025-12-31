@@ -79,6 +79,21 @@ function setWorkspaceMode(mode) {
     document.getElementById('m-' + mode).classList.add('active');
     if (mode === 'vault') document.body.classList.add('vault-mode');
     else document.body.classList.remove('vault-mode');
+
+    // Add animation class
+    const grid = document.getElementById('videoGrid');
+    const treemap = document.getElementById('treemapContainer');
+    if (grid) {
+        grid.classList.remove('animating');
+        void grid.offsetWidth; // Trigger reflow
+        grid.classList.add('animating');
+    }
+    if (treemap) {
+        treemap.classList.remove('animating');
+        void treemap.offsetWidth; // Trigger reflow
+        treemap.classList.add('animating');
+    }
+
     filterAndSort();
     updateURL();
 }
@@ -117,6 +132,11 @@ function setLayout(layout, skipURLUpdate = false) {
         sentinel.style.display = 'none';
         treemap.style.display = 'block';
 
+        // Trigger animation
+        treemap.classList.remove('animating');
+        void treemap.offsetWidth; // Trigger reflow
+        treemap.classList.add('animating');
+
         // Hide batch bar in treemap view (no checkboxes available)
         if (batchBar) {
             batchBar.style.display = 'none';
@@ -136,6 +156,11 @@ function setLayout(layout, skipURLUpdate = false) {
         grid.style.display = layout === 'list' ? 'flex' : 'grid';
         sentinel.style.display = 'flex';
         treemap.style.display = 'none';
+
+        // Trigger animation
+        grid.classList.remove('animating');
+        void grid.offsetWidth; // Trigger reflow
+        grid.classList.add('animating');
 
         // Reset treemap drill-down state
         treemapCurrentFolder = null;
@@ -1508,12 +1533,12 @@ async function openSettings() {
         data.default_exclusions.forEach(exc => {
             const isEnabled = !disabledDefaults.includes(exc.path);
             const item = document.createElement('label');
-            item.className = 'exclusion-item';
+            item.className = 'checkbox-item';
             item.innerHTML = `
                 <input type="checkbox" data-path="${exc.path}" ${isEnabled ? 'checked' : ''}>
-                <div class="exclusion-info">
-                    <div class="exclusion-path">${exc.path}</div>
-                    <div class="exclusion-desc">${exc.desc}</div>
+                <div class="checkbox-item-content">
+                    <div class="checkbox-item-title">${exc.path}</div>
+                    <div class="checkbox-item-description">${exc.desc}</div>
                 </div>
             `;
             container.appendChild(item);
@@ -1536,6 +1561,8 @@ function closeSettings() {
 }
 
 async function saveSettings() {
+    markSettingsSaving();
+
     const targetsText = document.getElementById('settingsTargets').value;
     const excludesText = document.getElementById('settingsExcludes').value;
 
@@ -1565,8 +1592,14 @@ async function saveSettings() {
         });
 
         if (response.ok) {
-            closeSettings();
-            // Show success feedback
+            markSettingsSaved();
+
+            // Close after brief delay to show success state
+            setTimeout(() => {
+                closeSettings();
+            }, 800);
+
+            // Show success feedback on settings button
             const btn = document.getElementById('settingsBtn');
             btn.style.color = 'var(--gold)';
             setTimeout(() => { btn.style.color = ''; }, 2000);
@@ -1578,10 +1611,12 @@ async function saveSettings() {
             };
         } else {
             alert('Fehler beim Speichern der Einstellungen');
+            markSettingsUnsaved();
         }
     } catch (e) {
         console.error('Failed to save settings:', e);
         alert('Fehler beim Speichern der Einstellungen');
+        markSettingsUnsaved();
     }
 }
 
@@ -1602,12 +1637,172 @@ async function loadSettings() {
     }
 }
 
-// Close settings modal on ESC
+// === NEW SETTINGS UI NAVIGATION ===
+
+function initSettingsNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    const contentSections = document.querySelectorAll('.content-section');
+
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const sectionId = item.dataset.section;
+
+            // Update active nav item
+            navItems.forEach(nav => nav.classList.remove('active'));
+            item.classList.add('active');
+
+            // Show corresponding content
+            contentSections.forEach(section => {
+                section.classList.remove('active');
+            });
+            const targetSection = document.getElementById(`content-${sectionId}`);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
+
+            // Update header
+            updateSettingsHeader(sectionId);
+        });
+    });
+}
+
+function updateSettingsHeader(sectionId) {
+    const headers = {
+        'scanning': {
+            title: 'Scanning',
+            subtitle: 'Configure video library scanning behavior'
+        },
+        'performance': {
+            title: 'Performance',
+            subtitle: 'Optimize scan performance and file filtering'
+        },
+        'interface': {
+            title: 'Interface',
+            subtitle: 'Customize dashboard appearance and features'
+        },
+        'storage': {
+            title: 'Storage',
+            subtitle: 'Manage cache and disk space usage'
+        }
+    };
+
+    const header = headers[sectionId] || { title: sectionId, subtitle: '' };
+    const titleEl = document.getElementById('section-title');
+    const subtitleEl = document.getElementById('section-subtitle');
+
+    if (titleEl) titleEl.textContent = header.title;
+    if (subtitleEl) subtitleEl.textContent = header.subtitle;
+}
+
+// Number Input Adjustment for new UI
+function adjustSettingsNumber(inputId, delta) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    const current = parseInt(input.value) || 0;
+    const min = parseInt(input.min) || 0;
+    const max = parseInt(input.max) || Infinity;
+    const newValue = Math.max(min, Math.min(max, current + delta));
+    input.value = newValue;
+    markSettingsUnsaved();
+}
+
+// Save State Indicator
+function markSettingsUnsaved() {
+    const indicator = document.querySelector('.save-indicator');
+    if (indicator) {
+        indicator.className = 'save-indicator unsaved';
+        indicator.innerHTML = '<span class="material-icons">warning</span><span>Unsaved changes</span>';
+    }
+}
+
+function markSettingsSaving() {
+    const indicator = document.querySelector('.save-indicator');
+    if (indicator) {
+        indicator.className = 'save-indicator saving';
+        indicator.innerHTML = '<div class="loading-spinner"></div><span>Saving...</span>';
+    }
+}
+
+function markSettingsSaved() {
+    const indicator = document.querySelector('.save-indicator');
+    if (indicator) {
+        indicator.className = 'save-indicator saved';
+        indicator.innerHTML = '<span class="material-icons">check_circle</span><span>All changes saved</span>';
+    }
+}
+
+// Initialize navigation when settings modal opens
+const originalOpenSettings = window.openSettings;
+window.openSettings = async function () {
+    if (originalOpenSettings) {
+        await originalOpenSettings();
+    }
+    // Initialize navigation after modal is populated
+    setTimeout(() => {
+        initSettingsNavigation();
+    }, 100);
+};
+
+// Add change listeners to mark unsaved
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const settingsInputs = document.querySelectorAll('#settingsModal input, #settingsModal textarea');
+        settingsInputs.forEach(el => {
+            el.addEventListener('input', markSettingsUnsaved);
+        });
+    }, 500);
+});
+
+// Keyboard Shortcuts for Settings Modal
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.getElementById('settingsModal').classList.contains('active')) {
-        closeSettings();
+    const settingsModal = document.getElementById('settingsModal');
+    const isSettingsOpen = settingsModal && settingsModal.classList.contains('active');
+
+    if (isSettingsOpen) {
+        // ESC to close
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeSettings();
+            showToast('Settings closed', 'info');
+        }
+
+        // Cmd+S (Mac) or Ctrl+S (Windows/Linux) to save
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+            e.preventDefault();
+            saveSettings();
+            showToast('Saving settings...', 'success');
+        }
     }
 });
+
+// Toast Notification Helper
+function showToast(message, type = 'info') {
+    // Remove existing toast if any
+    const existingToast = document.querySelector('.settings-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+
+    // Create toast
+    const toast = document.createElement('div');
+    toast.className = `settings-toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="material-icons">${type === 'success' ? 'check_circle' : 'info'}</span>
+        <span>${message}</span>
+    `;
+
+    document.body.appendChild(toast);
+
+    // Trigger animation
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
+}
 // --- RESCAN ---
 function rescanLibrary() {
     const btn = document.getElementById('refreshBtn');

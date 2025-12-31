@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
 """
-Arcade Video Scanner 4.0 (Legacy Wrapper)
-This script now serves as an entry point for the modular arcade_scanner package.
+Arcade Video Scanner 6.0 (Legacy Wrapper)
+This script wraps the modular arcade_scanner package.
+DEPRECATED: Please use `python -m arcade_scanner.main` or `arcade-scanner` command.
 """
 import sys
 import os
