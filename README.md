@@ -1,4 +1,4 @@
-# Arcade Video Scanner 5.4.0 (Dev)
+# Arcade Video Scanner 6.0.0 (Dev)
 
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
@@ -10,42 +10,39 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 5.4.0 (Performance & Visualization)
+## 🚀 Version 6.0.0 Highlights
 
-### 📊 Treemap Logarithmic Scale
-- **Toggle View**: Switch between **Linear** (size-accurate) and **Logarithmic** (structure-visible) treemap modes.
-- **Fixes Power Laws**: Easily visualize folder structures even when one directory (e.g., "Archive") is 100x larger than others.
+This major release combines a complete visual overhaul with enterprise-grade security hardening and a modular architectural refactor.
 
-### ⚡ Master Optimizer Toggle
-- **Resource Control**: Disable the entire optimization suite via `settings.json` (`"enable_optimizer": false`).
-- **Clean UI**: Hides all "Optimize" buttons, lightning bolt icons, and batch actions when disabled—perfect for low-power servers.
+### 🎨 UI & Experience Overhaul
+- **Settings Redesign**: A completely new, sidebar-based settings interface inspired by modern OS design standards (Apple/Linear).
+- **Smooth Transitions**: 500ms GPU-accelerated fade-in animations when switching between workspaces (Lobby, Vault) and layouts (Grid, Treemap).
+- **Modern Interactions**: iOS-style toggles, number steppers, toast notifications, and keyboard shortcuts (`Cmd+S` to save, `ESC` to close).
+- **Typography**: Integrated 'Inter' font family for superior legibility on all displays.
 
-### 🐧 Linux Hardware Acceleration (VAAPI)
-- **Native VAAPI Support**: Now supports hardware transcoding on Linux for Intel and AMD GPUs.
-- **Performance Boost**: Uses hardware acceleration for both **startup scanning** (preview generation) and **video optimization**.
-- **Smart Detection**: Automatically detects `/dev/dri/renderD128` or `/dev/dri/card0` and provides driver guidance if needed.
+### 🔒 Enterprise-Grade Security
+- **Path whitelisting**: Strict `PathValidator` ensures the scanner *only* accesses directories explicitly allowed in configuration.
+- **Directory Traversal Protection**: Active protection against `../` attacks and attempts to access system files.
+- **Input Sanitization**: All filenames and API parameters are rigorously validated and sanitized before processing.
+- **Safe Media Serving**: Video streaming uses secure byte-range handling with strict bounds checking.
 
-### 📱 Mobile Experience Overhaul
-- **Mobile-First Layout**: Fully responsive single-column design optimized for mobile devices.
-- **Touch Interactions**: "Click-to-Play" interface replaces hover menus on touchscreens.
-- **Stability**: Fixed layout shifts and scrolling issues for a buttery-smooth mobile experience.
-
-### ✂️ Advanced Optimization Controls
-- **Audio Modes**: Choose between "Standard" (AAC) or "Enhanced" (High-pass + Gate + Norm) audio processing.
-- **Video Trimming**: Select specific start and end times directly in the optimization panel.
+### 🏗️ Modular Architecture
+- **Refactored Core**: The monolithic codebase has been split into specialized packages (`core`, `security`, `database`, `server`) for better maintainability and testing.
+- **Type Safety**: Enhanced Pydantic models ensure data integrity throughout the application pipeline.
 
 ---
 
 ## 🚀 Previous Highlights
 
+### v5.4.0 (Performance & Visualization)
+- **Treemap Log Scale**: Toggle between Linear and Logarithmic visualization modes.
+- **Master Optimizer Toggle**: Completely disable optimization features for read-only setups.
+- **Linux VAAPI**: Native hardware acceleration support for Intel/AMD GPUs on Linux.
+
 ### v5.2.0 - Cinema Mode Edition
 - **Cinema Player**: Full-featured in-browser player with integrated "Favorite", "Vault", and "Optimize" actions.
 - **Deep Linking**: Direct links to specific views (`/treeview`, `/review`) supported.
 - **Saved Views**: Create custom presets for "Large Files", "Unoptimized 4K", etc.
-
-### v5.1.0 - Hardware Preview Generation
-- **GPU Previews**: Initial scans are 5-10x faster using hardware encoding for thumbnail/preview generation.
-- **Settings UI**: Configure scan targets, exclusions, and thresholds directly from the dashboard.
 
 ---
 
@@ -96,16 +93,24 @@ All settings can be configured through the **Settings UI** (gear icon) or by edi
   sudo apt-get install ffmpeg intel-media-va-driver-non-free
   ```
 
-### Run the Scanner
+### Run the App
 ```bash
-python3 scan_videos_mit_shell.py
+# Clone the repo
+git clone https://github.com/ralksta/arcade-video-scanner.git
+cd arcade-video-scanner
+
+# Run the startup script (Handles venv & dependencies automatically)
+./run.sh
 ```
 
-### Maintenance Commands
+### Manual Usage
 ```bash
+# Scan without starting server
+python3 scan_videos_mit_shell.py
+
 # Cleanup orphan files
 python3 scan_videos_mit_shell.py --cleanup
 
-# Force regenerate all thumbnails & previews (Useful after upgrading to VAAPI)
+# Force regenerate all thumbnails & previews
 python3 scan_videos_mit_shell.py --rebuild
 ```
