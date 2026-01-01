@@ -486,31 +486,35 @@ SETTINGS_MODAL_COMPONENT = """
     <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-[#1a1a24] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/10 transform scale-95 transition-transform duration-300">
         
         <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-64 bg-[#14141c] border-b md:border-b-0 md:border-r border-white/5 flex md:flex-col shrink-0">
-            <div class="p-4 md:p-6 flex items-center gap-3 text-white border-b border-white/5 md:border-none">
-                <span class="material-icons text-arcade-gold">settings</span>
-                <h2 class="font-bold tracking-wide">Settings</h2>
+        <aside class="w-full md:w-56 bg-[#12121a] border-b md:border-b-0 md:border-r border-white/5 flex md:flex-col shrink-0">
+            <div class="p-4 md:p-5 flex items-center gap-3 text-white border-b border-white/5 md:border-none">
+                <span class="material-icons text-arcade-gold text-xl">settings</span>
+                <h2 class="font-semibold tracking-wide text-lg">Settings</h2>
             </div>
             
-            <nav class="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:p-4 gap-1 md:gap-2">
-                <button class="nav-item active flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap" data-section="scanning">
-                    <span class="material-icons text-[20px]">folder_open</span>
-                    Scanning
+            <nav class="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:px-3 md:py-2 gap-1">
+                <button class="settings-nav-item active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="scanning">
+                    <span class="material-icons text-lg">folder_open</span>
+                    <span class="hidden md:inline">Scanning</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                <button class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap" data-section="performance">
-                    <span class="material-icons text-[20px]">speed</span>
-                    Performance
+                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="performance">
+                    <span class="material-icons text-lg">speed</span>
+                    <span class="hidden md:inline">Performance</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                <button class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap" data-section="interface">
-                    <span class="material-icons text-[20px]">palette</span>
-                    Interface
+                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="interface">
+                    <span class="material-icons text-lg">palette</span>
+                    <span class="hidden md:inline">Interface</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
                 
-                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-4"></div>
+                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
                 
-                <button class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap" data-section="storage">
-                    <span class="material-icons text-[20px]">storage</span>
-                    Storage
+                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="storage">
+                    <span class="material-icons text-lg">storage</span>
+                    <span class="hidden md:inline">Storage</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
             </nav>
         </aside>
@@ -519,107 +523,120 @@ SETTINGS_MODAL_COMPONENT = """
         <main class="flex-1 flex flex-col min-w-0 bg-[#1a1a24]">
             
             <!-- Header -->
-            <header class="p-6 border-b border-white/5 flex justify-between items-start">
+            <header class="p-5 md:p-6 border-b border-white/5 flex justify-between items-center">
                 <div>
-                    <h1 id="section-title" class="text-xl md:text-2xl font-bold text-white mb-1">Scanning</h1>
-                    <p id="section-subtitle" class="text-sm text-gray-400">Configure video library scanning behavior</p>
+                    <h1 id="section-title" class="text-xl md:text-2xl font-bold text-white">Scanning</h1>
+                    <p id="section-subtitle" class="text-sm text-gray-500 mt-0.5">Configure video library scanning</p>
                 </div>
-                <button class="text-gray-500 hover:text-white transition-colors p-2" title="Close Settings" onclick="closeSettings()">
+                <button class="text-gray-500 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg" title="Close (ESC)" onclick="closeSettings()">
                     <span class="material-icons">close</span>
                 </button>
             </header>
             
             <!-- Scrollable Body -->
-            <div class="settings-body flex-1 overflow-y-auto p-6 space-y-8">
+            <div class="settings-body flex-1 overflow-y-auto p-5 md:p-6 space-y-6">
                 
                 <!-- SCANNING SECTION -->
-                <div class="content-section active space-y-8" id="content-scanning">
-                    <section class="space-y-4">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <h3 class="text-lg font-medium text-white flex items-center gap-2">
-                                    <span>&#128193;</span> Scan Directories
-                                </h3>
-                                <p class="text-sm text-gray-400 mt-1">Add directories that should be scanned for video files. One path per line.</p>
-                            </div>
+                <div class="content-section active space-y-6" id="content-scanning">
+                    <section class="space-y-3">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-cyan">folder</span>
+                                Scan Directories
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Paths to scan for video files. One per line.</p>
                         </div>
-                        <textarea class="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none transition-colors resize-none placeholder-gray-700" id="settingsTargets" placeholder="/Users/username/Videos&#10;/Volumes/Media/Movies" rows="5"></textarea>
+                        <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsTargets" placeholder="/Users/username/Videos" rows="4" oninput="markSettingsUnsaved()"></textarea>
                         
-                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-3 text-sm text-blue-200">
-                             <span class="material-icons text-blue-400">info</span>
+                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-3 text-sm text-blue-300">
+                             <span class="material-icons text-blue-400 text-lg">info</span>
                              <div>
-                                 <strong>Default:</strong> System home directory
-                                 <br><span id="defaultTargetsHint" class="opacity-70 text-xs"></span>
+                                 <strong>Default:</strong> Home directory
+                                 <span id="defaultTargetsHint" class="opacity-70 text-xs block mt-0.5"></span>
                              </div>
                         </div>
                     </section>
                     
-                    <section class="space-y-4">
+                    <section class="space-y-3">
                         <div>
-                             <h3 class="text-lg font-medium text-white flex items-center gap-2">
-                                <span>&#128737;</span> System Exclusions
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-gray-400">block</span>
+                                System Exclusions
                             </h3>
-                            <p class="text-sm text-gray-400 mt-1">Default paths that are automatically excluded.</p>
+                            <p class="text-sm text-gray-500 mt-1">Default paths excluded from scanning.</p>
                         </div>
-                        <div id="defaultExclusionsContainer" class="bg-black/20 rounded-xl p-4 border border-white/5 space-y-2">
+                        <div id="defaultExclusionsContainer" class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-2 max-h-48 overflow-y-auto">
                             <!-- Populated by JS -->
                         </div>
                     </section>
                     
-                     <section class="space-y-4">
+                    <section class="space-y-3">
                         <div>
-                             <h3 class="text-lg font-medium text-white flex items-center gap-2">
-                                <span>&#128683;</span> Custom Exclusions
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-pink">remove_circle</span>
+                                Custom Exclusions
                             </h3>
-                             <p class="text-sm text-gray-400 mt-1">Additional paths to exclude (e.g. /Volumes/Backup).</p>
+                            <p class="text-sm text-gray-500 mt-1">Additional paths to exclude.</p>
                         </div>
-                        <textarea class="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none transition-colors resize-none placeholder-gray-700" id="settingsExcludes" placeholder="/Users/username/Private" rows="3"></textarea>
+                        <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsExcludes" placeholder="/Volumes/Backup" rows="2" oninput="markSettingsUnsaved()"></textarea>
                     </section>
                 </div>
                 
                 <!-- PERFORMANCE SECTION -->
-                <div class="content-section hidden space-y-8" id="content-performance">
-                     <section class="space-y-6">
-                        <div class="space-y-1">
-                            <h3 class="text-lg font-medium text-white">File Size Threshold</h3>
-                            <p class="text-sm text-gray-400">Ignore videos smaller than this size (in MB).</p>
+                <div class="content-section hidden space-y-6" id="content-performance">
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-gold">straighten</span>
+                                File Size Threshold
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Ignore videos smaller than this size.</p>
                         </div>
                         
-                        <div class="bg-black/20 rounded-xl p-4 border border-white/5 flex items-center justify-between">
-                            <div>
-                                <div class="text-white font-medium">Minimum File Size</div>
-                                <div class="text-xs text-gray-500">Exclude small files</div>
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Minimum Size</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Files below this are skipped</div>
                             </div>
-                            <div class="flex items-center gap-3 bg-black/40 rounded-lg border border-white/10 p-1">
-                                <button class="w-8 h-8 rounded hover:bg-white/10 text-gray-400 flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', -10)">
-                                    <span class="material-icons text-sm">remove</span>
+                            <div class="flex items-center gap-2 bg-black/50 rounded-lg border border-white/10 p-1">
+                                <button class="w-9 h-9 rounded-md hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', -10)">
+                                    <span class="material-icons text-lg">remove</span>
                                 </button>
-                                <input type="number" id="settingsMinSize" value="100" min="1" class="bg-transparent text-white font-mono text-center w-16 focus:outline-none appearance-none">
-                                <button class="w-8 h-8 rounded hover:bg-white/10 text-gray-400 flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', 10)">
-                                    <span class="material-icons text-sm">add</span>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" id="settingsMinSize" value="100" min="1" class="bg-transparent text-white font-mono text-center w-14 focus:outline-none" oninput="markSettingsUnsaved()">
+                                    <span class="text-gray-500 text-sm">MB</span>
+                                </div>
+                                <button class="w-9 h-9 rounded-md hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', 10)">
+                                    <span class="material-icons text-lg">add</span>
                                 </button>
                             </div>
                         </div>
                     </section>
                     
-                    <section class="space-y-6">
-                        <div class="space-y-1">
-                            <h3 class="text-lg font-medium text-white">Bitrate Classification</h3>
-                            <p class="text-sm text-gray-400">Videos exceeding this bitrate will be marked as HIGH.</p>
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-pink">local_fire_department</span>
+                                Bitrate Classification
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Videos above this are marked as HIGH bitrate.</p>
                         </div>
                         
-                        <div class="bg-black/20 rounded-xl p-4 border border-white/5 flex items-center justify-between">
-                            <div>
-                                <div class="text-white font-medium">Bitrate Threshold (kbps)</div>
-                                <div class="text-xs text-gray-500">Default: 15000</div>
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Bitrate Threshold</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Default: 15,000 kbps</div>
                             </div>
-                            <div class="flex items-center gap-3 bg-black/40 rounded-lg border border-white/10 p-1">
-                                <button class="w-8 h-8 rounded hover:bg-white/10 text-gray-400 flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', -1000)">
-                                    <span class="material-icons text-sm">remove</span>
+                            <div class="flex items-center gap-2 bg-black/50 rounded-lg border border-white/10 p-1">
+                                <button class="w-9 h-9 rounded-md hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', -1000)">
+                                    <span class="material-icons text-lg">remove</span>
                                 </button>
-                                <input type="number" id="settingsBitrate" value="15000" min="1000" class="bg-transparent text-white font-mono text-center w-20 focus:outline-none appearance-none">
-                                <button class="w-8 h-8 rounded hover:bg-white/10 text-gray-400 flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', 1000)">
-                                    <span class="material-icons text-sm">add</span>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" id="settingsBitrate" value="15000" min="1000" class="bg-transparent text-white font-mono text-center w-20 focus:outline-none" oninput="markSettingsUnsaved()">
+                                    <span class="text-gray-500 text-sm">kbps</span>
+                                </div>
+                                <button class="w-9 h-9 rounded-md hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', 1000)">
+                                    <span class="material-icons text-lg">add</span>
                                 </button>
                             </div>
                         </div>
@@ -627,74 +644,94 @@ SETTINGS_MODAL_COMPONENT = """
                 </div>
                 
                 <!-- INTERFACE SECTION -->
-                <div class="content-section hidden space-y-8" id="content-interface">
-                     <section class="space-y-6">
-                        <div class="space-y-1">
-                            <h3 class="text-lg font-medium text-white">&#127912; Visual Features</h3>
-                            <p class="text-sm text-gray-400">Customize the dashboard appearance.</p>
+                <div class="content-section hidden space-y-6" id="content-interface">
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-magenta">auto_awesome</span>
+                                Visual Features
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Customize the dashboard experience.</p>
                         </div>
                         
-                        <div class="bg-black/20 rounded-xl p-4 border border-white/5 flex items-center justify-between">
-                            <div>
-                                <div class="text-white font-medium">Fun Facts</div>
-                                <div class="text-xs text-gray-500">Show educational overlays during optimization</div>
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Fun Facts</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Educational overlays during optimization</div>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="settingsFunFacts" class="sr-only peer" onchange="markSettingsUnsaved()">
-                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-arcade-cyan"></div>
+                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-gold"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Video Optimizer</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Enable video compression features <span class="text-amber-400">(restart required)</span></div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingsOptimizer" class="sr-only peer" checked onchange="markSettingsUnsaved()">
+                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-gold"></div>
                             </label>
                         </div>
                     </section>
                 </div>
                 
                 <!-- STORAGE SECTION -->
-                <div class="content-section hidden space-y-8" id="content-storage">
-                    <section class="space-y-6">
-                         <div class="space-y-1">
-                            <h3 class="text-lg font-medium text-white">&#128190; Cache Statistics</h3>
-                            <p class="text-sm text-gray-400">Overview of disk space used by generated assets.</p>
+                <div class="content-section hidden space-y-6" id="content-storage">
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-cyan">pie_chart</span>
+                                Cache Statistics
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Disk space used by generated assets.</p>
                         </div>
                         
-                        <div class="grid grid-cols-3 gap-4">
-                            <div class="bg-black/30 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
-                                <span class="material-icons text-gray-500">image</span>
-                                <span class="text-xs text-gray-400 uppercase tracking-wider">Thumbnails</span>
-                                <span class="text-xl font-mono text-white" id="statThumbnails">—</span>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-black/40 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
+                                <span class="material-icons text-gray-500 text-2xl">image</span>
+                                <span class="text-xs text-gray-500 uppercase tracking-wider">Thumbnails</span>
+                                <span class="text-lg font-mono text-white" id="statThumbnails">—</span>
                             </div>
-                            <div class="bg-black/30 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
-                                <span class="material-icons text-gray-500">movie</span>
-                                <span class="text-xs text-gray-400 uppercase tracking-wider">Previews</span>
-                                <span class="text-xl font-mono text-white" id="statPreviews">—</span>
+                            <div class="bg-black/40 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
+                                <span class="material-icons text-gray-500 text-2xl">movie</span>
+                                <span class="text-xs text-gray-500 uppercase tracking-wider">Previews</span>
+                                <span class="text-lg font-mono text-white" id="statPreviews">—</span>
                             </div>
-                            <div class="bg-black/30 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
-                                <span class="material-icons text-arcade-magenta">storage</span>
-                                <span class="text-xs text-gray-400 uppercase tracking-wider">Total</span>
-                                <span class="text-xl font-mono text-arcade-magenta" id="statTotal">—</span>
+                            <div class="bg-black/40 p-4 rounded-xl border border-arcade-cyan/30 flex flex-col items-center gap-2">
+                                <span class="material-icons text-arcade-cyan text-2xl">storage</span>
+                                <span class="text-xs text-gray-500 uppercase tracking-wider">Total</span>
+                                <span class="text-lg font-mono text-arcade-cyan" id="statTotal">—</span>
                             </div>
                         </div>
                         
-                         <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex gap-3 text-sm text-yellow-200">
-                             <span class="material-icons text-yellow-500">warning</span>
-                             <div>
-                                 Changes to storage settings require an app restart.
-                             </div>
+                        <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex gap-3 text-sm text-amber-200">
+                            <span class="material-icons text-amber-400 text-lg">info</span>
+                            <div>Cache changes require an app restart.</div>
                         </div>
                     </section>
                 </div>
             </div>
             
             <!-- Footer -->
-            <footer class="p-4 border-t border-white/5 bg-[#14141c] flex justify-between items-center">
-                <div class="flex flex-col gap-1">
-                    <div class="flex items-center gap-2 text-green-400 text-xs font-bold opacity-0 transition-opacity" id="saveIndicator">
-                        <span class="material-icons text-[14px]">check_circle</span>
-                        All changes saved
+            <footer class="p-4 border-t border-white/5 bg-[#12121a] flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 text-amber-400 text-xs font-medium opacity-0 transition-opacity" id="unsavedIndicator">
+                        <span class="material-icons text-sm">warning</span>
+                        Unsaved changes
                     </div>
                 </div>
                 <div class="flex gap-3">
-                    <button class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" onclick="closeSettings()">Cancel</button>
-                    <button class="px-5 py-2 rounded-lg text-sm font-bold text-black bg-arcade-cyan hover:bg-cyan-300 shadow-[0_0_15px_rgba(0,255,208,0.3)] transition-all flex items-center gap-2" onclick="saveSettings()">
-                        <span class="material-icons text-[18px]">save</span> Save
+                    <button class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" onclick="closeSettings()">Cancel</button>
+                    <button id="saveSettingsBtn" class="px-5 py-2 rounded-lg text-sm font-bold text-black bg-arcade-cyan hover:bg-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-arcade-cyan/20 transition-all flex items-center gap-2" onclick="saveSettings()">
+                        <span class="material-icons text-lg save-icon">save</span>
+                        <svg class="animate-spin h-4 w-4 save-spinner hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="save-text">Save</span>
                     </button>
                 </div>
             </footer>
@@ -702,20 +739,28 @@ SETTINGS_MODAL_COMPONENT = """
         </main>
     </div>
 </div>
+
+<!-- Settings Toast Notification -->
+<div id="settingsToast" class="fixed bottom-6 right-6 z-[200] transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-green-500/95 backdrop-blur text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+        <span class="material-icons">check_circle</span>
+        <span class="font-medium">Settings saved</span>
+    </div>
+</div>
 """
 
 
 FILTER_BAR_COMPONENT = """
 <!-- Filter Bar (Sticky on Desktop, Scrollable Row on Mobile) -->
-<div class="sticky top-[34px] md:top-16 z-30 bg-arcade-bg/95 backdrop-blur border-b border-white/5 px-2 md:px-6 py-2 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-300">
+<div class="sticky top-[34px] md:top-16 z-30 bg-arcade-bg/95 backdrop-blur border-b border-white/5 px-2 md:px-6 py-2 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-300 overflow-x-hidden">
     <!-- Mobile Search (Full Width) -->
-    <div class="w-full md:w-96 relative">
+    <div class="w-full md:w-80 lg:w-96 relative flex-shrink min-w-0">
         <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[18px]">search</span>
         <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Suchen..." class="w-full bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-arcade-cyan/50 focus:bg-white/10 transition-all placeholder-gray-600">
     </div>
     
     <!-- Filter Chips (Horizontal Scroll on Mobile) -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide w-full md:w-auto">
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide flex-shrink-0">
         <!-- Status Codec Dropdowns converted to modern Menus/Chips -->
         <select id="statusSelect" onchange="setFilter(this.value)" class="bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-arcade-cyan/50 appearance-none min-w-[100px]">
             <option value="all">All Videos</option>
@@ -752,7 +797,7 @@ FILTER_BAR_COMPONENT = """
             </button>
         </div>
         
-        <button onclick="rescanLibrary()" class="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white p-2 rounded-full transition-colors flex items-center justify-center flex-shrink-0">
+        <button id="refreshBtn" onclick="rescanLibrary()" class="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white p-2 rounded-full transition-colors flex items-center justify-center flex-shrink-0" title="Rescan Library">
             <span class="material-icons text-[18px]">refresh</span>
         </button>
     </div>

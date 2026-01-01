@@ -10,33 +10,6 @@ let filteredVideos = [];
 let renderedCount = 0;
 const BATCH_SIZE = 40;
 
-// --- STARFIELD ---
-// --- STARFIELD ---
-const canvas = document.getElementById('starfield');
-if (canvas) {
-    const ctx = canvas.getContext('2d');
-    let stars = [];
-    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    window.onresize = resize; resize();
-
-    for (let i = 0; i < 200; i++) {
-        stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 2, speed: Math.random() * 0.5 + 0.1 });
-    }
-
-    function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        stars.forEach(s => {
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-            ctx.fill();
-            s.y += s.speed;
-            if (s.y > canvas.height) s.y = 0;
-        });
-        requestAnimationFrame(animate);
-    }
-    animate();
-}
 
 // --- DEBOUNCED SEARCH ---
 let searchTimeout;
@@ -587,7 +560,7 @@ function createVideoCard(v) {
                  <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
                     <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
-                  ${window.ENABLE_OPTIMIZER ? `
+                  ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? `
                  <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${encodeURIComponent(v.FilePath)}', 'h_frame')">
                     <span class="material-icons">bolt</span>
                  </button>` : ''}
@@ -1565,6 +1538,8 @@ async function openSettings() {
 
         // New Features
         document.getElementById('settingsFunFacts').checked = data.enable_fun_facts !== false;
+        const optimizerCheckbox = document.getElementById('settingsOptimizer');
+        if (optimizerCheckbox) optimizerCheckbox.checked = data.enable_optimizer !== false;
 
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
@@ -1607,7 +1582,16 @@ function closeSettings() {
 }
 
 async function saveSettings() {
-    markSettingsSaving();
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    const saveIcon = saveBtn?.querySelector('.save-icon');
+    const saveSpinner = saveBtn?.querySelector('.save-spinner');
+    const saveText = saveBtn?.querySelector('.save-text');
+
+    // Show loading state
+    if (saveBtn) saveBtn.disabled = true;
+    if (saveIcon) saveIcon.classList.add('hidden');
+    if (saveSpinner) saveSpinner.classList.remove('hidden');
+    if (saveText) saveText.textContent = 'Saving...';
 
     const targetsText = document.getElementById('settingsTargets').value;
     const excludesText = document.getElementById('settingsExcludes').value;
@@ -1624,10 +1608,12 @@ async function saveSettings() {
         scan_targets: targetsText.split('\n').map(s => s.trim()).filter(s => s),
         exclude_paths: excludesText.split('\n').map(s => s.trim()).filter(s => s),
         disabled_defaults: disabledDefaults,
+        saved_views: window.userSettings?.saved_views || [],
         min_size_mb: parseInt(document.getElementById('settingsMinSize').value) || 100,
         bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000,
-        enable_previews: window.userSettings.enable_previews, // Keep existing value (hidden setting)
-        enable_fun_facts: document.getElementById('settingsFunFacts').checked
+        enable_previews: window.userSettings?.enable_previews || false,
+        enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
+        enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true
     };
 
     try {
@@ -1637,18 +1623,24 @@ async function saveSettings() {
             body: JSON.stringify(settings)
         });
 
+        // Reset button state
+        if (saveBtn) saveBtn.disabled = false;
+        if (saveIcon) saveIcon.classList.remove('hidden');
+        if (saveSpinner) saveSpinner.classList.add('hidden');
+        if (saveText) saveText.textContent = 'Save';
+
         if (response.ok) {
-            markSettingsSaved();
+            // Hide unsaved indicator
+            const unsavedIndicator = document.getElementById('unsavedIndicator');
+            if (unsavedIndicator) unsavedIndicator.style.opacity = '0';
+
+            // Show success toast
+            showSettingsToast();
 
             // Close after brief delay to show success state
             setTimeout(() => {
                 closeSettings();
-            }, 800);
-
-            // Show success feedback on settings button
-            const btn = document.getElementById('settingsBtn');
-            btn.style.color = 'var(--gold)';
-            setTimeout(() => { btn.style.color = ''; }, 2000);
+            }, 1200);
 
             // Update local state immediately
             window.userSettings = {
@@ -1656,14 +1648,42 @@ async function saveSettings() {
                 ...settings
             };
         } else {
-            alert('Fehler beim Speichern der Einstellungen');
-            markSettingsUnsaved();
+            showSettingsToast('Error saving settings', true);
         }
     } catch (e) {
         console.error('Failed to save settings:', e);
-        alert('Fehler beim Speichern der Einstellungen');
-        markSettingsUnsaved();
+        // Reset button state
+        if (saveBtn) saveBtn.disabled = false;
+        if (saveIcon) saveIcon.classList.remove('hidden');
+        if (saveSpinner) saveSpinner.classList.add('hidden');
+        if (saveText) saveText.textContent = 'Save';
+
+        showSettingsToast('Error saving settings', true);
     }
+}
+
+function showSettingsToast(message = 'Settings saved', isError = false) {
+    const toast = document.getElementById('settingsToast');
+    if (!toast) return;
+
+    const toastContent = toast.querySelector('div');
+    if (toastContent) {
+        toastContent.className = isError
+            ? 'bg-red-500/95 backdrop-blur text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3'
+            : 'bg-green-500/95 backdrop-blur text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3';
+        const icon = toastContent.querySelector('.material-icons');
+        const text = toastContent.querySelector('span:last-child');
+        if (icon) icon.textContent = isError ? 'error' : 'check_circle';
+        if (text) text.textContent = message;
+    }
+
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    toast.classList.add('translate-y-0', 'opacity-100');
+
+    setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+    }, 3000);
 }
 
 async function loadSettings() {
@@ -1686,23 +1706,38 @@ async function loadSettings() {
 // === NEW SETTINGS UI NAVIGATION ===
 
 function initSettingsNavigation() {
-    const navItems = document.querySelectorAll('.nav-item');
-    const contentSections = document.querySelectorAll('.content-section');
+    // Use more specific selector to only target settings modal nav items
+    const settingsModal = document.getElementById('settingsModal');
+    if (!settingsModal) return;
+
+    const navItems = settingsModal.querySelectorAll('.settings-nav-item[data-section]');
+    const contentSections = settingsModal.querySelectorAll('.content-section');
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
             const sectionId = item.dataset.section;
+            if (!sectionId) return;
 
-            // Update active nav item
-            navItems.forEach(nav => nav.classList.remove('active'));
-            item.classList.add('active');
+            // Update active nav item and indicator
+            navItems.forEach(nav => {
+                nav.classList.remove('active', 'text-white', 'bg-white/5');
+                nav.classList.add('text-gray-400');
+                const indicator = nav.querySelector('.active-indicator');
+                if (indicator) indicator.classList.add('opacity-0');
+            });
+            item.classList.add('active', 'text-white', 'bg-white/5');
+            item.classList.remove('text-gray-400');
+            const activeIndicator = item.querySelector('.active-indicator');
+            if (activeIndicator) activeIndicator.classList.remove('opacity-0');
 
-            // Show corresponding content
+            // Show corresponding content - toggle hidden class
             contentSections.forEach(section => {
+                section.classList.add('hidden');
                 section.classList.remove('active');
             });
             const targetSection = document.getElementById(`content-${sectionId}`);
             if (targetSection) {
+                targetSection.classList.remove('hidden');
                 targetSection.classList.add('active');
             }
 
@@ -1710,6 +1745,15 @@ function initSettingsNavigation() {
             updateSettingsHeader(sectionId);
         });
     });
+
+    // Set initial active state
+    const initialActive = settingsModal.querySelector('.settings-nav-item.active');
+    if (initialActive) {
+        const indicator = initialActive.querySelector('.active-indicator');
+        if (indicator) indicator.classList.remove('opacity-0');
+        initialActive.classList.add('text-white', 'bg-white/5');
+        initialActive.classList.remove('text-gray-400');
+    }
 }
 
 function updateSettingsHeader(sectionId) {
@@ -1755,10 +1799,9 @@ function adjustSettingsNumber(inputId, delta) {
 
 // Save State Indicator
 function markSettingsUnsaved() {
-    const indicator = document.querySelector('.save-indicator');
+    const indicator = document.getElementById('unsavedIndicator');
     if (indicator) {
-        indicator.className = 'save-indicator unsaved';
-        indicator.innerHTML = '<span class="material-icons">warning</span><span>Unsaved changes</span>';
+        indicator.style.opacity = '1';
     }
 }
 
@@ -1988,7 +2031,7 @@ function cinemaOptimize() {
         return;
     }
 
-    if (window.ENABLE_OPTIMIZER !== true) return;
+    if (window.ENABLE_OPTIMIZER !== true || window.userSettings?.enable_optimizer === false) return;
 
     // Populate Initial State
     currentOptAudio = 'enhanced'; // Reset to default

@@ -12,6 +12,10 @@ class AsyncFileSystem:
     VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.avi', '.mov', '.m4v', '.wmv', '.flv', '.webm', '.ts')
 
     def __init__(self):
+        pass  # Settings are loaded fresh at scan time
+
+    def _load_settings(self):
+        """Reload settings from config (called at scan start)."""
         self.min_size_bytes = config.settings.min_size_mb * 1024 * 1024
         
         # Resolve excluded paths to absolute for robust matching
@@ -24,6 +28,9 @@ class AsyncFileSystem:
         """
         Asynchronously yields absolute paths of valid video files found in targets.
         """
+        # Reload settings fresh (picks up any changes to exclusions/min_size)
+        self._load_settings()
+        
         for target in targets:
             abs_target = os.path.abspath(os.path.expanduser(target))
             if not os.path.exists(abs_target):

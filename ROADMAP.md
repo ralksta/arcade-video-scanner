@@ -10,7 +10,7 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ---
 
-## Version 5.3.0 (Planned)
+## Version 6.1.0 (Planned)
 
 ### 🟢 Performance & Optimization
 - [ ] Database migration from JSON to SQLite for better performance with large libraries
@@ -21,55 +21,48 @@ This document outlines planned features and improvements for the Arcade Video Sc
 - [ ] Dark/Light theme toggle
 - [ ] Customizable grid layout (card size, columns)
 - [ ] Keyboard shortcuts for common actions (space = play, f = favorite, etc.)
-- [ ] Drag-and-drop file organization
 
 ### 🟢 Search & Filtering
 - [ ] Advanced search with multiple criteria (date range, resolution, duration)
-
 - [ ] Tag system for custom categorization
 - [ ] Smart collections (auto-updating based on criteria)
 
 ---
 
-## Version 5.3.0
+## Version 6.2.0
 
 ### 🔵 Media Management
 - [ ] Duplicate detection (find similar/identical videos)
 - [ ] Bulk rename functionality
-- [ ] Export/Import favorites and vault lists
 - [ ] Video trimming/cutting tool (non-destructive)
+- [ ] Server-Side File Operations (Move/Rename/Delete via UI)
+- [ ] Web Upload (Add files from client device)
 
 ### 🔵 Analytics & Insights
-- [ ] Storage savings dashboard (before/after optimization)
 - [ ] Timeline view (videos by date)
 - [ ] Most watched/favorited statistics
-- [ ] Codec distribution charts
 
 ### 🔵 Integration & Export
-- [ ] Export to CSV/JSON for external analysis
 - [ ] Webhook support for automation
 - [ ] API endpoints for third-party integrations
 - [ ] Plex/Jellyfin metadata export
 
 ---
 
-## Version 6.0.0 (Major Features)
+## Version 7.0.0 (Future Major Features)
 
 ### 🔵 Multi-User Support
-- [ ] User accounts and authentication
-- [ ] Per-user favorites and vault
-- [ ] Shared libraries with permissions
+- [ ] Guest / Read-Only Access
 - [ ] Activity logging
 
-### 🔵 Cloud & Sync
+### 🔵 Network & Remote Access
 - [ ] Optional cloud backup for metadata
-- [ ] Sync settings across multiple machines
-- [ ] Remote access (secure web interface)
+- [ ] Reverse Proxy / Tunneled Access Support
+- [ ] Bandwidth-aware streaming (Transcoding on-the-fly)
 
 ### 🔵 AI & Machine Learning
 - [ ] Auto-tagging based on video content
 - [ ] Scene detection and chapter markers
-- [ ] Quality assessment (blur detection, noise analysis)
 - [ ] Smart recommendations
 
 ---
@@ -82,14 +75,12 @@ This document outlines planned features and improvements for the Arcade Video Sc
 - [ ] Video playlists
 - [ ] Comparison view (side-by-side videos)
 - [ ] Mobile app (iOS/Android)
-- [ ] Browser extension for quick adds
 - [ ] Integration with video editing software
 - [ ] Automatic backup scheduling
 - [ ] Network share support (SMB/NFS)
 - [ ] Docker containerization
 
 ### 🔵 Video Processing
-- [ ] Batch watermarking
 - [ ] Audio normalization
 - [ ] Subtitle extraction/embedding
 - [ ] Format conversion presets
@@ -98,6 +89,12 @@ This document outlines planned features and improvements for the Arcade Video Sc
 ---
 
 ## Completed Features
+
+### ✅ Version 6.0.0 (2025-12-31)
+- UI & Experience Overhaul (Settings, Transitions, Typography)
+- Enterprise-Grade Security (Path validation, Sanitization)
+- Modular Architecture (Refactored Core, Type Safety)
+- Keyboard Shortcuts (`Cmd+S`, `ESC`)
 
 ### ✅ Version 5.2.0 (2025-12-29)
 - Saved search filters and presets
@@ -151,4 +148,4 @@ Features are prioritized based on:
 
 ---
 
-*Last updated: 2025-12-29*
+*Last updated: 2025-12-31*

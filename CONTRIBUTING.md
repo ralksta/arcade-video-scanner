@@ -124,4 +124,4 @@ Every contribution, whether it's code, documentation, bug reports, or feature su
 
 ---
 
-*For more details, see [ROADMAP.md](ROADMAP.md) and [GITHUB_SETUP.md](GITHUB_SETUP.md)*
+*For more details, see [ROADMAP.md](ROADMAP.md) and [GITHUB_SETUP.md](.github/GITHUB_SETUP.md)*

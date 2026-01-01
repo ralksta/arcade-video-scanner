@@ -129,15 +129,16 @@ class ScannerManager:
             if pending_tasks:
                 await asyncio.gather(*pending_tasks)
 
-            # 4. Prune Orphans
+            # 4. Prune Orphans (files deleted OR now excluded)
             if found_paths:
                 orphans = [p for p in existing_paths if p not in found_paths]
+                removed_count = 0
                 for orphan in orphans:
-                    if not os.path.exists(orphan):
-                        db.remove(orphan)
+                    db.remove(orphan)
+                    removed_count += 1
                 
-                if orphans:
-                    print(f"🗑 Removed {len(orphans)} orphaned files.")
+                if removed_count > 0:
+                    print(f"🗑 Removed {removed_count} files (deleted or now excluded).")
 
             db.save()
             
