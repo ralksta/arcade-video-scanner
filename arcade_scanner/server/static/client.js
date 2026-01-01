@@ -104,7 +104,7 @@ function setWorkspaceMode(mode) {
             treemap.classList.add('animating');
         }
 
-        filterAndSort();
+        filterAndSort(true); // Scroll to top on workspace change
         updateURL();
     } catch (e) {
         alert("Error in setWorkspaceMode: " + e.message + "\\n" + e.stack);
@@ -265,7 +265,7 @@ function loadFromURL() {
 }
 
 // --- PERFORMANCE ENGINE: FILTER & SORT ---
-function filterAndSort() {
+function filterAndSort(scrollToTop = false) {
     try {
         let vCount = 0; let tSize = 0;
 
@@ -366,7 +366,7 @@ function filterAndSort() {
         const sizeEl = document.getElementById('size-total');
         if (sizeEl) sizeEl.innerText = formatSize(tSize);
 
-        renderUI(true);
+        renderUI(true, scrollToTop);
     } catch (e) {
         alert("Error in filterAndSort: " + e.message + "\\n" + e.stack);
         console.error(e);
@@ -380,7 +380,7 @@ function formatSize(mb) {
 }
 
 // --- PERFORMANCE ENGINE: INFINITE SCROLL ---
-function renderUI(reset) {
+function renderUI(reset, scrollToTop = false) {
     // If in treemap mode, re-render treemap instead
     if (currentLayout === 'treemap') {
         renderTreemap();
@@ -391,7 +391,11 @@ function renderUI(reset) {
     if (reset) {
         grid.innerHTML = '';
         renderedCount = 0;
-        window.scrollTo(0, 0);
+        // Only scroll to top when explicitly requested (e.g., workspace change)
+        // This prevents scroll-jumping when filtering/sorting
+        if (scrollToTop) {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
     }
     renderNextBatch();
 }
@@ -1513,8 +1517,6 @@ window.addEventListener('resize', () => {
     resizeTimeout = setTimeout(() => {
         if (currentLayout === 'treemap') {
             renderTreemap();
-        } else {
-            renderUI(true);
         }
     }, 250);
 });
