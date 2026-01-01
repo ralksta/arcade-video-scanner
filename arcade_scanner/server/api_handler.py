@@ -184,8 +184,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     # Regenerate HTML report so refresh works
                     try:
                         current_port = self.server.server_address[1]
-                        results = list(c.values())
-                        generate_html_report(results, REPORT_FILE, server_port=current_port)
+                        results = [e.model_dump(by_alias=True) for e in db.get_all()]
+                        generate_html_report(results, config.report_file, server_port=current_port)
                         print(f"✅ Marked as optimized and report updated: {os.path.basename(abs_path)}")
                     except Exception as e:
                         print(f"⚠️ Cache updated but report gen failed: {e}")
@@ -401,30 +401,50 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     paths = unquote(self.path.split("paths=")[1]).split(",")
                     current_port = self.server.server_address[1]
                     
+                    # Validate all paths first
+                    validated_paths = []
                     for p in paths:
-                        # Security: Validate each path
                         try:
                             validated_path = sanitize_path(p)
+                            if os.path.exists(validated_path):
+                                validated_paths.append(validated_path)
+                            else:
+                                print(f"⚠️ Skipping non-existent file: {validated_path}")
                         except (SecurityError, ValueError) as e:
                             print(f"🚨 Skipping invalid path in batch: {p} - {e}")
                             continue
-                        
-                        if not os.path.exists(validated_path):
-                            print(f"⚠️ Skipping non-existent file: {validated_path}")
-                            continue
-                        
-                        # Build safe command
-                        cmd_parts = [sys.executable, config.optimizer_path, validated_path,
-                                     "--port", str(current_port)]
-                        
-                        if IS_WIN:
-                            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)
-                        else:
-                            safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
-                            applescript = f'tell application "Terminal" to do script "{safe_cmd}"'
-                            subprocess.run(["osascript", "-e", applescript])
-                        
-                        time.sleep(1)  # Avoid overwhelming the system
+                    
+                    if not validated_paths:
+                        print("❌ No valid files to process in batch")
+                        self.send_response(204)
+                        self.end_headers()
+                        return
+                    
+                    # Build batch controller command
+                    batch_controller_path = os.path.join(
+                        os.path.dirname(config.optimizer_path), 
+                        "batch_controller.py"
+                    )
+                    
+                    # Comma-separate paths for the controller
+                    files_arg = ",".join(validated_paths)
+                    
+                    cmd_parts = [
+                        sys.executable,
+                        batch_controller_path,
+                        f"--files={files_arg}",
+                        f"--port={current_port}"
+                    ]
+                    
+                    if IS_WIN:
+                        # Windows: Launch in new console
+                        subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)
+                    else:
+                        # macOS: Single terminal window
+                        safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
+                        print(f"🚀 Launching Batch Controller: {len(validated_paths)} files")
+                        applescript = f'tell application "Terminal" to do script "{safe_cmd}"'
+                        subprocess.run(["osascript", "-e", applescript])
                     
                     self.send_response(204)
                     self.end_headers()
@@ -442,7 +462,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                          # Create generic entry if not found (rare but possible)
                         entry = VideoEntry(FilePath=abs_path)
                     
-                    entry.hidden = state
+                    entry.vaulted = state
                     db.upsert(entry)
                     db.save()
                     print(f"Updated vault state for: {os.path.basename(abs_path)} -> hidden={state}")
@@ -458,7 +478,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     entry = db.get(abs_p)
                     if not entry:
                          entry = VideoEntry(FilePath=abs_p)
-                    entry.hidden = state
+                    entry.vaulted = state
                     db.upsert(entry)
                     updated_count += 1
                 db.save()

@@ -11,36 +11,39 @@ let renderedCount = 0;
 const BATCH_SIZE = 40;
 
 // --- STARFIELD ---
+// --- STARFIELD ---
 const canvas = document.getElementById('starfield');
-const ctx = canvas.getContext('2d');
-let stars = [];
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-window.onresize = resize; resize();
+if (canvas) {
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.onresize = resize; resize();
 
-for (let i = 0; i < 200; i++) {
-    stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 2, speed: Math.random() * 0.5 + 0.1 });
-}
+    for (let i = 0; i < 200; i++) {
+        stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 2, speed: Math.random() * 0.5 + 0.1 });
+    }
 
-function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#fff';
-    stars.forEach(s => {
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-        ctx.fill();
-        s.y += s.speed;
-        if (s.y > canvas.height) s.y = 0;
-    });
-    requestAnimationFrame(animate);
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        stars.forEach(s => {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fill();
+            s.y += s.speed;
+            if (s.y > canvas.height) s.y = 0;
+        });
+        requestAnimationFrame(animate);
+    }
+    animate();
 }
-animate();
 
 // --- DEBOUNCED SEARCH ---
 let searchTimeout;
 function onSearchInput() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-        searchTerm = document.getElementById('searchBar').value.toLowerCase();
+        searchTerm = document.getElementById('mobileSearchInput').value.toLowerCase();
 
         // Show/Hide Save Button based on input
         const saveBtn = document.getElementById('saveViewBtn');
@@ -74,28 +77,36 @@ function setSort(s) {
 }
 
 function setWorkspaceMode(mode) {
-    workspaceMode = mode;
-    document.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('m-' + mode).classList.add('active');
-    if (mode === 'vault') document.body.classList.add('vault-mode');
-    else document.body.classList.remove('vault-mode');
+    try {
+        console.log("Setting workspace mode:", mode);
+        workspaceMode = mode;
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        // Safe check in case element is missing during transition
+        const modeBtn = document.getElementById('m-' + mode);
+        if (modeBtn) modeBtn.classList.add('active');
+        if (mode === 'vault') document.body.classList.add('vault-mode');
+        else document.body.classList.remove('vault-mode');
 
-    // Add animation class
-    const grid = document.getElementById('videoGrid');
-    const treemap = document.getElementById('treemapContainer');
-    if (grid) {
-        grid.classList.remove('animating');
-        void grid.offsetWidth; // Trigger reflow
-        grid.classList.add('animating');
-    }
-    if (treemap) {
-        treemap.classList.remove('animating');
-        void treemap.offsetWidth; // Trigger reflow
-        treemap.classList.add('animating');
-    }
+        // Add animation class
+        const grid = document.getElementById('videoGrid');
+        const treemap = document.getElementById('treemapContainer');
+        if (grid) {
+            grid.classList.remove('animating');
+            void grid.offsetWidth; // Trigger reflow
+            grid.classList.add('animating');
+        }
+        if (treemap) {
+            treemap.classList.remove('animating');
+            void treemap.offsetWidth; // Trigger reflow
+            treemap.classList.add('animating');
+        }
 
-    filterAndSort();
-    updateURL();
+        filterAndSort();
+        updateURL();
+    } catch (e) {
+        alert("Error in setWorkspaceMode: " + e.message + "\\n" + e.stack);
+        console.error(e);
+    }
 }
 
 function toggleLayout() {
@@ -252,103 +263,111 @@ function loadFromURL() {
 
 // --- PERFORMANCE ENGINE: FILTER & SORT ---
 function filterAndSort() {
-    let vCount = 0; let tSize = 0;
+    try {
+        let vCount = 0; let tSize = 0;
 
-    // Standard Filtering
-    if (workspaceMode === 'optimized') {
-        const pairs = [];
-        const map = new Map();
+        // Standard Filtering
+        if (workspaceMode === 'optimized') {
+            const pairs = [];
+            const map = new Map();
 
-        // 1. Map all files by stem (filename without extension)
-        window.ALL_VIDEOS.forEach(v => {
-            const fileName = v.FilePath.split(/[\\\\/]/).pop();
-            const lastDot = fileName.lastIndexOf('.');
-            const stem = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
+            // 1. Map all files by stem (filename without extension)
+            window.ALL_VIDEOS.forEach(v => {
+                const fileName = v.FilePath.split(/[\\\\/]/).pop();
+                const lastDot = fileName.lastIndexOf('.');
+                const stem = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
 
-            // Normalize path to directory to ensure we only pair in same folder
-            const lastSlash = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
-            const dir = v.FilePath.substring(0, lastSlash);
+                // Normalize path to directory to ensure we only pair in same folder
+                const lastSlash = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
+                const dir = v.FilePath.substring(0, lastSlash);
 
-            const key = dir + '|' + stem;
-            map.set(key, v);
-        });
+                const key = dir + '|' + stem;
+                map.set(key, v);
+            });
 
-        // 2. Find pairs
-        // We look for any key that ends in "_opt". 
-        // If found, we check if corresponding "non-opt" key exists.
+            // 2. Find pairs
+            // We look for any key that ends in "_opt". 
+            // If found, we check if corresponding "non-opt" key exists.
 
-        map.forEach((vOpt, key) => {
-            if (key.endsWith('_opt')) {
-                const baseKey = key.substring(0, key.length - 4); // Strip _opt
+            map.forEach((vOpt, key) => {
+                if (key.endsWith('_opt')) {
+                    const baseKey = key.substring(0, key.length - 4); // Strip _opt
 
-                // Do we have the original?
-                // Note: This relies on the original having the exact same stem minus "_opt".
-                // Case A: movie.mkv -> movie_opt.mp4 (Stem: "movie" vs "movie_opt").
-                // map has "dir|movie" and "dir|movie_opt".
+                    // Do we have the original?
+                    // Note: This relies on the original having the exact same stem minus "_opt".
+                    // Case A: movie.mkv -> movie_opt.mp4 (Stem: "movie" vs "movie_opt").
+                    // map has "dir|movie" and "dir|movie_opt".
 
-                if (map.has(baseKey)) {
-                    const vOrig = map.get(baseKey);
+                    if (map.has(baseKey)) {
+                        const vOrig = map.get(baseKey);
 
-                    // Create a virtual pair object
-                    pairs.push({
-                        type: 'pair',
-                        original: vOrig,
-                        optimized: vOpt,
-                        diff: vOpt.Size_MB - vOrig.Size_MB
-                    });
+                        // Create a virtual pair object
+                        pairs.push({
+                            type: 'pair',
+                            original: vOrig,
+                            optimized: vOpt,
+                            diff: vOpt.Size_MB - vOrig.Size_MB
+                        });
+                    }
                 }
-            }
-        });
+            });
 
-        filteredVideos = pairs;
+            filteredVideos = pairs;
 
-    } else {
-        filteredVideos = window.ALL_VIDEOS.filter(v => {
-            const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
-            const status = v.Status;
-            const codec = v.codec || 'unknown';
-            const isHidden = v.hidden || false;
-            const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
-            const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
+        } else {
+            filteredVideos = window.ALL_VIDEOS.filter(v => {
+                const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
+                const status = v.Status;
+                const codec = v.codec || 'unknown';
+                const isHidden = v.hidden || false;
+                const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
+                const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
 
-            let matchesFilter = false;
-            if (currentFilter === 'all') matchesFilter = true;
-            else if (currentFilter === 'optimized_files') matchesFilter = v.FilePath.includes('_opt');
-            else matchesFilter = (status === currentFilter);
-            const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
-            const matchesSearch = name.includes(searchTerm) || v.FilePath.toLowerCase().includes(searchTerm);
-            const matchesFolder = (currentFolder === 'all' || folder === currentFolder);
+                let matchesFilter = false;
+                if (currentFilter === 'all') matchesFilter = true;
+                else if (currentFilter === 'optimized_files') matchesFilter = v.FilePath.includes('_opt');
+                else matchesFilter = (status === currentFilter);
+                const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
+                const matchesSearch = name.includes(searchTerm) || v.FilePath.toLowerCase().includes(searchTerm);
+                const matchesFolder = (currentFolder === 'all' || folder === currentFolder);
 
-            let matchesWorkspace = true;
-            if (workspaceMode === 'lobby') matchesWorkspace = !isHidden; // Show _opt files too!
-            else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
-            else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
+                let matchesWorkspace = true;
+                if (workspaceMode === 'lobby') matchesWorkspace = !isHidden; // Show _opt files too!
+                else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
+                else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
 
-            const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
-            if (ok) { vCount++; tSize += v.Size_MB; }
-            return ok;
-        });
+                const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
+                if (ok) { vCount++; tSize += v.Size_MB; }
+                return ok;
+            });
+        }
+
+        // Sort
+        if (workspaceMode !== 'optimized') {
+            filteredVideos.sort((a, b) => {
+                if (currentSort === 'bitrate') return b.Bitrate_Mbps - a.Bitrate_Mbps;
+                if (currentSort === 'size') return b.Size_MB - a.Size_MB;
+                if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
+                if (currentSort === 'date') return (b.mtime || 0) - (a.mtime || 0); // Newest first
+                return 0;
+            });
+        } else {
+            // Sort pairs by date (newest first)? Or name?
+            // Default to name for now
+            filteredVideos.sort((a, b) => a.original.FilePath.localeCompare(b.original.FilePath));
+        }
+
+        const countEl = document.getElementById('count-total');
+        if (countEl) countEl.innerText = vCount;
+
+        const sizeEl = document.getElementById('size-total');
+        if (sizeEl) sizeEl.innerText = formatSize(tSize);
+
+        renderUI(true);
+    } catch (e) {
+        alert("Error in filterAndSort: " + e.message + "\\n" + e.stack);
+        console.error(e);
     }
-
-    // Sort
-    if (workspaceMode !== 'optimized') {
-        filteredVideos.sort((a, b) => {
-            if (currentSort === 'bitrate') return b.Bitrate_Mbps - a.Bitrate_Mbps;
-            if (currentSort === 'size') return b.Size_MB - a.Size_MB;
-            if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
-            if (currentSort === 'date') return (b.mtime || 0) - (a.mtime || 0); // Newest first
-            return 0;
-        });
-    } else {
-        // Sort pairs by date (newest first)? Or name?
-        // Default to name for now
-        filteredVideos.sort((a, b) => a.original.FilePath.localeCompare(b.original.FilePath));
-    }
-
-    document.getElementById('count-total').innerText = vCount;
-    document.getElementById('size-total').innerText = formatSize(tSize);
-
-    renderUI(true);
 }
 
 function formatSize(mb) {
@@ -414,77 +433,77 @@ function createComparisonCard(pair) {
     const isSmaller = diffMB < 0;
 
     const container = document.createElement('div');
-    container.className = 'video-card-container comparison-card';
-    container.style.gridColumn = "span 2"; // Make it wider
+    // col-span-1 md:col-span-2 relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4
+    container.className = 'col-span-1 md:col-span-2 relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4';
+
+    // Explicitly set grid span here, though class handles it usually, but existing grid logic might override without it if it was inline style before
+    container.style.gridColumn = "span 2";
 
     // Format Display Stats
     const formatSize = (mb) => mb.toFixed(1) + " MB";
     const formatBitrate = (mbps) => mbps.toFixed(1) + " Mbps";
 
     container.innerHTML = `
-        <div class="content-card" style="display:flex; flex-direction:row; height:auto; min-height:400px; padding:16px; gap:16px;">
-            
-            <!-- ORIGINAL -->
-            <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
-                <div class="badge" style="align-self:flex-start; margin-bottom:8px; background:#444;">ORIGINAL</div>
-                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)" data-path="${orig.FilePath}">
-                    <img src="thumbnails/${orig.thumb}" class="thumb" loading="lazy">
-                    <video class="preview-video" muted loop preload="none" 
-                           data-src="/preview?name=${orig.preview}">
-                    </video>
-                </div>
-                <div style="margin-top:8px; overflow:hidden;">
-                    <div class="file-name" title="${orig.FilePath}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${orig.FilePath.split(/[\\\\/]/).pop()}</div>
-                    <div style="display:flex; justify-content:space-between; color:#bbb; font-size:0.9rem; margin-top:4px;">
-                        <span>${formatSize(orig.Size_MB)}</span>
-                        <span>${formatBitrate(orig.Bitrate_Mbps)}</span>
-                        <span>${orig.codec}</span>
-                    </div>
-                </div>
-                <a href="/reveal?path=${encodeURIComponent(orig.FilePath)}" target="h_frame" class="btn" style="margin-top:10px; width:100%; text-align:center; display:block; padding:8px; background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.9); text-decoration:none; border-radius:4px; transition: background 0.2s;">
-                    <span class="material-icons" style="vertical-align:middle; font-size:18px; margin-right:4px;">folder_open</span> Reveal
-                </a>
+        <!-- Original Column -->
+        <div class="flex-1 min-w-0 flex flex-col gap-2">
+            <div class="text-xs font-bold text-gray-500 uppercase tracking-widest flex justify-between">
+                <span>Original</span>
+                <span class="text-[9px] bg-white/5 px-1 rounded">${orig.codec}</span>
             </div>
             
-            <!-- STATS CENTER -->
-            <div style="width:160px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-left:1px solid #333; border-right:1px solid #333; padding:0 8px; flex-shrink:0;">
-                <div style="font-size:1.5rem; font-weight:bold; color:${isSmaller ? '#4cd964' : '#ff3b30'};">
-                    ${diffPct.toFixed(1)}%
-                </div>
-                <div style="color:#888; font-size:0.8rem; margin-bottom:24px;">
-                    ${diffMB.toFixed(1)} MB
-                </div>
-                
-                <button class="filter-btn active" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')" style="width:100%; margin-bottom:8px;">
-                    <span class="material-icons">check</span> KEEP
-                </button>
-                <button class="filter-btn" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')" style="width:100%; background:transparent; border:1px solid #444;">
-                    <span class="material-icons">delete</span> DISCARD
-                </button>
+            <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="openCinema(this)" data-path="${orig.FilePath}">
+                 <img src="thumbnails/${orig.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                 </div>
+                 <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/80 text-white font-mono font-bold backdrop-blur">${formatSize(orig.Size_MB)}</span>
             </div>
+            
+            <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
+                <span class="truncate font-medium text-gray-300" title="${orig.FilePath}">${orig.FilePath.split(/[\\\\/]/).pop()}</span>
+                <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
+            </div>
+            
+            <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="window.open('/reveal?path=${encodeURIComponent(orig.FilePath)}', 'h_frame')">
+                <span class="material-icons text-[12px]">folder_open</span> Reveal
+            </button>
+        </div>
 
-            <!-- OPTIMIZED -->
-            <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
-                <div class="badge ok" style="align-self:flex-start; margin-bottom:8px;">OPTIMIZED</div>
-                <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)" data-path="${opt.FilePath}">
-                    <img src="thumbnails/${opt.thumb}" class="thumb" loading="lazy">
-                    <video class="preview-video" muted loop preload="none" 
-                           data-src="/preview?name=${opt.preview}">
-                    </video>
-                </div>
-                <div style="margin-top:8px; overflow:hidden;">
-                    <div class="file-name" title="${opt.FilePath}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${opt.FilePath.split(/[\\\\/]/).pop()}</div>
-                    <div style="display:flex; justify-content:space-between; color:#bbb; font-size:0.9rem; margin-top:4px;">
-                        <span>${formatSize(opt.Size_MB)}</span>
-                        <span>${formatBitrate(opt.Bitrate_Mbps)}</span>
-                        <span>${opt.codec}</span>
-                    </div>
-                </div>
-                <a href="/reveal?path=${encodeURIComponent(opt.FilePath)}" target="h_frame" class="btn" style="margin-top:10px; width:100%; text-align:center; display:block; padding:8px; background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.9); text-decoration:none; border-radius:4px; transition: background 0.2s;">
-                    <span class="material-icons" style="vertical-align:middle; font-size:18px; margin-right:4px;">folder_open</span> Reveal
-                </a>
+        <!-- Stats Center -->
+        <div class="w-full md:w-32 flex flex-col items-center justify-center gap-1 border-y md:border-y-0 md:border-x border-white/5 py-4 md:py-0 bg-white/[0.02] rounded-lg md:bg-transparent">
+             <div class="text-2xl font-bold ${isSmaller ? 'text-green-400 drop-shadow-[0_0_8px_rgba(76,217,100,0.4)]' : 'text-red-500'} font-mono tracking-tighter">${diffPct.toFixed(1)}%</div>
+             <div class="text-xs text-gray-500 font-mono mb-2">${diffMB.toFixed(1)} MB</div>
+             
+             <button class="w-full py-2 rounded-lg bg-arcade-cyan/20 text-arcade-cyan hover:bg-arcade-cyan hover:text-black border border-arcade-cyan/30 hover:shadow-[0_0_10px_rgba(0,255,208,0.3)] text-xs font-bold transition-all flex items-center justify-center gap-1 mt-1" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')">
+                <span class="material-icons text-[14px]">check</span> KEEP
+             </button>
+             <button class="w-full py-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
+                <span class="material-icons text-[14px]">delete</span> DISCARD
+             </button>
+        </div>
+
+        <!-- Optimized Column -->
+        <div class="flex-1 min-w-0 flex flex-col gap-2">
+            <div class="text-xs font-bold text-arcade-cyan uppercase tracking-widest flex justify-between">
+                <span>Optimized</span>
+                <span class="text-[9px] bg-arcade-cyan/10 text-arcade-cyan px-1 rounded border border-arcade-cyan/20">${opt.codec}</span>
             </div>
             
+             <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group border border-arcade-cyan/30 shadow-[0_0_10px_rgba(0,255,208,0.05)]" onclick="openCinema(this)" data-path="${opt.FilePath}">
+                 <img src="thumbnails/${opt.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                 </div>
+                 <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-arcade-cyan/20 text-arcade-cyan font-mono font-bold backdrop-blur border border-arcade-cyan/30">${formatSize(opt.Size_MB)}</span>
+            </div>
+            
+            <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
+                <span class="truncate font-medium text-gray-300" title="${opt.FilePath}">${opt.FilePath.split(/[\\\\/]/).pop()}</span>
+                <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
+            </div>
+             <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="window.open('/reveal?path=${encodeURIComponent(opt.FilePath)}', 'h_frame')">
+                <span class="material-icons text-[12px]">folder_open</span> Reveal
+            </button>
         </div>
     `;
 
@@ -514,10 +533,21 @@ function discardOptimized(opt) {
         });
 }
 
+// Helper for duration formatting
+function formatDuration(seconds) {
+    if (!seconds) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 function createVideoCard(v) {
     const container = document.createElement('div');
-    container.className = 'video-card-container';
-    container.setAttribute('data-path', v.FilePath);
+    // Using utility classes for the card wrapper
+    // group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container
+    container.className = 'group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container flex flex-col';
+    container.setAttribute('data-path', v.FilePath); // Keep this for JS logic
 
     const isHevc = (v.codec || '').includes('hevc') || (v.codec || '').includes('h265');
     const barW = Math.min(100, (v.Bitrate_Mbps / 25) * 100);
@@ -526,59 +556,75 @@ function createVideoCard(v) {
     const dirName = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
 
     container.innerHTML = `
-        <div class="content-card">
-            <div class="archive-badge">ARCHIVIERT</div>
-            <div class="checkbox-wrapper">
-                <input type="checkbox" onchange="updateBatchSelection()">
-                <div class="favorite-btn ${v.favorite ? 'active' : ''}" title="${v.favorite ? 'Favorit' : 'Zu Favoriten hinzufügen'}" onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))">
-                    <span class="material-icons">${v.favorite ? 'star' : 'star_border'}</span>
+        <!-- Thumbnail (Card Media) -->
+        <div class="card-media relative w-full aspect-video bg-black overflow-hidden group cursor-pointer" 
+             onmouseenter="handleMouseEnter(this)" 
+             onmouseleave="handleMouseLeave(this)" 
+             onclick="openCinema(this)">
+             
+             <!-- Corner Checkbox -->
+             <div class="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-black/50 text-arcade-cyan focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); updateBatchSelection()">
+             </div>
+
+             <!-- Favorite Star -->
+             <button class="favorite-btn absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 flex items-center justify-center transition-all ${v.favorite ? 'text-arcade-gold active scale-110' : 'text-gray-400 opacity-0 group-hover:opacity-100'}"
+                onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))">
+                <span class="material-icons text-lg">${v.favorite ? 'star' : 'star_border'}</span>
+             </button>
+
+             <img src="thumbnails/${v.thumb}" class="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110" loading="lazy">
+             <video class="preview-video absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300" muted loop preload="none" data-src="/preview?name=${v.preview}"></video>
+             
+             <!-- Quick Actions Overlay -->
+             <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
+                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); window.open('/reveal?path=${encodeURIComponent(v.FilePath)}', 'h_frame')">
+                    <span class="material-icons">folder_open</span>
+                 </button>
+                 <button class="w-12 h-12 rounded-full bg-arcade-cyan/20 hover:bg-arcade-cyan text-arcade-cyan hover:text-black border border-arcade-cyan/50 flex items-center justify-center backdrop-blur transition-all transform hover:scale-110 shadow-[0_0_15px_rgba(0,255,208,0.3)]" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
+                    <span class="material-icons text-3xl">play_arrow</span>
+                 </button>
+                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
+                    <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
+                 </button>
+                  ${window.ENABLE_OPTIMIZER ? `
+                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${encodeURIComponent(v.FilePath)}', 'h_frame')">
+                    <span class="material-icons">bolt</span>
+                 </button>` : ''}
+             </div>
+             
+             <!-- Badges -->
+             <div class="absolute bottom-2 left-2 flex gap-1 flex-wrap pr-12 pointer-events-none">
+                 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-black/60 text-white backdrop-blur border border-white/10">${v.Status}</span>
+                 ${isHevc ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-arcade-cyan/20 text-arcade-cyan backdrop-blur border border-arcade-cyan/30">HEVC</span>' : ''}
+                 ${fileName.includes('_opt.') ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400 backdrop-blur border border-green-500/30">OPT</span>' : ''}
+             </div>
+             
+             <!-- Duration -->
+             <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-black/80 text-white backdrop-blur pointer-events-none">
+                ${v.Duration ? formatDuration(v.Duration) : ''}
+             </span>
+        </div>
+
+        <!-- Content -->
+        <div class="p-3 flex flex-col gap-1">
+            <h3 class="text-sm font-medium text-gray-200 line-clamp-1 group-hover:text-arcade-cyan transition-colors" title="${fileName}">${fileName}</h3>
+            <p class="text-[11px] text-gray-500 truncate" title="${v.FilePath}">${dirName}</p>
+            
+            <div class="flex items-center justify-between mt-1 text-xs font-mono text-gray-400">
+                <div class="flex items-center gap-2">
+                    <span class="bg-white/5 px-1.5 py-0.5 rounded text-[10px]">${v.Size_MB.toFixed(0)} MB</span>
+                    <span>${v.Bitrate_Mbps.toFixed(1)} Mb/s</span>
                 </div>
+                
+                <button class="text-gray-600 hover:text-white transition-colors hide-toggle-btn" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
+                    <span class="material-icons text-[16px]">${v.hidden ? 'visibility' : 'visibility_off'}</span>
+                </button>
             </div>
-            <div class="card-media" onmouseenter="handleMouseEnter(this)" onmouseleave="handleMouseLeave(this)" onclick="openCinema(this)">
-                <img src="thumbnails/${v.thumb}" class="thumb" loading="lazy">
-                <video class="preview-video" muted loop preload="none" 
-                       data-src="/preview?name=${v.preview}">
-                </video>
-                <div class="quick-actions-overlay">
-                    <a href="/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Im Finder zeigen" onclick="event.stopPropagation()">
-                        <span class="material-icons">folder_open</span>
-                    </a>
-                    <div class="quick-action-btn" title="Wiedergeben" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
-                        <span class="material-icons">play_arrow</span>
-                    </div>
-                    <div class="quick-action-btn hide-toggle-btn" title="Status ändern" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
-                        <span class="material-icons">${v.hidden ? 'visibility' : 'visibility_off'}</span>
-                    </div>
-                    ${window.ENABLE_OPTIMIZER ? `
-                    <a href="/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="quick-action-btn" title="Optimieren" onclick="event.stopPropagation()">
-                        <span class="material-icons">bolt</span>
-                    </a>` : ''}
-                </div>
-            </div>
-            <div class="card-body">
-                <h2 class="file-name" title="${fileName}">${fileName}</h2>
-                <p class="file-dir" title="${v.FilePath}">${dirName}</p>
-                <div class="bitrate-track">
-                    <div class="bitrate-fill" style="width: ${barW}%"></div>
-                </div>
-                <div style="margin-top: 8px; font-size: 0.8rem; display: flex; justify-content: space-between;">
-                    <span>${v.Bitrate_Mbps.toFixed(1)} Mbps</span>
-                    <span style="color:#888;">${v.Size_MB.toFixed(0)} MB</span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <div style="display:flex; align-items:center;">
-                    <span class="badge ${v.Status.toLowerCase()}">${v.Status}</span>
-                    <span class="badge hevc">${isHevc ? 'HEVC' : (v.codec || 'UNK').toUpperCase()}</span>
-                    ${fileName.includes('_opt.') ? '<span class="badge ok">OPTIMIZED</span>' : ''}
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <a href="/reveal?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn"><span class="material-icons" style="font-size:18px;">folder_open</span></a>
-                    ${window.ENABLE_OPTIMIZER ? `
-                    <a href="/compress?path=${encodeURIComponent(v.FilePath)}" target="h_frame" class="btn">
-                        <span class="material-icons" style="font-size:18px;">bolt</span>
-                    </a>` : ''}
-                </div>
+            
+            <!-- Progress Bar -->
+            <div class="mt-2 h-0.5 w-full bg-white/5 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-arcade-cyan to-blue-500" style="width: ${barW}%"></div>
             </div>
         </div>
     `;
@@ -1010,7 +1056,7 @@ function resetDashboard() {
     searchTerm = '';
 
     // Reset UI elements
-    document.getElementById('searchBar').value = '';
+    document.getElementById('mobileSearchInput').value = '';
     document.getElementById('codecSelect').value = 'all';
     document.getElementById('sortSelect').value = 'bitrate';
 
@@ -1881,7 +1927,7 @@ function loadView(id) {
 
     // Apply settings
     searchTerm = view.search || "";
-    document.getElementById('searchBar').value = searchTerm;
+    document.getElementById('mobileSearchInput').value = searchTerm;
 
     currentFilter = view.filter || "all";
     document.getElementById('statusSelect').value = currentFilter;
