@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.0.0] - 2026-01-01
+
+### Added
+- **Workspace Differentiation**: Context-aware color accents and background tints for Lobby (Cyan), Favorites (Gold), Review (Cyan), and Vault (Magenta).
+- **Professional Navigation**: Enhanced sidebar with structural active states, indicator bars, and workspace-specific iconography.
+- **Settings UI Redesign**: Modern, sidebar-based configuration interface inspired by modern OS design standards (Apple/Linear/Stripe).
+- **State Management**: Integrated toast notifications, loading spinners, and unsaved changes tracking.
+- **Video Optimizer Toggle**: UI toggle in settings to enable/disable optimization features.
+
+### Changed
+- **Filter Bar Redesign**: Dynamic workspace-sensitive border colors and background tints.
+- **Responsive List View**: Improved card layouts and reduced thumbnail sizes to prevent overflow on wide screens.
+- **UI Architecture**: Moved away from hybrid inline styles towards a more structured workspace theming system.
+
+### Fixed
+- **Search Logic**: Corrected input binding that caused search to fail.
+- **Settings Navigation**: Fixed tab-switching logic and content visibility in the settings modal.
+- **UI Overflow**: Resolved horizontal scrolling issues in the list view on high-resolution displays.
+- **Refresh Button**: Added missing ID to the rescan button to restore functionality.
+- **State Persistence**: Improved persistence check for Video Optimizer settings.
+
 ## [5.2.0] - 2025-12-29
 
 ### Added

@@ -12,13 +12,16 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 
 ## 🚀 Version 6.0.0 Highlights
 
-This major release combines a complete visual overhaul with enterprise-grade security hardening and a modular architectural refactor.
+This major release combines a complete visual overhaul with enterprise-grade security hardening, a modular architectural refactor, and professional-grade desktop UX enhancements.
 
 ### 🎨 UI & Experience Overhaul
-- **Settings Redesign**: A completely new, sidebar-based settings interface inspired by modern OS design standards (Apple/Linear).
-- **Smooth Transitions**: 500ms GPU-accelerated fade-in animations when switching between workspaces (Lobby, Vault) and layouts (Grid, Treemap).
-- **Modern Interactions**: iOS-style toggles, number steppers, toast notifications, and keyboard shortcuts (`Cmd+S` to save, `ESC` to close).
-- **Typography**: Integrated 'Inter' font family for superior legibility on all displays.
+- **Workspace Differentiation**: Context-aware color accents and background tints for Lobby (Cyan), Favorites (Gold), Review (Cyan), and Vault (Magenta).
+- **Professional Navigation**: Enhanced sidebar with structural active states, indicator bars, and workspace-specific iconography.
+- **Settings Redesign**: A completely new, sidebar-based settings interface inspired by modern OS design standards (Apple/Linear/Stripe).
+- **Responsive Precision**: Fixed all horizontal overflow issues in list view and optimized grid tile density for high-resolution displays.
+- **State Management**: Integrated toast notifications, loading spinners, and unsaved changes tracking.
+- **Smooth Transitions**: 500ms GPU-accelerated fade-in animations when switching between workspaces and layouts.
+- **Modern Interactions**: iOS-style toggles, number steppers, and keyboard shortcuts (`Cmd+S` to save, `ESC` to close).
 
 ### 🔒 Enterprise-Grade Security
 - **Path whitelisting**: Strict `PathValidator` ensures the scanner *only* accesses directories explicitly allowed in configuration.

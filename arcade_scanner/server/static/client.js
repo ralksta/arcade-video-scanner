@@ -53,12 +53,42 @@ function setWorkspaceMode(mode) {
     try {
         console.log("Setting workspace mode:", mode);
         workspaceMode = mode;
-        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-        // Safe check in case element is missing during transition
+
+        // Set workspace data attribute for CSS theming
+        document.body.setAttribute('data-workspace', mode);
+
+        // Update nav items with enhanced active states
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.classList.remove('active');
+            const indicator = btn.querySelector('.nav-indicator');
+            if (indicator) indicator.classList.add('opacity-0');
+        });
+
         const modeBtn = document.getElementById('m-' + mode);
-        if (modeBtn) modeBtn.classList.add('active');
+        if (modeBtn) {
+            modeBtn.classList.add('active');
+            const indicator = modeBtn.querySelector('.nav-indicator');
+            if (indicator) indicator.classList.remove('opacity-0');
+        }
+
+        // Legacy vault mode class
         if (mode === 'vault') document.body.classList.add('vault-mode');
         else document.body.classList.remove('vault-mode');
+
+        // Update workspace indicator bar with actual colors
+        const wsColors = {
+            lobby: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
+            favorites: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' },
+            optimized: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
+            review: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
+            vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' }
+        };
+        const colors = wsColors[mode] || wsColors.lobby;
+        const wsIndicator = document.querySelector('.workspace-indicator');
+        if (wsIndicator) {
+            wsIndicator.style.borderBottomColor = colors.accent;
+            wsIndicator.style.backgroundColor = colors.bg;
+        }
 
         // Add animation class
         const grid = document.getElementById('videoGrid');
@@ -2114,6 +2144,24 @@ window.triggerOptimization = triggerOptimization;
 
 // --- RUN ON LOAD ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize workspace theming
+    const initialWorkspace = workspaceMode || 'lobby';
+    document.body.setAttribute('data-workspace', initialWorkspace);
+
+    // Apply initial workspace colors
+    const wsColors = {
+        lobby: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
+        favorites: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' },
+        optimized: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
+        vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' }
+    };
+    const colors = wsColors[initialWorkspace] || wsColors.lobby;
+    const wsIndicator = document.querySelector('.workspace-indicator');
+    if (wsIndicator) {
+        wsIndicator.style.borderBottomColor = colors.accent;
+        wsIndicator.style.backgroundColor = colors.bg;
+    }
+
     // Check optimized status on backend
     // fetch('/status')...
 

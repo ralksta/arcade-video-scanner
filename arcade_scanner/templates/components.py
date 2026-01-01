@@ -192,33 +192,41 @@ HEADER_COMPONENT = """
 
 NAVIGATION_COMPONENT = """
 <!-- Desktop Sidebar (Hidden on Mobile) -->
-<nav class="hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-white/5 p-4 gap-2 z-[100]">
-    <div class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 px-3">Workspace</div>
+<nav class="hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-white/5 p-4 gap-1 z-[100]">
+    <div class="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2 px-3">Workspace</div>
     
-    <button id="m-lobby" onclick="setWorkspaceMode('lobby')" class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 hover:text-arcade-cyan transition-colors">
-        <span class="material-icons text-[20px]">dashboard</span>
-        Lobby
+    <button id="m-lobby" onclick="setWorkspaceMode('lobby')" class="nav-item active group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-cyan rounded-r transition-opacity"></div>
+        <span class="material-icons text-[20px] text-arcade-cyan">dashboard</span>
+        <span class="font-medium group-[.active]:text-white">Lobby</span>
+        <span id="count-lobby" class="ml-auto text-[11px] text-gray-500 font-mono"></span>
     </button>
 
-    <button id="m-favorites" onclick="setWorkspaceMode('favorites')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 hover:text-arcade-gold transition-colors">
-        <span class="material-icons text-[20px]">star</span>
-        Favoriten
+    <button id="m-favorites" onclick="setWorkspaceMode('favorites')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-gold rounded-r opacity-0 transition-opacity"></div>
+        <span class="material-icons text-[20px] group-hover:text-arcade-gold group-[.active]:text-arcade-gold">star</span>
+        <span class="font-medium group-[.active]:text-white">Favoriten</span>
+        <span id="count-favorites" class="ml-auto text-[11px] text-gray-500 font-mono"></span>
     </button>
     
-    <button id="m-optimized" onclick="setWorkspaceMode('optimized')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 hover:text-arcade-cyan transition-colors">
-        <span class="material-icons text-[20px]">offline_bolt</span>
-        Review
+    <button id="m-optimized" onclick="setWorkspaceMode('optimized')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
+        <span class="material-icons text-[20px] group-hover:text-arcade-cyan group-[.active]:text-arcade-cyan">offline_bolt</span>
+        <span class="font-medium group-[.active]:text-white">Review</span>
+        <span id="count-review" class="ml-auto text-[11px] text-gray-500 font-mono"></span>
     </button>
 
-    <button id="m-vault" onclick="setWorkspaceMode('vault')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 hover:text-arcade-magenta transition-colors">
-        <span class="material-icons text-[20px]">archive</span>
-        Vault
+    <button id="m-vault" onclick="setWorkspaceMode('vault')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-magenta rounded-r opacity-0 transition-opacity"></div>
+        <span class="material-icons text-[20px] group-hover:text-arcade-magenta group-[.active]:text-arcade-magenta">archive</span>
+        <span class="font-medium group-[.active]:text-white">Vault</span>
+        <span id="count-vault" class="ml-auto text-[11px] text-gray-500 font-mono"></span>
     </button>
     
-    <div class="mt-auto">
-        <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 transition-colors">
+    <div class="mt-auto border-t border-white/5 pt-3">
+        <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
             <span class="material-icons text-[20px]">settings</span>
-            Settings
+            <span>Settings</span>
         </button>
     </div>
     
@@ -752,7 +760,7 @@ SETTINGS_MODAL_COMPONENT = """
 
 FILTER_BAR_COMPONENT = """
 <!-- Filter Bar (Sticky on Desktop, Scrollable Row on Mobile) -->
-<div class="sticky top-[34px] md:top-16 z-30 bg-arcade-bg/95 backdrop-blur border-b border-white/5 px-2 md:px-6 py-2 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-300 overflow-x-hidden">
+<div class="workspace-indicator sticky top-[34px] md:top-16 z-30 bg-arcade-bg/95 backdrop-blur border-b-2 px-2 md:px-6 py-2 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-300 overflow-x-hidden" style="border-color: var(--ws-accent, var(--cyan)); background: var(--ws-bg-tint, transparent);">
     <!-- Mobile Search (Full Width) -->
     <div class="w-full md:w-80 lg:w-96 relative flex-shrink min-w-0">
         <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[18px]">search</span>

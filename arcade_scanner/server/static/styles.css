@@ -48,6 +48,39 @@ body.vault-mode {
     --pink: var(--cyan);
 }
 
+/* === WORKSPACE-SPECIFIC ACCENT COLORS === */
+body[data-workspace="lobby"] {
+    --ws-accent: var(--cyan);
+    --ws-accent-glow: rgba(0, 255, 208, 0.25);
+    --ws-bg-tint: rgba(0, 255, 208, 0.02);
+}
+
+body[data-workspace="favorites"] {
+    --ws-accent: var(--gold);
+    --ws-accent-glow: rgba(244, 179, 66, 0.25);
+    --ws-bg-tint: rgba(244, 179, 66, 0.03);
+}
+
+body[data-workspace="optimized"],
+body[data-workspace="review"] {
+    --ws-accent: var(--cyan);
+    --ws-accent-glow: rgba(0, 255, 208, 0.25);
+    --ws-bg-tint: rgba(0, 255, 208, 0.02);
+}
+
+body[data-workspace="vault"] {
+    --ws-accent: var(--magenta);
+    --ws-accent-glow: rgba(143, 1, 119, 0.25);
+    --ws-bg-tint: rgba(143, 1, 119, 0.04);
+}
+
+/* Workspace indicator bar */
+.workspace-indicator {
+    border-bottom: 2px solid var(--ws-accent, var(--cyan));
+    background: var(--ws-bg-tint, transparent);
+    transition: border-color 0.3s, background 0.3s;
+}
+
 margin: 0;
 padding: 0;
 padding-top: env(safe-area-inset-top);

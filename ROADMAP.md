@@ -90,11 +90,15 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ## Completed Features
 
-### ✅ Version 6.0.0 (2025-12-31)
+### ✅ Version 6.0.0 (2026-01-01)
 - UI & Experience Overhaul (Settings, Transitions, Typography)
+- Professional Desktop UX (Workspace differentiation, Sidebar indicator bars)
 - Enterprise-Grade Security (Path validation, Sanitization)
 - Modular Architecture (Refactored Core, Type Safety)
+- Responsive Precision (List view overflow fixes)
+- Integrated State Feedback (Toast notifications, Loading spinners)
 - Keyboard Shortcuts (`Cmd+S`, `ESC`)
+- Fixed core functionality (Search logic, Settings navigation, Rescan button)
 
 ### ✅ Version 5.2.0 (2025-12-29)
 - Saved search filters and presets
