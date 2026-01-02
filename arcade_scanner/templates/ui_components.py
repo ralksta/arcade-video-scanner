@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-from arcade_scanner.templates.theme import BaseTheme
+from arcade_scanner.templates.theme import BaseTheme, render_theme_css
 
-def render_base_layout(theme: BaseTheme, content: str, scripts: str) -> str:
+def render_base_layout(theme: BaseTheme, content: str, scripts: str, active_theme_name: str = "arcade") -> str:
     """
     Renders the main HTML shell, injecting theme CSS variables and config.
     """
     return f"""<!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark" data-theme="{active_theme_name}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -17,7 +17,7 @@ def render_base_layout(theme: BaseTheme, content: str, scripts: str) -> str:
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=SF+Mono:wght@400;600&display=swap" rel="stylesheet">
     
     <!-- Theme CSS Variables -->
-    {theme.render_css_variables()}
+    {render_theme_css()}
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>

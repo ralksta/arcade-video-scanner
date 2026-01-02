@@ -146,5 +146,76 @@ class ProfessionalTheme(BaseTheme):
         return f"{base} text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white"
 
 
-# Active Theme Instance
-CURRENT_THEME = ArcadeTheme()
+class CandyTheme(BaseTheme):
+    name = "candy"
+    
+    # Palette provided: #FCF8F8 (Bg), #FBEFEF (Surface), #F9DFDF (Border), #F5AFAF (Accent)
+    css_variables = {
+        '--arcade-bg': ('#FCF8F8', '#1a0510'), # Pastel Pink / Dark Rose
+        '--text-main': ('#4a4a4a', '#FBEFEF'), # Soft Charcoal / Pinkish White
+        '--text-muted': ('#9ca3af', '#F9DFDF'), 
+        
+        # Soft Accents
+        '--arcade-purple': ('#FBEFEF', '#2d0f1a'),
+        '--arcade-magenta': ('#F5AFAF', '#d16d8e'), # Main Accent
+        '--arcade-pink': ('#F9DFDF', '#be185d'),
+        '--arcade-gold': ('#F5AFAF', '#F4B342'), 
+        '--arcade-cyan': ('#be185d', '#00ffd0'), # Contrast for icons
+        
+        '--surface-glass': ('rgba(252, 248, 248, 0.8)', 'rgba(26, 5, 16, 0.8)'),
+        '--surface-border': ('#F9DFDF', '#4a1525'),
+    }
+    
+    header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 bg-arcade-bg/95 backdrop-blur border-b border-[#F9DFDF] dark:border-white/10"
+    sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-[#F9DFDF] dark:border-white/10 p-4 gap-1 z-[100]"
+
+
+# Theme Registry
+THEMES = {
+    "arcade": ArcadeTheme(),
+    "professional": ProfessionalTheme(),
+    "candy": CandyTheme()
+}
+
+# Active Theme Instance (Default)
+CURRENT_THEME = THEMES["arcade"]
+
+def render_theme_css():
+    """Generates the CSS <style> block for ALL themes."""
+    css_lines = []
+    
+    # Render Default (Root) - Fallback
+    css_lines.append(":root {")
+    for name, (light, _) in CURRENT_THEME.css_variables.items():
+        css_lines.append(f"    {name}: {light};")
+    css_lines.append("}")
+    
+    css_lines.append(".dark {")
+    for name, (_, dark) in CURRENT_THEME.css_variables.items():
+        css_lines.append(f"    {name}: {dark};")
+    css_lines.append("}")
+    
+    # Render overrides for each theme
+    for key, theme in THEMES.items():
+        # Light Mode override
+        css_lines.append(f'[data-theme="{key}"] {{')
+        for name, (light, _) in theme.css_variables.items():
+            css_lines.append(f"    {name}: {light};")
+        css_lines.append("}")
+        
+        # Dark Mode override
+        css_lines.append(f'[data-theme="{key}"].dark {{') # Or .dark[data-theme="..."]
+        css_lines.append(f"    /* {theme.name} Dark */")
+        for name, (_, dark) in theme.css_variables.items():
+            css_lines.append(f"    {name}: {dark};")
+        css_lines.append("}")
+        
+    css_lines.append("""
+        body {
+            background-color: var(--arcade-bg);
+            color: var(--text-main);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+    """)
+    
+    return f"<style>{chr(10).join(css_lines)}</style>"

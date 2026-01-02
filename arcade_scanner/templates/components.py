@@ -354,6 +354,17 @@ OPTIMIZE_PANEL_COMPONENT = """
 <div id="optimizePanel" class="fixed bottom-0 left-0 right-0 bg-[#101018]/95 backdrop-blur-xl border-t border-white/10 p-6 translate-y-[110%] transition-transform duration-300 z-[10100] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col gap-4">
     <!-- Active state class 'translate-y-0' handled by JS -->
     
+    <!-- Video Row -->
+    <div class="flex items-center gap-4 flex-wrap">
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px]">Video</div>
+        <div class="flex bg-white/5 rounded-lg p-0.5">
+            <div class="px-4 py-1.5 text-sm cursor-pointer rounded-md text-white bg-white/10 shadow-sm transition-all" id="optVideoCompress" onclick="setOptVideo('compress')">Compress</div>
+            <div class="px-4 py-1.5 text-sm cursor-pointer rounded-md text-gray-400 hover:text-white transition-all" id="optVideoCopy" onclick="setOptVideo('copy')">Copy</div>
+        </div>
+        <div class="flex-1"></div>
+        <span class="text-xs text-gray-500" id="optVideoDesc">Optimize to efficient HEVC/H.265</span>
+    </div>
+
     <!-- Audio Row -->
     <div class="flex items-center gap-4 flex-wrap">
         <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px]">Audio</div>
@@ -430,7 +441,7 @@ CINEMA_MODAL_COMPONENT = """
         </div>
     </div>
     
-    <div class="absolute bottom-8 flex gap-4 z-40">
+    <div id="cinemaActions" class="cinema-actions absolute bottom-8 flex gap-4 z-40">
         <button class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors group" onclick="toggleCinemaInfo()" title="Info">
             <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-all">
                 <span class="material-icons text-lg">info</span>
@@ -1095,6 +1106,18 @@ SETTINGS_MODAL_COMPONENT = """
                     <span class="hidden md:inline">Storage</span>
                     <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
+                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
+                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="privacy">
+                    <span class="material-icons text-lg">security</span>
+                    <span class="hidden md:inline">Privacy</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
+                </button>
+                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
+                 <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="backup">
+                    <span class="material-icons text-lg">save</span>
+                    <span class="hidden md:inline">Backup & Restore</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
+                </button>
             </nav>
         </aside>
         
@@ -1227,6 +1250,26 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-magenta">palette</span>
+                                Theme
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Customize the visual style.</p>
+                        </div>
+                        
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
+                            <label class="block text-xs text-gray-400 mb-1">Color Paradigm</label>
+                            <select id="settingsTheme" onchange="markSettingsUnsaved()" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none">
+                                <option value="arcade">Arcade (Neon)</option>
+                                <option value="professional">Professional (Clean)</option>
+                                <option value="candy">Candy (Pastel)</option>
+                            </select>
+                            <p class="text-xs text-gray-500">Use the header toggle (Sun/Moon) to switch between Light/Dark mode for any theme.</p>
+                        </div>
+                    </section>
+
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
                                 <span class="material-icons text-lg text-arcade-magenta">auto_awesome</span>
                                 Visual Features
                             </h3>
@@ -1290,6 +1333,102 @@ SETTINGS_MODAL_COMPONENT = """
                             <span class="material-icons text-amber-400 text-lg">info</span>
                             <div>Cache changes require an app restart.</div>
                         </div>
+                    </section>
+                    </section>
+                </div>
+
+                <!-- PRIVACY SECTION -->
+                <div class="content-section hidden space-y-6" id="content-privacy">
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-cyan">shield</span>
+                                Safe Mode Configuration
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Define what content is hidden when Safe Mode is enabled.</p>
+                        </div>
+
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Enable Safe Mode</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Hide sensitive content based on tags and directories</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingsSafeMode" class="sr-only peer" onchange="markSettingsUnsaved()">
+                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-white mb-2">Sensitive Directories</label>
+                                <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsSensitiveDirs" placeholder="/path/to/private" rows="3" oninput="markSettingsUnsaved()"></textarea>
+                                <p class="text-xs text-gray-500 mt-1">One absolute path per line. Files in these folders will be hidden.</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-white mb-2">Sensitive Tags</label>
+                                <input type="text" id="settingsSensitiveTags" placeholder="nsfw, adult" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" oninput="markSettingsUnsaved()">
+                                <p class="text-xs text-gray-500 mt-1">Comma separated list of tags to hide.</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-white mb-2">Sensitive Collections</label>
+                                <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsSensitiveCollections" placeholder="My Private Collection" rows="3" oninput="markSettingsUnsaved()"></textarea>
+                                <p class="text-xs text-gray-500 mt-1">One collection name per line. These collections will be hidden from the sidebar.</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- BACKUP SECTION -->
+                <div class="content-section hidden space-y-6" id="content-backup">
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-cyan">cloud_download</span>
+                                Export Settings
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Download your current configuration, including collections and tags.</p>
+                        </div>
+                        
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Backup Configuration</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Saves as arcade_settings_backup.json</div>
+                            </div>
+                            <button onclick="exportSettings()" class="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-medium transition-colors border border-white/10 flex items-center gap-2">
+                                <span class="material-icons text-sm">download</span>
+                                Download
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="space-y-4">
+                         <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-pink">cloud_upload</span>
+                                Import Settings
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Restore configuration from a backup file. Existing settings will be overwritten.</p>
+                        </div>
+                        
+                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
+                            <div class="flex items-center gap-4">
+                                <div class="flex-1">
+                                    <label class="block text-sm font-medium text-white mb-1">Select Backup File</label>
+                                    <input type="file" id="settingsImportFile" accept=".json" class="block w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer">
+                                </div>
+                                <button onclick="importSettings()" class="px-4 py-2 bg-arcade-cyan/20 hover:bg-arcade-cyan/30 text-arcade-cyan rounded-lg text-sm font-medium transition-colors border border-arcade-cyan/30 flex items-center gap-2 h-[38px] mt-6">
+                                    <span class="material-icons text-sm">upload</span>
+                                    Restore
+                                </button>
+                            </div>
+                             <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex gap-3 text-sm text-yellow-200">
+                                <span class="material-icons text-yellow-400 text-lg">warning</span>
+                                <div>Restoring will reload the page and apply settings immediately.</div>
+                            </div>
+                         </div>
                     </section>
                 </div>
             </div>

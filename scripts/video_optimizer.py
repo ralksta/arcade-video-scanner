@@ -319,7 +319,7 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     
     sys.stdout.flush()
 
-def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None):
+def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress'):
     """Build the ffmpeg command based on encoder profile."""
     cmd = ['ffmpeg', '-y']
     
@@ -327,14 +327,20 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     if ss: cmd.extend(['-ss', str(ss)])
     if to: cmd.extend(['-to', str(to)])
     
-    cmd.extend(profile['hwaccel_input'])
-    cmd.extend(['-i', str(input_path)])
-    
-    # Map video codec
-    cmd.extend(['-c:v', profile['codec']])
-    cmd.extend(profile['encoder_args'])
-    cmd.extend([profile['quality_flag'], str(quality_value)])
-    cmd.extend(['-vf', profile['video_filter']])
+    if video_mode == 'copy':
+        # Passthrough video
+        cmd.extend(['-i', str(input_path)])
+        cmd.extend(['-c:v', 'copy'])
+    else:
+        # Re-encode video
+        cmd.extend(profile['hwaccel_input'])
+        cmd.extend(['-i', str(input_path)])
+        
+        # Map video codec
+        cmd.extend(['-c:v', profile['codec']])
+        cmd.extend(profile['encoder_args'])
+        cmd.extend([profile['quality_flag'], str(quality_value)])
+        cmd.extend(['-vf', profile['video_filter']])
     
     # Audio settings
     if copy_audio:
@@ -357,7 +363,7 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     
     return cmd
 
-def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None):
+def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress'):
     """Process a single video file. Returns (success, bytes_saved)."""
     input_path = Path(input_path)
     is_trim = ss is not None or to is not None
@@ -376,10 +382,12 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
         return (False, 0)
 
     # Determine Output Path
-    if is_trim:
-        # For trim, we always create a new file, maybe with _trim suffix?
-        # Or standard _opt but allow overwrite?
-        # Use standard suffix for consistency
+    if video_mode == 'copy':
+        # "Copy" mode (Passthrough/Trim) -> Use _trim suffix
+        suffix = "_trim.mp4"
+        output_path = input_path.parent / f"{input_path.stem}{suffix}"
+    elif is_trim:
+        # Re-encode + Trim -> Use _opt suffix (standard)
         output_path = input_path.parent / f"{input_path.stem}_opt.mp4"
     else:
         output_path = input_path.parent / f"{input_path.stem}_opt.mp4"
@@ -420,15 +428,79 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     file_start_time = time.time()
     
     def should_continue(q):
+        if video_mode == 'copy':
+            return False # Only one pass for copy mode
+        
         if profile['quality_direction'] > 0:
             return q <= end_q
         else:
             return q >= end_q
     
+    # Video Copy Mode Bypass
+    if video_mode == 'copy':
+        print(f"{BG}>>> COPY MODE: Skipping re-encode logic.{NC}")
+        file_start_time = time.time()
+        
+        cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to, video_mode='copy')
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        # Simple progress loop (copy/trim tends to be fast but we still want feedback)
+        # Note: ffmpeg output parsing logic below relies partially on encoding stats.
+        # Copy mode outputs less stats, but we can try reuse the existing loop.
+        
+        cur_stats = {"bitrate": "copy", "speed": "N/A"}
+        encode_start = time.time()
+        
+        try:
+             while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                # Only duration/size is really reliable in copy mode progress?
+                if 'out_time_ms=' in line:
+                    val = line.split('=')[1].strip()
+                    if val != 'N/A':
+                         try:
+                            ms = int(val)
+                            elapsed = time.time() - encode_start
+                            show_progress(ms / 1000000, info['duration'], 'copy', "copy", "fast", elapsed)
+                         except ValueError:
+                            pass
+        
+        except KeyboardInterrupt:
+            process.terminate()
+            if output_path.exists(): output_path.unlink()
+            return (False, 0)
+            
+        process.wait()
+        
+        if process.returncode == 0:
+             file_time = time.time() - file_start_time
+             print(f" {BG}>>> SUCCESS (COPY)! Saved to {output_path.name} in {format_time(file_time)}.{NC}")
+             batch_stats['total_time'] += file_time
+             batch_stats['success'] += 1
+             
+             # Calculate size diff just for logs, though savings aren't guaranteed
+             size_after = output_path.stat().st_size
+             saved_bytes = size_before - size_after
+             
+             last_encode_result['filename'] = input_path.name
+             last_encode_result['status'] = 'success'
+             last_encode_result['reason'] = 'Video Copy (Passthrough)'
+             last_encode_result['duration'] = file_time
+             last_encode_result['saved_bytes'] = saved_bytes # Might be negative if container overhead
+             
+             if port: notify_server(port, input_path)
+             return (True, 0)
+        else:
+             print(f"{R}FFmpeg error during copy.{NC}")
+             batch_stats['failed'] += 1
+             return (False, 0)
+
     while should_continue(quality):
         print(f"{G}Pass:{NC} Q={quality}")
         
-        cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to)
+        cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to, video_mode='compress')
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}
@@ -605,6 +677,8 @@ def main():
     parser.add_argument('--ss', type=str, help='Start time (e.g. 00:00:10 or 10)')
     parser.add_argument('--to', type=str, help='End time (e.g. 00:00:20 or 20)')
     parser.add_argument('--no-fun-facts', action='store_true', help='Disable fun facts display')
+    parser.add_argument('--video-mode', choices=['compress', 'copy'], default='compress',
+                        help='Video processing mode: compress (default) or copy (passthrough)')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     args = parser.parse_args()
     
@@ -629,6 +703,9 @@ def main():
     elif args.audio_mode:
         print(f"{Y}Audio Mode: {args.audio_mode}{NC}")
 
+    if args.video_mode == 'copy':
+        print(f"{Y}Video Mode: Copy (Passthrough){NC}")
+
     if args.min_size != DEFAULT_MIN_SIZE_MB:
         print(f"{Y}Min size: {args.min_size} MB{NC}")
         
@@ -650,7 +727,16 @@ def main():
     
     for f in files:
         batch_stats['processed'] += 1
-        success, saved_bytes = process_file(f, profile, min_size_mb=args.min_size, copy_audio=args.copy_audio, port=args.port, audio_mode=args.audio_mode, ss=args.ss, to=args.to)
+        success, saved_bytes = process_file(
+            f, profile, 
+            min_size_mb=args.min_size, 
+            copy_audio=args.copy_audio, 
+            port=args.port, 
+            audio_mode=args.audio_mode, 
+            ss=args.ss, 
+            to=args.to,
+            video_mode=args.video_mode
+        )
         
         # Write to encode log (for both batch controller and single-file calls)
         if last_encode_result['filename']:

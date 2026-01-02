@@ -18,6 +18,15 @@ class VideoEntry(BaseModel):
     width: Optional[int] = Field(0, alias="Width")
     height: Optional[int] = Field(0, alias="Height")
     
+    # Extended Technical Details
+    audio_codec: Optional[str] = Field("unknown", alias="AudioCodec")
+    audio_channels: Optional[int] = Field(0, alias="AudioChannels")
+    container_format: Optional[str] = Field("unknown", alias="Container")
+    profile: Optional[str] = Field("", alias="Profile")
+    level: Optional[float] = Field(0.0, alias="Level")
+    pixel_format: Optional[str] = Field("", alias="PixelFormat")
+    frame_rate: Optional[float] = Field(0.0, alias="FrameRate")
+    
     # User-defined attributes
     favorite: bool = Field(False, description="Is marked as favorite")
     vaulted: bool = Field(False, alias="hidden", description="Is moved to vault/hidden")

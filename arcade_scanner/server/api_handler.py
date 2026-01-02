@@ -9,7 +9,7 @@ from pathlib import Path
 import socket
 from urllib.parse import unquote, urlparse, parse_qs
 import shlex
-from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX
+from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE
 from arcade_scanner.database import db
 from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.server.streaming_util import serve_file_range
@@ -212,6 +212,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         return
 
                     audio_mode = params.get("audio", ["enhanced"])[0]
+                    video_mode = params.get("video", ["compress"])[0]
                     ss = params.get("ss", [None])[0]
                     to = params.get("to", [None])[0]
                     
@@ -220,11 +221,17 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         print(f"🚨 Invalid audio mode: {audio_mode}")
                         self.send_error(400, "Invalid audio mode")
                         return
+                        
+                    # Validate video_mode
+                    if video_mode not in ["compress", "copy"]:
+                        print(f"🚨 Invalid video mode: {video_mode}")
+                        self.send_error(400, "Invalid video mode")
+                        return
                     
                     # Get current running port
                     current_port = self.server.server_address[1]
                     print(f"🔌 Current Server Port: {current_port}")
-                    print(f"⚡ Optimize: {file_path} | Audio: {audio_mode} | Trim: {ss}-{to}")
+                    print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Trim: {ss}-{to}")
                     
                     # Load latest settings to check fun facts preference
                     enable_fun_facts = config.settings.enable_fun_facts
@@ -232,7 +239,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     # Build command as list (NEVER use shell=True!)
                     cmd_parts = [sys.executable, config.optimizer_path, file_path,
                                  "--port", str(current_port),
-                                 "--audio-mode", audio_mode]
+                                 "--audio-mode", audio_mode,
+                                 "--video-mode", video_mode]
                     
                     if ss: 
                         cmd_parts.extend(["--ss", ss])
@@ -394,6 +402,32 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     
                 except Exception as e:
                     print(f"❌ Rescan failed: {e}")
+                    self.send_error(500, str(e))
+
+            elif self.path == "/api/backup":
+                try:
+                    # Security Fix: Ensure only authenticated/local users (implicitly local)
+                    print("💾 Backup requested...")
+                    
+                    # Force save first to ensure latest memory state is on disk?
+                    # config.save({}) # No-op save to flush? No, config.save updates logic.
+                    # Just read the file.
+                    
+                    if os.path.exists(SETTINGS_FILE):
+                        with open(SETTINGS_FILE, 'rb') as f:
+                            data = f.read()
+                            
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json")
+                        self.send_header("Content-Disposition", 'attachment; filename="arcade_settings_backup.json"')
+                        self.end_headers()
+                        self.wfile.write(data)
+                        print("✅ Backup sent.")
+                    else:
+                        self.send_error(404, "Settings file not found")
+                        
+                except Exception as e:
+                    print(f"❌ Backup failed: {e}")
                     self.send_error(500, str(e))
 
             elif self.path.startswith("/batch_compress?paths="):
@@ -581,6 +615,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "enable_fun_facts": s.enable_fun_facts,
                     "enable_optimizer": s.enable_optimizer,
                     "available_tags": s.available_tags,
+                    "enable_optimizer": s.enable_optimizer,
+                    "available_tags": s.available_tags,
+                    "theme": s.theme,
+                    "sensitive_dirs": s.sensitive_dirs,
+                    "sensitive_tags": s.sensitive_tags,
+                    "sensitive_collections": s.sensitive_collections,
                     "default_scan_targets": [HOME_DIR],
                     "default_exclusions": DEFAULT_EXCLUSIONS
                 }
@@ -759,18 +799,35 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         "scan_targets": new_settings.get("scan_targets", []),
                         "exclude_paths": new_settings.get("exclude_paths", []),
                         "disabled_defaults": new_settings.get("disabled_defaults", []),
-                        "saved_views": new_settings.get("saved_views", []),
-                        "smart_collections": new_settings.get("smart_collections", []),
+                        "saved_views": new_settings.get("saved_views", config.settings.saved_views),
+                        "smart_collections": new_settings.get("smart_collections", config.settings.smart_collections),
                         "min_size_mb": new_settings.get("min_size_mb", 100),
                         "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000),
                         "enable_previews": new_settings.get("enable_previews", False),
                         "enable_fun_facts": new_settings.get("enable_fun_facts", True),
                         "enable_optimizer": new_settings.get("enable_optimizer", True),
-                        "available_tags": new_settings.get("available_tags", config.settings.available_tags)
+                        "available_tags": new_settings.get("available_tags", config.settings.available_tags),
+                        "enable_fun_facts": new_settings.get("enable_fun_facts", True),
+                        "enable_optimizer": new_settings.get("enable_optimizer", True),
+                        "available_tags": new_settings.get("available_tags", config.settings.available_tags),
+                        "theme": new_settings.get("theme", config.settings.theme),
+                        "sensitive_dirs": new_settings.get("sensitive_dirs", []),
+                        "sensitive_tags": new_settings.get("sensitive_tags", []),
+                        "sensitive_collections": new_settings.get("sensitive_collections", [])
                     }
                     
                     if config.save(update_data):
                         print(f"✅ Settings saved: {len(update_data['scan_targets'])} targets, {len(update_data['exclude_paths'])} excludes")
+                        
+                        # Regenerate HTML report to bake in new settings (Theme, etc.)
+                        try:
+                            current_port = self.server.server_address[1]
+                            results = [e.model_dump(by_alias=True) for e in db.get_all()]
+                            generate_html_report(results, config.report_file, server_port=current_port)
+                            print("✅ HTML Report regenerated with new settings")
+                        except Exception as e:
+                            print(f"⚠️ Settings saved but report gen failed: {e}")
+
                         self.send_response(200)
                         self.send_header("Content-Type", "application/json")
                         self.end_headers()
@@ -786,6 +843,38 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(400, "Invalid JSON")
                 except Exception as e:
                     print(f"❌ Error saving settings: {e}")
+                    self.send_error(500, str(e))
+            
+            elif self.path == "/api/restore":
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    
+                    if content_length > MAX_REQUEST_SIZE:
+                        self.send_error(413, "Request Entity Too Large")
+                        return
+
+                    body = self.rfile.read(content_length).decode('utf-8')
+                    try:
+                        # Expecting pure JSON body (client parses file and sends JSON)
+                        new_settings = json.loads(body)
+                    except json.JSONDecodeError:
+                        self.send_error(400, "Invalid JSON format")
+                        return
+                    
+                    print("♻️ Restoring settings from backup...")
+                    
+                    if config.save(new_settings):
+                        print("✅ Settings restored successfully.")
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"success": True}).encode())
+                    else:
+                        print("❌ Failed to save restored settings.")
+                        self.send_error(500, "Failed to save settings")
+                        
+                except Exception as e:
+                    print(f"❌ Restore exception: {e}")
                     self.send_error(500, str(e))
             
             # --- TAG SYSTEM POST ENDPOINTS ---

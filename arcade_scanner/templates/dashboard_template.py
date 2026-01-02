@@ -3,7 +3,7 @@ import socket
 import time
 import json
 from arcade_scanner.config import config
-from arcade_scanner.templates.theme import CURRENT_THEME
+from arcade_scanner.templates.theme import CURRENT_THEME, THEMES
 from arcade_scanner.templates.ui_components import (
     render_base_layout,
     render_header,
@@ -48,9 +48,13 @@ def generate_html_report(results, report_file, server_port=8000):
     opt_avail_str = 'true' if config.optimizer_available else 'false'
     opt_enabled_str = 'true' if (config.optimizer_available and config.settings.enable_optimizer) else 'false'
     
+    # Determine Active Theme
+    active_theme_name = config.settings.theme
+    active_theme = THEMES.get(active_theme_name, THEMES['arcade'])
+    
     # 1. Prepare Header (Themed)
     header_html = render_header(
-        CURRENT_THEME,
+        active_theme,
         hostname=socket.gethostname().upper(),
         count=len(results),
         size_gb=f"{total_mb/1024:.1f}"
@@ -71,7 +75,7 @@ def generate_html_report(results, report_file, server_port=8000):
     
     # 3. Assemble Main Content
     # Render Navigation using Theme
-    nav_html = render_navigation(CURRENT_THEME)
+    nav_html = render_navigation(active_theme)
     
     main_body_html = f"""
     {nav_html}
@@ -147,9 +151,10 @@ def generate_html_report(results, report_file, server_port=8000):
     
     # Combine content using Theme-aware Base Layout
     final_html = render_base_layout(
-        CURRENT_THEME,
+        active_theme,
         content=main_body_html + external_scripts,
-        scripts=full_scripts_block
+        scripts=full_scripts_block,
+        active_theme_name=active_theme.name
     )
 
     with open(report_file, "w", encoding="utf-8") as f:

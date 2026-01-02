@@ -7,6 +7,7 @@ let currentFolder = 'all';
 let searchTerm = '';
 let activeSmartCollectionCriteria = null; // Stores current smart collection rules
 let activeCollectionId = null; // Stores currently active collection ID for UI highlighting
+let safeMode = localStorage.getItem('safe_mode') === 'true'; // Safe Mode State
 
 let filteredVideos = [];
 let renderedCount = 0;
@@ -19,6 +20,34 @@ function toggleTheme() {
 
     const icon = document.getElementById('themeIcon');
     if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
+}
+
+// --- SAFE MODE LOGIC ---
+// Safe Mode is now toggled via Settings modal
+
+function isSensitive(video) {
+    if (!video) return false;
+
+    // 1. Check Tags
+    const sensitiveTags = window.userSettings?.sensitive_tags || ['nsfw', 'adult', '18+'];
+    if (video.tags && video.tags.some(t => sensitiveTags.includes(t.toLowerCase()))) {
+        return true;
+    }
+
+    // 2. Check Paths
+    const sensitiveDirs = window.userSettings?.sensitive_dirs || [];
+    // Normalize paths for comparison (forward slashes)
+    const vPath = video.FilePath.replace(/\\/g, '/').toLowerCase();
+
+    for (const dir of sensitiveDirs) {
+        if (!dir) continue;
+        const cleanDir = dir.replace(/\\/g, '/').toLowerCase();
+        if (vPath.startsWith(cleanDir)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // Init Theme
@@ -333,8 +362,9 @@ function filterAndSort(scrollToTop = false) {
             // If found, we check if corresponding "non-opt" key exists.
 
             map.forEach((vOpt, key) => {
-                if (key.endsWith('_opt')) {
-                    const baseKey = key.substring(0, key.length - 4); // Strip _opt
+                if (key.endsWith('_opt') || key.endsWith('_trim')) {
+                    const suffixLen = key.endsWith('_opt') ? 4 : 5;
+                    const baseKey = key.substring(0, key.length - suffixLen); // Strip _opt or _trim
 
                     // Do we have the original?
                     // Note: This relies on the original having the exact same stem minus "_opt".
@@ -360,13 +390,14 @@ function filterAndSort(scrollToTop = false) {
         } else {
             filteredVideos = window.ALL_VIDEOS.filter(v => {
                 // 0. Smart Collection Override
+                let matchesCollection = true;
                 if (activeSmartCollectionCriteria) {
-                    const matches = evaluateCollectionMatch(v, activeSmartCollectionCriteria);
-                    if (matches) { vCount++; tSize += v.Size_MB; }
-                    return matches;
+                    matchesCollection = evaluateCollectionMatch(v, activeSmartCollectionCriteria);
                 }
 
-                const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
+                if (!matchesCollection) return false;
+
+                const name = v.FilePath.split(/[\\/]/).pop().toLowerCase();
                 const status = v.Status;
                 const codec = v.codec || 'unknown';
                 const isHidden = v.hidden || false;
@@ -374,16 +405,29 @@ function filterAndSort(scrollToTop = false) {
                 const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
                 const videoTags = v.tags || [];
 
+                // --- SAFE MODE CHECK ---
+                if (safeMode && isSensitive(v)) {
+                    return false;
+                }
+
                 let matchesFilter = false;
                 if (currentFilter === 'all') matchesFilter = true;
-                else if (currentFilter === 'optimized_files') matchesFilter = v.FilePath.includes('_opt');
+                else if (currentFilter === 'optimized_files') matchesFilter = v.FilePath.includes('_opt') || v.FilePath.includes('_trim');
                 else matchesFilter = (status === currentFilter);
+
                 const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
                 const matchesSearch = name.includes(searchTerm) || v.FilePath.toLowerCase().includes(searchTerm);
                 const matchesFolder = (currentFolder === 'all' || folder === currentFolder);
 
                 let matchesWorkspace = true;
-                if (workspaceMode === 'lobby') matchesWorkspace = !isHidden; // Show _opt files too!
+                // Note: When in a Collection (activeSmartCollectionCriteria is set), 
+                // typically workspaceMode is still 'lobby' or whatever was active.
+                // Should collection override workspace mode rules? 
+                // User expects collection contents. Usually collections span the whole library (except hidden/vault)?
+                // Let's assume collection contents respect vault hiding unless collection specifically asks for hidden.
+                // EXISTING BEHAVIOR: standard workspace rules apply. 
+
+                if (workspaceMode === 'lobby') matchesWorkspace = !isHidden;
                 else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
                 else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
 
@@ -630,7 +674,7 @@ function createVideoCard(v) {
              
              <!-- Corner Checkbox -->
              <div class="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-black/50 text-arcade-cyan focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); updateBatchSelection()">
+                <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-black/50 text-arcade-cyan focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
              </div>
 
              <!-- Favorite Star -->
@@ -668,7 +712,7 @@ function createVideoCard(v) {
              
              <!-- Duration -->
              <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-black/80 text-white backdrop-blur pointer-events-none">
-                ${v.Duration ? formatDuration(v.Duration) : ''}
+                ${v.Duration_Sec ? formatDuration(v.Duration_Sec) : ''}
              </span>
         </div>
 
@@ -927,28 +971,44 @@ function updateCinemaInfo() {
 
     content.innerHTML = `
         <div class="info-row">
+            <span class="info-label">Format</span>
+            <span class="info-value">${v.Container || 'unknown'}</span>
+        </div>
+        <div class="info-row">
             <span class="info-label">Resolution</span>
             <span class="info-value">${v.Width} × ${v.Height}</span>
         </div>
         <div class="info-row">
             <span class="info-label">Duration</span>
-            <span class="info-value">${formatDuration(v.Duration)}</span>
+            <span class="info-value">${formatDuration(v.Duration_Sec)}</span>
         </div>
         <div class="info-row">
             <span class="info-label">Frame Rate</span>
-            <span class="info-value">${v.FrameRate} fps</span>
+            <span class="info-value">${v.FrameRate || '?'} fps</span>
         </div>
         <div class="info-row">
-            <span class="info-label">Codec</span>
-            <span class="info-value">${v.Codec}</span>
+            <span class="info-label">Video Codec</span>
+            <span class="info-value">${v.codec} ${(v.Profile) ? `(${v.Profile})` : ''}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Pixel Format</span>
+            <span class="info-value">${v.PixelFormat || '-'}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Audio Codec</span>
+            <span class="info-value">${v.AudioCodec || '-'}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Channels</span>
+            <span class="info-value">${v.AudioChannels || '-'}</span>
         </div>
         <div class="info-row">
             <span class="info-label">Bitrate</span>
-            <span class="info-value">${v.Bitrate.toLocaleString()} kbps</span>
+            <span class="info-value">${(v.Bitrate_Mbps * 1000).toLocaleString()} kbps</span>
         </div>
         <div class="info-row">
             <span class="info-label">File Size</span>
-            <span class="info-value">${formatSize(v.SizeMB)}</span>
+            <span class="info-value">${formatSize(v.Size_MB)}</span>
         </div>
         <div class="info-row">
             <span class="info-label">Status</span>
@@ -1044,6 +1104,45 @@ function updateBatchSelection() {
 
 function clearSelection() {
     document.querySelectorAll('.video-card-container input:checked').forEach(i => i.checked = false);
+    updateBatchSelection();
+}
+
+// --- BATCH SELECTION HELPERS ---
+let lastCheckedPath = null;
+
+function toggleSelection(checkbox, event, path) {
+    if (event.shiftKey && lastCheckedPath) {
+        // Shift+Click Logic
+        const currentIndex = filteredVideos.findIndex(v => v.FilePath === path);
+        const lastIndex = filteredVideos.findIndex(v => v.FilePath === lastCheckedPath);
+
+        if (currentIndex !== -1 && lastIndex !== -1) {
+            const start = Math.min(currentIndex, lastIndex);
+            const end = Math.max(currentIndex, lastIndex);
+
+            const targetState = checkbox.checked;
+
+            // Apply to range
+            for (let i = start; i <= end; i++) {
+                const video = filteredVideos[i];
+                const container = document.querySelector(`.video-card-container[data-path="${CSS.escape(video.FilePath)}"]`);
+                if (container) {
+                    const cb = container.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = targetState;
+                }
+            }
+        }
+    }
+
+    // Update state
+    if (checkbox.checked) {
+        lastCheckedPath = path;
+    } else {
+        lastCheckedPath = null; // Reset if unchecked? Or keep last checked? Keeping enables complex patterns.
+        // Usually shift-selection anchors on the last *interaction*.
+        lastCheckedPath = path;
+    }
+
     updateBatchSelection();
 }
 
@@ -2001,7 +2100,14 @@ async function openSettings() {
         document.getElementById('settingsMinSize').value = data.min_size_mb;
         document.getElementById('settingsBitrate').value = data.bitrate_threshold_kbps;
 
+        // Privacy
+        document.getElementById('settingsSafeMode').checked = safeMode;
+        document.getElementById('settingsSensitiveDirs').value = (data.sensitive_dirs || []).join('\n');
+        document.getElementById('settingsSensitiveTags').value = (data.sensitive_tags || []).join(', ');
+        document.getElementById('settingsSensitiveCollections').value = (data.sensitive_collections || []).join('\n');
+
         // New Features
+        document.getElementById('settingsTheme').value = data.theme || 'arcade';
         document.getElementById('settingsFunFacts').checked = data.enable_fun_facts !== false;
         const optimizerCheckbox = document.getElementById('settingsOptimizer');
         if (optimizerCheckbox) optimizerCheckbox.checked = data.enable_optimizer !== false;
@@ -2074,11 +2180,15 @@ async function saveSettings() {
         exclude_paths: excludesText.split('\n').map(s => s.trim()).filter(s => s),
         disabled_defaults: disabledDefaults,
         saved_views: window.userSettings?.saved_views || [],
+        sensitive_dirs: document.getElementById('settingsSensitiveDirs').value.split('\n').map(s => s.trim()).filter(s => s),
+        sensitive_tags: document.getElementById('settingsSensitiveTags').value.split(',').map(s => s.trim()).filter(s => s),
+        sensitive_collections: document.getElementById('settingsSensitiveCollections').value.split(/[\n,]/).map(s => s.trim()).filter(s => s),
         min_size_mb: parseInt(document.getElementById('settingsMinSize').value) || 100,
         bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000,
         enable_previews: window.userSettings?.enable_previews || false,
         enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
-        enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true
+        enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
+        theme: document.getElementById('settingsTheme').value || 'arcade'
     };
 
     try {
@@ -2099,6 +2209,11 @@ async function saveSettings() {
             const unsavedIndicator = document.getElementById('unsavedIndicator');
             if (unsavedIndicator) unsavedIndicator.style.opacity = '0';
 
+            // Update Theme immediately
+            const newTheme = document.getElementById('settingsTheme').value;
+            if (newTheme) document.documentElement.setAttribute('data-theme', newTheme);
+
+
             // Show success toast
             showSettingsToast();
 
@@ -2112,6 +2227,17 @@ async function saveSettings() {
                 ...window.userSettings,
                 ...settings
             };
+
+            // Update Safe Mode State separately (localStorage)
+            const newSafeMode = document.getElementById('settingsSafeMode').checked;
+            if (newSafeMode !== safeMode) {
+                safeMode = newSafeMode;
+                localStorage.setItem('safe_mode', safeMode);
+            }
+
+            // Always refresh content to reflect potential changes in sensitive lists or other settings
+            filterAndSort();
+            renderCollections();
         } else {
             showSettingsToast('Error saving settings', true);
         }
@@ -2262,6 +2388,10 @@ function updateSettingsHeader(sectionId) {
         'storage': {
             title: 'Storage',
             subtitle: 'Manage cache and disk space usage'
+        },
+        'privacy': {
+            title: 'Privacy & Safety',
+            subtitle: 'Configure Safe Mode and hidden content'
         }
     };
 
@@ -3160,7 +3290,7 @@ function getCollectionCount(collection) {
         if (isHidden) return false;
 
         // Status filter
-        if (collection.criteria.status !== 'all') {
+        if (collection.criteria.status && collection.criteria.status !== 'all') {
             if (collection.criteria.status === 'optimized_files') {
                 if (!v.FilePath.includes('_opt')) return false;
             } else if (status !== collection.criteria.status) {
@@ -3169,7 +3299,7 @@ function getCollectionCount(collection) {
         }
 
         // Codec filter
-        if (collection.criteria.codec !== 'all') {
+        if (collection.criteria.codec && collection.criteria.codec !== 'all') {
             if (!codec.includes(collection.criteria.codec)) return false;
         }
 
@@ -3195,7 +3325,20 @@ function renderCollections() {
     const container = document.getElementById('collectionsNav');
     if (!container) return;
 
-    const collections = userSettings.smart_collections || [];
+    const allCollections = userSettings.smart_collections || [];
+
+    // Filter out sensitive collections if Safe Mode is ON
+    let collections = allCollections;
+    if (safeMode) {
+        let sensitiveCols = window.userSettings?.sensitive_collections || [];
+        // Normalize sensitive list: trim and lowercase
+        sensitiveCols = sensitiveCols.map(s => s.trim().toLowerCase()).filter(s => s);
+
+        collections = allCollections.filter(c => {
+            const name = (c.name || '').trim().toLowerCase();
+            return !sensitiveCols.includes(name);
+        });
+    }
 
     if (collections.length === 0) {
         container.innerHTML = '<p class="text-xs text-gray-600 italic px-3 py-2">No collections yet</p>';
@@ -3307,12 +3450,14 @@ function cinemaOptimize() {
 
     // Show panel
     panel.classList.add('active');
-    document.querySelector('.cinema-actions').style.display = 'none';
+    const actions = document.getElementById('cinemaActions');
+    if (actions) actions.style.display = 'none';
 }
 
 function closeOptimize() {
     document.getElementById('optimizePanel').classList.remove('active');
-    document.querySelector('.cinema-actions').style.display = 'flex';
+    const actions = document.getElementById('cinemaActions');
+    if (actions) actions.style.display = 'flex';
 }
 
 function setOptAudio(mode) {
@@ -3320,13 +3465,66 @@ function setOptAudio(mode) {
     updateOptAudioUI();
 }
 
-function updateOptAudioUI() {
-    document.getElementById('optAudioEnhanced').classList.toggle('selected', currentOptAudio === 'enhanced');
-    document.getElementById('optAudioStandard').classList.toggle('selected', currentOptAudio === 'standard');
+let currentOptVideo = 'compress';
 
-    const desc = document.getElementById('optAudioDesc');
-    if (currentOptAudio === 'enhanced') desc.innerText = "Smart normalization & noise reduction";
-    else desc.innerText = "Standard encoding (no filters)";
+function setOptVideo(mode) {
+    currentOptVideo = mode;
+    updateOptVideoUI();
+}
+
+function updateOptVideoUI() {
+    const compressBtn = document.getElementById('optVideoCompress');
+    const copyBtn = document.getElementById('optVideoCopy');
+
+    // Check if elements exist (safety)
+    if (!compressBtn || !copyBtn) return;
+
+    const activeClasses = ['text-white', 'bg-white/10', 'shadow-sm'];
+    const inactiveClasses = ['text-gray-400', 'hover:text-white'];
+
+    if (currentOptVideo === 'compress') {
+        compressBtn.classList.add(...activeClasses);
+        compressBtn.classList.remove(...inactiveClasses);
+
+        copyBtn.classList.remove(...activeClasses);
+        copyBtn.classList.add(...inactiveClasses);
+
+        document.getElementById('optVideoDesc').innerText = "Optimize to efficient HEVC/H.265";
+    } else {
+        compressBtn.classList.remove(...activeClasses);
+        compressBtn.classList.add(...inactiveClasses);
+
+        copyBtn.classList.add(...activeClasses);
+        copyBtn.classList.remove(...inactiveClasses);
+
+        document.getElementById('optVideoDesc').innerText = "Copy video stream (Passthrough)";
+    }
+}
+
+function updateOptAudioUI() {
+    const enhancedBtn = document.getElementById('optAudioEnhanced');
+    const standardBtn = document.getElementById('optAudioStandard');
+
+    const activeClasses = ['text-white', 'bg-white/10', 'shadow-sm'];
+    const inactiveClasses = ['text-gray-400', 'hover:text-white'];
+
+    if (currentOptAudio === 'enhanced') {
+        enhancedBtn.classList.add(...activeClasses);
+        enhancedBtn.classList.remove(...inactiveClasses);
+
+        standardBtn.classList.remove(...activeClasses);
+        standardBtn.classList.add(...inactiveClasses);
+
+        document.getElementById('optAudioDesc').innerText = "Smart normalization & noise reduction";
+    } else {
+        enhancedBtn.classList.remove(...activeClasses);
+        enhancedBtn.classList.add(...inactiveClasses);
+
+        standardBtn.classList.add(...activeClasses);
+        standardBtn.classList.remove(...inactiveClasses);
+
+        document.getElementById('optAudioDesc').innerText = "Standard encoding (no filters)";
+    }
 }
 
 function setTrimFromHead(type) {
@@ -3357,6 +3555,7 @@ function triggerOptimization() {
     const params = new URLSearchParams();
     params.set('path', currentCinemaPath);
     params.set('audio', currentOptAudio);
+    params.set('video', currentOptVideo);
     if (ss) params.set('ss', ss);
     if (to) params.set('to', to);
 
@@ -3369,15 +3568,65 @@ function triggerOptimization() {
         .catch(err => alert("Error starting optimization: " + err));
 }
 
+// --- BACKUP & RESTORE ---
+function exportSettings() {
+    window.location.href = '/api/backup';
+}
+
+function importSettings() {
+    const fileInput = document.getElementById('settingsImportFile');
+    const file = fileInput.files[0];
+    if (!file) {
+        alert("Please select a file to restore.");
+        return;
+    }
+
+    if (!confirm("Are you sure? This will overwrite your current settings, collections, and tags.")) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        const jsonContent = e.target.result;
+        try {
+            // Validate JSON client-side briefly
+            JSON.parse(jsonContent);
+
+            const response = await fetch('/api/restore', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: jsonContent
+            });
+
+            if (response.ok) {
+                alert("Settings restored successfully! Reloading...");
+                window.location.reload();
+            } else {
+                const err = await response.text();
+                alert("Failed to restore settings: " + err);
+            }
+        } catch (err) {
+            alert("Invalid JSON file: " + err);
+        }
+    };
+    reader.readAsText(file);
+}
+
 // --- GLOBAL UTILS ---
 window.toggleLayout = toggleLayout;
 // Expose for HTML access
 window.cinemaOptimize = cinemaOptimize;
 window.setOptAudio = setOptAudio;
+window.setOptVideo = setOptVideo;
 window.setTrimFromHead = setTrimFromHead;
 window.clearTrim = clearTrim;
 window.closeOptimize = closeOptimize;
 window.triggerOptimization = triggerOptimization;
+window.toggleSelection = toggleSelection;
+window.exportSettings = exportSettings;
+window.importSettings = importSettings;
 
 
 // =============================================================================

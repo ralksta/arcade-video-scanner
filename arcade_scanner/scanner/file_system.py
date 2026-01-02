@@ -140,7 +140,7 @@ class AsyncFileSystem:
 
     def _is_valid_size(self, path: str) -> bool:
         # Optimization check
-        if "_opt." in os.path.basename(path):
+        if "_opt." in os.path.basename(path) or "_trim." in os.path.basename(path):
             return True
             
         try:

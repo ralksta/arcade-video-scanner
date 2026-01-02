@@ -16,8 +16,11 @@ This release introduces a powerful **Query Builder**, **Custom Tags**, and full 
 
 ### 🎨 Global Theming & Light Mode
 - **Theme Architecture**: New `theme.py` system decouples styles from logic.
-- **Light Mode**: Fully supported "Professional" light theme with adaptive colors.
-- **One-Line Switch**: Easily toggle between Arcade (Dark/Neon) and Professional (Light/Clean) themes via config or UI.
+- **Multiple Themes**: 
+  - **Arcade**: The classic Neon Dark mode.
+  - **Professional**: A clean, high-contrast Light mode.
+  - **Candy**: A soft, pastel-colored theme.
+- **Theme Switcher**: Instantly toggle themes via the new **Interface Settings**.
 
 ### 🏷️ Tags & Smart Collections
 - **Tagging System**: Add custom tags (e.g., "Funny", "Project X") to videos.

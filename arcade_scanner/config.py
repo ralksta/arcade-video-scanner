@@ -86,7 +86,15 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_optimizer": "Master toggle for optimization features.",
     "enable_optimizer": True,
     "_comment_tags": "User-created tags for video categorization.",
-    "available_tags": []
+    "available_tags": [],
+    "_comment_theme": "Application theme (arcade, professional, candy).",
+    "theme": "arcade",
+    "_comment_sensitive_dirs": "List of paths considered sensitive (NSFW) to be hidden in safe mode.",
+    "sensitive_dirs": [],
+    "_comment_sensitive_tags": "List of tags considered sensitive (NSFW) to be hidden in safe mode.",
+    "sensitive_tags": ["nsfw", "adult", "18+"],
+    "_comment_sensitive_collections": "List of collection names to be hidden in safe mode.",
+    "sensitive_collections": []
 }
 
 # ==============================================================================
@@ -111,7 +119,12 @@ class AppSettings(BaseSettings):
     enable_previews: bool = Field(False)
     enable_fun_facts: bool = Field(True)
     enable_optimizer: bool = Field(True)
+    enable_optimizer: bool = Field(True)
     available_tags: List[Dict[str, str]] = Field(default_factory=list)  # [{"name": "Gaming", "color": "#00ffd0"}]
+    theme: str = Field("arcade")
+    sensitive_dirs: List[str] = Field(default_factory=list)
+    sensitive_tags: List[str] = Field(default_factory=list)
+    sensitive_collections: List[str] = Field(default_factory=list)
 
     class Config:
         env_prefix = "ARCADE_"
