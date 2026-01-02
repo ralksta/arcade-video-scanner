@@ -589,6 +589,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "bitrate_threshold_kbps": s.bitrate_threshold_kbps,
                     "enable_fun_facts": s.enable_fun_facts,
                     "enable_optimizer": s.enable_optimizer,
+                    "enable_deovr": s.enable_deovr,
                     "available_tags": s.available_tags,
                     "enable_optimizer": s.enable_optimizer,
                     "available_tags": s.available_tags,
@@ -603,6 +604,64 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(response).encode("utf-8"))
+            
+            elif self.path == "/api/deovr/library.json":
+                # DeoVR library endpoint
+                from arcade_scanner.core.deovr_generator import generate_deovr_json
+                
+                # Get server URL from request
+                host = self.headers.get("Host", "localhost:8000")
+                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+                server_url = f"{protocol}://{host}"
+                
+                # Generate DeoVR JSON
+                all_videos = db.get_all()
+                deovr_data = generate_deovr_json(all_videos, server_url)
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")  # Allow VR headsets to access
+                self.end_headers()
+                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
+            
+            elif self.path.startswith("/api/deovr/collection/"):
+                # DeoVR collection endpoint
+                from arcade_scanner.core.deovr_generator import generate_collection_deovr_json
+                
+                # Extract collection ID from path
+                collection_id = self.path.split("/api/deovr/collection/")[1].replace(".json", "")
+                
+                # Find collection in settings
+                collection = None
+                for coll in config.settings.smart_collections:
+                    if coll.get("id") == collection_id:
+                        collection = coll
+                        break
+                
+                if not collection:
+                    self.send_error(404, "Collection not found")
+                    return
+                
+                # Get server URL
+                host = self.headers.get("Host", "localhost:8000")
+                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+                server_url = f"{protocol}://{host}"
+                
+                # Generate DeoVR JSON for collection
+                all_videos = db.get_all()
+                deovr_data = generate_collection_deovr_json(
+                    all_videos,
+                    collection.get("name", collection_id),
+                    collection.get("criteria", {}),
+                    server_url
+                )
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
+            
             elif self.path == "/api/cache-stats":
                 # Calculate cache sizes
                 def get_dir_size(path):
@@ -761,6 +820,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000),
                         "enable_fun_facts": new_settings.get("enable_fun_facts", True),
                         "enable_optimizer": new_settings.get("enable_optimizer", True),
+                        "enable_deovr": new_settings.get("enable_deovr", False),
                         "available_tags": new_settings.get("available_tags", config.settings.available_tags),
                         "theme": new_settings.get("theme", config.settings.theme),
                         "sensitive_dirs": new_settings.get("sensitive_dirs", []),

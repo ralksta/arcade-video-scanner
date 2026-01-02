@@ -2071,9 +2071,8 @@ async function openSettings() {
         // Populate form fields
         document.getElementById('settingsTargets').value = data.scan_targets.join('\n');
         document.getElementById('settingsExcludes').value = data.exclude_paths.join('\n');
-        document.getElementById('settingsMinSize').value = data.min_size_mb;
-        document.getElementById('settingsMinSize').value = data.min_size_mb;
-        document.getElementById('settingsBitrate').value = data.bitrate_threshold_kbps;
+        document.getElementById('settingsMinSize').value = data.min_size_mb || 100;
+        document.getElementById('settingsBitrate').value = data.bitrate_threshold_kbps || 15000;
 
         // Privacy
         document.getElementById('settingsSafeMode').checked = safeMode;
@@ -2083,7 +2082,7 @@ async function openSettings() {
 
         // New Features
         document.getElementById('settingsTheme').value = data.theme || 'arcade';
-        document.getElementById('settingsFunFacts').checked = data.enable_fun_facts !== false;
+        document.getElementById('settingsFunFacts').checked = data.enable_fun_facts ?? true;
         const optimizerCheckbox = document.getElementById('settingsOptimizer');
         if (optimizerCheckbox) optimizerCheckbox.checked = data.enable_optimizer !== false;
 
@@ -2163,6 +2162,7 @@ async function saveSettings() {
 
         enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
+        enable_deovr: document.getElementById('settingsDeoVR')?.checked || false,
         theme: document.getElementById('settingsTheme').value || 'arcade'
     };
 

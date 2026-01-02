@@ -60,7 +60,18 @@ def run_scanner(args_list=None):
     
     generate_html_report(results, config.report_file, server_port=port)
     
-    # 4. Open Browser
+    # 4. DeoVR JSON Generation (if enabled)
+    if config.settings.enable_deovr:
+        from arcade_scanner.core.deovr_generator import save_deovr_library
+        import os
+        
+        deovr_path = os.path.join(config.hidden_data_dir, "deovr_library.json")
+        server_url = f"http://localhost:{port}"
+        
+        print("🥽 Generating DeoVR library...")
+        save_deovr_library(deovr_path, db.get_all(), server_url)
+    
+    # 5. Open Browser
     url = f"http://localhost:{port}/"
     print(f"Opening dashboard: {url}")
     webbrowser.open(url)

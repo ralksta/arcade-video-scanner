@@ -93,7 +93,9 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_sensitive_tags": "List of tags considered sensitive (NSFW) to be hidden in safe mode.",
     "sensitive_tags": ["nsfw", "adult", "18+"],
     "_comment_sensitive_collections": "List of collection names to be hidden in safe mode.",
-    "sensitive_collections": []
+    "sensitive_collections": [],
+    "_comment_deovr": "Generate DeoVR-compatible JSON for VR headset viewing.",
+    "enable_deovr": False
 }
 
 # ==============================================================================
@@ -124,6 +126,7 @@ class AppSettings(BaseSettings):
     sensitive_dirs: List[str] = Field(default_factory=list)
     sensitive_tags: List[str] = Field(default_factory=list)
     sensitive_collections: List[str] = Field(default_factory=list)
+    enable_deovr: bool = Field(False)
 
     class Config:
         env_prefix = "ARCADE_"
