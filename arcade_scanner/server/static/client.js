@@ -2160,7 +2160,7 @@ async function saveSettings() {
         sensitive_collections: document.getElementById('settingsSensitiveCollections').value.split(/[\n,]/).map(s => s.trim()).filter(s => s),
         min_size_mb: parseInt(document.getElementById('settingsMinSize').value) || 100,
         bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000,
-        enable_previews: window.userSettings?.enable_previews || false,
+
         enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
         theme: document.getElementById('settingsTheme').value || 'arcade'
