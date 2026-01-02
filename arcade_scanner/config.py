@@ -28,7 +28,7 @@ def find_free_port(start_port: int) -> int:
 # Data Directories
 HIDDEN_DATA_DIR = os.path.join(PROJECT_ROOT, "arcade_data")
 THUMB_DIR = os.path.join(HIDDEN_DATA_DIR, "thumbnails")
-PREVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "previews")
+
 CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
 REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
 SETTINGS_FILE = os.path.join(HIDDEN_DATA_DIR, "settings.json")
@@ -38,7 +38,7 @@ STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 MAX_REQUEST_SIZE = 1024 * 1024  # 1 MB limit for API requests
 ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg']
 ALLOWED_THUMBNAIL_PREFIX = "thumb_"
-ALLOWED_PREVIEW_PREFIX = "prev_"
+
 
 
 # Default Exclusions
@@ -79,8 +79,7 @@ DEFAULT_SETTINGS_JSON = {
     "min_size_mb": 100,
     "_comment_bitrate": "Mark videos above this kbps as HIGH bitrate.",
     "bitrate_threshold_kbps": 15000,
-    "_comment_previews": "Set to true to generate hover previews (CPU intensive).",
-    "enable_previews": False,
+
     "_comment_fun_facts": "Show educational overlays during optimization.",
     "enable_fun_facts": True,
     "_comment_optimizer": "Master toggle for optimization features.",
@@ -116,7 +115,7 @@ class AppSettings(BaseSettings):
     min_size_mb: int = Field(100)
     bitrate_threshold_kbps: int = Field(15000)
     
-    enable_previews: bool = Field(False)
+
     enable_fun_facts: bool = Field(True)
     enable_optimizer: bool = Field(True)
     enable_optimizer: bool = Field(True)
@@ -140,7 +139,7 @@ class ConfigManager:
         self.settings = self._load_settings()
         
     def _ensure_directories(self):
-        for d in [HIDDEN_DATA_DIR, THUMB_DIR, PREVIEW_DIR]:
+        for d in [HIDDEN_DATA_DIR, THUMB_DIR]:
             if not os.path.exists(d):
                 os.makedirs(d)
 
@@ -250,9 +249,7 @@ class ConfigManager:
     def thumb_dir(self) -> str:
         return THUMB_DIR
 
-    @property
-    def preview_dir(self) -> str:
-        return PREVIEW_DIR
+
         
     @property
     def static_dir(self) -> str:

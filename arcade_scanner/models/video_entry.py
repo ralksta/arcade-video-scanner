@@ -32,7 +32,7 @@ class VideoEntry(BaseModel):
     vaulted: bool = Field(False, alias="hidden", description="Is moved to vault/hidden")
     tags: list[str] = Field(default_factory=list, description="User defined tags")
     thumb: str = Field("", description="Thumbnail filename")
-    preview: str = Field("", description="Preview filename")
+
     
     class Config:
         populate_by_name = True  # Allows using snake_case in code, but aliases for JSON compat

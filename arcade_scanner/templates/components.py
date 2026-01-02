@@ -1311,16 +1311,11 @@ SETTINGS_MODAL_COMPONENT = """
                             <p class="text-sm text-gray-500 mt-1">Disk space used by generated assets.</p>
                         </div>
                         
-                        <div class="grid grid-cols-3 gap-3">
+                        <div class="grid grid-cols-2 gap-3">
                             <div class="bg-black/40 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
                                 <span class="material-icons text-gray-500 text-2xl">image</span>
                                 <span class="text-xs text-gray-500 uppercase tracking-wider">Thumbnails</span>
                                 <span class="text-lg font-mono text-white" id="statThumbnails">—</span>
-                            </div>
-                            <div class="bg-black/40 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
-                                <span class="material-icons text-gray-500 text-2xl">movie</span>
-                                <span class="text-xs text-gray-500 uppercase tracking-wider">Previews</span>
-                                <span class="text-lg font-mono text-white" id="statPreviews">—</span>
                             </div>
                             <div class="bg-black/40 p-4 rounded-xl border border-arcade-cyan/30 flex flex-col items-center gap-2">
                                 <span class="material-icons text-arcade-cyan text-2xl">storage</span>
@@ -1331,7 +1326,7 @@ SETTINGS_MODAL_COMPONENT = """
                         
                         <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex gap-3 text-sm text-amber-200">
                             <span class="material-icons text-amber-400 text-lg">info</span>
-                            <div>Cache changes require an app restart.</div>
+                            <div>Cache changes require an app restart. Clearing cache deletes all thumbnails.</div>
                         </div>
                     </section>
                     </section>

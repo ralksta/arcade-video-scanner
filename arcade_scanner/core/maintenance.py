@@ -31,7 +31,7 @@ def purge_media():
 
     targets = [
         (config.thumb_dir, "thumb_", ".jpg"),
-        (config.preview_dir, "prev_", ".mp4")
+        (config.thumb_dir, "thumb_", ".jpg")
     ]
 
     for folder, prefix, ext in targets:
@@ -67,32 +67,14 @@ def purge_thumbnails():
                     print(f"  [Error] Failed to delete {file_path}: {e}")
         print(f"✅ Thumbnails purge complete. Removed {count} files.")
 
-def purge_previews():
-    """Deletes all preview clip files only."""
-    print(f"🧹 Purging preview clips...")
-    
-    if "arcade_data" not in config.hidden_data_dir:
-        print("❌ [Safety] HIDDEN_DATA_DIR looks suspicious. Aborting purge.")
-        return
 
-    if os.path.exists(config.preview_dir):
-        count = 0
-        for filename in os.listdir(config.preview_dir):
-            file_path = os.path.join(config.preview_dir, filename)
-            if is_safe_to_delete(file_path, config.preview_dir, "prev_", ".mp4"):
-                try:
-                    os.remove(file_path)
-                    count += 1
-                except Exception as e:
-                    print(f"  [Error] Failed to delete {file_path}: {e}")
-        print(f"✅ Preview clips purge complete. Removed {count} files.")
 
 def purge_broken_media():
     """Removes media files that are 0 bytes or corrupted."""
     removed_count = 0
     targets = [
         (config.thumb_dir, "thumb_", ".jpg"),
-        (config.preview_dir, "prev_", ".mp4")
+        (config.thumb_dir, "thumb_", ".jpg")
     ]
     for folder, prefix, ext in targets:
         if os.path.exists(folder):
@@ -119,7 +101,7 @@ def cleanup_orphans(video_files: List[str]):
     removed_count = 0
     targets = [
         (config.thumb_dir, "thumb_", ".jpg"),
-        (config.preview_dir, "prev_", ".mp4")
+        (config.thumb_dir, "thumb_", ".jpg")
     ]
     
     for folder, prefix, ext in targets:

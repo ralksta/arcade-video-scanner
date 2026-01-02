@@ -8,7 +8,7 @@ from ..database import db
 from ..models.video_entry import VideoEntry
 from .file_system import fs_scanner
 from .media_probe import MediaProbe
-from ..core.video_processor import create_thumbnail, create_preview_clip
+from ..core.video_processor import create_thumbnail
 
 class ScannerManager:
     """
@@ -93,10 +93,7 @@ class ScannerManager:
                         if thumb_name:
                             entry.thumb = thumb_name
                         
-                        if config.settings.enable_previews:
-                            prev_name = await loop.run_in_executor(self.probe.executor, create_preview_clip, path)
-                            if prev_name:
-                                entry.preview = prev_name
+
                             
                         # Upsert AFTER populating assets
                         db.upsert(entry)

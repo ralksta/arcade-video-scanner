@@ -668,8 +668,6 @@ function createVideoCard(v) {
     container.innerHTML = `
         <!-- Thumbnail (Card Media) -->
         <div class="card-media relative w-full aspect-video bg-black overflow-hidden group cursor-pointer" 
-             onmouseenter="handleMouseEnter(this)" 
-             onmouseleave="handleMouseLeave(this)" 
              onclick="openCinema(this)">
              
              <!-- Corner Checkbox -->
@@ -684,7 +682,7 @@ function createVideoCard(v) {
              </button>
 
              <img src="/thumbnails/${v.thumb}" class="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110" loading="lazy">
-             <video class="preview-video absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300" muted loop preload="none" data-src="/preview?name=${v.preview}"></video>
+
              
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
@@ -850,30 +848,7 @@ function triggerBatchFavorite(state) {
     }
 }
 
-function handleMouseEnter(container) {
-    // Check global settings
-    if (window.userSettings && window.userSettings.enable_previews === false) {
-        return;
-    }
 
-    const video = container.querySelector('video');
-    container.hoverTimeout = setTimeout(() => {
-        const src = video.getAttribute('data-src');
-        if (src && !video.getAttribute('src')) {
-            video.src = src;
-            video.load();
-            video.play().catch(() => { });
-        }
-    }, 400);
-}
-
-function handleMouseLeave(container) {
-    const video = container.querySelector('video');
-    clearTimeout(container.hoverTimeout);
-    video.pause();
-    video.removeAttribute('src');
-    video.load();
-}
 
 // --- CINEMA ---
 // --- CINEMA (VIDEO PLAYER) ---
@@ -2141,7 +2116,7 @@ async function openSettings() {
         const stats = await statsResponse.json();
 
         document.getElementById('statThumbnails').textContent = `${stats.thumbnails_mb} MB`;
-        document.getElementById('statPreviews').textContent = `${stats.previews_mb} MB`;
+
         document.getElementById('statTotal').textContent = `${stats.total_mb} MB`;
     } catch (e) {
         console.error('Failed to load settings:', e);

@@ -568,31 +568,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as e:
                     print(f"❌ Error in stream endpoint: {e}")
                     self.send_error(500)
-            elif self.path.startswith("/preview?name="):
-                try:
-                    name = unquote(self.path.split("name=")[1])
-                    
-                    # Security: Validate filename pattern
-                    from arcade_scanner.config import ALLOWED_PREVIEW_PREFIX
-                    if not validate_filename(name, prefix=ALLOWED_PREVIEW_PREFIX, suffix=".mp4"):
-                        print(f"🚨 Invalid preview name: {name}")
-                        self.send_error(400, "Invalid preview name")
-                        return
-                    
-                    prev_path = os.path.join(config.preview_dir, name)
-                    
-                    # Additional check: Ensure path stays in preview_dir
-                    if not is_safe_directory_traversal(config.preview_dir, prev_path):
-                        self.send_error(403, "Forbidden")
-                        return
-                    
-                    serve_file_range(self, prev_path, method="GET")
-                except SecurityError as e:
-                    print(f"🚨 Security violation in preview: {e}")
-                    self.send_error(403, "Forbidden")
-                except Exception as e:
-                    print(f"❌ Error in preview endpoint: {e}")
-                    self.send_error(500)
+
             elif self.path == "/api/settings":
                 # Return current settings as JSON
                 # We construct response from config.settings
@@ -611,7 +587,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "smart_collections": [c for c in s.smart_collections],  # Smart collections
                     "min_size_mb": s.min_size_mb,
                     "bitrate_threshold_kbps": s.bitrate_threshold_kbps,
-                    "enable_previews": s.enable_previews,
                     "enable_fun_facts": s.enable_fun_facts,
                     "enable_optimizer": s.enable_optimizer,
                     "available_tags": s.available_tags,
@@ -643,12 +618,10 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     return total
                 
                 thumb_size = get_dir_size(config.thumb_dir) / (1024 * 1024)  # MB
-                preview_size = get_dir_size(config.preview_dir) / (1024 * 1024)  # MB
-                total_size = thumb_size + preview_size
+                total_size = thumb_size
                 
                 stats = {
                     "thumbnails_mb": round(thumb_size, 2),
-                    "previews_mb": round(preview_size, 2),
                     "total_mb": round(total_size, 2)
                 }
                 
@@ -736,24 +709,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     return
                 
                 serve_file_range(self, file_path, method="HEAD")
-            elif self.path.startswith("/preview?name="):
-                name = unquote(self.path.split("name=")[1])
-                
-                # Security: Validate filename pattern
-                from arcade_scanner.config import ALLOWED_PREVIEW_PREFIX
-                if not validate_filename(name, prefix=ALLOWED_PREVIEW_PREFIX, suffix=".mp4"):
-                    print(f"🚨 Invalid preview name: {name}")
-                    self.send_error(400, "Invalid preview name")
-                    return
-                
-                prev_path = os.path.join(config.preview_dir, name)
-                
-                # Additional check: Ensure path stays in preview_dir
-                if not is_safe_directory_traversal(config.preview_dir, prev_path):
-                    self.send_error(403, "Forbidden")
-                    return
-                
-                serve_file_range(self, prev_path, method="HEAD")
+
             else:
                 self.send_error(405)
         except Exception as e:

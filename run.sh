@@ -16,6 +16,17 @@ fi
 # Activate virtual environment
 source .venv/bin/activate
 
+# Check for dependencies
+python3 -c "import pydantic" >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "📦 Dependencies missing. Installing..."
+    pip install -r requirements.txt
+    if [ $? -ne 0 ]; then
+         echo "❌ Failed to install dependencies."
+         exit 1
+    fi
+fi
+
 # Use the cleaner python -m syntax which resolves path issues better
 echo "🕹️  Starting Arcade Video Scanner..."
 python3 -m arcade_scanner.main "$@"

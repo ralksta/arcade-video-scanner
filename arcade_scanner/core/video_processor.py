@@ -77,44 +77,7 @@ def create_thumbnail(video_path: str) -> str:
             
     return thumb_name
 
-def create_preview_clip(video_path: str) -> str:
-    file_hash = hashlib.md5(video_path.encode()).hexdigest()
-    prev_name = f"prev_{file_hash}.mp4"
-    prev_path = os.path.join(config.preview_dir, prev_name)
-    
-    if not os.path.exists(prev_path) or os.path.getsize(prev_path) < 1000:
-        duration = 0
-        try:
-            cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
-            duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL).decode().strip())
-        except:
-            pass
 
-        ss = "0"
-        if duration > 30:
-            ss = str(min(60, int(duration * 0.1)))
-
-        # Get the best available encoder
-        encoder, encoder_opts = get_best_encoder()
-        
-        cmd = [
-            "ffmpeg",
-            "-ss", ss,
-            "-t", "5",
-            "-i", video_path,
-            "-vf", "scale=480:-2",
-            "-an",
-            "-c:v", encoder,
-            *encoder_opts,
-            prev_path,
-            "-y",
-            "-loglevel", "quiet"
-        ]
-        try:
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
-        except:
-            return ""
-    return prev_name
 
 
 # --- HARDWARE ENCODER DETECTION ---
@@ -298,10 +261,9 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
         else:
             if filepath in cache:
                 entry = cached_entry
-                if entry.get("mtime") == mtime and entry.get("size_mb") == size_mb and "codec" in entry and "preview" in entry:
+                if entry.get("mtime") == mtime and entry.get("size_mb") == size_mb and "codec" in entry:
                     thumb_path = os.path.join(config.thumb_dir, entry["thumb"])
-                    prev_path = os.path.join(config.preview_dir, entry["preview"])
-                    if os.path.exists(thumb_path) and os.path.exists(prev_path) and os.path.getsize(prev_path) > 1000:
+                    if os.path.exists(thumb_path):
                         if "hidden" not in entry:
                             entry["hidden"] = False
                         return entry
@@ -317,13 +279,11 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
 
         if rebuild_mode == 'thumbs':
             thumb = create_thumbnail(filepath)
-            preview = existing_preview
-        elif rebuild_mode == 'previews':
-            thumb = existing_thumb
-            preview = create_preview_clip(filepath) if config.settings.enable_previews else ""
         else:
-            thumb = create_thumbnail(filepath)
-            preview = create_preview_clip(filepath) if config.settings.enable_previews else ""
+            thumb = existing_thumb if rebuild_mode == 'previews' else create_thumbnail(filepath)
+            
+        # Preview generation removed
+        preview = ""
 
         is_hidden = cached_entry.get("hidden", False)
         is_favorite = cached_entry.get("favorite", False)
