@@ -5,10 +5,39 @@ let currentLayout = 'grid'; // grid, list, or treemap
 let workspaceMode = 'lobby'; // lobby, mixed, vault
 let currentFolder = 'all';
 let searchTerm = '';
+let activeSmartCollectionCriteria = null; // Stores current smart collection rules
+let activeCollectionId = null; // Stores currently active collection ID for UI highlighting
 
 let filteredVideos = [];
 let renderedCount = 0;
 const BATCH_SIZE = 40;
+
+// --- THEME LOGIC ---
+function toggleTheme() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+
+    const icon = document.getElementById('themeIcon');
+    if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
+}
+
+// Init Theme
+(function initTheme() {
+    const saved = localStorage.getItem('theme');
+    const isDark = saved ? saved === 'dark' : true; // Default to dark
+
+    if (isDark) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+
+    // Wait for DOM in case script runs early (though it's at end of body)
+    setTimeout(() => {
+        const icon = document.getElementById('themeIcon');
+        if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
+    }, 0);
+})();
 
 
 // --- DEBOUNCED SEARCH ---
@@ -49,10 +78,18 @@ function setSort(s) {
     filterAndSort();
 }
 
+// --- SEARCHABLE FOLDER DROPDOWN LOGIC ---
+
+
 function setWorkspaceMode(mode) {
     try {
         console.log("Setting workspace mode:", mode);
         workspaceMode = mode;
+
+        // Clear active smart collection when changing workspace (unless mode is explicitly 'collection' which we don't use yet)
+        activeSmartCollectionCriteria = null;
+        activeCollectionId = null; // Clear active visual state
+        renderCollections(); // Re-render to remove active class
 
         // Set workspace data attribute for CSS theming
         document.body.setAttribute('data-workspace', mode);
@@ -262,6 +299,9 @@ function loadFromURL() {
     if (layout === 'treemap') {
         setLayout('treemap');
     }
+
+    // Check for deep links (navigating back/forward)
+    checkDeepLinks();
 }
 
 // --- PERFORMANCE ENGINE: FILTER & SORT ---
@@ -319,12 +359,20 @@ function filterAndSort(scrollToTop = false) {
 
         } else {
             filteredVideos = window.ALL_VIDEOS.filter(v => {
+                // 0. Smart Collection Override
+                if (activeSmartCollectionCriteria) {
+                    const matches = evaluateCollectionMatch(v, activeSmartCollectionCriteria);
+                    if (matches) { vCount++; tSize += v.Size_MB; }
+                    return matches;
+                }
+
                 const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
                 const status = v.Status;
                 const codec = v.codec || 'unknown';
                 const isHidden = v.hidden || false;
                 const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
                 const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
+                const videoTags = v.tags || [];
 
                 let matchesFilter = false;
                 if (currentFilter === 'all') matchesFilter = true;
@@ -339,7 +387,18 @@ function filterAndSort(scrollToTop = false) {
                 else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
                 else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
 
-                const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder;
+                // Tag filtering: if activeTags is not empty, video must have ALL selected tags
+                let matchesTags = true;
+                if (activeTags.length > 0) {
+                    matchesTags = activeTags.every(tag => videoTags.includes(tag));
+                }
+
+                // Untagged filter: show only videos with no tags
+                if (filterUntaggedOnly) {
+                    matchesTags = videoTags.length === 0;
+                }
+
+                const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder && matchesTags;
                 if (ok) { vCount++; tSize += v.Size_MB; }
                 return ok;
             });
@@ -459,7 +518,7 @@ function createComparisonCard(pair) {
             </div>
             
             <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="openCinema(this)" data-path="${orig.FilePath}">
-                 <img src="thumbnails/${orig.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+                 <img src="/thumbnails/${orig.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
                  </div>
@@ -497,7 +556,7 @@ function createComparisonCard(pair) {
             </div>
             
              <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group border border-arcade-cyan/30 shadow-[0_0_10px_rgba(0,255,208,0.05)]" onclick="openCinema(this)" data-path="${opt.FilePath}">
-                 <img src="thumbnails/${opt.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+                 <img src="/thumbnails/${opt.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
                  </div>
@@ -580,7 +639,7 @@ function createVideoCard(v) {
                 <span class="material-icons text-lg">${v.favorite ? 'star' : 'star_border'}</span>
              </button>
 
-             <img src="thumbnails/${v.thumb}" class="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110" loading="lazy">
+             <img src="/thumbnails/${v.thumb}" class="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110" loading="lazy">
              <video class="preview-video absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300" muted loop preload="none" data-src="/preview?name=${v.preview}"></video>
              
              <!-- Quick Actions Overlay -->
@@ -617,6 +676,8 @@ function createVideoCard(v) {
         <div class="p-3 flex flex-col gap-1">
             <h3 class="text-sm font-medium text-gray-200 line-clamp-1 group-hover:text-arcade-cyan transition-colors" title="${fileName}">${fileName}</h3>
             <p class="text-[11px] text-gray-500 truncate" title="${v.FilePath}">${dirName}</p>
+            
+            ${renderVideoCardTags(v.tags || [])}
             
             <div class="flex items-center justify-between mt-1 text-xs font-mono text-gray-400">
                 <div class="flex items-center gap-2">
@@ -665,7 +726,12 @@ function toggleHidden(card) {
     if (shouldHide) {
         card.style.opacity = '0';
         card.style.transform = 'scale(0.8)';
-        setTimeout(() => filterAndSort(), 300);
+        setTimeout(() => {
+            filterAndSort();
+            renderCollections(); // Update sidebar counts
+        }, 300);
+    } else {
+        renderCollections(); // Update immediately if not animating out
     }
 }
 
@@ -693,7 +759,12 @@ function toggleFavorite(card) {
     if (workspaceMode === 'favorites' && !video.favorite) {
         card.style.opacity = '0';
         card.style.transform = 'scale(0.8)';
-        setTimeout(() => filterAndSort(), 300);
+        setTimeout(() => {
+            filterAndSort();
+            renderCollections(); // Update sidebar counts
+        }, 300);
+    } else {
+        renderCollections(); // Update immediately
     }
 }
 
@@ -801,14 +872,19 @@ function openCinema(container) {
 
     // Populate info panel
     updateCinemaInfo();
+
+    // Populate tag picker
+    updateCinemaTags();
 }
 
 function closeCinema() {
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
     const infoPanel = document.getElementById('cinemaInfoPanel');
+    const tagPanel = document.getElementById('cinemaTagPanel');
     modal.classList.remove('active');
     infoPanel.classList.remove('active');
+    if (tagPanel) tagPanel.classList.add('hidden');
     video.pause();
     video.src = '';
     currentCinemaPath = null;
@@ -1008,6 +1084,363 @@ function triggerBatchCompress() {
     }
 }
 
+// --- BATCH TAGGING (Modern Redesign) ---
+let batchTagActions = {}; // { tagName: 'add' | 'remove' | null }
+let batchTagSearchTerm = '';
+let batchTagFocusIndex = -1;
+
+function openBatchTagModal() {
+    const selected = document.querySelectorAll('.video-card-container input:checked');
+    if (selected.length === 0) return;
+
+    batchTagActions = {};
+    batchTagSearchTerm = '';
+    batchTagFocusIndex = -1;
+
+    let modal = document.getElementById('batchTagModal');
+    if (!modal) {
+        createBatchTagModal();
+        modal = document.getElementById('batchTagModal');
+    }
+
+    renderBatchTagOptions();
+    if (modal) modal.style.display = 'flex';
+
+    // Focus search input
+    setTimeout(() => {
+        document.getElementById('batchTagSearch')?.focus();
+    }, 100);
+}
+
+function createBatchTagModal() {
+    const modal = document.createElement('div');
+    modal.id = 'batchTagModal';
+    modal.className = 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+        <div class="w-full max-w-md bg-[#1a1a1e] rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+            <!-- Header -->
+            <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="material-icons text-purple-400 text-xl">sell</span>
+                    <div>
+                        <h2 class="font-semibold text-white">Batch Tagging</h2>
+                        <p class="text-xs text-gray-500">Editing <strong id="batchTagCount" class="text-purple-400">0</strong> items</p>
+                    </div>
+                </div>
+                <button onclick="closeBatchTagModal()" class="text-gray-500 hover:text-white p-1 rounded hover:bg-white/10 transition-colors">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="px-5 py-3 border-b border-white/5">
+                <div class="relative">
+                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg">search</span>
+                    <input type="text" 
+                           id="batchTagSearch" 
+                           class="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-purple-500 focus:outline-none" 
+                           placeholder="Search tags..." 
+                           oninput="handleBatchTagSearch(this.value)"
+                           onkeydown="handleBatchTagKeyNav(event)">
+                </div>
+            </div>
+            
+            <!-- Tag Cloud -->
+            <div class="px-5 py-4 flex flex-wrap gap-2 max-h-[200px] overflow-y-auto" id="batchTagOptions">
+                <!-- Populated by JS -->
+            </div>
+            
+            <!-- Add New Tag -->
+            <div class="px-5 py-3 border-t border-white/5 bg-black/20 flex gap-2">
+                <div class="relative flex-1">
+                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg">add</span>
+                    <input type="text" 
+                           id="batchTagNewInput" 
+                           class="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-purple-500 focus:outline-none" 
+                           placeholder="New tag name..."
+                           onkeydown="handleBatchTagNewKeydown(event)">
+                </div>
+                <button onclick="createAndApplyNewTag()" class="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg text-sm font-medium hover:bg-purple-500/30 transition-colors">
+                    Add
+                </button>
+            </div>
+            
+            <!-- Footer -->
+            <div class="px-5 py-4 border-t border-white/5 flex gap-3">
+                <button onclick="closeBatchTagModal()" class="flex-1 py-2.5 bg-white/5 text-gray-400 border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 hover:text-white transition-colors">
+                    Cancel
+                </button>
+                <button onclick="applyBatchTags()" class="flex-1 py-2.5 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-400 transition-colors flex items-center justify-center gap-2">
+                    <span class="material-icons text-sm">check</span>
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeBatchTagModal();
+    });
+
+    document.body.appendChild(modal);
+}
+
+function handleBatchTagSearch(value) {
+    batchTagSearchTerm = value.toLowerCase();
+    batchTagFocusIndex = -1;
+    renderBatchTagOptions();
+}
+
+function handleBatchTagKeyNav(event) {
+    const chips = document.querySelectorAll('.batch-tag-chip');
+    if (chips.length === 0) return;
+
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        batchTagFocusIndex = Math.min(batchTagFocusIndex + 1, chips.length - 1);
+        chips[batchTagFocusIndex]?.focus();
+    } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        batchTagFocusIndex = Math.max(batchTagFocusIndex - 1, 0);
+        chips[batchTagFocusIndex]?.focus();
+    } else if (event.key === 'Enter' && batchTagFocusIndex >= 0) {
+        event.preventDefault();
+        chips[batchTagFocusIndex]?.click();
+    }
+}
+
+function handleBatchTagChipKeydown(event, tagName) {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleBatchTagOption(tagName);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        handleBatchTagKeyNav(event);
+    }
+}
+
+function handleBatchTagNewKeydown(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        createAndApplyNewTag();
+    }
+}
+
+async function createAndApplyNewTag() {
+    const input = document.getElementById('batchTagNewInput');
+    const name = input?.value.trim();
+    if (!name) return;
+
+    // Check if tag already exists
+    if (availableTags.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+        batchTagActions[name] = 'add';
+        input.value = '';
+        renderBatchTagOptions();
+        return;
+    }
+
+    // Create new tag with random color
+    const colors = ['#9D5BFF', '#00ffd0', '#F4B342', '#DE1A58', '#22c55e', '#06b6d4', '#ec4899'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+    const newTag = { name: name, color: randomColor };
+    availableTags.push(newTag);
+
+    userSettings.available_tags = availableTags;
+    await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userSettings)
+    });
+
+    batchTagActions[name] = 'add';
+    input.value = '';
+    renderBatchTagOptions();
+}
+
+function getSelectedVideoPaths() {
+    const selected = document.querySelectorAll('.video-card-container input:checked');
+    return Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
+}
+
+function getTagStateForSelection(tagName) {
+    const paths = getSelectedVideoPaths();
+    if (paths.length === 0) return 'none';
+
+    let hasCount = 0;
+    paths.forEach(path => {
+        const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
+        if (video && (video.tags || []).includes(tagName)) {
+            hasCount++;
+        }
+    });
+
+    if (hasCount === 0) return 'none';
+    if (hasCount === paths.length) return 'all';
+    return 'some';
+}
+
+function renderBatchTagOptions() {
+    const container = document.getElementById('batchTagOptions');
+    const countEl = document.getElementById('batchTagCount');
+
+    if (!container) return;
+
+    const paths = getSelectedVideoPaths();
+    if (countEl) countEl.textContent = paths.length;
+
+    const filteredTags = availableTags.filter(tag =>
+        tag.name.toLowerCase().includes(batchTagSearchTerm)
+    );
+
+    if (filteredTags.length === 0 && availableTags.length === 0) {
+        container.innerHTML = `
+        < div class="batch-tag-empty" >
+                <span class="material-icons">label_off</span>
+                <p>No tags yet</p>
+                <p class="text-xs text-gray-600">Create your first tag below</p>
+            </div >
+        `;
+        return;
+    }
+
+    if (filteredTags.length === 0) {
+        container.innerHTML = `
+        < div class="batch-tag-empty" >
+                <span class="material-icons">search_off</span>
+                <p>No tags match "${batchTagSearchTerm}"</p>
+            </div >
+        `;
+        return;
+    }
+
+    container.innerHTML = filteredTags.map((tag, index) => {
+        const currentState = getTagStateForSelection(tag.name);
+        const action = batchTagActions[tag.name];
+
+        let displayState = currentState;
+        if (action === 'add') displayState = 'all';
+        else if (action === 'remove') displayState = 'none';
+
+        const hasAction = action !== undefined && action !== null;
+
+        let checkIcon, bgColor, borderColor, textColor;
+        if (displayState === 'all') {
+            checkIcon = 'check_box';
+            bgColor = 'bg-green-500/15';
+            borderColor = 'border-green-500/30';
+            textColor = 'text-green-400';
+        } else if (displayState === 'some') {
+            checkIcon = 'indeterminate_check_box';
+            bgColor = 'bg-yellow-500/15';
+            borderColor = 'border-yellow-500/30';
+            textColor = 'text-yellow-400';
+        } else {
+            checkIcon = 'check_box_outline_blank';
+            bgColor = 'bg-white/5';
+            borderColor = 'border-white/10';
+            textColor = 'text-gray-400';
+        }
+
+        const pendingGlow = hasAction ? 'shadow-[0_0_12px_rgba(168,85,247,0.4)]' : '';
+
+        return `
+            <button class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm font-medium ${bgColor} ${borderColor} ${textColor} ${pendingGlow} hover:bg-white/10"
+                    onclick="toggleBatchTagOption('${tag.name}')"
+                    onkeydown="handleBatchTagChipKeydown(event, '${tag.name}')"
+                    tabindex="${index === batchTagFocusIndex ? '0' : '-1'}">
+                <span class="material-icons text-lg">${checkIcon}</span>
+                <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
+                <span>${tag.name}</span>
+                ${hasAction ? '<span class="text-purple-400 font-bold ml-1">•</span>' : ''}
+            </button>
+        `;
+    }).join('');
+}
+
+function toggleBatchTagOption(tagName) {
+    const currentState = getTagStateForSelection(tagName);
+    const currentAction = batchTagActions[tagName];
+
+    if (currentAction === 'add') {
+        batchTagActions[tagName] = 'remove';
+    } else if (currentAction === 'remove') {
+        batchTagActions[tagName] = null;
+    } else {
+        if (currentState === 'all') {
+            batchTagActions[tagName] = 'remove';
+        } else {
+            batchTagActions[tagName] = 'add';
+        }
+    }
+
+    renderBatchTagOptions();
+}
+
+function closeBatchTagModal() {
+    const modal = document.getElementById('batchTagModal');
+    if (modal) modal.style.display = 'none';
+    batchTagActions = {};
+    batchTagSearchTerm = '';
+}
+
+async function applyBatchTags() {
+    const actions = Object.entries(batchTagActions).filter(([_, action]) => action === 'add' || action === 'remove');
+
+    if (actions.length === 0) {
+        closeBatchTagModal();
+        return;
+    }
+
+    const tagsToAdd = actions.filter(([_, a]) => a === 'add').map(([name]) => name);
+    const tagsToRemove = actions.filter(([_, a]) => a === 'remove').map(([name]) => name);
+
+    const paths = getSelectedVideoPaths();
+    let successCount = 0;
+
+    const saveBtn = document.querySelector('.batch-tag-save');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="material-icons animate-spin text-sm">refresh</span> Saving...';
+    }
+
+    for (const path of paths) {
+        const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
+        if (!video) continue;
+
+        let currentTags = [...(video.tags || [])];
+
+        tagsToAdd.forEach(t => {
+            if (!currentTags.includes(t)) currentTags.push(t);
+        });
+
+        currentTags = currentTags.filter(t => !tagsToRemove.includes(t));
+
+        try {
+            const res = await fetch('/api/video/tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path, tags: currentTags })
+            });
+            if (res.ok) {
+                video.tags = currentTags;
+                successCount++;
+            }
+        } catch (err) {
+            console.error('Failed to update tags:', path, err);
+        }
+    }
+
+    closeBatchTagModal();
+    clearSelection();
+
+    filterAndSort(true);
+    renderCollections();
+
+    const addedStr = tagsToAdd.length > 0 ? `+ ${tagsToAdd.join(', ')} ` : '';
+    const removedStr = tagsToRemove.length > 0 ? `- ${tagsToRemove.join(', ')} ` : '';
+    console.log(`✅ Updated ${successCount}/${paths.length} videos: ${addedStr} ${removedStr}`.trim());
+}
 // --- FOLDER SIDEBAR ---
 function toggleFolderSidebar() {
     document.getElementById('folderSidebar').classList.toggle('active');
@@ -1729,9 +2162,33 @@ async function loadSettings() {
                 ...data
             };
             console.log("Settings loaded:", window.userSettings);
+
+            // Check for deep links (e.g., /collections/Name)
+            checkDeepLinks();
         }
     } catch (e) {
         console.error("Failed to load settings:", e);
+    }
+}
+
+function checkDeepLinks() {
+    const path = window.location.pathname;
+    if (path.startsWith('/collections/')) {
+        const nameEncoded = path.substring('/collections/'.length);
+        const name = decodeURIComponent(nameEncoded);
+
+        const collections = window.userSettings.smart_collections || [];
+        const collection = collections.find(c => c.name === name);
+
+        if (collection) {
+            console.log("Deep link to collection:", collection.name);
+            applyCollection(collection.id);
+        } else {
+            console.warn("Deep link collection not found:", name);
+            // Default to lobby if not found
+            // setWorkspaceMode('lobby'); // Standard default
+            history.replaceState(null, '', '/');
+        }
     }
 }
 
@@ -2049,6 +2506,784 @@ function saveSettingsWithoutReload() {
     });
 }
 
+// --- SMART COLLECTIONS ---
+let editingCollectionId = null;
+let collectionCriteria = {
+    status: 'all',
+    codec: 'all',
+    tags: [],
+    search: ''
+};
+
+// DEBUG FUNCTION
+window.runDeepDebug = function () {
+    console.log('🔍 --- DEEP DEBUG START ---');
+    console.log('Criteria:', JSON.parse(JSON.stringify(collectionCriteriaNew)));
+
+    const all = window.ALL_VIDEOS || [];
+    console.log(`Total Videos: ${all.length}`);
+
+    // Check favorites specifically
+    const favs = all.filter(v => v.favorite || v.Favorite || v.isFavorite || v.IsFavorite);
+    console.log(`Expected Favorites Count: ${favs.length}`);
+
+    if (favs.length > 0) {
+        console.log('Sample Favorite Video:', favs[0]);
+        console.log('Sample Favorite Keys:', Object.keys(favs[0]));
+
+        // Test evaluation on sample
+        const match = evaluateCollectionMatch(favs[0], collectionCriteriaNew);
+        console.log('Does sample match current criteria?', match);
+    } else {
+        console.warn('⚠️ NO FAVORITES FOUND IN ALL_VIDEOS!');
+    }
+    console.log('🔍 --- DEEP DEBUG END ---');
+    alert('Debug info logged to console! Please check output.');
+};
+
+function openCollectionModal(editId = null) {
+    const modal = document.getElementById('collectionModal');
+    if (!modal) return;
+
+    editingCollectionId = editId;
+
+    // Reset form
+    document.getElementById('collectionName').value = '';
+    document.getElementById('collectionSearch').value = '';
+    document.getElementById('collectionColor').value = '#64FFDA';
+    document.getElementById('collectionColorBtn').style.backgroundColor = '#64FFDA';
+    document.getElementById('selectedCollectionIcon').innerText = 'folder_special';
+
+    // Initialize new criteria schema
+    collectionCriteriaNew = getDefaultCollectionCriteria();
+
+    // Also reset legacy for backward compat
+    collectionCriteria = { status: 'all', codec: 'all', tags: [], search: '' };
+
+    // Update UI title
+    document.getElementById('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
+    document.getElementById('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
+
+    // If editing, load existing data
+    if (editId) {
+        const existing = (userSettings.smart_collections || []).find(c => c.id === editId);
+        if (existing) {
+            document.getElementById('collectionName').value = existing.name || '';
+            document.getElementById('collectionSearch').value = existing.criteria?.search || '';
+            document.getElementById('collectionColor').value = existing.color || '#64FFDA';
+            document.getElementById('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
+            document.getElementById('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
+
+            // Check if using new schema
+            if (existing.criteria?.include || existing.criteria?.exclude) {
+                // Deep copy the criteria
+                collectionCriteriaNew = JSON.parse(JSON.stringify(existing.criteria));
+            } else {
+                // Convert legacy schema to new
+                collectionCriteriaNew = getDefaultCollectionCriteria();
+                if (existing.criteria?.status && existing.criteria.status !== 'all') {
+                    collectionCriteriaNew.include.status = [existing.criteria.status];
+                }
+                if (existing.criteria?.codec && existing.criteria.codec !== 'all') {
+                    collectionCriteriaNew.include.codec = [existing.criteria.codec];
+                }
+                if (existing.criteria?.tags) {
+                    collectionCriteriaNew.include.tags = [...existing.criteria.tags];
+                }
+                collectionCriteriaNew.search = existing.criteria?.search || '';
+            }
+        }
+    }
+
+    // Sync UI with new criteria
+    syncSmartCollectionUI();
+
+    modal.classList.add('active');
+}
+
+function closeCollectionModal() {
+    const modal = document.getElementById('collectionModal');
+    if (modal) modal.classList.remove('active');
+    editingCollectionId = null;
+    document.getElementById('collectionIconPicker')?.classList.add('hidden');
+    document.getElementById('collectionColorPicker')?.classList.add('hidden');
+}
+
+function syncCollectionModalUI() {
+    // Sync filter chips with current criteria
+    document.querySelectorAll('.collection-filter-chip[data-filter="status"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === collectionCriteria.status);
+    });
+    document.querySelectorAll('.collection-filter-chip[data-filter="codec"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === collectionCriteria.codec);
+    });
+}
+
+function setCollectionFilter(filterType, value) {
+    collectionCriteria[filterType] = value;
+    syncCollectionModalUI();
+}
+
+function renderCollectionTagsList() {
+    const container = document.getElementById('collectionTagsList');
+    if (!container) return;
+
+    if (availableTags.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags created</span>';
+        return;
+    }
+
+    container.innerHTML = availableTags.map(tag => `
+        <button class="collection-filter-chip ${collectionCriteria.tags.includes(tag.name) ? 'active' : ''}" 
+                onclick="toggleCollectionTag('${tag.name}')"
+                style="border-color: ${collectionCriteria.tags.includes(tag.name) ? tag.color : 'rgba(255,255,255,0.1)'}">
+            <span class="tag-dot" style="background-color: ${tag.color}; width: 6px; height: 6px; border-radius: 50%; display: inline-block;"></span>
+            ${tag.name}
+        </button>
+    `).join('');
+}
+
+function toggleCollectionTag(tagName) {
+    const idx = collectionCriteria.tags.indexOf(tagName);
+    if (idx >= 0) {
+        collectionCriteria.tags.splice(idx, 1);
+    } else {
+        collectionCriteria.tags.push(tagName);
+    }
+    renderCollectionTagsList();
+}
+
+function toggleCollectionIconPicker() {
+    document.getElementById('collectionColorPicker')?.classList.add('hidden');
+    document.getElementById('collectionIconPicker')?.classList.toggle('hidden');
+}
+
+function selectCollectionIcon(icon) {
+    document.getElementById('selectedCollectionIcon').innerText = icon;
+    document.getElementById('collectionIconPicker')?.classList.add('hidden');
+}
+
+function toggleCollectionColorPicker() {
+    document.getElementById('collectionIconPicker')?.classList.add('hidden');
+    document.getElementById('collectionColorPicker')?.classList.toggle('hidden');
+}
+
+function selectCollectionColor(color) {
+    document.getElementById('collectionColor').value = color;
+    document.getElementById('collectionColorBtn').style.backgroundColor = color;
+    document.getElementById('collectionColorPicker')?.classList.add('hidden');
+}
+
+function saveCollection() {
+    const name = document.getElementById('collectionName').value.trim();
+    if (!name) {
+        alert('Please enter a collection name');
+        return;
+    }
+
+    const icon = document.getElementById('selectedCollectionIcon').innerText;
+    const color = document.getElementById('collectionColor').value;
+    const search = document.getElementById('collectionSearch').value.trim();
+
+    // Update search in criteria
+    if (collectionCriteriaNew) {
+        collectionCriteriaNew.search = search;
+    }
+
+    const collection = {
+        id: editingCollectionId || 'col_' + Date.now(),
+        name: name,
+        icon: icon,
+        color: color,
+        criteria: collectionCriteriaNew ? JSON.parse(JSON.stringify(collectionCriteriaNew)) : {
+            status: collectionCriteria.status,
+            codec: collectionCriteria.codec,
+            tags: [...collectionCriteria.tags],
+            search: search
+        }
+    };
+
+    if (!userSettings.smart_collections) userSettings.smart_collections = [];
+
+    if (editingCollectionId) {
+        // Update existing
+        const idx = userSettings.smart_collections.findIndex(c => c.id === editingCollectionId);
+        if (idx >= 0) {
+            userSettings.smart_collections[idx] = collection;
+        }
+    } else {
+        // Add new
+        userSettings.smart_collections.push(collection);
+    }
+
+    saveSettingsWithoutReload();
+    renderCollections();
+    closeCollectionModal();
+}
+
+function deleteCurrentCollection() {
+    if (!editingCollectionId) return;
+    if (!confirm('Delete this collection?')) return;
+
+    if (userSettings.smart_collections) {
+        userSettings.smart_collections = userSettings.smart_collections.filter(c => c.id !== editingCollectionId);
+        saveSettingsWithoutReload();
+        renderCollections();
+    }
+    closeCollectionModal();
+}
+
+// --- SMART COLLECTION QUERY BUILDER ---
+
+// Default criteria structure for new collections
+function getDefaultCollectionCriteria() {
+    return {
+        tagLogic: 'any', // 'any' (OR) or 'all' (AND)
+        include: {
+            status: [],
+            codec: [],
+            tags: [],
+            resolution: [],
+            orientation: []
+        },
+        exclude: {
+            status: [],
+            codec: [],
+            tags: [],
+            resolution: [],
+            orientation: []
+        },
+        favorites: null, // true = only, false = exclude, null = any
+        date: {
+            type: 'any', // 'any', 'relative', 'absolute'
+            relative: null, // '24h', '7d', '30d', '90d'
+            from: null,
+            to: null
+        },
+        duration: {
+            min: null, // seconds
+            max: null
+        },
+        size: {
+            min: null, // bytes
+            max: null
+        },
+        search: ''
+    };
+}
+
+// Get video resolution category
+function getVideoResolution(video) {
+    // Check both lowercase and uppercase (model alias may differ)
+    const width = video.width || video.Width || 0;
+    const height = video.height || video.Height || 0;
+    const maxDim = Math.max(width, height);
+
+    if (maxDim >= 3840) return '4k';
+    if (maxDim >= 1920) return '1080p';
+    if (maxDim >= 1280) return '720p';
+    return 'sd';
+}
+
+// Get video orientation
+function getVideoOrientation(video) {
+    const width = video.width || video.Width || 0;
+    const height = video.height || video.Height || 0;
+
+    if (width === 0 || height === 0) return 'unknown';
+
+    const ratio = width / height;
+    if (ratio > 1.1) return 'landscape';
+    if (ratio < 0.9) return 'portrait';
+    return 'square';
+}
+
+// Check if video matches date filter
+function matchesDateFilter(video, dateFilter) {
+    if (!dateFilter || dateFilter.type === 'any' || dateFilter.type === 'all') return true;
+
+    const videoDate = video.CreatedDate ? new Date(video.CreatedDate) : null;
+    if (!videoDate) return false;
+
+    const now = new Date();
+
+    if (dateFilter.type === 'relative' && dateFilter.relative) {
+        const msMap = {
+            '24h': 24 * 60 * 60 * 1000,
+            '7d': 7 * 24 * 60 * 60 * 1000,
+            '30d': 30 * 24 * 60 * 60 * 1000,
+            '90d': 90 * 24 * 60 * 60 * 1000
+        };
+        const cutoff = now.getTime() - (msMap[dateFilter.relative] || 0);
+        return videoDate.getTime() >= cutoff;
+    }
+
+    if (dateFilter.type === 'absolute') {
+        if (dateFilter.from && videoDate < new Date(dateFilter.from)) return false;
+        if (dateFilter.to && videoDate > new Date(dateFilter.to)) return false;
+    }
+
+    return true;
+}
+
+// Main evaluation function for Smart Collection matching
+function evaluateCollectionMatch(video, criteria) {
+    if (!criteria) return true;
+
+    // Utility: check if video matches any value in array
+    const matchesAny = (videoVal, arr) => arr.length === 0 || arr.some(v =>
+        videoVal?.toLowerCase?.().includes?.(v.toLowerCase()) || videoVal === v
+    );
+
+    // Utility: check if excluded
+    const isExcluded = (videoVal, arr) => arr.length > 0 && arr.some(v =>
+        videoVal?.toLowerCase?.().includes?.(v.toLowerCase()) || videoVal === v
+    );
+
+    const status = video.Status || '';
+    const codec = (video.codec || '').toLowerCase();
+    const videoTags = video.tags || [];
+    const resolution = getVideoResolution(video);
+    const orientation = getVideoOrientation(video);
+    const isHidden = video.hidden || false;
+    const isFavorite = video.favorite || false;
+    const duration = video.duration || 0;
+    const size = video.SizeBytes || 0;
+
+    // Hidden videos are never included
+    if (isHidden) return false;
+
+    // --- EXCLUSIONS (if ANY match, reject) ---
+    const exc = criteria.exclude || {};
+
+    // Status exclusion
+    if (exc.status?.length > 0 && isExcluded(status, exc.status)) return false;
+
+    // Codec exclusion
+    if (exc.codec?.length > 0) {
+        for (const excCodec of exc.codec) {
+            if (codec.includes(excCodec.toLowerCase())) return false;
+        }
+    }
+
+    // Tags exclusion
+    if (exc.tags?.length > 0) {
+        if (exc.tags.some(t => videoTags.includes(t))) return false;
+    }
+
+    // Resolution exclusion
+    if (exc.resolution?.length > 0 && exc.resolution.includes(resolution)) return false;
+
+    // Orientation exclusion
+    if (exc.orientation?.length > 0 && exc.orientation.includes(orientation)) return false;
+
+    // --- INCLUSIONS (must satisfy all that are set) ---
+    const inc = criteria.include || {};
+
+    // Status inclusion
+    if (inc.status?.length > 0) {
+        const statusMatch = inc.status.some(s => {
+            if (s === 'optimized_files') return video.FilePath?.includes('_opt');
+            return status === s;
+        });
+        if (!statusMatch) return false;
+    }
+
+    // Codec inclusion
+    if (inc.codec?.length > 0) {
+        const codecMatch = inc.codec.some(c => codec.includes(c.toLowerCase()));
+        if (!codecMatch) return false;
+    }
+
+    // Tags inclusion
+    if (inc.tags?.length > 0) {
+        if (criteria.tagLogic === 'all') {
+            // ALL must match
+            if (!inc.tags.every(t => videoTags.includes(t))) return false;
+        } else {
+            // ANY must match
+            if (!inc.tags.some(t => videoTags.includes(t))) return false;
+        }
+    }
+
+    // Resolution inclusion
+    if (inc.resolution?.length > 0 && !inc.resolution.includes(resolution)) return false;
+
+    // Orientation inclusion
+    if (inc.orientation?.length > 0 && !inc.orientation.includes(orientation)) return false;
+
+    // --- FAVORITES ---
+    // Check both boolean True and string "true"
+    const wantOnlyFavorites = criteria.favorites === true || criteria.favorites === 'true';
+    const wantExcludeFavorites = criteria.favorites === false || criteria.favorites === 'false';
+
+    if (wantOnlyFavorites || wantExcludeFavorites) {
+        // Robust check for favorite property in video object (case-insensitive)
+        const isFav = !!(video.favorite || video.Favorite || video.isFavorite || video.IsFavorite);
+
+        if (wantOnlyFavorites && !isFav) return false;
+        if (wantExcludeFavorites && isFav) return false;
+    }
+
+    // --- DATE FILTER ---
+    if (!matchesDateFilter(video, criteria.date)) return false;
+
+    // --- DURATION FILTER ---
+    if (criteria.duration) {
+        if (criteria.duration.min !== null && duration < criteria.duration.min) return false;
+        if (criteria.duration.max !== null && duration > criteria.duration.max) return false;
+    }
+
+    // --- SIZE FILTER ---
+    if (criteria.size) {
+        if (criteria.size.min !== null && size < criteria.size.min) return false;
+        if (criteria.size.max !== null && size > criteria.size.max) return false;
+    }
+
+    // --- SEARCH ---
+    if (criteria.search) {
+        const searchLower = criteria.search.toLowerCase();
+        const filename = video.FilePath?.split(/[\\/]/).pop()?.toLowerCase() || '';
+        if (!filename.includes(searchLower) && !video.FilePath?.toLowerCase()?.includes(searchLower)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// --- SMART COLLECTION MODAL UI FUNCTIONS ---
+
+// State variable for new collection criteria
+let collectionCriteriaNew = null;
+
+// Initialize new criteria state when opening modal
+function initNewCollectionCriteria() {
+    collectionCriteriaNew = getDefaultCollectionCriteria();
+    updateCollectionPreviewCount();
+}
+
+// Toggle filter chip active state (include mode)
+function toggleSmartFilterChip(chip) {
+    const filterType = chip.dataset.filter;
+    const value = chip.dataset.value;
+
+    if (!collectionCriteriaNew) initNewCollectionCriteria();
+
+    const includeArr = collectionCriteriaNew.include[filterType];
+
+    chip.classList.toggle('active');
+
+    if (chip.classList.contains('active')) {
+        if (!includeArr.includes(value)) includeArr.push(value);
+    } else {
+        const idx = includeArr.indexOf(value);
+        if (idx > -1) includeArr.splice(idx, 1);
+    }
+
+    updateCollectionPreviewCount();
+}
+
+// Toggle tag chip for new collection
+function toggleSmartTagChip(tagName) {
+    if (!collectionCriteriaNew) initNewCollectionCriteria();
+
+    const includeArr = collectionCriteriaNew.include.tags;
+    const idx = includeArr.indexOf(tagName);
+
+    if (idx > -1) {
+        includeArr.splice(idx, 1);
+    } else {
+        includeArr.push(tagName);
+    }
+
+    renderSmartCollectionTagsList();
+    updateCollectionPreviewCount();
+}
+
+// Toggle tag logic between ANY and ALL
+function toggleTagLogic() {
+    if (!collectionCriteriaNew) initNewCollectionCriteria();
+
+    collectionCriteriaNew.tagLogic = collectionCriteriaNew.tagLogic === 'any' ? 'all' : 'any';
+
+    const btn = document.getElementById('tagLogicBtn');
+    if (btn) {
+        btn.textContent = collectionCriteriaNew.tagLogic.toUpperCase();
+    }
+
+    updateCollectionPreviewCount();
+}
+
+// Set favorites filter (true = only, false = exclude, null = any)
+function setFavoritesFilter(value) {
+    if (!collectionCriteriaNew) initNewCollectionCriteria();
+
+    collectionCriteriaNew.favorites = value;
+
+    // Update UI
+    document.querySelectorAll('[data-filter="favorites"]').forEach(btn => {
+        const btnValue = btn.dataset.value === 'null' ? null : btn.dataset.value === 'true';
+        btn.classList.toggle('active', btnValue === value);
+    });
+
+    updateCollectionPreviewCount();
+}
+
+// Render tags list for smart collection modal
+function renderSmartCollectionTagsList() {
+    const container = document.getElementById('collectionTagsList');
+    if (!container) return;
+
+    if (availableTags.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags created</span>';
+        return;
+    }
+
+    const selectedTags = collectionCriteriaNew?.include?.tags || [];
+
+    container.innerHTML = availableTags.map(tag => `
+        <button class="filter-chip ${selectedTags.includes(tag.name) ? 'active' : ''}" 
+                onclick="toggleSmartTagChip('${tag.name}')"
+                style="${selectedTags.includes(tag.name) ? `border-color: ${tag.color}; background: ${tag.color}20;` : ''}">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
+            ${tag.name}
+        </button>
+    `).join('');
+}
+
+// Update the real-time match count badge
+function updateCollectionPreviewCount() {
+    const countEl = document.getElementById('matchCountNumber');
+    if (!countEl) return;
+
+    if (!collectionCriteriaNew) {
+        countEl.textContent = '0';
+        return;
+    }
+
+    // Include search term from input
+    const searchInput = document.getElementById('collectionSearch');
+    if (searchInput) {
+        collectionCriteriaNew.search = searchInput.value.trim();
+    }
+
+    // Count matching videos
+    const allVideos = window.ALL_VIDEOS || [];
+    const matchingVideos = allVideos.filter(v => evaluateCollectionMatch(v, collectionCriteriaNew));
+    const count = matchingVideos.length;
+    countEl.textContent = count;
+
+    // Debug logging
+    if (collectionCriteriaNew.favorites === true) {
+        const favVideos = allVideos.filter(v => v.favorite);
+        console.log(`🎬 Favorites filter: ${favVideos.length} videos have favorite=true out of ${allVideos.length}`);
+    }
+    if (collectionCriteriaNew.include?.resolution?.length > 0) {
+        const sample = allVideos.slice(0, 3).map(v => ({ w: v.width || v.Width, h: v.height || v.Height }));
+        console.log('📐 Sample video dimensions:', sample);
+    }
+
+    // Animate if changed
+    countEl.closest('.px-3')?.classList.add('animate-pulse');
+    setTimeout(() => {
+        countEl.closest('.px-3')?.classList.remove('animate-pulse');
+    }, 300);
+}
+
+// Sync modal UI with collectionCriteriaNew state
+function syncSmartCollectionUI() {
+    if (!collectionCriteriaNew) return;
+
+    // Sync status chips
+    document.querySelectorAll('[data-filter="status"]').forEach(chip => {
+        const value = chip.dataset.value;
+        chip.classList.toggle('active', collectionCriteriaNew.include.status.includes(value));
+    });
+
+    // Sync codec chips
+    document.querySelectorAll('[data-filter="codec"]').forEach(chip => {
+        const value = chip.dataset.value;
+        chip.classList.toggle('active', collectionCriteriaNew.include.codec.includes(value));
+    });
+
+    // Sync resolution chips
+    document.querySelectorAll('[data-filter="resolution"]').forEach(chip => {
+        const value = chip.dataset.value;
+        chip.classList.toggle('active', collectionCriteriaNew.include.resolution.includes(value));
+    });
+
+    // Sync orientation chips
+    document.querySelectorAll('[data-filter="orientation"]').forEach(chip => {
+        const value = chip.dataset.value;
+        chip.classList.toggle('active', collectionCriteriaNew.include.orientation.includes(value));
+    });
+
+    // Sync tag logic button
+    const tagLogicBtn = document.getElementById('tagLogicBtn');
+    if (tagLogicBtn) tagLogicBtn.textContent = (collectionCriteriaNew.tagLogic || 'any').toUpperCase();
+
+    // Sync favorites
+    document.querySelectorAll('[data-filter="favorites"]').forEach(btn => {
+        const btnValue = btn.dataset.value === 'null' ? null : btn.dataset.value === 'true';
+        btn.classList.toggle('active', btnValue === collectionCriteriaNew.favorites);
+    });
+
+    // Sync search
+    const searchInput = document.getElementById('collectionSearch');
+    if (searchInput) searchInput.value = collectionCriteriaNew.search || '';
+
+    renderSmartCollectionTagsList();
+    updateCollectionPreviewCount();
+}
+
+// Count videos matching collection criteria (updated for new schema)
+function getCollectionCount(collection) {
+    if (!window.ALL_VIDEOS || !collection.criteria) return 0;
+
+    // Check if using new schema (has include/exclude) vs legacy (status/codec/tags)
+    const isNewSchema = collection.criteria.include || collection.criteria.exclude;
+
+    if (isNewSchema) {
+        return window.ALL_VIDEOS.filter(v => evaluateCollectionMatch(v, collection.criteria)).length;
+    }
+
+    // Legacy compatibility for old collections
+    return window.ALL_VIDEOS.filter(v => {
+        const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
+        const status = v.Status;
+        const codec = v.codec || 'unknown';
+        const videoTags = v.tags || [];
+        const isHidden = v.hidden || false;
+
+        // Must be visible (not in vault)
+        if (isHidden) return false;
+
+        // Status filter
+        if (collection.criteria.status !== 'all') {
+            if (collection.criteria.status === 'optimized_files') {
+                if (!v.FilePath.includes('_opt')) return false;
+            } else if (status !== collection.criteria.status) {
+                return false;
+            }
+        }
+
+        // Codec filter
+        if (collection.criteria.codec !== 'all') {
+            if (!codec.includes(collection.criteria.codec)) return false;
+        }
+
+        // Tags filter (match ANY)
+        if (collection.criteria.tags && collection.criteria.tags.length > 0) {
+            const hasMatchingTag = collection.criteria.tags.some(t => videoTags.includes(t));
+            if (!hasMatchingTag) return false;
+        }
+
+        // Search filter
+        if (collection.criteria.search) {
+            const searchLower = collection.criteria.search.toLowerCase();
+            if (!name.includes(searchLower) && !v.FilePath.toLowerCase().includes(searchLower)) {
+                return false;
+            }
+        }
+
+        return true;
+    }).length;
+}
+
+function renderCollections() {
+    const container = document.getElementById('collectionsNav');
+    if (!container) return;
+
+    const collections = userSettings.smart_collections || [];
+
+    if (collections.length === 0) {
+        container.innerHTML = '<p class="text-xs text-gray-600 italic px-3 py-2">No collections yet</p>';
+        return;
+    }
+
+    container.innerHTML = collections.map(col => {
+        const count = getCollectionCount(col);
+        const isActive = col.id === activeCollectionId;
+
+        return `
+            <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 border border-transparent'}" 
+                    onclick="applyCollection('${col.id}')"
+                    ondblclick="openCollectionModal('${col.id}')">
+                <span class="material-icons text-[18px]" style="color: ${col.color}">${col.icon}</span>
+                <span class="flex-1 text-left truncate">${col.name}</span>
+                
+                <button onclick="event.stopPropagation(); openCollectionModal('${col.id}')" 
+                        class="${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white transition-opacity"
+                        title="Edit Collection">
+                    <span class="material-icons text-[14px]">edit</span>
+                </button>
+                
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-black/40 text-arcade-cyan border border-arcade-cyan/30' : 'bg-black/5 dark:bg-white/5 text-gray-400 dark:text-gray-500'} font-mono">${count}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function applyCollection(collectionId) {
+    const collection = (userSettings.smart_collections || []).find(c => c.id === collectionId);
+    if (!collection || !collection.criteria) return;
+
+    // Reset to lobby workspace first (this clears any previous active collection)
+    setWorkspaceMode('lobby');
+
+    // CONVERT LEGACY TO NEW SCHEMA IF NEEDED
+    let criteria = collection.criteria;
+
+    // Check if using new schema (has include/exclude)
+    const isNewSchema = criteria.include || criteria.exclude;
+
+    if (!isNewSchema) {
+        // Convert legacy schema to new format on the fly for viewing
+        const converted = getDefaultCollectionCriteria();
+
+        if (criteria.status && criteria.status !== 'all') {
+            converted.include.status = [criteria.status];
+        }
+        if (criteria.codec && criteria.codec !== 'all') {
+            converted.include.codec = [criteria.codec];
+        }
+        if (criteria.tags) {
+            converted.include.tags = [...criteria.tags];
+        }
+        converted.search = criteria.search || '';
+
+        criteria = converted;
+    }
+
+    // Update URL history for deep linking
+    const newUrl = '/collections/' + encodeURIComponent(collection.name);
+    // Don't push duplicate state
+    if (window.location.pathname !== newUrl) {
+        history.pushState({ id: collectionId }, '', newUrl);
+    }
+
+    // Set the active smart collection criteria and ID
+    activeSmartCollectionCriteria = criteria;
+    activeCollectionId = collectionId;
+
+    // Update search UI to match (visual only)
+    if (criteria.search) {
+        searchTerm = criteria.search;
+        document.getElementById('mobileSearchInput').value = searchTerm;
+    } else {
+        searchTerm = '';
+        document.getElementById('mobileSearchInput').value = '';
+    }
+
+    // Execute filter
+    filterAndSort(true);
+    renderCollections(); // Update sidebar UI to show active state
+
+    // Show toast
+    showToast(`Applied collection: ${collection.name}`, 'info');
+}
+
 // --- OPTIMIZATION PANEL LOGIC ---
 let currentOptAudio = 'enhanced';
 
@@ -2144,6 +3379,482 @@ window.clearTrim = clearTrim;
 window.closeOptimize = closeOptimize;
 window.triggerOptimization = triggerOptimization;
 
+
+// =============================================================================
+// FILTER PANEL & TAG SYSTEM
+// =============================================================================
+
+// Filter state (in addition to existing currentFilter, currentCodec)
+let activeTags = [];      // Array of tag names currently selected for filtering
+let filterUntaggedOnly = false;
+let availableTags = [];   // Loaded from API
+
+// --- FILTER PANEL CONTROLS ---
+function openFilterPanel() {
+    const panel = document.getElementById('filterPanel');
+    if (panel) {
+        panel.classList.add('active');
+        loadAvailableTags();
+        syncFilterPanelState();
+    }
+}
+
+function closeFilterPanel() {
+    const panel = document.getElementById('filterPanel');
+    if (panel) {
+        panel.classList.remove('active');
+    }
+}
+
+function syncFilterPanelState() {
+    // Sync status chips
+    document.querySelectorAll('[data-filter="status"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === currentFilter);
+    });
+
+    // Sync codec chips
+    document.querySelectorAll('[data-filter="codec"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === currentCodec);
+    });
+
+    // Sync untagged checkbox
+    const untaggedCheck = document.getElementById('filterUntaggedOnly');
+    if (untaggedCheck) untaggedCheck.checked = filterUntaggedOnly;
+
+    updateFilterPanelCount();
+}
+
+function setFilterOption(type, value) {
+    if (type === 'status') {
+        currentFilter = value;
+    } else if (type === 'codec') {
+        currentCodec = value;
+    }
+
+    // Update chip visual state
+    document.querySelectorAll(`[data-filter="${type}"]`).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === value);
+    });
+
+    updateFilterPanelCount();
+}
+
+function toggleTagFilter(tagName) {
+    const idx = activeTags.indexOf(tagName);
+    if (idx > -1) {
+        activeTags.splice(idx, 1);
+    } else {
+        activeTags.push(tagName);
+    }
+
+    // Update visual state
+    renderFilterTagsList();
+    updateFilterPanelCount();
+}
+
+function toggleUntaggedFilter() {
+    filterUntaggedOnly = document.getElementById('filterUntaggedOnly')?.checked || false;
+    updateFilterPanelCount();
+}
+
+function updateFilterPanelCount() {
+    let count = 0;
+    if (currentFilter !== 'all') count++;
+    if (currentCodec !== 'all') count++;
+    count += activeTags.length;
+    if (filterUntaggedOnly) count++;
+
+    // Update panel header count
+    const panelCount = document.getElementById('filterPanelCount');
+    if (panelCount) panelCount.textContent = `(${count} active)`;
+
+    // Update button badge
+    const badge = document.getElementById('filterBadge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+}
+
+function applyFilters() {
+    closeFilterPanel();
+
+    // Filters are already set via setFilterOption, just need to run filterAndSort
+    filterAndSort(true);
+
+    // Update active filters row
+    renderActiveFiltersRow();
+}
+
+function resetFilters() {
+    currentFilter = 'all';
+    currentCodec = 'all';
+    activeTags = [];
+    filterUntaggedOnly = false;
+
+    // Sync UI
+    syncFilterPanelState();
+    renderFilterTagsList();
+
+    // Clear active filters row
+    const row = document.getElementById('activeFiltersRow');
+    if (row) row.classList.add('hidden');
+
+    // Update badge
+    updateFilterPanelCount();
+
+    // Refresh grid
+    filterAndSort(true);
+}
+
+function renderActiveFiltersRow() {
+    const row = document.getElementById('activeFiltersRow');
+    const chipsContainer = document.getElementById('activeFilterChips');
+
+    if (!row || !chipsContainer) return;
+
+    const chips = [];
+
+    if (currentFilter !== 'all') {
+        chips.push({ label: `Status: ${currentFilter}`, type: 'status' });
+    }
+    if (currentCodec !== 'all') {
+        chips.push({ label: `Codec: ${currentCodec.toUpperCase()}`, type: 'codec' });
+    }
+    activeTags.forEach(tag => {
+        const tagData = availableTags.find(t => t.name === tag);
+        chips.push({ label: tag, type: 'tag', color: tagData?.color || '#888' });
+    });
+    if (filterUntaggedOnly) {
+        chips.push({ label: 'Untagged only', type: 'untagged' });
+    }
+
+    if (chips.length === 0) {
+        row.classList.add('hidden');
+        return;
+    }
+
+    row.classList.remove('hidden');
+    chipsContainer.innerHTML = chips.map(c => `
+        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-white/10 text-gray-300 border border-white/10">
+            ${c.type === 'tag' ? `<span class="w-2 h-2 rounded-full" style="background: ${c.color}"></span>` : ''}
+            ${c.label}
+            <button class="hover:text-arcade-pink" onclick="removeActiveFilter('${c.type}', '${c.label}')">×</button>
+        </span>
+    `).join('');
+}
+
+function removeActiveFilter(type, label) {
+    if (type === 'status') {
+        currentFilter = 'all';
+    } else if (type === 'codec') {
+        currentCodec = 'all';
+    } else if (type === 'tag') {
+        activeTags = activeTags.filter(t => t !== label);
+    } else if (type === 'untagged') {
+        filterUntaggedOnly = false;
+    }
+
+    syncFilterPanelState();
+    renderFilterTagsList();
+    updateFilterPanelCount();
+    renderActiveFiltersRow();
+    filterAndSort(true);
+}
+
+// --- TAG MANAGEMENT ---
+function loadAvailableTags() {
+    fetch('/api/tags')
+        .then(res => res.json())
+        .then(tags => {
+            availableTags = tags || [];
+            renderFilterTagsList();
+            renderExistingTagsList();
+        })
+        .catch(err => {
+            console.error('Failed to load tags:', err);
+            availableTags = [];
+        });
+}
+
+function renderFilterTagsList() {
+    const container = document.getElementById('filterTagsList');
+    if (!container) return;
+
+    if (availableTags.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags created yet</span>';
+        return;
+    }
+
+    container.innerHTML = availableTags.map(tag => `
+        <button class="tag-filter-chip ${activeTags.includes(tag.name) ? 'active' : ''}" 
+                onclick="toggleTagFilter('${tag.name}')"
+                style="border-color: ${activeTags.includes(tag.name) ? tag.color : 'rgba(255,255,255,0.15)'}">
+            <span class="tag-dot" style="background-color: ${tag.color}"></span>
+            ${tag.name}
+        </button>
+    `).join('');
+}
+
+// --- VIDEO CARD TAG CHIPS ---
+function renderVideoCardTags(tags) {
+    if (!tags || tags.length === 0) return '';
+
+    const maxShow = 3;
+    const visibleTags = tags.slice(0, maxShow);
+    const remaining = tags.length - maxShow;
+
+    let html = '<div class="video-card-tags flex flex-wrap gap-1 mt-1">';
+
+    visibleTags.forEach(tagName => {
+        const tagData = availableTags.find(t => t.name === tagName);
+        const color = tagData?.color || '#888';
+        html += `<span class="video-card-tag" style="background-color: ${color}20; border-color: ${color}40; color: ${color}">
+            <span class="tag-dot-small" style="background-color: ${color}"></span>
+            ${tagName}
+        </span>`;
+    });
+
+    if (remaining > 0) {
+        html += `<span class="video-card-tag overflow-tag">+${remaining}</span>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// --- CINEMA MODAL TAG PICKER ---
+function toggleCinemaTagPanel() {
+    const panel = document.getElementById('cinemaTagPanel');
+    if (panel) {
+        panel.classList.toggle('hidden');
+        // Ensure tags are populated when opening
+        if (!panel.classList.contains('hidden')) {
+            updateCinemaTags();
+        }
+    }
+}
+
+function updateCinemaTags() {
+    const container = document.getElementById('cinemaTagPicker');
+    if (!container || !currentCinemaVideo) return;
+
+    const videoTags = currentCinemaVideo.tags || [];
+
+    if (availableTags.length === 0) {
+        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags available</span>';
+        return;
+    }
+
+    container.innerHTML = availableTags.map(tag => `
+        <button class="cinema-tag-chip ${videoTags.includes(tag.name) ? 'active' : ''}" 
+                onclick="toggleCinemaTag('${tag.name}')"
+                style="--tag-color: ${tag.color}">
+            <span class="tag-dot" style="background-color: ${tag.color}"></span>
+            ${tag.name}
+        </button>
+    `).join('');
+}
+
+function toggleCinemaTag(tagName) {
+    if (!currentCinemaPath || !currentCinemaVideo) return;
+
+    const currentTags = currentCinemaVideo.tags || [];
+    let newTags;
+
+    if (currentTags.includes(tagName)) {
+        newTags = currentTags.filter(t => t !== tagName);
+    } else {
+        newTags = [...currentTags, tagName];
+    }
+
+    // Optimistic UI update
+    currentCinemaVideo.tags = newTags;
+    updateCinemaTags();
+
+    // Update in ALL_VIDEOS array
+    const videoInArray = window.ALL_VIDEOS.find(v => v.FilePath === currentCinemaPath);
+    if (videoInArray) {
+        videoInArray.tags = newTags;
+    }
+
+    // Save to server
+    fetch('/api/video/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            path: currentCinemaPath,
+            tags: newTags
+        })
+    })
+        .then(res => res.json())
+        .then(data => {
+            console.log('Tags updated:', data.tags);
+            // Re-render the grid to show updated tags on cards
+            filterAndSort();
+        })
+        .catch(err => {
+            console.error('Failed to update tags:', err);
+            // Revert on error
+            currentCinemaVideo.tags = currentTags;
+            if (videoInArray) videoInArray.tags = currentTags;
+            updateCinemaTags();
+        });
+}
+
+// --- TAG MANAGER MODAL ---
+function openTagManager() {
+    const modal = document.getElementById('tagManagerModal');
+    if (modal) {
+        modal.classList.add('active');
+        loadAvailableTags();
+    }
+}
+
+function closeTagManager() {
+    const modal = document.getElementById('tagManagerModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+    // Also close color picker
+    document.getElementById('tagColorPicker')?.classList.add('hidden');
+}
+
+function toggleTagColorPicker() {
+    const picker = document.getElementById('tagColorPicker');
+    if (picker) picker.classList.toggle('hidden');
+}
+
+function selectTagColor(color) {
+    document.getElementById('newTagColor').value = color;
+    document.getElementById('tagColorBtn').style.backgroundColor = color;
+    document.getElementById('tagColorPicker')?.classList.add('hidden');
+}
+
+function createNewTag() {
+    const nameInput = document.getElementById('newTagName');
+    const colorInput = document.getElementById('newTagColor');
+
+    const name = nameInput?.value?.trim();
+    const color = colorInput?.value || '#00ffd0';
+
+    if (!name) {
+        alert('Please enter a tag name');
+        return;
+    }
+
+    fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color })
+    })
+        .then(res => {
+            if (res.status === 409) {
+                alert('Tag already exists');
+                return null;
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data) {
+                // Clear input
+                nameInput.value = '';
+                // Refresh lists
+                loadAvailableTags();
+            }
+        })
+        .catch(err => {
+            console.error('Error creating tag:', err);
+            alert('Failed to create tag');
+        });
+}
+
+function deleteTag(tagName) {
+    if (!confirm(`Delete tag "${tagName}"? This will remove it from all videos.`)) return;
+
+    fetch(`/api/tags?action=delete&name=${encodeURIComponent(tagName)}`)
+        .then(res => res.json())
+        .then(() => {
+            // Remove from active filters
+            activeTags = activeTags.filter(t => t !== tagName);
+            // Refresh
+            loadAvailableTags();
+            updateFilterPanelCount();
+        })
+        .catch(err => {
+            console.error('Error deleting tag:', err);
+            alert('Failed to delete tag');
+        });
+}
+
+function renderExistingTagsList() {
+    const container = document.getElementById('existingTagsList');
+    if (!container) return;
+
+    if (availableTags.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-600 italic">No tags created yet</p>';
+        return;
+    }
+
+    container.innerHTML = availableTags.map(tag => `
+        <div class="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
+            <div class="flex items-center gap-2">
+                <span class="w-4 h-4 rounded-full" style="background-color: ${tag.color}"></span>
+                <span class="text-sm text-white">${tag.name}</span>
+            </div>
+            <button onclick="deleteTag('${tag.name}')" class="text-gray-500 hover:text-arcade-pink transition-colors">
+                <span class="material-icons text-sm">delete</span>
+            </button>
+        </div>
+    `).join('');
+}
+
+// --- VIDEO TAG ASSIGNMENT ---
+function setVideoTags(videoPath, tags) {
+    return fetch('/api/video/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: videoPath, tags })
+    })
+        .then(res => res.json())
+        .then(data => {
+            // Update local cache
+            const video = window.ALL_VIDEOS.find(v => v.FilePath === videoPath);
+            if (video) {
+                video.tags = data.tags || [];
+            }
+            return data.tags;
+        });
+}
+
+// --- KEYBOARD SHORTCUTS FOR FILTER PANEL ---
+document.addEventListener('keydown', (e) => {
+    // ESC closes filter panel
+    if (e.key === 'Escape') {
+        const filterPanel = document.getElementById('filterPanel');
+        if (filterPanel?.classList.contains('active')) {
+            closeFilterPanel();
+            e.preventDefault();
+            return;
+        }
+
+        const tagManager = document.getElementById('tagManagerModal');
+        if (tagManager?.classList.contains('active')) {
+            closeTagManager();
+            e.preventDefault();
+            return;
+        }
+    }
+});
+
+// =============================================================================
+// END FILTER PANEL & TAG SYSTEM
+// =============================================================================
+
 // --- RUN ON LOAD ---
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize workspace theming
@@ -2164,12 +3875,10 @@ document.addEventListener('DOMContentLoaded', () => {
         wsIndicator.style.backgroundColor = colors.bg;
     }
 
-    // Check optimized status on backend
-    // fetch('/status')...
-
-    // Initial Filter
-    if (document.getElementById('statusSelect'))
-        setFilter(document.getElementById('statusSelect').value);
+    // Load available tags for filtering
+    if (typeof loadAvailableTags === 'function') {
+        loadAvailableTags();
+    }
 
     // Handle URL Back/Forward
     window.onpopstate = (event) => {
@@ -2179,6 +3888,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial Load
     loadFromURL();
 
-    // Render views
-    setTimeout(renderSavedViews, 500);
+    // Render views and collections
+    setTimeout(() => {
+        renderSavedViews();
+        renderCollections();
+    }, 500);
 });

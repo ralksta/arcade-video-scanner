@@ -84,7 +84,9 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_fun_facts": "Show educational overlays during optimization.",
     "enable_fun_facts": True,
     "_comment_optimizer": "Master toggle for optimization features.",
-    "enable_optimizer": True
+    "enable_optimizer": True,
+    "_comment_tags": "User-created tags for video categorization.",
+    "available_tags": []
 }
 
 # ==============================================================================
@@ -101,6 +103,7 @@ class AppSettings(BaseSettings):
     exclude_paths: List[str] = Field(default_factory=list)
     disabled_defaults: List[str] = Field(default_factory=list)
     saved_views: List[Dict[str, Any]] = Field(default_factory=list)
+    smart_collections: List[Dict[str, Any]] = Field(default_factory=list)  # Smart collections with filter criteria
     
     min_size_mb: int = Field(100)
     bitrate_threshold_kbps: int = Field(15000)
@@ -108,6 +111,7 @@ class AppSettings(BaseSettings):
     enable_previews: bool = Field(False)
     enable_fun_facts: bool = Field(True)
     enable_optimizer: bool = Field(True)
+    available_tags: List[Dict[str, str]] = Field(default_factory=list)  # [{"name": "Gaming", "color": "#00ffd0"}]
 
     class Config:
         env_prefix = "ARCADE_"

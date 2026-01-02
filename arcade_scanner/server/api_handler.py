@@ -21,7 +21,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         try:
             # 1. ROOT / INDEX -> Serve REPORT_FILE
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview"]
-            if self.path in spa_routes or self.path.startswith("/index.html?"):
+            if self.path in spa_routes or self.path.startswith("/index.html?") or self.path.startswith("/collections"):
                 self.send_response(200)
                 self.send_header("Content-type", "text/html; charset=utf-8")
                 
@@ -574,11 +574,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "exclude_paths": s.exclude_paths,
                     "disabled_defaults": s.disabled_defaults,
                     "saved_views": [v for v in s.saved_views], # Pydantic model to list
+                    "smart_collections": [c for c in s.smart_collections],  # Smart collections
                     "min_size_mb": s.min_size_mb,
                     "bitrate_threshold_kbps": s.bitrate_threshold_kbps,
                     "enable_previews": s.enable_previews,
                     "enable_fun_facts": s.enable_fun_facts,
                     "enable_optimizer": s.enable_optimizer,
+                    "available_tags": s.available_tags,
                     "default_scan_targets": [HOME_DIR],
                     "default_exclusions": DEFAULT_EXCLUSIONS
                 }
@@ -614,6 +616,69 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(stats).encode("utf-8"))
+            
+            # --- TAG SYSTEM ENDPOINTS ---
+            elif self.path == "/api/tags":
+                # GET: Return all available tags
+                tags = config.settings.available_tags
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(tags).encode("utf-8"))
+            
+            elif self.path.startswith("/api/video/tags?"):
+                # GET: Return tags for a specific video
+                params = parse_qs(urlparse(self.path).query)
+                path = params.get("path", [None])[0]
+                
+                if not path:
+                    self.send_error(400, "Missing path parameter")
+                    return
+                
+                abs_path = os.path.abspath(path)
+                entry = db.get(abs_path)
+                
+                if entry:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"tags": entry.tags}).encode("utf-8"))
+                else:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"tags": []}).encode("utf-8"))
+            
+            elif self.path.startswith("/api/tags?"):
+                # DELETE: Remove a tag (handled in do_GET for simplicity with query params)
+                # This is a workaround since we're using GET with action=delete
+                params = parse_qs(urlparse(self.path).query)
+                action = params.get("action", [None])[0]
+                tag_name = params.get("name", [None])[0]
+                
+                if action == "delete" and tag_name:
+                    # Remove tag from available_tags
+                    current_tags = list(config.settings.available_tags)
+                    updated_tags = [t for t in current_tags if t.get("name") != tag_name]
+                    
+                    # Also remove this tag from all videos
+                    for entry in db.get_all():
+                        if tag_name in entry.tags:
+                            entry.tags = [t for t in entry.tags if t != tag_name]
+                            db.upsert(entry)
+                    db.save()
+                    
+                    # Save updated tags list
+                    config.save({"available_tags": updated_tags})
+                    
+                    print(f"🏷️ Deleted tag: {tag_name}")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                else:
+                    self.send_error(400, "Invalid action or missing name")
+            
             else:
                 # 404 for anything else
                 self.send_error(404)
@@ -695,11 +760,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         "exclude_paths": new_settings.get("exclude_paths", []),
                         "disabled_defaults": new_settings.get("disabled_defaults", []),
                         "saved_views": new_settings.get("saved_views", []),
+                        "smart_collections": new_settings.get("smart_collections", []),
                         "min_size_mb": new_settings.get("min_size_mb", 100),
                         "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000),
                         "enable_previews": new_settings.get("enable_previews", False),
                         "enable_fun_facts": new_settings.get("enable_fun_facts", True),
-                        "enable_optimizer": new_settings.get("enable_optimizer", True)
+                        "enable_optimizer": new_settings.get("enable_optimizer", True),
+                        "available_tags": new_settings.get("available_tags", config.settings.available_tags)
                     }
                     
                     if config.save(update_data):
@@ -720,6 +787,100 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as e:
                     print(f"❌ Error saving settings: {e}")
                     self.send_error(500, str(e))
+            
+            # --- TAG SYSTEM POST ENDPOINTS ---
+            elif self.path == "/api/tags":
+                # POST: Create a new tag
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    if content_length > MAX_REQUEST_SIZE:
+                        self.send_error(413, "Request Entity Too Large")
+                        return
+                    if content_length == 0:
+                        self.send_error(400, "Empty request body")
+                        return
+                    
+                    body = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(body)
+                    
+                    tag_name = data.get("name", "").strip()
+                    tag_color = data.get("color", "#00ffd0")  # Default cyan
+                    
+                    if not tag_name:
+                        self.send_error(400, "Tag name is required")
+                        return
+                    
+                    # Check if tag already exists
+                    current_tags = list(config.settings.available_tags)
+                    existing_names = [t.get("name", "").lower() for t in current_tags]
+                    
+                    if tag_name.lower() in existing_names:
+                        self.send_error(409, "Tag already exists")
+                        return
+                    
+                    # Add new tag
+                    new_tag = {"name": tag_name, "color": tag_color}
+                    current_tags.append(new_tag)
+                    config.save({"available_tags": current_tags})
+                    
+                    print(f"🏷️ Created tag: {tag_name} ({tag_color})")
+                    self.send_response(201)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(new_tag).encode("utf-8"))
+                    
+                except json.JSONDecodeError:
+                    self.send_error(400, "Invalid JSON")
+                except Exception as e:
+                    print(f"❌ Error creating tag: {e}")
+                    self.send_error(500, str(e))
+            
+            elif self.path.startswith("/api/video/tags"):
+                # POST: Set tags for a video
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    if content_length > MAX_REQUEST_SIZE:
+                        self.send_error(413, "Request Entity Too Large")
+                        return
+                    
+                    body = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(body)
+                    
+                    video_path = data.get("path")
+                    tags = data.get("tags", [])
+                    
+                    if not video_path:
+                        self.send_error(400, "Video path is required")
+                        return
+                    
+                    abs_path = os.path.abspath(video_path)
+                    entry = db.get(abs_path)
+                    
+                    if not entry:
+                        # Create minimal entry if not found
+                        from arcade_scanner.models.video_entry import VideoEntry
+                        entry = VideoEntry(FilePath=abs_path, Size_MB=0)
+                    
+                    # Validate tags exist in available_tags
+                    available_tag_names = [t.get("name") for t in config.settings.available_tags]
+                    valid_tags = [t for t in tags if t in available_tag_names]
+                    
+                    entry.tags = valid_tags
+                    db.upsert(entry)
+                    db.save()
+                    
+                    print(f"🏷️ Updated tags for {os.path.basename(abs_path)}: {valid_tags}")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"tags": valid_tags}).encode("utf-8"))
+                    
+                except json.JSONDecodeError:
+                    self.send_error(400, "Invalid JSON")
+                except Exception as e:
+                    print(f"❌ Error setting video tags: {e}")
+                    self.send_error(500, str(e))
+            
             else:
                 self.send_error(404)
         except Exception as e:

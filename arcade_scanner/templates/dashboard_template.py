@@ -3,12 +3,20 @@ import socket
 import time
 import json
 from arcade_scanner.config import config
+from arcade_scanner.templates.theme import CURRENT_THEME
+from arcade_scanner.templates.ui_components import (
+    render_base_layout,
+    render_header,
+    render_navigation
+)
 from arcade_scanner.templates.components import (
     BASE_LAYOUT,
     HEADER_COMPONENT,
     NAVIGATION_COMPONENT,
     FILTER_BAR_COMPONENT,
-
+    FILTER_PANEL_COMPONENT,
+    TAG_MANAGER_MODAL_COMPONENT,
+    COLLECTION_MODAL_COMPONENT,
     LIST_VIEW_COMPONENT,
     OPTIMIZE_PANEL_COMPONENT,
     SETTINGS_MODAL_COMPONENT,
@@ -40,8 +48,9 @@ def generate_html_report(results, report_file, server_port=8000):
     opt_avail_str = 'true' if config.optimizer_available else 'false'
     opt_enabled_str = 'true' if (config.optimizer_available and config.settings.enable_optimizer) else 'false'
     
-    # 1. Prepare Header
-    header_html = HEADER_COMPONENT.format(
+    # 1. Prepare Header (Themed)
+    header_html = render_header(
+        CURRENT_THEME,
         hostname=socket.gethostname().upper(),
         count=len(results),
         size_gb=f"{total_mb/1024:.1f}"
@@ -61,11 +70,11 @@ def generate_html_report(results, report_file, server_port=8000):
     cinema_modal_html = CINEMA_MODAL_COMPONENT.format(opt_btn=opt_btn_html)
     
     # 3. Assemble Main Content
-    # Structure: Header -> (Nav + Main Area) -> Modals
-    # Main Area: Filter Bar -> Content Container (Grid/List/Tree)
+    # Render Navigation using Theme
+    nav_html = render_navigation(CURRENT_THEME)
     
     main_body_html = f"""
-    {NAVIGATION_COMPONENT}
+    {nav_html}
 
     {FOLDER_SIDEBAR_COMPONENT}
     
@@ -104,10 +113,11 @@ def generate_html_report(results, report_file, server_port=8000):
     
     <!-- Modals & Overlays -->
     {cinema_modal_html}
-    <!-- Modals & Overlays -->
-    {cinema_modal_html}
     {OPTIMIZE_PANEL_COMPONENT}
     {SETTINGS_MODAL_COMPONENT}
+    {FILTER_PANEL_COMPONENT}
+    {TAG_MANAGER_MODAL_COMPONENT}
+    {COLLECTION_MODAL_COMPONENT}
     {BATCH_BAR_COMPONENT}
     
     <!-- Hidden frame for form submissions if needed -->
@@ -124,31 +134,22 @@ def generate_html_report(results, report_file, server_port=8000):
         window.ENABLE_OPTIMIZER = {opt_enabled_str};
     """
     
-    # 5. Inject External Scripts manually into content because Base Layout puts scripts at bottom
-    # Actually BASE_LAYOUT has a {scripts} placeholder at the bottom.
-    # But we also need to link client.js and treemap_layout.js.
-    # The BASE_LAYOUT helper doesn't have a place for <script src="..."> easily unless we put it in content or scripts.
-    # Best to put it in the scripts placeholder.
-    
     full_scripts_block = f"""
+    <script>
     {scripts_html}
+    </script>
     """
-    
-    # Link external JS files
-    # Note: We must ensure these load AFTER the window variables are set.
-    # So we simply append the script tags to the document or include them in the content.
-    # However, BASE_LAYOUT closes </body> right after {scripts}.
-    # So we can just append the <script src> tags to the `scripts` string.
     
     external_scripts = f"""
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
     <script src="/static/client.js?v={int(time.time())}"></script>
     """
     
-    # Combine content
-    final_html = BASE_LAYOUT.format(
-        content=main_body_html + external_scripts, # Injecting external scripts at end of body content
-        scripts=full_scripts_block # Injecting the inline config setup
+    # Combine content using Theme-aware Base Layout
+    final_html = render_base_layout(
+        CURRENT_THEME,
+        content=main_body_html + external_scripts,
+        scripts=full_scripts_block
     )
 
     with open(report_file, "w", encoding="utf-8") as f:

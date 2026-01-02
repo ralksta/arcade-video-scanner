@@ -1,4 +1,4 @@
-# Arcade Video Scanner 6.0.0 (Dev)
+# Arcade Video Scanner 6.1.0
 
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
@@ -10,9 +10,26 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
+## 🚀 Version 6.1.0 Highlights
+
+This release introduces a powerful **Query Builder**, **Custom Tags**, and full **Light/Dark Mode** support, powered by a new semantic theming engine.
+
+### 🎨 Global Theming & Light Mode
+- **Theme Architecture**: New `theme.py` system decouples styles from logic.
+- **Light Mode**: Fully supported "Professional" light theme with adaptive colors.
+- **One-Line Switch**: Easily toggle between Arcade (Dark/Neon) and Professional (Light/Clean) themes via config or UI.
+
+### 🏷️ Tags & Smart Collections
+- **Tagging System**: Add custom tags (e.g., "Funny", "Project X") to videos.
+- **Visual Query Builder**: Create complex filters (e.g., "Include: 4K AND Tag:Space, Exclude: 1080p").
+- **Smart Collections**: Save any search query as a sidebar collection for instant access.
+- **Batch Tagging**: Apply tags to multiple videos at once.
+
+---
+
 ## 🚀 Version 6.0.0 Highlights
 
-This major release combines a complete visual overhaul with enterprise-grade security hardening, a modular architectural refactor, and professional-grade desktop UX enhancements.
+This major release combined a complete visual overhaul with enterprise-grade security hardening, a modular architectural refactor, and professional-grade desktop UX enhancements.
 
 ### 🎨 UI & Experience Overhaul
 - **Workspace Differentiation**: Context-aware color accents and background tints for Lobby (Cyan), Favorites (Gold), Review (Cyan), and Vault (Magenta).
