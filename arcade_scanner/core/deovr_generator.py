@@ -63,7 +63,7 @@ def generate_deovr_json(videos: List[VideoEntry], server_url: str) -> Dict[str, 
             continue
         
         # Extract filename without extension
-        filename = video.FilePath.split('/')[-1].split('\\')[-1]
+        filename = video.file_path.split('/')[-1].split('\\')[-1]
         title = filename.rsplit('.', 1)[0] if '.' in filename else filename
         
         # Detect VR type from filename
@@ -72,8 +72,8 @@ def generate_deovr_json(videos: List[VideoEntry], server_url: str) -> Dict[str, 
         # Build scene object
         scene = {
             "title": title,
-            "videoUrl": f"{server_url}/stream?path={quote(video.FilePath)}",
-            "duration": int(video.Duration_Sec) if video.Duration_Sec else 0,
+            "videoUrl": f"{server_url}/stream?path={quote(video.file_path)}",
+            "duration": int(video.duration_sec) if video.duration_sec else 0,
             **vr_info
         }
         
@@ -129,9 +129,9 @@ def generate_collection_deovr_json(
         if "status" in collection_criteria:
             required_status = collection_criteria["status"]
             if isinstance(required_status, list):
-                if video.Status not in required_status:
+                if video.status not in required_status:
                     continue
-            elif video.Status != required_status:
+            elif video.status != required_status:
                 continue
         
         # Check codec criteria

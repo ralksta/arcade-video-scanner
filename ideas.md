@@ -33,10 +33,6 @@ Ein "Social Media" Toolkit direkt im Browser.
 - **Idee**: Du schaust ein Video im Review-Tab. Setze "Start" und "Ende" Marker und klicke "Export GIF" oder "Export MP4".
 - **Feature**: Automatisches Zuschneiden (Crop) auf 9:16 für TikTok/Shorts optional.
 
-### 🕹️ Retro-Frontend Integration
-Da es "Arcade" Scanner heißt:
-- **Idee**: Exportiere deine Bibliothek als `gamelist.xml` (EmulationStation Format).
-- **Use Case**: Nutze deine gescannten Clips automatisch als Video-Snaps in RetroPie oder Batocera.
 
 ---
 
