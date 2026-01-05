@@ -670,14 +670,18 @@ FILTER_PANEL_COMPONENT = """
             </section>
 
             <!-- STATUS Section -->
+            <!-- STATUS Section -->
             <section>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Status</h3>
                 <div class="flex flex-wrap gap-2">
                     <button class="filter-chip active" data-filter="status" data-value="all" onclick="setFilterOption('status', 'all')">
                         All
                     </button>
-                    <button class="filter-chip" data-filter="status" data-value="new" onclick="setFilterOption('status', 'new')">
-                        New
+                    <button class="filter-chip" data-filter="status" data-value="HIGH" onclick="setFilterOption('status', 'HIGH')">
+                        High Bitrate
+                    </button>
+                     <button class="filter-chip" data-filter="status" data-value="OK" onclick="setFilterOption('status', 'OK')">
+                        OK
                     </button>
                     <button class="filter-chip" data-filter="status" data-value="optimized_files" onclick="setFilterOption('status', 'optimized_files')">
                         Optimized

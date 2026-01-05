@@ -991,9 +991,34 @@ function openCinema(container) {
 
     // Populate tag picker
     updateCinemaTags();
+
+    // Force focus handling for ESC
+    // Use capturing phase to ensure we catch it before video element swallows it
+    // Force focus handling for ESC
+    // Use capturing phase to ensure we catch it before video element swallows it
+    window.addEventListener('keydown', cinemaEscHandler, true);
+
+    // Also try to focus the modal container to steal focus from video initially
+    if (modal) {
+        modal.tabIndex = -1;
+        modal.focus();
+    }
+}
+
+function cinemaEscHandler(e) {
+    if (e.key === 'Escape') {
+        console.log('ESC pressed in cinema mode (captured)');
+        e.preventDefault();
+        e.stopPropagation(); // Stop it from reaching video element
+        closeCinema();
+    }
 }
 
 function closeCinema() {
+
+    // Remove the special handler
+    window.removeEventListener('keydown', cinemaEscHandler, true);
+
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
     const infoPanel = document.getElementById('cinemaInfoPanel');
@@ -2107,13 +2132,28 @@ function setupTreemapInteraction() {
 }
 
 // ESC key handler for treemap zoom out
+// ESC key handler for treemap zoom out
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+        const cinemaModal = document.getElementById('cinemaModal');
+        const filterPanel = document.getElementById('filterPanel');
+
+        if (cinemaModal && cinemaModal.classList.contains('active')) {
+            // Cinema has priority
+            e.preventDefault();
+            e.stopPropagation();
+            closeCinema();
+            return;
+        }
+
+        if (filterPanel && filterPanel.classList.contains('active')) {
+            closeFilterPanel();
+            return;
+        }
+
         if (currentLayout === 'treemap' && treemapCurrentFolder !== null) {
             e.preventDefault();
             treemapZoomOut();
-        } else {
-            closeCinema();
         }
     }
 });
@@ -4330,12 +4370,8 @@ function setVideoTags(videoPath, tags) {
 document.addEventListener('keydown', (e) => {
     // ESC closes filter panel
     if (e.key === 'Escape') {
-        const filterPanel = document.getElementById('filterPanel');
-        if (filterPanel?.classList.contains('active')) {
-            closeFilterPanel();
-            e.preventDefault();
-            return;
-        }
+        // ESC for filter panel is now handled by the main global handler.
+        // This block is kept for other potential shortcuts or modal handlers.
 
         const tagManager = document.getElementById('tagManagerModal');
         if (tagManager?.classList.contains('active')) {

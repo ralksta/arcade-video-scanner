@@ -11,7 +11,9 @@ import json
 import re
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+import threading
+import queue
 
 # Logs directory
 LOG_DIR = Path.home() / ".arcade-scanner" / "logs"
@@ -232,11 +234,24 @@ def get_video_info(file_path):
         print(f"{R}Error probing {file_path}: {e}{NC}")
         return None
 
-def get_ssim(original, optimized, start_time, duration):
-    """Calculate SSIM between original and optimized file."""
+def parse_time_to_seconds(time_str):
+    """Convert time string (HH:MM:SS or SS) to seconds."""
+    if not time_str:
+        return 0.0
+    try:
+        if ':' in str(time_str):
+            t = datetime.strptime(str(time_str), "%H:%M:%S")
+            delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            return delta.total_seconds()
+        return float(time_str)
+    except:
+        return 0.0
+
+def get_ssim(original, optimized, orig_start, opt_start, duration):
+    """Calculate SSIM between original (at orig_start) and optimized (at opt_start)."""
     cmd = [
-        'ffmpeg', '-ss', str(start_time), '-t', str(duration), '-i', str(original),
-        '-ss', str(start_time), '-t', str(duration), '-i', str(optimized),
+        'ffmpeg', '-ss', str(orig_start), '-t', str(duration), '-i', str(original),
+        '-ss', str(opt_start), '-t', str(duration), '-i', str(optimized),
         '-filter_complex', 'ssim', '-f', 'null', '-'
     ]
     try:
@@ -363,6 +378,12 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     
     return cmd
 
+def enqueue_output(out, q):
+    """Read lines from stream and populate queue."""
+    for line in iter(out.readline, ''):
+        q.put(line)
+    out.close()
+
 def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress'):
     """Process a single video file. Returns (success, bytes_saved)."""
     input_path = Path(input_path)
@@ -404,8 +425,31 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     
     size_before = input_path.stat().st_size
     size_mb = size_before / (1024 * 1024)
+
+    info = get_video_info(input_path)
+    if not info or info['duration'] <= 0:
+        batch_stats['failed'] += 1
+        return (False, 0)
     
-    # Skip small files (UNLESS trimming)
+    # Calculate Trim Duration and Projected Size
+    trim_start_sec = parse_time_to_seconds(ss)
+    trim_end_sec = parse_time_to_seconds(to)
+    
+    start_offset = trim_start_sec # Original starts at this offset
+    
+    if trim_end_sec > 0:
+        trim_duration = trim_end_sec - trim_start_sec
+    else:
+        trim_duration = info['duration'] - trim_start_sec
+        
+    if trim_duration <= 0:
+        trim_duration = info['duration'] # Fallback
+    
+    # Prorate original size for fair comparison
+    projected_original_size = size_before * (trim_duration / info['duration']) if info['duration'] > 0 else size_before
+    
+    # Skip small files (UNLESS trimming - user intent overrides size check usually, but let's keep it sane)
+    # If projected size is tiny, maybe skip? But for explicit trim, we usually want it done.
     if not is_trim and size_mb < min_size_mb:
         print(f"{Y}Skipping:{NC} {input_path.name} ({size_mb:.1f} MB < {min_size_mb} MB min)")
         batch_stats['skipped'] += 1
@@ -416,12 +460,14 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
         return (False, 0)
     
     print(f"\n{G}Target:{NC} {input_path.name} ({format_size(size_before)})")
+    if is_trim:
+        print(f" {Y}Trim Segment:{NC} {format_time(trim_start_sec)} - {format_time(trim_start_sec + trim_duration)} (Dur: {format_time(trim_duration)})")
+        print(f" {Y}Projected Orig Size:{NC} ~{format_size(projected_original_size)}")
+        size_to_compare = projected_original_size
+    else:
+        size_to_compare = size_before
+        
     print("-" * 52)
-    
-    info = get_video_info(input_path)
-    if not info or info['duration'] <= 0:
-        batch_stats['failed'] += 1
-        return (False, 0)
 
     start_q, end_q, step = profile['quality_range']
     quality = start_q
@@ -442,7 +488,7 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
         file_start_time = time.time()
         
         cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to, video_mode='copy')
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
         # Simple progress loop (copy/trim tends to be fast but we still want feedback)
         # Note: ffmpeg output parsing logic below relies partially on encoding stats.
@@ -450,12 +496,33 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
         
         cur_stats = {"bitrate": "copy", "speed": "N/A"}
         encode_start = time.time()
+        captured_errors = []
+        
+        # Start Non-Blocking Reader
+        q = queue.Queue()
+        t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
+        t.daemon = True
+        t.start()
         
         try:
              while True:
-                line = process.stdout.readline()
-                if not line and process.poll() is not None:
+                try:
+                    line = q.get(timeout=2.0)
+                except queue.Empty:
+                    if process.poll() is not None:
+                        break
+                    # Still running but silent? likely faststart
+                    sys.stdout.write(f"\r {G}copy{NC} [Moving Atoms / Finalizing...] ({time.time()-encode_start:.0f}s)    ")
+                    sys.stdout.flush()
+                    continue
+
+                if not line:
                     break
+                
+                # Capture potential errors
+                if line.strip() and not any(k in line for k in ['bitrate=', 'speed=', 'out_time_ms=', 'total_size=']):
+                     captured_errors.append(line.strip())
+                     
                 # Only duration/size is really reliable in copy mode progress?
                 if 'out_time_ms=' in line:
                     val = line.split('=')[1].strip()
@@ -463,7 +530,8 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
                          try:
                             ms = int(val)
                             elapsed = time.time() - encode_start
-                            show_progress(ms / 1000000, info['duration'], 'copy', "copy", "fast", elapsed)
+                            duration_to_show = trim_duration if is_trim else info['duration']
+                            show_progress(ms / 1000000, duration_to_show, 'copy', "copy", "fast", elapsed)
                          except ValueError:
                             pass
         
@@ -493,7 +561,10 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
              if port: notify_server(port, input_path)
              return (True, 0)
         else:
+
              print(f"{R}FFmpeg error during copy.{NC}")
+             for err in captured_errors[-10:]: # Print last 10 lines of error
+                 print(f"  {R}{err}{NC}")
              batch_stats['failed'] += 1
              return (False, 0)
 
@@ -501,16 +572,38 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
         print(f"{G}Pass:{NC} Q={quality}")
         
         cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to, video_mode='compress')
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}
         encode_start = time.time()
+        captured_errors = [] # Reset errors
+        
+        # Start Non-Blocking Reader
+        q = queue.Queue()
+        t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
+        t.daemon = True
+        t.start()
         
         try:
             while True:
-                line = process.stdout.readline()
-                if not line and process.poll() is not None:
-                    break
+                try:
+                    line = q.get(timeout=2.0)
+                except queue.Empty:
+                    if process.poll() is not None:
+                        break
+                    # Still running but silent? likely faststart
+                    # Calculate percentage based on duration if we can
+                    sys.stdout.write(f"\r {G}{profile['codec']}{NC} [Moving Atoms / Finalizing...] ({time.time()-encode_start:.0f}s)    ")
+                    sys.stdout.flush()
+                    continue
+
+                if not line: # Should not happen with Thread logic usually unless empty string put in queue
+                    if process.poll() is not None:
+                        break
+                
+                # Capture potential errors (everything not progress info)
+                if line.strip() and not any(k in line for k in ['bitrate=', 'speed=', 'out_time_ms=', 'total_size=', 'frame=']):
+                     captured_errors.append(line.strip())
                 
                 if 'bitrate=' in line:
                     cur_stats["bitrate"] = line.split('=')[1].strip()
@@ -522,7 +615,8 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
                         try:
                             ms = int(val)
                             elapsed = time.time() - encode_start
-                            show_progress(ms / 1000000, info['duration'], profile['codec'], cur_stats["bitrate"], cur_stats["speed"], elapsed)
+                            duration_to_show = trim_duration if is_trim else info['duration']
+                            show_progress(ms / 1000000, duration_to_show, profile['codec'], cur_stats["bitrate"], cur_stats["speed"], elapsed)
                         except ValueError:
                             pass
             
@@ -531,6 +625,8 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
             
             if process.returncode != 0:
                 print(f"{R}FFmpeg error during encoding.{NC}")
+                for err in captured_errors[-10:]:
+                    print(f"  {R}{err}{NC}")
                 if output_path.exists(): output_path.unlink()
                 batch_stats['failed'] += 1
                 return (False, 0)
@@ -538,31 +634,43 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
             size_after = output_path.stat().st_size
             
             # If trimming, we cannot compare size properly against original or do SSIM easily (durations differ)
-            if is_trim:
-                file_time = time.time() - file_start_time
-                print(f" {BG}>>> SUCCESS (TRIM)! Saved to {output_path.name} in {format_time(file_time)}.{NC}")
-                batch_stats['total_time'] += file_time
-                batch_stats['success'] += 1
-                if port: notify_server(port, input_path)
-                return (True, 0)
+            # FIXED: We now use projected size and offset SSIM
+            # if is_trim:
+            #     file_time = time.time() - file_start_time
+            #     print(f" {BG}>>> SUCCESS (TRIM)! Saved to {output_path.name} in {format_time(file_time)}.{NC}")
+            #     batch_stats['total_time'] += file_time
+            #     batch_stats['success'] += 1
+            #     if port: notify_server(port, input_path)
+            #     return (True, 0)
 
-            if size_after >= size_before:
-                print(f" {R}-> File larger. Adjusting quality...{NC}")
+            if size_after >= size_to_compare:
+                print(f" {R}-> File larger ({format_size(size_after)} > {format_size(size_to_compare)}). Adjusting quality...{NC}")
                 quality += step
                 continue
 
             # SSIM verification
-            p1 = info['duration'] * 0.25
-            p2 = info['duration'] * 0.75
-            if p2 + SAMPLE_DURATION > info['duration']:
-                p2 = max(0, info['duration'] - SAMPLE_DURATION - 1)
+            # If trimming, use trim_duration for sampling points
+            dur_for_samples = trim_duration if is_trim else info['duration']
             
-            ssim1 = get_ssim(input_path, output_path, p1, SAMPLE_DURATION)
-            ssim2 = get_ssim(input_path, output_path, p2, SAMPLE_DURATION)
+            p1 = dur_for_samples * 0.25
+            p2 = dur_for_samples * 0.75
+            
+            # Ensure p2 + sample is within bounds
+            if p2 + SAMPLE_DURATION > dur_for_samples:
+                p2 = max(0, dur_for_samples - SAMPLE_DURATION - 1)
+            
+            # For orig file, add start_offset. For opt file, starts at 0.
+            orig_p1 = start_offset + p1
+            orig_p2 = start_offset + p2
+            
+            # print(f"DEBUG: SSIM Check P1: Orig@{orig_p1} vs Opt@{p1}")
+            
+            ssim1 = get_ssim(input_path, output_path, orig_p1, p1, SAMPLE_DURATION)
+            ssim2 = get_ssim(input_path, output_path, orig_p2, p2, SAMPLE_DURATION)
             ssim = min(ssim1, ssim2)
             
-            saved_bytes = size_before - size_after
-            saved_pct = saved_bytes * 100 / size_before
+            saved_bytes = size_to_compare - size_after
+            saved_pct = saved_bytes * 100 / size_to_compare
             print(f" {G}-> Result:{NC} Q={quality} | Saved: {saved_pct:.2f}% | SSIM: {ssim:.4f}")
 
             if (saved_pct >= MIN_SAVINGS and ssim >= MIN_QUALITY) or \
