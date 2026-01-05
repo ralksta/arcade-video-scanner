@@ -55,8 +55,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 return
             
             # 1. ROOT / INDEX -> Serve REPORT_FILE
+            # Normalize path to ignore query parameters for routing
+            clean_path = self.path.split('?')[0]
+            
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview"]
-            if self.path in spa_routes or self.path.startswith("/index.html?") or self.path.startswith("/collections"):
+            if clean_path in spa_routes or clean_path.startswith("/collections/"):
                 self.send_response(200)
                 self.send_header("Content-type", "text/html; charset=utf-8")
                 

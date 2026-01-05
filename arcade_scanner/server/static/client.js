@@ -4,6 +4,12 @@ let currentSort = 'bitrate';
 let currentLayout = 'grid'; // grid, list, or treemap
 let workspaceMode = 'lobby'; // lobby, mixed, vault
 let currentFolder = 'all';
+let minSizeMB = null;
+let maxSizeMB = null;
+let dateFilter = 'all'; // all, 1d, 7d, 30d
+let activeTags = []; // Array of tag names currently selected for filtering
+let filterUntaggedOnly = false;
+let availableTags = []; // Loaded from API
 let searchTerm = '';
 let activeSmartCollectionCriteria = null; // Stores current smart collection rules
 let activeCollectionId = null; // Stores currently active collection ID for UI highlighting
@@ -102,6 +108,34 @@ function setCodecFilter(c) {
     filterAndSort();
 }
 
+function setCodecFilter(c) {
+    currentCodec = c;
+    filterAndSort();
+}
+
+function setMinSize(val) {
+    minSizeMB = val ? parseFloat(val) : null;
+    filterAndSort();
+}
+
+function setMaxSize(val) {
+    maxSizeMB = val ? parseFloat(val) : null;
+    filterAndSort();
+}
+
+function setDateFilter(val) {
+    dateFilter = val;
+    // Update active class
+    document.querySelectorAll('[data-filter="date"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === val);
+        // Update border color
+        btn.style.borderColor = btn.dataset.value === val ? 'rgba(0, 255, 208, 0.5)' : 'rgba(255, 255, 255, 0.1)';
+        btn.style.background = btn.dataset.value === val ? 'rgba(0, 255, 208, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+        btn.style.color = btn.dataset.value === val ? '#00ffd0' : '#9ca3af';
+    });
+    filterAndSort();
+}
+
 function setSort(s) {
     currentSort = s;
     filterAndSort();
@@ -110,15 +144,17 @@ function setSort(s) {
 // --- SEARCHABLE FOLDER DROPDOWN LOGIC ---
 
 
-function setWorkspaceMode(mode) {
+function setWorkspaceMode(mode, preserveCollection = false) {
     try {
         console.log("Setting workspace mode:", mode);
         workspaceMode = mode;
 
-        // Clear active smart collection when changing workspace (unless mode is explicitly 'collection' which we don't use yet)
-        activeSmartCollectionCriteria = null;
-        activeCollectionId = null; // Clear active visual state
-        renderCollections(); // Re-render to remove active class
+        // Clear active smart collection when changing workspace unless executing a collection load
+        if (!preserveCollection) {
+            activeSmartCollectionCriteria = null;
+            activeCollectionId = null; // Clear active visual state
+            renderCollections(); // Re-render to remove active class
+        }
 
         // Set workspace data attribute for CSS theming
         document.body.setAttribute('data-workspace', mode);
@@ -292,11 +328,18 @@ function updateURL() {
         if (workspaceMode === 'optimized') path = '/review';
         else if (workspaceMode === 'favorites') path = '/favorites';
         else if (workspaceMode === 'vault') path = '/vault';
+        else if (path.startsWith('/collections/')) { } // Keep existing path for collections
         else path = '/lobby';
+
+        // Add view param if not grid
+        if (currentLayout !== 'grid') {
+            path += `?view=${currentLayout}`;
+        }
     }
 
-    // Only push if changed
-    if (window.location.pathname !== path) {
+    // Only push if changed (ignoring duplicate slashes etc)
+    const currentPath = window.location.pathname + window.location.search;
+    if (currentPath !== path) {
         window.history.pushState({ layout: currentLayout, folder: treemapCurrentFolder, mode: workspaceMode }, '', path);
     }
 }
@@ -308,7 +351,7 @@ function loadFromURL() {
 
     // Default
     let mode = 'lobby';
-    let layout = 'grid';
+    let layout = params.get('view') || 'grid';
 
     if (path === '/favorites') mode = 'favorites';
     else if (path === '/review') mode = 'optimized';
@@ -317,12 +360,34 @@ function loadFromURL() {
         mode = 'lobby';
         layout = 'treemap';
     }
+    else if (path.startsWith('/collections/')) {
+        mode = 'lobby'; // Start in lobby mode but with filter
+        const collectionName = decodeURIComponent(path.substring('/collections/'.length));
+
+        // Wait for settings to be loaded? NO, userSettings is global and loaded in main block.
+        // Assuming userSettings is available.
+        if (userSettings && userSettings.smart_collections) {
+            const col = userSettings.smart_collections.find(c => c.name === collectionName);
+            if (col) {
+                activeSmartCollectionCriteria = col.criteria;
+                activeCollectionId = col.id;
+                // We'll rely on renderUI -> renderFolderSidebar/renderCollections to highlight it?
+                // Actually filterAndSort uses activeSmartCollectionCriteria.
+            }
+        }
+    }
 
     // Overrides from params
     if (params.get('view') === 'treemap') layout = 'treemap';
     if (params.get('folder')) treemapCurrentFolder = decodeURIComponent(params.get('folder'));
 
-    setWorkspaceMode(mode);
+    // Check deep links
+    if (path.startsWith('/collections/')) {
+        // We set mode='lobby' above, but here we MUST preserve the collection we found
+        setWorkspaceMode(mode, true);
+    } else {
+        setWorkspaceMode(mode);
+    }
 
     // Force layout if treeview
     if (layout === 'treemap') {
@@ -431,10 +496,40 @@ function filterAndSort(scrollToTop = false) {
                 else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
                 else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
 
-                // Tag filtering: if activeTags is not empty, video must have ALL selected tags
+                // Size Filter
+                let matchesSize = true;
+                if (minSizeMB !== null && v.Size_MB < minSizeMB) matchesSize = false;
+                if (maxSizeMB !== null && v.Size_MB > maxSizeMB) matchesSize = false;
+
+                // Date Filter (Imported At or fallback to mtime)
+                let matchesDate = true;
+                if (dateFilter !== 'all') {
+                    const now = Date.now() / 1000;
+                    const fileTime = v.imported_at > 0 ? v.imported_at : (v.mtime || 0);
+                    const diff = now - fileTime;
+
+                    if (dateFilter === '1d' && diff > 86400) matchesDate = false;
+                    else if (dateFilter === '7d' && diff > 7 * 86400) matchesDate = false;
+                    else if (dateFilter === '30d' && diff > 30 * 86400) matchesDate = false;
+                }
+
+                // Tag filtering with Tri-State support (Include vs Exclude)
                 let matchesTags = true;
                 if (activeTags.length > 0) {
-                    matchesTags = activeTags.every(tag => videoTags.includes(tag));
+                    const positiveTags = activeTags.filter(t => !t.startsWith('!'));
+                    const negativeTags = activeTags.filter(t => t.startsWith('!')).map(t => t.substring(1));
+
+                    // Must have ALL positive tags
+                    if (positiveTags.length > 0) {
+                        const hasAllPos = positiveTags.every(pt => videoTags.includes(pt));
+                        if (!hasAllPos) matchesTags = false;
+                    }
+
+                    // Must have NONE of the negative tags
+                    if (matchesTags && negativeTags.length > 0) {
+                        const hasAnyNeg = negativeTags.some(nt => videoTags.includes(nt));
+                        if (hasAnyNeg) matchesTags = false;
+                    }
                 }
 
                 // Untagged filter: show only videos with no tags
@@ -442,7 +537,7 @@ function filterAndSort(scrollToTop = false) {
                     matchesTags = videoTags.length === 0;
                 }
 
-                const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder && matchesTags;
+                const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder && matchesTags && matchesSize && matchesDate;
                 if (ok) { vCount++; tSize += v.Size_MB; }
                 return ok;
             });
@@ -657,6 +752,8 @@ function createVideoCard(v) {
     // Using utility classes for the card wrapper
     // group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container
     container.className = 'group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container flex flex-col';
+    // Debug layout
+    if (window.debugLayout) console.log('Created card with classes:', container.className);
     container.setAttribute('data-path', v.FilePath); // Keep this for JS logic
 
     const isHevc = (v.codec || '').includes('hevc') || (v.codec || '').includes('h265');
@@ -667,7 +764,7 @@ function createVideoCard(v) {
 
     container.innerHTML = `
         <!-- Thumbnail (Card Media) -->
-        <div class="card-media relative w-full aspect-video bg-black overflow-hidden group cursor-pointer" 
+        <div class="card-media relative aspect-video bg-black overflow-hidden group cursor-pointer" 
              onclick="openCinema(this)">
              
              <!-- Corner Checkbox -->
@@ -681,7 +778,7 @@ function createVideoCard(v) {
                 <span class="material-icons text-lg">${v.favorite ? 'star' : 'star_border'}</span>
              </button>
 
-             <img src="/thumbnails/${v.thumb}" class="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110" loading="lazy">
+             <img src="/thumbnails/${v.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
 
              
              <!-- Quick Actions Overlay -->
@@ -715,7 +812,7 @@ function createVideoCard(v) {
         </div>
 
         <!-- Content -->
-        <div class="p-3 flex flex-col gap-1">
+        <div class="card-body p-3 flex flex-col gap-1">
             <h3 class="text-sm font-medium text-gray-200 line-clamp-1 group-hover:text-arcade-cyan transition-colors" title="${fileName}">${fileName}</h3>
             <p class="text-[11px] text-gray-500 truncate" title="${v.FilePath}">${dirName}</p>
             
@@ -1527,6 +1624,10 @@ function setFolderFilter(folder) {
     renderFolderSidebar();
 }
 
+function initialRender() {
+    renderFolderSidebar();
+}
+
 function renderFolderSidebar() {
     const list = document.getElementById('folderList');
     if (!list.parentElement.classList.contains('active')) return;
@@ -2039,25 +2140,7 @@ window.addEventListener('popstate', (event) => {
     }
 });
 
-// Init
-window.onload = () => {
-    loadFromURL();
-    filterAndSort();
-
-    // Add double-click handler to stats display for quick treemap access
-    const statsDisplay = document.querySelector('.stats-display');
-    if (statsDisplay) {
-        statsDisplay.addEventListener('dblclick', () => {
-            setLayout('treemap');
-            // Update toggle button icon
-            const btn = document.getElementById('toggleView');
-            btn.innerHTML = '<span class="material-icons">view_module</span>';
-        });
-    }
-
-    // Load fresh settings from API to ensure sync
-    loadSettings();
-};
+// Init handled in DOMContentLoaded below
 
 // --- SETTINGS MODAL ---
 async function openSettings() {
@@ -2655,6 +2738,9 @@ function openCollectionModal(editId = null) {
     // Reset form
     document.getElementById('collectionName').value = '';
     document.getElementById('collectionSearch').value = '';
+    document.getElementById('collectionDateFilter').value = 'all';
+    document.getElementById('collectionMinSize').value = '';
+    document.getElementById('collectionMaxSize').value = '';
     document.getElementById('collectionColor').value = '#64FFDA';
     document.getElementById('collectionColorBtn').style.backgroundColor = '#64FFDA';
     document.getElementById('selectedCollectionIcon').innerText = 'folder_special';
@@ -2675,6 +2761,12 @@ function openCollectionModal(editId = null) {
         if (existing) {
             document.getElementById('collectionName').value = existing.name || '';
             document.getElementById('collectionSearch').value = existing.criteria?.search || '';
+
+            // Populate New Fields
+            document.getElementById('collectionDateFilter').value = existing.criteria?.date || 'all';
+            document.getElementById('collectionMinSize').value = existing.criteria?.size?.min || '';
+            document.getElementById('collectionMaxSize').value = existing.criteria?.size?.max || '';
+
             document.getElementById('collectionColor').value = existing.color || '#64FFDA';
             document.getElementById('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
             document.getElementById('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
@@ -2696,6 +2788,12 @@ function openCollectionModal(editId = null) {
                     collectionCriteriaNew.include.tags = [...existing.criteria.tags];
                 }
                 collectionCriteriaNew.search = existing.criteria?.search || '';
+
+                // Preserve new fields if they were mixed in (Migration fix)
+                if (existing.criteria?.size) collectionCriteriaNew.size = existing.criteria.size;
+                if (existing.criteria?.date) collectionCriteriaNew.date = existing.criteria.date;
+                if (existing.criteria?.duration) collectionCriteriaNew.duration = existing.criteria.duration;
+                if (existing.criteria?.favorites) collectionCriteriaNew.favorites = existing.criteria.favorites;
             }
         }
     }
@@ -2790,9 +2888,19 @@ function saveCollection() {
     const color = document.getElementById('collectionColor').value;
     const search = document.getElementById('collectionSearch').value.trim();
 
-    // Update search in criteria
+    // New Inputs
+    const dateVal = document.getElementById('collectionDateFilter').value;
+    const sizeMin = document.getElementById('collectionMinSize').value;
+    const sizeMax = document.getElementById('collectionMaxSize').value;
+
+    // Update criteria
     if (collectionCriteriaNew) {
         collectionCriteriaNew.search = search;
+        collectionCriteriaNew.date = (dateVal && dateVal !== 'all') ? dateVal : null;
+        collectionCriteriaNew.size = {
+            min: sizeMin ? parseInt(sizeMin) : null,
+            max: sizeMax ? parseInt(sizeMax) : null
+        };
     }
 
     const collection = {
@@ -2823,6 +2931,12 @@ function saveCollection() {
 
     saveSettingsWithoutReload();
     renderCollections();
+
+    // If we just edited the currently active collection, re-apply it so changes take effect immediately
+    if (editingCollectionId && editingCollectionId === activeCollectionId) {
+        applyCollection(editingCollectionId); // This uses the updated userSettings
+    }
+
     closeCollectionModal();
 }
 
@@ -2905,27 +3019,34 @@ function getVideoOrientation(video) {
 
 // Check if video matches date filter
 function matchesDateFilter(video, dateFilter) {
-    if (!dateFilter || dateFilter.type === 'any' || dateFilter.type === 'all') return true;
+    // dateFilter can be string 'all', '1d' etc, or object {type: 'relative', relative: '1d'}
+    if (!dateFilter || dateFilter === 'all' || (dateFilter.type && dateFilter.type === 'all')) return true;
 
-    const videoDate = video.CreatedDate ? new Date(video.CreatedDate) : null;
-    if (!videoDate) return false;
+    // Use imported_at if available (new logic), fallback to mtime
+    const timestamp = (video.imported_at > 0 ? video.imported_at : video.mtime) || 0;
+    if (timestamp === 0) return false; // No date info
 
-    const now = new Date();
+    const now = Math.floor(Date.now() / 1000); // Current unix timestamp
+    const videoTime = timestamp;
 
-    if (dateFilter.type === 'relative' && dateFilter.relative) {
-        const msMap = {
-            '24h': 24 * 60 * 60 * 1000,
-            '7d': 7 * 24 * 60 * 60 * 1000,
-            '30d': 30 * 24 * 60 * 60 * 1000,
-            '90d': 90 * 24 * 60 * 60 * 1000
+    let relativeKey = typeof dateFilter === 'string' ? dateFilter : dateFilter.relative;
+
+    if (relativeKey) {
+        const secondsMap = {
+            '1d': 24 * 60 * 60,
+            '7d': 7 * 24 * 60 * 60,
+            '30d': 30 * 24 * 60 * 60,
+            '90d': 90 * 24 * 60 * 60,
+            '1y': 365 * 24 * 60 * 60
         };
-        const cutoff = now.getTime() - (msMap[dateFilter.relative] || 0);
-        return videoDate.getTime() >= cutoff;
+        const cutoff = now - (secondsMap[relativeKey] || 0);
+        return videoTime >= cutoff;
     }
 
     if (dateFilter.type === 'absolute') {
-        if (dateFilter.from && videoDate < new Date(dateFilter.from)) return false;
-        if (dateFilter.to && videoDate > new Date(dateFilter.to)) return false;
+        // Absolute not fully reimagined for modal yet, but keeping logic structure
+        // Assuming videoTime is seconds, and from/to are date strings or millis?
+        // Let's defer absolute for now as modal only has relative select.
     }
 
     return true;
@@ -2953,7 +3074,8 @@ function evaluateCollectionMatch(video, criteria) {
     const isHidden = video.hidden || false;
     const isFavorite = video.favorite || false;
     const duration = video.duration || 0;
-    const size = video.SizeBytes || 0;
+    // Use consistent Size_MB
+    const sizeMB = video.Size_MB || 0;
 
     // Hidden videos are never included
     if (isHidden) return false;
@@ -3031,7 +3153,8 @@ function evaluateCollectionMatch(video, criteria) {
     }
 
     // --- DATE FILTER ---
-    if (!matchesDateFilter(video, criteria.date)) return false;
+    // Support both simple string '7d' logic and complex object logic
+    if (criteria.date && !matchesDateFilter(video, criteria.date)) return false;
 
     // --- DURATION FILTER ---
     if (criteria.duration) {
@@ -3041,8 +3164,9 @@ function evaluateCollectionMatch(video, criteria) {
 
     // --- SIZE FILTER ---
     if (criteria.size) {
-        if (criteria.size.min !== null && size < criteria.size.min) return false;
-        if (criteria.size.max !== null && size > criteria.size.max) return false;
+        // criteria.size.min/max are expected in MB now because UI inputs are MB
+        if (criteria.size.min !== null && sizeMB < criteria.size.min) return false;
+        if (criteria.size.max !== null && sizeMB > criteria.size.max) return false;
     }
 
     // --- SEARCH ---
@@ -3145,16 +3269,61 @@ function renderSmartCollectionTagsList() {
         return;
     }
 
-    const selectedTags = collectionCriteriaNew?.include?.tags || [];
+    const includedTags = collectionCriteriaNew?.include?.tags || [];
+    const excludedTags = collectionCriteriaNew?.exclude?.tags || [];
 
-    container.innerHTML = availableTags.map(tag => `
-        <button class="filter-chip ${selectedTags.includes(tag.name) ? 'active' : ''}" 
+    container.innerHTML = availableTags.map(tag => {
+        const isIncluded = includedTags.includes(tag.name);
+        const isExcluded = excludedTags.includes(tag.name);
+
+        let style = '';
+        let classes = 'filter-chip';
+
+        if (isIncluded) {
+            style = `border-color: ${tag.color}; background: ${tag.color}20;`;
+            classes += ' active';
+        } else if (isExcluded) {
+            // Red style for exclusion
+            style = `border-color: #ef4444; background: rgba(239, 68, 68, 0.15); color: #ef4444; text-decoration: line-through; opacity: 0.8;`;
+            classes += ' exclude';
+        }
+
+        return `
+        <button class="${classes}" 
                 onclick="toggleSmartTagChip('${tag.name}')"
-                style="${selectedTags.includes(tag.name) ? `border-color: ${tag.color}; background: ${tag.color}20;` : ''}">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
+                style="${style}">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${isExcluded ? '#ef4444' : tag.color}"></span>
             ${tag.name}
         </button>
-    `).join('');
+        `;
+    }).join('');
+}
+
+// Toggle tag chip (Unselected -> Included -> Excluded -> Unselected)
+function toggleSmartTagChip(tagName) {
+    if (!collectionCriteriaNew) initNewCollectionCriteria();
+
+    // Ensure arrays exist
+    if (!collectionCriteriaNew.include.tags) collectionCriteriaNew.include.tags = [];
+    if (!collectionCriteriaNew.exclude.tags) collectionCriteriaNew.exclude.tags = [];
+
+    const incIdx = collectionCriteriaNew.include.tags.indexOf(tagName);
+    const excIdx = collectionCriteriaNew.exclude.tags.indexOf(tagName);
+
+    if (incIdx === -1 && excIdx === -1) {
+        // State 0 -> 1: Include it
+        collectionCriteriaNew.include.tags.push(tagName);
+    } else if (incIdx !== -1) {
+        // State 1 -> 2: Exclude it
+        collectionCriteriaNew.include.tags.splice(incIdx, 1);
+        collectionCriteriaNew.exclude.tags.push(tagName);
+    } else if (excIdx !== -1) {
+        // State 2 -> 0: Remove it
+        collectionCriteriaNew.exclude.tags.splice(excIdx, 1);
+    }
+
+    renderSmartCollectionTagsList();
+    updateCollectionPreviewCount();
 }
 
 // Update the real-time match count badge
@@ -3167,27 +3336,42 @@ function updateCollectionPreviewCount() {
         return;
     }
 
-    // Include search term from input
+    // Clone base structure from valid criteria
+    // We only want to override the fields that have input elements (Search, Date, Size)
+    // The chip-based criteria (Status, Codec, Tags, etc.) are already updated in `collectionCriteriaNew` by their toggle functions.
+    const tempCriteria = JSON.parse(JSON.stringify(collectionCriteriaNew));
+
+    // 1. Search
     const searchInput = document.getElementById('collectionSearch');
     if (searchInput) {
-        collectionCriteriaNew.search = searchInput.value.trim();
+        tempCriteria.search = searchInput.value.trim();
+    }
+
+    // 2. Date
+    const dateInput = document.getElementById('collectionDateFilter');
+    if (dateInput) {
+        const val = dateInput.value;
+        tempCriteria.date = (val && val !== 'all') ? val : null;
+    }
+
+    // 3. Size
+    const minSizeInput = document.getElementById('collectionMinSize');
+    const maxSizeInput = document.getElementById('collectionMaxSize');
+
+    const minVal = minSizeInput && minSizeInput.value ? parseInt(minSizeInput.value) : null;
+    const maxVal = maxSizeInput && maxSizeInput.value ? parseInt(maxSizeInput.value) : null;
+
+    if (minVal !== null || maxVal !== null) {
+        tempCriteria.size = { min: minVal, max: maxVal };
+    } else {
+        tempCriteria.size = null;
     }
 
     // Count matching videos
     const allVideos = window.ALL_VIDEOS || [];
-    const matchingVideos = allVideos.filter(v => evaluateCollectionMatch(v, collectionCriteriaNew));
+    const matchingVideos = allVideos.filter(v => evaluateCollectionMatch(v, tempCriteria));
     const count = matchingVideos.length;
     countEl.textContent = count;
-
-    // Debug logging
-    if (collectionCriteriaNew.favorites === true) {
-        const favVideos = allVideos.filter(v => v.favorite);
-        console.log(`🎬 Favorites filter: ${favVideos.length} videos have favorite=true out of ${allVideos.length}`);
-    }
-    if (collectionCriteriaNew.include?.resolution?.length > 0) {
-        const sample = allVideos.slice(0, 3).map(v => ({ w: v.width || v.Width, h: v.height || v.Height }));
-        console.log('📐 Sample video dimensions:', sample);
-    }
 
     // Animate if changed
     countEl.closest('.px-3')?.classList.add('animate-pulse');
@@ -3370,6 +3554,12 @@ function applyCollection(collectionId) {
             converted.include.tags = [...criteria.tags];
         }
         converted.search = criteria.search || '';
+
+        // Preserve new fields if they were mixed in (Migration fix)
+        if (criteria.size) converted.size = criteria.size;
+        if (criteria.date) converted.date = criteria.date;
+        if (criteria.duration) converted.duration = criteria.duration;
+        if (criteria.favorites) converted.favorites = criteria.favorites;
 
         criteria = converted;
     }
@@ -3609,9 +3799,7 @@ window.importSettings = importSettings;
 // =============================================================================
 
 // Filter state (in addition to existing currentFilter, currentCodec)
-let activeTags = [];      // Array of tag names currently selected for filtering
-let filterUntaggedOnly = false;
-let availableTags = [];   // Loaded from API
+// activeTags, filterUntaggedOnly, minSizeMB, maxSizeMB, dateFilter, availableTags are declared at the top of the file.
 
 // --- FILTER PANEL CONTROLS ---
 function openFilterPanel() {
@@ -3641,6 +3829,17 @@ function syncFilterPanelState() {
         btn.classList.toggle('active', btn.dataset.value === currentCodec);
     });
 
+    // Sync size inputs
+    const minSizeInput = document.getElementById('filterMinSize');
+    if (minSizeInput) minSizeInput.value = minSizeMB !== null ? minSizeMB : '';
+    const maxSizeInput = document.getElementById('filterMaxSize');
+    if (maxSizeInput) maxSizeInput.value = maxSizeMB !== null ? maxSizeMB : '';
+
+    // Sync date chips
+    document.querySelectorAll('[data-filter="date"]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === dateFilter);
+    });
+
     // Sync untagged checkbox
     const untaggedCheck = document.getElementById('filterUntaggedOnly');
     if (untaggedCheck) untaggedCheck.checked = filterUntaggedOnly;
@@ -3653,21 +3852,39 @@ function setFilterOption(type, value) {
         currentFilter = value;
     } else if (type === 'codec') {
         currentCodec = value;
+    } else if (type === 'minSize') {
+        minSizeMB = value === '' ? null : parseInt(value);
+    } else if (type === 'maxSize') {
+        maxSizeMB = value === '' ? null : parseInt(value);
+    } else if (type === 'date') {
+        dateFilter = value;
     }
 
-    // Update chip visual state
-    document.querySelectorAll(`[data-filter="${type}"]`).forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.value === value);
-    });
+    // Update chip visual state (for status, codec, date)
+    if (type === 'status' || type === 'codec' || type === 'date') {
+        document.querySelectorAll(`[data-filter="${type}"]`).forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === value);
+        });
+    }
 
     updateFilterPanelCount();
 }
 
 function toggleTagFilter(tagName) {
-    const idx = activeTags.indexOf(tagName);
-    if (idx > -1) {
-        activeTags.splice(idx, 1);
+    const idxPos = activeTags.indexOf(tagName);
+    const idxNeg = activeTags.indexOf('!' + tagName);
+
+    // Tri-state: Inactive -> Positive -> Negative -> Inactive
+
+    if (idxPos > -1) {
+        // Was Positive -> Change to Negative
+        activeTags.splice(idxPos, 1);
+        activeTags.push('!' + tagName);
+    } else if (idxNeg > -1) {
+        // Was Negative -> Change to Inactive
+        activeTags.splice(idxNeg, 1);
     } else {
+        // Was Inactive -> Change to Positive
         activeTags.push(tagName);
     }
 
@@ -3685,6 +3902,9 @@ function updateFilterPanelCount() {
     let count = 0;
     if (currentFilter !== 'all') count++;
     if (currentCodec !== 'all') count++;
+    if (minSizeMB !== null) count++;
+    if (maxSizeMB !== null) count++;
+    if (dateFilter !== 'all') count++;
     count += activeTags.length;
     if (filterUntaggedOnly) count++;
 
@@ -3719,6 +3939,9 @@ function resetFilters() {
     currentCodec = 'all';
     activeTags = [];
     filterUntaggedOnly = false;
+    minSizeMB = null;
+    maxSizeMB = null;
+    dateFilter = 'all';
 
     // Sync UI
     syncFilterPanelState();
@@ -3749,9 +3972,33 @@ function renderActiveFiltersRow() {
     if (currentCodec !== 'all') {
         chips.push({ label: `Codec: ${currentCodec.toUpperCase()}`, type: 'codec' });
     }
+
+    // Size Chips
+    if (minSizeMB !== null) chips.push({ label: `> ${minSizeMB} MB`, type: 'minSize' });
+    if (maxSizeMB !== null) chips.push({ label: `< ${maxSizeMB} MB`, type: 'maxSize' });
+
+    // Date Chips
+    if (dateFilter !== 'all') {
+        let label = 'Date';
+        if (dateFilter === '1d') label = 'Last 24h';
+        if (dateFilter === '7d') label = 'Last 7 Days';
+        if (dateFilter === '30d') label = 'Last 30 Days';
+        chips.push({ label: label, type: 'date' });
+    }
+
     activeTags.forEach(tag => {
-        const tagData = availableTags.find(t => t.name === tag);
-        chips.push({ label: tag, type: 'tag', color: tagData?.color || '#888' });
+        // Handle negative tags
+        const isNeg = tag.startsWith('!');
+        const realName = isNeg ? tag.substring(1) : tag;
+
+        const tagData = availableTags.find(t => t.name === realName);
+        // Note: For display in the active filters row, we show them distinctively
+        chips.push({
+            label: realName,
+            type: 'tag',
+            color: isNeg ? '#ef4444' : (tagData?.color || '#888'),
+            isNeg: isNeg
+        });
     });
     if (filterUntaggedOnly) {
         chips.push({ label: 'Untagged only', type: 'untagged' });
@@ -3764,7 +4011,7 @@ function renderActiveFiltersRow() {
 
     row.classList.remove('hidden');
     chipsContainer.innerHTML = chips.map(c => `
-        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-white/10 text-gray-300 border border-white/10">
+        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-white/10 text-gray-300 border border-white/10 ${c.isNeg ? 'line-through decoration-red-500 decoration-2 text-red-200' : ''}">
             ${c.type === 'tag' ? `<span class="w-2 h-2 rounded-full" style="background: ${c.color}"></span>` : ''}
             ${c.label}
             <button class="hover:text-arcade-pink" onclick="removeActiveFilter('${c.type}', '${c.label}')">×</button>
@@ -3777,8 +4024,17 @@ function removeActiveFilter(type, label) {
         currentFilter = 'all';
     } else if (type === 'codec') {
         currentCodec = 'all';
+    } else if (type === 'minSize') {
+        minSizeMB = null;
+        document.getElementById('filterMinSize').value = '';
+    } else if (type === 'maxSize') {
+        maxSizeMB = null;
+        document.getElementById('filterMaxSize').value = '';
+    } else if (type === 'date') {
+        setDateFilter('all');
     } else if (type === 'tag') {
-        activeTags = activeTags.filter(t => t !== label);
+        // Handle removal of both normal and negative tags
+        activeTags = activeTags.filter(t => t !== label && t !== '!' + label);
     } else if (type === 'untagged') {
         filterUntaggedOnly = false;
     }
@@ -3814,14 +4070,29 @@ function renderFilterTagsList() {
         return;
     }
 
-    container.innerHTML = availableTags.map(tag => `
-        <button class="tag-filter-chip ${activeTags.includes(tag.name) ? 'active' : ''}" 
+    container.innerHTML = availableTags.map(tag => {
+        const isPos = activeTags.includes(tag.name);
+        const isNeg = activeTags.includes('!' + tag.name);
+        let classes = 'tag-filter-chip';
+        let style = 'border-color: rgba(255,255,255,0.15)';
+
+        if (isPos) {
+            classes += ' active';
+            style = `border-color: ${tag.color}`;
+        } else if (isNeg) {
+            classes += ' negative';
+            style = `border-color: rgba(239, 68, 68, 0.5)`;
+        }
+
+        return `
+        <button class="${classes}" 
                 onclick="toggleTagFilter('${tag.name}')"
-                style="border-color: ${activeTags.includes(tag.name) ? tag.color : 'rgba(255,255,255,0.15)'}">
-            <span class="tag-dot" style="background-color: ${tag.color}"></span>
+                style="${style}">
+            <span class="tag-dot" style="background-color: ${isNeg ? '#ef4444' : tag.color}"></span>
             ${tag.name}
         </button>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // --- VIDEO CARD TAG CHIPS ---
@@ -4080,7 +4351,7 @@ document.addEventListener('keydown', (e) => {
 // =============================================================================
 
 // --- RUN ON LOAD ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Initialize workspace theming
     const initialWorkspace = workspaceMode || 'lobby';
     document.body.setAttribute('data-workspace', initialWorkspace);
@@ -4090,6 +4361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lobby: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
         favorites: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' },
         optimized: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
+        review: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
         vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' }
     };
     const colors = wsColors[initialWorkspace] || wsColors.lobby;
@@ -4109,12 +4381,32 @@ document.addEventListener('DOMContentLoaded', () => {
         loadFromURL();
     };
 
-    // Initial Load
+    // 1. Load Settings FIRST (async)
+    // This ensures userSettings.smart_collections is populated before we parse URL
+    await loadSettings();
+
+    // 2. Initial Render (Sidebar etc)
+    initialRender();
+
+    // 3. Parse URL and set initial state
     loadFromURL();
+
+    // Add double-click handler to stats display for quick treemap access
+    const statsDisplay = document.querySelector('.stats-display');
+    if (statsDisplay) {
+        statsDisplay.addEventListener('dblclick', () => {
+            setLayout('treemap');
+            // Update toggle button icon
+            const btn = document.getElementById('toggleView');
+            if (btn) btn.innerHTML = '<span class="material-icons">view_module</span>';
+        });
+    }
 
     // Render views and collections
     setTimeout(() => {
         renderSavedViews();
         renderCollections();
+        // Force one last filter execution to ensure everything is matched
+        filterAndSort();
     }, 500);
 });

@@ -32,8 +32,13 @@ class VideoEntry(BaseModel):
     vaulted: bool = Field(False, alias="hidden", description="Is moved to vault/hidden")
     tags: list[str] = Field(default_factory=list, description="User defined tags")
     thumb: str = Field("", description="Thumbnail filename")
+    
+    # Date Metadata
+    imported_at: Optional[int] = Field(0, description="Timestamp when first imported/scanned")
+    mtime: Optional[int] = Field(0, description="Last modification timestamp of the file")
 
     
     class Config:
-        populate_by_name = True  # Allows using snake_case in code, but aliases for JSON compat
+        populate_by_name = True
+        extra = "ignore"  # Robustness against cache mismatch
         

@@ -795,6 +795,11 @@ html {
     }
 }
 
+/* Default Media Width (Grid Mode) */
+#videoGrid:not(.list-view) .card-media {
+    width: 100%;
+}
+
 /* Enhanced List View (Accessible & Readable) */
 #videoGrid.list-view {
     display: flex;
@@ -809,31 +814,33 @@ html {
     max-width: 100%;
     min-width: 0;
     overflow: hidden;
-}
-
-#videoGrid.list-view .content-card {
-    flex-direction: row;
+    flex-direction: row !important;
+    /* Force row layout override flex-col utility */
     align-items: center;
     padding: 0 15px;
     height: auto;
     min-height: 120px;
     gap: 15px;
     background: rgba(13, 1, 26, 0.95);
-    /* Opaque background to block scanlines */
     border-width: 2px;
-    max-width: 100%;
     box-sizing: border-box;
-    overflow: hidden;
 }
 
 #videoGrid.list-view .card-media {
-    width: 180px;
-    min-width: 120px;
-    height: 100px;
+    width: 180px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
+    height: 100px !important;
     aspect-ratio: 16/9;
     flex-shrink: 0;
     border-radius: 8px;
     border: 1px solid var(--glass-border);
+}
+
+#videoGrid.list-view .card-media img {
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
 }
 
 #videoGrid.list-view .card-body {
@@ -1966,34 +1973,38 @@ html {
     border-radius: 50%;
 }
 
-/* Stack list view vertically on mobile */
-#videoGrid.list-view .content-card {
-    flex-direction: column;
-    height: auto;
-    padding: 15px;
-    gap: 15px;
-}
+@media (max-width: 768px) {
 
-#videoGrid.list-view .card-media {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 16/9;
-    margin-bottom: 10px;
-}
+    /* Stack list view vertically on mobile */
+    #videoGrid.list-view .video-card-container {
+        flex-direction: column !important;
+        height: auto;
+        padding: 15px;
+        gap: 15px;
+    }
 
-#videoGrid.list-view .card-body {
-    width: 100%;
-}
+    #videoGrid.list-view .card-media {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 16/9;
+        margin-bottom: 10px;
+        max-width: 100% !important;
+    }
 
-#videoGrid.list-view .bitrate-track {
-    width: 100%;
-}
+    #videoGrid.list-view .card-body {
+        width: 100%;
+    }
 
-#videoGrid.list-view .card-footer {
-    width: 100%;
-    flex-direction: row;
-    justify-content: space-between;
-    margin-top: 10px;
+    #videoGrid.list-view .bitrate-track {
+        width: 100%;
+    }
+
+    #videoGrid.list-view .card-footer {
+        width: 100%;
+        flex-direction: row;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
 }
 
 /* Info Panel on mobile - Slide up from bottom */

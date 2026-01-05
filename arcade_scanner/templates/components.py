@@ -634,6 +634,41 @@ FILTER_PANEL_COMPONENT = """
         <!-- Scrollable Body -->
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
             
+            <!-- SIZE Section -->
+            <section>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Filesize (MB)</h3>
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <input type="number" id="filterMinSize" placeholder="Min" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" onchange="setMinSize(this.value)">
+                        <span class="absolute right-2 top-2 text-xs text-gray-500 pointer-events-none">MB</span>
+                    </div>
+                    <span class="text-gray-500">-</span>
+                    <div class="relative flex-1">
+                        <input type="number" id="filterMaxSize" placeholder="Max" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" onchange="setMaxSize(this.value)">
+                        <span class="absolute right-2 top-2 text-xs text-gray-500 pointer-events-none">MB</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- DATE Section -->
+            <section>
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Import Date</h3>
+                <div class="flex flex-wrap gap-2">
+                    <button class="filter-chip active" data-filter="date" data-value="all" onclick="setDateFilter('all')">
+                        All Time
+                    </button>
+                    <button class="filter-chip" data-filter="date" data-value="1d" onclick="setDateFilter('1d')">
+                        Last 24h
+                    </button>
+                    <button class="filter-chip" data-filter="date" data-value="7d" onclick="setDateFilter('7d')">
+                        Last 7d
+                    </button>
+                    <button class="filter-chip" data-filter="date" data-value="30d" onclick="setDateFilter('30d')">
+                        Last 30d
+                    </button>
+                </div>
+            </section>
+
             <!-- STATUS Section -->
             <section>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Status</h3>
@@ -754,6 +789,15 @@ FILTER_PANEL_COMPONENT = """
         height: 8px;
         border-radius: 50%;
     }
+    .tag-filter-chip.negative {
+        background: rgba(239, 68, 68, 0.15);
+        border-color: rgba(239, 68, 68, 0.5);
+        color: #fca5a5;
+        text-decoration: line-through;
+    }
+    .tag-filter-chip.negative .tag-dot {
+        background-color: #ef4444 !important;
+    }
 </style>
 """
 
@@ -833,7 +877,7 @@ TAG_MANAGER_MODAL_COMPONENT = """
 COLLECTION_MODAL_COMPONENT = """
 <!-- Smart Collection Modal -->
 <div id="collectionModal" class="fixed inset-0 z-[95] bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
-    <div class="w-full max-w-lg bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 transform scale-95 transition-transform duration-300 overflow-hidden max-h-[90vh] flex flex-col">
+    <div class="w-full max-w-4xl bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 transform scale-95 transition-transform duration-300 overflow-hidden max-h-[90vh] flex flex-col">
         
         <!-- Header -->
         <div class="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
@@ -900,87 +944,121 @@ COLLECTION_MODAL_COMPONENT = """
             </section>
             
             <!-- Filter Rules Section -->
-            <section class="bg-black/20 rounded-xl p-4">
-                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <span class="material-icons text-sm">filter_alt</span> Filter Rules
-                </h3>
-                
-                <!-- Status -->
-                <div class="filter-rule-row mb-2">
-                    <label class="text-xs text-gray-400 mb-1.5 block">Status</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        <button class="filter-chip" data-filter="status" data-value="HIGH" onclick="toggleSmartFilterChip(this)">High Bitrate</button>
-                        <button class="filter-chip" data-filter="status" data-value="OK" onclick="toggleSmartFilterChip(this)">OK</button>
-                        <button class="filter-chip" data-filter="status" data-value="optimized_files" onclick="toggleSmartFilterChip(this)">Optimized</button>
-                    </div>
-                </div>
-                
-                <!-- Codec -->
-                <div class="filter-rule-row mb-2">
-                    <label class="text-xs text-gray-400 mb-1.5 block">Codec</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        <button class="filter-chip" data-filter="codec" data-value="hevc" onclick="toggleSmartFilterChip(this)">HEVC</button>
-                        <button class="filter-chip" data-filter="codec" data-value="h264" onclick="toggleSmartFilterChip(this)">H.264</button>
-                    </div>
-                </div>
-                
-                <!-- Tags with Logic Toggle -->
-                <div class="filter-rule-row mb-2">
-                    <div class="flex items-center justify-between mb-1.5">
-                        <label class="text-xs text-gray-400">Tags</label>
-                        <div class="flex items-center gap-1 text-[10px]">
-                            <span class="text-gray-600">Match:</span>
-                            <button id="tagLogicBtn" onclick="toggleTagLogic()" class="px-2 py-0.5 rounded bg-arcade-cyan/20 text-arcade-cyan font-medium">ANY</button>
+            <section class="flex-1 overflow-y-auto h-full p-4">
+                <!-- 2-Column Grid Layout -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Left Column: Technical Specs -->
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 border-b border-white/5 pb-1">Properties</h3>
+                        
+                        <!-- Status -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Status</label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button class="filter-chip" data-filter="status" data-value="HIGH" onclick="toggleSmartFilterChip(this)">High Bitrate</button>
+                                <button class="filter-chip" data-filter="status" data-value="OK" onclick="toggleSmartFilterChip(this)">OK</button>
+                                <button class="filter-chip" data-filter="status" data-value="optimized_files" onclick="toggleSmartFilterChip(this)">Optimized</button>
+                            </div>
+                        </div>
+                    
+                        <!-- Codec -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Codec</label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button class="filter-chip" data-filter="codec" data-value="hevc" onclick="toggleSmartFilterChip(this)">HEVC</button>
+                                <button class="filter-chip" data-filter="codec" data-value="h264" onclick="toggleSmartFilterChip(this)">H.264</button>
+                                <button class="filter-chip" data-filter="codec" data-value="vp9" onclick="toggleSmartFilterChip(this)">VP9</button>
+                            </div>
+                        </div>
+
+                        <!-- Resolution -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Resolution</label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button class="filter-chip" data-filter="resolution" data-value="4k" onclick="toggleSmartFilterChip(this)">4K</button>
+                                <button class="filter-chip" data-filter="resolution" data-value="1080p" onclick="toggleSmartFilterChip(this)">1080p</button>
+                                <button class="filter-chip" data-filter="resolution" data-value="720p" onclick="toggleSmartFilterChip(this)">720p</button>
+                                <button class="filter-chip" data-filter="resolution" data-value="sd" onclick="toggleSmartFilterChip(this)">SD</button>
+                            </div>
+                        </div>
+
+                        <!-- Orientation -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Orientation</label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button class="filter-chip" data-filter="orientation" data-value="landscape" onclick="toggleSmartFilterChip(this)">
+                                    <span class="material-icons text-xs">crop_landscape</span>Landscape
+                                </button>
+                                <button class="filter-chip" data-filter="orientation" data-value="portrait" onclick="toggleSmartFilterChip(this)">
+                                    <span class="material-icons text-xs">crop_portrait</span>Portrait
+                                </button>
+                                <button class="filter-chip" data-filter="orientation" data-value="square" onclick="toggleSmartFilterChip(this)">
+                                    <span class="material-icons text-xs">crop_square</span>Square
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div id="collectionTagsList" class="flex flex-wrap gap-1.5">
-                        <span class="text-xs text-gray-600 italic">No tags created</span>
+
+                    <!-- Right Column: Content & Metadata -->
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 border-b border-white/5 pb-1">Content & Metadata</h3>
+
+                        <!-- Date -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Import Date</label>
+                            <select id="collectionDateFilter" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" onchange="updateCollectionPreviewCount()">
+                                <option value="all">Any Time</option>
+                                <option value="1d">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                                <option value="90d">Last 3 Months</option>
+                                <option value="1y">Last Year</option>
+                            </select>
+                        </div>
+
+                        <!-- Size -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">File Size (MB)</label>
+                            <div class="flex items-center gap-2">
+                                 <input type="number" id="collectionMinSize" placeholder="Min" class="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" oninput="updateCollectionPreviewCount()">
+                                 <span class="text-gray-500">-</span>
+                                 <input type="number" id="collectionMaxSize" placeholder="Max" class="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" oninput="updateCollectionPreviewCount()">
+                            </div>
+                        </div>
+
+                        <!-- Favorites -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Favorites</label>
+                            <div class="flex gap-1.5">
+                                <button class="filter-chip" data-filter="favorites" data-value="true" onclick="setFavoritesFilter(true)">Only Favorites</button>
+                                <button class="filter-chip" data-filter="favorites" data-value="false" onclick="setFavoritesFilter(false)">Exclude</button>
+                                <button class="filter-chip active" data-filter="favorites" data-value="null" onclick="setFavoritesFilter(null)">Any</button>
+                            </div>
+                        </div>
+
+                        <!-- Tags (Tri-State) -->
+                        <div class="filter-rule-row">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label class="text-xs text-gray-400">Tags</label>
+                                <div class="flex items-center gap-1 text-[10px]">
+                                    <span class="text-gray-600">Match:</span>
+                                    <button id="tagLogicBtn" onclick="toggleTagLogic()" class="px-2 py-0.5 rounded bg-arcade-cyan/20 text-arcade-cyan font-medium">ANY</button>
+                                </div>
+                            </div>
+                            <div id="collectionTagsList" class="flex flex-wrap gap-1.5">
+                                <span class="text-xs text-gray-600 italic">No tags created</span>
+                            </div>
+                        </div>
+
+                        <!-- Search -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Search Term</label>
+                            <input type="text" id="collectionSearch" placeholder="Filter by filename..." 
+                                   class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none"
+                                   oninput="updateCollectionPreviewCount()">
+                        </div>
                     </div>
-                </div>
-                
-                <!-- Resolution -->
-                <div class="filter-rule-row mb-2">
-                    <label class="text-xs text-gray-400 mb-1.5 block">Resolution</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        <button class="filter-chip" data-filter="resolution" data-value="4k" onclick="toggleSmartFilterChip(this)">4K</button>
-                        <button class="filter-chip" data-filter="resolution" data-value="1080p" onclick="toggleSmartFilterChip(this)">1080p</button>
-                        <button class="filter-chip" data-filter="resolution" data-value="720p" onclick="toggleSmartFilterChip(this)">720p</button>
-                        <button class="filter-chip" data-filter="resolution" data-value="sd" onclick="toggleSmartFilterChip(this)">SD</button>
-                    </div>
-                </div>
-                
-                <!-- Orientation -->
-                <div class="filter-rule-row mb-2">
-                    <label class="text-xs text-gray-400 mb-1.5 block">Orientation</label>
-                    <div class="flex flex-wrap gap-1.5">
-                        <button class="filter-chip" data-filter="orientation" data-value="landscape" onclick="toggleSmartFilterChip(this)">
-                            <span class="material-icons text-xs">crop_landscape</span>Landscape
-                        </button>
-                        <button class="filter-chip" data-filter="orientation" data-value="portrait" onclick="toggleSmartFilterChip(this)">
-                            <span class="material-icons text-xs">crop_portrait</span>Portrait
-                        </button>
-                        <button class="filter-chip" data-filter="orientation" data-value="square" onclick="toggleSmartFilterChip(this)">
-                            <span class="material-icons text-xs">crop_square</span>Square
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Favorites -->
-                <div class="filter-rule-row mb-2">
-                    <label class="text-xs text-gray-400 mb-1.5 block">Favorites</label>
-                    <div class="flex gap-1.5">
-                        <button class="filter-chip" data-filter="favorites" data-value="true" onclick="setFavoritesFilter(true)">Only Favorites</button>
-                        <button class="filter-chip" data-filter="favorites" data-value="false" onclick="setFavoritesFilter(false)">Exclude</button>
-                        <button class="filter-chip active" data-filter="favorites" data-value="null" onclick="setFavoritesFilter(null)">Any</button>
-                    </div>
-                </div>
-                
-                <!-- Search -->
-                <div class="filter-rule-row">
-                    <label class="text-xs text-gray-400 mb-1.5 block">Search Term</label>
-                    <input type="text" id="collectionSearch" placeholder="Filter by filename..." 
-                           class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none"
-                           oninput="updateCollectionPreviewCount()">
                 </div>
             </section>
             

@@ -61,8 +61,8 @@ class ScannerManager:
                     needs_update = True
                 else:
                     try:
-                        # Basic existence check (cheap)
-                        os.stat(path)
+                        # Basic existence check and stat
+                        file_stat = os.stat(path)
                     except OSError:
                         needs_update = True
 
@@ -84,6 +84,25 @@ class ScannerManager:
                             entry.favorite = cached_entry.favorite
                             entry.vaulted = cached_entry.vaulted
                             entry.tags = cached_entry.tags
+                            # Preserve original import time if available, otherwise it stays what get_metadata gave (0 or now?)
+                            # Actually get_metadata creates fresh. We should copy from cache if exists.
+                            if cached_entry.imported_at > 0:
+                                entry.imported_at = cached_entry.imported_at
+                        
+                        # Populate date fields
+                        try:
+                            # We need to re-stat if we didn't get it above (e.g. if needs_update was True from start)
+                            # But optimization: we can just stat here.
+                            if not 'file_stat' in locals():
+                                file_stat = os.stat(path)
+                            
+                            entry.mtime = int(file_stat.st_mtime)
+                            
+                            # If imported_at is still 0 (new file), set to now
+                            if entry.imported_at == 0:
+                                entry.imported_at = int(time.time())
+                        except:
+                            pass
                         
                         # ASSET GENERATION (Thumbnails & Previews)
                         loop = asyncio.get_event_loop()
