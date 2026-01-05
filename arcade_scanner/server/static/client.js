@@ -3653,6 +3653,33 @@ function cinemaOptimize() {
     updateOptAudioUI();
     clearTrim(); // Reset trim
 
+    // Reset Q Factor
+    const qInput = document.getElementById('optQuality');
+    const qSugg = document.getElementById('optQualitySuggestion');
+    if (qInput) {
+        qInput.value = 75; // Default start
+        // Update suggestion based on current video
+        if (typeof currentCinemaPath !== 'undefined') {
+            const video = window.ALL_VIDEOS?.find(v => v.FilePath === currentCinemaPath);
+            if (video && video.Bitrate_Mbps) {
+                let sugg = 75;
+                let reason = "Standard";
+
+                if (video.Bitrate_Mbps > 20) {
+                    sugg = 65;
+                    reason = "High Bitrate";
+                } else if (video.Bitrate_Mbps < 5) {
+                    sugg = 80;
+                    reason = "Low Bitrate";
+                }
+
+                if (qSugg) qSugg.innerText = `Suggested: ${sugg} (${reason})`;
+            } else if (qSugg) {
+                qSugg.innerText = "";
+            }
+        }
+    }
+
     // Show panel
     panel.classList.add('active');
     const actions = document.getElementById('cinemaActions');
@@ -3753,6 +3780,7 @@ function triggerOptimization() {
 
     const ss = document.getElementById('optTrimStart').value;
     const to = document.getElementById('optTrimEnd').value;
+    const qVal = document.getElementById('optQuality')?.value;
 
     // Simple validation
     // (Could add regex check for HH:MM:SS here but backend/ffmpeg handles partials well usually)
@@ -3763,6 +3791,7 @@ function triggerOptimization() {
     params.set('video', currentOptVideo);
     if (ss) params.set('ss', ss);
     if (to) params.set('to', to);
+    if (qVal) params.set('q', qVal);
 
     fetch(`/compress?${params.toString()}`)
         .then(() => {

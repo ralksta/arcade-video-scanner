@@ -384,7 +384,7 @@ def enqueue_output(out, q):
         q.put(line)
     out.close()
 
-def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress'):
+def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress', q_override=None):
     """Process a single video file. Returns (success, bytes_saved)."""
     input_path = Path(input_path)
     is_trim = ss is not None or to is not None
@@ -471,6 +471,12 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
 
     start_q, end_q, step = profile['quality_range']
     quality = start_q
+    
+    # Override starting quality if provided manually
+    if q_override is not None:
+        print(f"{Y}Manual Start Quality:{NC} Q={q_override}")
+        quality = q_override
+
     file_start_time = time.time()
     
     def should_continue(q):
@@ -787,6 +793,7 @@ def main():
     parser.add_argument('--no-fun-facts', action='store_true', help='Disable fun facts display')
     parser.add_argument('--video-mode', choices=['compress', 'copy'], default='compress',
                         help='Video processing mode: compress (default) or copy (passthrough)')
+    parser.add_argument('--q', type=int, help='Manual starting quality value')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     args = parser.parse_args()
     
@@ -843,7 +850,8 @@ def main():
             audio_mode=args.audio_mode, 
             ss=args.ss, 
             to=args.to,
-            video_mode=args.video_mode
+            video_mode=args.video_mode,
+            q_override=args.q
         )
         
         # Write to encode log (for both batch controller and single-file calls)

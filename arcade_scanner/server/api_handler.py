@@ -253,8 +253,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     audio_mode = params.get("audio", ["enhanced"])[0]
                     video_mode = params.get("video", ["compress"])[0]
-                    ss = params.get("ss", [None])[0]
-                    to = params.get("to", [None])[0]
+                    q_val = params.get("q", [None])[0]
                     
                     # Validate audio_mode (whitelist)
                     if audio_mode not in ["enhanced", "standard"]:
@@ -271,7 +270,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     # Get current running port
                     current_port = self.server.server_address[1]
                     print(f"🔌 Current Server Port: {current_port}")
-                    print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Trim: {ss}-{to}")
+                    print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Q: {q_val} | Trim: {ss}-{to}")
                     
                     # Load latest settings to check fun facts preference
                     enable_fun_facts = config.settings.enable_fun_facts
@@ -286,6 +285,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         cmd_parts.extend(["--ss", ss])
                     if to:
                         cmd_parts.extend(["--to", to])
+                    if q_val:
+                         cmd_parts.extend(["--q", q_val])
                     if not enable_fun_facts:
                         cmd_parts.append("--no-fun-facts")
                     

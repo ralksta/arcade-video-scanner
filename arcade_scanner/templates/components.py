@@ -398,6 +398,14 @@ OPTIMIZE_PANEL_COMPONENT = """
         </button>
     </div>
     
+    <!-- Quality Row -->
+    <div class="flex items-center gap-4 flex-wrap">
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px]">Start Q</div>
+        <input type="number" class="bg-black/30 border border-white/10 text-white px-3 py-1.5 rounded-md font-mono text-center w-[100px] focus:border-arcade-cyan/50 focus:outline-none" id="optQuality" placeholder="Default">
+        
+        <span class="text-xs text-gray-500 font-mono italic" id="optQualitySuggestion"></span>
+    </div>
+    
     <!-- Actions -->
     <div class="flex items-center gap-4 mt-2">
         <button class="flex-1 py-2.5 rounded-lg font-bold cursor-pointer text-gray-400 bg-white/5 hover:bg-white/10 hover:text-white transition-all max-w-[120px]" onclick="closeOptimize()">Cancel</button>
