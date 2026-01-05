@@ -75,6 +75,15 @@ struct VideoGridContainer: View {
                 )
             }
         }
-        .navigationTitle(viewModel.selectedCollection?.name ?? "Videos")
+        .navigationTitle(navigationTitleWithCount)
+    }
+    
+    private var navigationTitleWithCount: String {
+        let name = viewModel.selectedCollection?.name ?? "Videos"
+        let count = viewModel.videos.count
+        if count > 0 {
+            return "\(name) (\(count) Videos)"
+        }
+        return name
     }
 }

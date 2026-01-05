@@ -16,6 +16,7 @@ def run_scanner(args_list=None):
     parser.add_argument("--rebuild-thumbs", action="store_true", help="Delete only thumbnails and regenerate them.")
 
     parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
+    parser.add_argument("--ssl", action="store_true", help="Enable HTTPS mode with self-signed certificate.")
     args, unknown = parser.parse_known_args(args_list)
 
     print("--- Arcade Video Scanner 6.0 (Refactored) ---")
@@ -56,7 +57,7 @@ def run_scanner(args_list=None):
     results = [e.model_dump(by_alias=True) for e in db.get_all()]
     
     # Start Server first to know port
-    server, port = start_server()
+    server, port = start_server(use_ssl=args.ssl)
     
     generate_html_report(results, config.report_file, server_port=port)
     
@@ -65,14 +66,16 @@ def run_scanner(args_list=None):
         from arcade_scanner.core.deovr_generator import save_deovr_library
         import os
         
+        protocol = "https" if args.ssl else "http"
         deovr_path = os.path.join(config.hidden_data_dir, "deovr_library.json")
-        server_url = f"http://localhost:{port}"
+        server_url = f"{protocol}://localhost:{port}"
         
         print("🥽 Generating DeoVR library...")
         save_deovr_library(deovr_path, db.get_all(), server_url)
     
     # 5. Open Browser
-    url = f"http://localhost:{port}/"
+    protocol = "https" if args.ssl else "http"
+    url = f"{protocol}://localhost:{port}/"
     print(f"Opening dashboard: {url}")
     webbrowser.open(url)
     

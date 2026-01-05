@@ -7,6 +7,7 @@ import time
 import json
 from pathlib import Path
 import socket
+import ssl
 from urllib.parse import unquote, urlparse, parse_qs
 import shlex
 from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE
@@ -19,6 +20,40 @@ from arcade_scanner.security import sanitize_path, is_path_allowed, validate_fil
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         try:
+            # 0. DeoVR AUTO-DETECTION ENDPOINT: /deovr serves library JSON
+            # DeoVR browser checks for this endpoint when navigating to any site
+            if self.path == "/deovr" or self.path == "/deovr/":
+                from arcade_scanner.core.deovr_generator import generate_deovr_json
+                
+                host = self.headers.get("Host", "localhost:8000")
+                
+                # Detect protocol: Check proxy header OR native SSL socket
+                protocol = "http"
+                if self.headers.get("X-Forwarded-Proto") == "https":
+                    protocol = "https"
+                elif isinstance(self.connection, ssl.SSLSocket):
+                    protocol = "https"
+                    
+                server_url = f"{protocol}://{host}"
+                
+                all_videos = db.get_all()
+                smart_collections = list(config.settings.smart_collections)
+                
+                deovr_data = generate_deovr_json(all_videos, server_url, smart_collections)
+                
+                scene_count = len(deovr_data.get('scenes', []))
+                video_count = sum(len(s.get('list', [])) for s in deovr_data.get('scenes', []))
+                print(f"🥽 DeoVR endpoint accessed! Serving {scene_count} scenes ({video_count} total videos)")
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
+                return
+            
             # 1. ROOT / INDEX -> Serve REPORT_FILE
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview"]
             if self.path in spa_routes or self.path.startswith("/index.html?") or self.path.startswith("/collections"):
@@ -40,6 +75,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             elif self.path.startswith("/thumbnails/"):
                 try:
                     rel_path = unquote(self.path[12:])  # remove /thumbnails/
+                    print(f"📸 Thumbnail request: {rel_path}")
                     
                     # Security Fix C-4: Prevent path traversal
                     thumb_dir_abs = os.path.abspath(config.thumb_dir)
@@ -61,6 +97,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     if os.path.exists(file_path) and os.path.isfile(file_path):
                         self.send_response(200)
                         self.send_header("Content-type", "image/jpeg")
+                        self.send_header("Access-Control-Allow-Origin", "*")  # Allow VR headsets
                         fs = os.stat(file_path)
                         self.send_header("Content-Length", str(fs.st_size))
                         self.end_headers()
@@ -606,23 +643,23 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps(response).encode("utf-8"))
             
             elif self.path == "/api/deovr/library.json":
-                # DeoVR library endpoint
-                from arcade_scanner.core.deovr_generator import generate_deovr_json
+                # iOS app library endpoint (uses simplified format)
+                from arcade_scanner.core.deovr_generator import generate_ios_json
                 
                 # Get server URL from request
                 host = self.headers.get("Host", "localhost:8000")
                 protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
                 server_url = f"{protocol}://{host}"
                 
-                # Generate DeoVR JSON
+                # Generate iOS-compatible JSON
                 all_videos = db.get_all()
-                deovr_data = generate_deovr_json(all_videos, server_url)
+                ios_data = generate_ios_json(all_videos, server_url)
                 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")  # Allow VR headsets to access
+                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
-                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
+                self.wfile.write(json.dumps(ios_data).encode("utf-8"))
             
             elif self.path.startswith("/api/deovr/collection/"):
                 # DeoVR collection endpoint
