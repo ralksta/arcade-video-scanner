@@ -121,9 +121,6 @@ class AppSettings(BaseSettings):
     enable_optimizer: bool = Field(True)
 
     theme: str = Field("arcade")
-    sensitive_dirs: List[str] = Field(default_factory=list)
-    sensitive_tags: List[str] = Field(default_factory=list)
-    sensitive_collections: List[str] = Field(default_factory=list)
     enable_deovr: bool = Field(False)
 
     class Config:

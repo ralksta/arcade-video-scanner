@@ -24,6 +24,11 @@ class UserVideoData(BaseModel):
     # Available Tags (Definitions)
     available_tags: List[Dict[str, str]] = Field(default_factory=list, description="User specific tag definitions")
 
+    # Sensitive / Safe Mode Settings
+    sensitive_dirs: List[str] = Field(default_factory=list, description="Directories considered sensitive/NSFW")
+    sensitive_tags: List[str] = Field(default_factory=list, description="Tags considered sensitive/NSFW")
+    sensitive_collections: List[str] = Field(default_factory=list, description="Collections considered sensitive")
+
 class User(BaseModel):
     """
     Represents a registered user.

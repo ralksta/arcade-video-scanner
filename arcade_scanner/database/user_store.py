@@ -210,6 +210,7 @@ class UserStore:
         self.migrate_collections()
         self.migrate_scan_settings()
         self.migrate_tags()
+        self.migrate_sensitive_settings()
         self.cleanup_legacy_settings()
 
     def migrate_tags(self):
@@ -301,6 +302,48 @@ class UserStore:
         except Exception as e:
             print(f"⚠️ Error migrating collections: {e}")
 
+    def migrate_sensitive_settings(self):
+        """Migrates global sensitive settings (Safe Mode) to admin user."""
+        admin = self.get_user("admin")
+        if not admin: return
+
+        settings_path = os.path.join(config.hidden_data_dir, "settings.json")
+        if not os.path.exists(settings_path): return
+            
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            modified = False
+            
+            # Sensitive Dirs
+            s_dirs = data.get("sensitive_dirs", [])
+            for d in s_dirs:
+                if d not in admin.data.sensitive_dirs:
+                    admin.data.sensitive_dirs.append(d)
+                    modified = True
+
+            # Sensitive Tags
+            s_tags = data.get("sensitive_tags", [])
+            for t in s_tags:
+                if t not in admin.data.sensitive_tags:
+                    admin.data.sensitive_tags.append(t)
+                    modified = True
+
+            # Sensitive Collections
+            s_cols = data.get("sensitive_collections", [])
+            for c in s_cols:
+                if c not in admin.data.sensitive_collections:
+                    admin.data.sensitive_collections.append(c)
+                    modified = True
+            
+            if modified:
+                print(f"📦 Migrated sensitive settings to 'admin'.")
+                self.add_user(admin)
+
+        except Exception as e:
+            print(f"⚠️ Error migrating sensitive settings: {e}")
+
     def cleanup_legacy_settings(self):
         """Removes migrated keys from settings.json."""
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
@@ -310,9 +353,17 @@ class UserStore:
             with open(settings_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             
-            keys_to_remove = ["smart_collections", "scan_targets", "exclude_paths", "available_tags"]
-            modified = False
+            keys_to_remove = [
+                "smart_collections", 
+                "scan_targets", 
+                "exclude_paths", 
+                "available_tags",
+                "sensitive_dirs",
+                "sensitive_tags",
+                "sensitive_collections"
+            ]
             
+            modified = False
             for k in keys_to_remove:
                 if k in data:
                     del data[k]
