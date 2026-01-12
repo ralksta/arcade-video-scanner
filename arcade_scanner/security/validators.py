@@ -117,7 +117,7 @@ def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool
     from ..config import config
     
     if allowed_dirs is None:
-        allowed_dirs = config.settings.scan_targets
+        allowed_dirs = config.active_scan_targets
     
     try:
         abs_path = os.path.abspath(path)

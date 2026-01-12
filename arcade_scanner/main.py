@@ -4,7 +4,7 @@ import webbrowser
 import argparse
 import os
 from arcade_scanner.config import config
-from arcade_scanner.database import db
+from arcade_scanner.database import db, user_db
 from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.server.web_server import start_server
@@ -30,6 +30,10 @@ def run_scanner(args_list=None):
     
     purge_broken_media()
     
+    # 0.5 Data Migration
+    print("📦 Checking for legacy user data to migrate...")
+    user_db.migrate_from_db(db)
+
     # 1. Run Async Scan
     try:
         # Run the metadata scan

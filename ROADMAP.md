@@ -13,7 +13,7 @@ This document outlines planned features and improvements for the Arcade Video Sc
 ## Version 6.2.0 (Planned)
 
 ### 🟢 Performance & Optimization
-- [ ] Database migration from JSON to SQLite for better performance with large libraries
+- [x] Database migration from JSON to SQLite for better performance with large libraries
 - [ ] Implement incremental scanning (only scan new/modified files)
 - [ ] Add background worker for preview generation to avoid blocking UI
 
@@ -25,8 +25,17 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ## Completed Features
 
-### ✅ Version 6.1.0 (2026-01-02)
-- **Global Theming Architecture**: Full Dark/Light mode support with semantic theming (`theme.py`).
+### ✅ Version 7.0.0 (2026-01-12)
+- **Multi-User Support**: Individual accounts with isolated scan targets, favorites, tags, and collections.
+- **SQLite Database**: Migrated from JSON for performance and scalability.
+- **Data Isolation**: Complete privacy between users.
+- **User Management Tools**: CLI scripts for managing users.
+- **Legacy Cleanup**: Automated migration and cleanup of legacy settings.
+
+### ✅ Version 6.2.0 (2026-01-10)
+- **Deep Filtering**: Negative tag filters, precision size/date filters.
+- **Layout Precision**: Desktop/Mobile list view parity.
+- **State Persistence**: URL-based view state (`?view=list`).
 - **Tagging System**: Custom metadata tags for any video.
 - **Smart Collections**: Save complex search queries (Tags + Filters) as dynamic sidebar collections.
 - **Advanced Query Builder**: Visual builder for "Include/Exclude" criteria.

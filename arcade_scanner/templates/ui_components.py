@@ -118,6 +118,10 @@ def render_header(theme: BaseTheme, hostname: str, count: int, size_gb: str) -> 
         <button onclick="toggleTheme()" class="hover:bg-black/5 dark:hover:bg-white/10 p-1.5 rounded-lg transition-colors" title="Switch Theme">
             <span class="material-icons text-[18px]" id="themeIcon">light_mode</span>
         </button>
+        <span class="opacity-20">|</span>
+        <button onclick="logout()" class="hover:bg-red-500/10 p-1.5 rounded-lg transition-colors text-gray-500 hover:text-red-400" title="Logout">
+            <span class="material-icons text-[18px]">logout</span>
+        </button>
     </div>
     
     <!-- Mobile Actions -->

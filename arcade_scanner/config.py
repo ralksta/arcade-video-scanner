@@ -109,11 +109,9 @@ class AppSettings(BaseSettings):
     Loads from env vars (ARCADE_*) or defaults.
     File loading is handled manually to preserve JSON comments.
     """
-    scan_targets: List[str] = Field(default_factory=list)
-    exclude_paths: List[str] = Field(default_factory=list)
     disabled_defaults: List[str] = Field(default_factory=list)
+
     saved_views: List[Dict[str, Any]] = Field(default_factory=list)
-    smart_collections: List[Dict[str, Any]] = Field(default_factory=list)  # Smart collections with filter criteria
 
     min_size_mb: int = Field(100)
     bitrate_threshold_kbps: int = Field(15000)
@@ -121,8 +119,7 @@ class AppSettings(BaseSettings):
 
     enable_fun_facts: bool = Field(True)
     enable_optimizer: bool = Field(True)
-    enable_optimizer: bool = Field(True)
-    available_tags: List[Dict[str, str]] = Field(default_factory=list)  # [{"name": "Gaming", "color": "#00ffd0"}]
+
     theme: str = Field("arcade")
     sensitive_dirs: List[str] = Field(default_factory=list)
     sensitive_tags: List[str] = Field(default_factory=list)
@@ -172,16 +169,6 @@ class ConfigManager:
         # Note: Pydantic BaseSettings usually loads files via _env_file, but here we explicitly pass dict
         settings = AppSettings(**file_data)
 
-        # SECURITY FIX: If scan_targets is empty, default to HOME_DIR
-        # This prevents the security whitelist from blocking everything
-        if not settings.scan_targets:
-            settings.scan_targets = [HOME_DIR]
-            print(f"ℹ️ No scan targets configured, defaulting to: {HOME_DIR}")
-
-        # Remove duplicates while preserving order
-        seen = set()
-        settings.scan_targets = [x for x in settings.scan_targets if not (x in seen or seen.add(x))]
-
         return settings
 
     def _save_json_raw(self, data: Dict[str, Any]):
@@ -217,21 +204,56 @@ class ConfigManager:
             return False
 
     @property
+    def default_exclusions(self) -> List[str]:
+        """Returns the default exclusions, filtered by disabled_defaults."""
+        return [e["path"] for e in DEFAULT_EXCLUSIONS
+                if e["path"] not in self.settings.disabled_defaults]
+
+    @property
     def active_scan_targets(self) -> List[str]:
-        # Add HOME_DIR as default if not already present
-        targets = self.settings.scan_targets if self.settings.scan_targets else [HOME_DIR]
-
-        # Ensure HOME_DIR is included (but avoid duplicates)
-        if HOME_DIR not in targets:
-            targets = [HOME_DIR] + targets
-
-        return targets
+        """
+        Returns unique scan targets aggregated from ALL users + default HOME.
+        The scanner needs to know EVERYTHING it should watch.
+        """
+        targets = set()
+        
+        # 1. Add Default Home if needed
+        # targets.add(HOME_DIR) 
+        
+        # 2. Add User Targets
+        # We need to import user_db here to avoid circular init issues at top level if possible
+        # Or better, verify if user_db is ready.
+        try:
+            from arcade_scanner.database.user_store import user_db
+            for user in user_db.get_all_users():
+                for t in user.data.scan_targets:
+                    if t:
+                        targets.add(t)
+        except ImportError:
+            pass # Startup case
+            
+        if not targets:
+            targets.add(HOME_DIR)
+            
+        return list(targets)
 
     @property
     def active_exclude_paths(self) -> List[str]:
-        default_paths = [e["path"] for e in DEFAULT_EXCLUSIONS
-                        if e["path"] not in self.settings.disabled_defaults]
-        return default_paths + self.settings.exclude_paths
+        """
+        Returns unique exclude paths from ALL users + defaults.
+        """
+        excludes = set(self.default_exclusions) # Start with defaults!
+        
+        try:
+            from arcade_scanner.database.user_store import user_db
+            for user in user_db.get_all_users():
+                for e in user.data.exclude_paths:
+                    if e:
+                        excludes.add(e)
+        except ImportError:
+            pass
+            
+        return list(excludes)
 
     @property
     def optimizer_path(self) -> str:

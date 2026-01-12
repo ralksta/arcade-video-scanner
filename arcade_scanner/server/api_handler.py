@@ -11,13 +11,24 @@ import ssl
 from urllib.parse import unquote, urlparse, parse_qs
 import shlex
 from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE
-from arcade_scanner.database import db
+from arcade_scanner.database import db, user_db
+from arcade_scanner.security import session_manager
+from http.cookies import SimpleCookie
 from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
+    def get_current_user(self):
+        """Returns the username from the session cookie, or None."""
+        if "Cookie" in self.headers:
+            cookie = SimpleCookie(self.headers["Cookie"])
+            if "session_token" in cookie:
+                return session_manager.get_username(cookie["session_token"].value)
+        return None
+
+
     def do_GET(self):
         try:
             # 0. DeoVR AUTO-DETECTION ENDPOINT: /deovr serves library JSON
@@ -60,6 +71,25 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview"]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
+                
+                # AUTH CHECK for Root
+                user = self.get_current_user()
+                if not user:
+                    # Serve Login Page
+                    login_path = os.path.join(os.path.dirname(__file__), "static", "login.html")
+                    if os.path.exists(login_path):
+                        self.send_response(200)
+                        self.send_header("Content-type", "text/html; charset=utf-8")
+                        with open(login_path, 'rb') as f:
+                            data = f.read()
+                            self.send_header("Content-Length", str(len(data)))
+                            self.end_headers()
+                            self.wfile.write(data)
+                        return
+                    else:
+                        self.send_error(404, "Login page not found")
+                        return
+
                 self.send_response(200)
                 self.send_header("Content-type", "text/html; charset=utf-8")
                 
@@ -67,6 +97,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     fs = os.stat(config.report_file)
                     self.send_header("Content-Length", str(fs.st_size))
                     self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
+                    # Add User Header for debug
+                    self.send_header("X-Arcade-User", user)
                     self.end_headers()
                     with open(config.report_file, 'rb') as f:
                         self.wfile.write(f.read())
@@ -154,6 +186,22 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
             # 4. API Endpoints
+            elif self.path == "/api/user/data":
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                
+                u = user_db.get_user(user_name)
+                if u:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(u.data.model_dump_json().encode())
+                else:
+                     self.send_error(404, "User not found")
+                return
+            
             elif self.path.startswith("/reveal?path="):
                 try:
                     file_path = unquote(self.path.split("path=")[1])
@@ -531,69 +579,107 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error in batch_compress: {e}")
                     self.send_error(500)
             elif self.path.startswith("/hide?"):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                
                 params = parse_qs(urlparse(self.path).query)
                 path = params.get("path", [None])[0]
                 state = params.get("state", ["true"])[0].lower() == "true"
+                
                 if path:
                     abs_path = os.path.abspath(path)
-                    entry = db.get(abs_path)
-                    if not entry:
-                         # Create generic entry if not found (rare but possible)
-                        entry = VideoEntry(FilePath=abs_path)
+                    u = user_db.get_user(user_name)
+                    if u:
+                        if state:
+                            if abs_path not in u.data.vaulted:
+                                u.data.vaulted.append(abs_path)
+                        else:
+                            if abs_path in u.data.vaulted:
+                                u.data.vaulted.remove(abs_path)
+                        user_db.save()
+                        print(f"Updated vault state for {user_name}: {os.path.basename(abs_path)} -> hidden={state}")
                     
-                    entry.vaulted = state
-                    db.upsert(entry)
-                    db.save()
-                    print(f"Updated vault state for: {os.path.basename(abs_path)} -> hidden={state}")
                 self.send_response(204)
                 self.end_headers()
             elif self.path.startswith("/batch_hide?paths="):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                    
                 paths_str = unquote(self.path.split("paths=")[1])
                 paths_list = paths_str.split("&state=")[0].split(",")
                 state = "state=false" not in self.path
-                updated_count = 0
-                for p in paths_list:
-                    abs_p = os.path.abspath(p)
-                    entry = db.get(abs_p)
-                    if not entry:
-                         entry = VideoEntry(FilePath=abs_p)
-                    entry.vaulted = state
-                    db.upsert(entry)
-                    updated_count += 1
-                db.save()
-                print(f"Batch updated vault state for {updated_count} files -> hidden={state}")
+                
+                u = user_db.get_user(user_name)
+                if u:
+                    updated_count = 0
+                    for p in paths_list:
+                        abs_p = os.path.abspath(p)
+                        if state:
+                            if abs_p not in u.data.vaulted:
+                                u.data.vaulted.append(abs_p)
+                                updated_count += 1
+                        else:
+                            if abs_p in u.data.vaulted:
+                                u.data.vaulted.remove(abs_p)
+                                updated_count += 1
+                    user_db.save()
+                    print(f"Batch updated vault state for {user_name} ({updated_count} files) -> hidden={state}")
                 self.send_response(204)
                 self.end_headers()
             elif self.path.startswith("/favorite?"):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                    
                 params = parse_qs(urlparse(self.path).query)
                 path = params.get("path", [None])[0]
                 state = params.get("state", ["true"])[0].lower() == "true"
                 if path:
                     abs_path = os.path.abspath(path)
-                    entry = db.get(abs_path)
-                    if not entry:
-                        entry = VideoEntry(FilePath=abs_path)
-                    entry.favorite = state
-                    db.upsert(entry)
-                    db.save()
-                    print(f"Updated favorite state for: {os.path.basename(abs_path)} -> favorite={state}")
+                    u = user_db.get_user(user_name)
+                    if u:
+                        if state:
+                            if abs_path not in u.data.favorites:
+                                u.data.favorites.append(abs_path)
+                        else:
+                            if abs_path in u.data.favorites:
+                                u.data.favorites.remove(abs_path)
+                        user_db.save()
+                        print(f"Updated favorite state for {user_name}: {os.path.basename(abs_path)} -> favorite={state}")
+                        
                 self.send_response(204)
                 self.end_headers()
             elif self.path.startswith("/batch_favorite?"):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                
                 params = parse_qs(urlparse(self.path).query)
                 paths = params.get("paths", [""])[0].split(",")
                 state = params.get("state", ["true"])[0].lower() == "true"
-                updated_count = 0
-                for p in paths:
-                    if p:
-                        abs_path = os.path.abspath(p)
-                        entry = db.get(abs_path)
-                        if entry:
-                            entry.favorite = state
-                            db.upsert(entry)
-                            updated_count += 1
-                db.save()
-                print(f"Batch updated favorite state for {updated_count} files -> favorite={state}")
+                
+                u = user_db.get_user(user_name)
+                if u:
+                    updated_count = 0
+                    for p in paths:
+                        if p:
+                            abs_path = os.path.abspath(p)
+                            if state:
+                                if abs_path not in u.data.favorites:
+                                    u.data.favorites.append(abs_path)
+                                    updated_count += 1
+                            else:
+                                if abs_path in u.data.favorites:
+                                    u.data.favorites.remove(abs_path)
+                                    updated_count += 1
+                    user_db.save()
+                    print(f"Batch updated favorite state for {user_name} ({updated_count} files) -> favorite={state}")
                 self.send_response(204)
                 self.end_headers()
             elif self.path.startswith("/stream?path="):
@@ -615,40 +701,35 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(500)
 
             elif self.path == "/api/settings":
-                # Return current settings as JSON
-                # We construct response from config.settings
-                s = config.settings
-                # We need to access defaults from config module constants if possible, 
-                # or just hardcode/use empty for now as frontend might rely on them.
-                # In config.py I defined DEFAULT_EXCLUSIONS but didn't expose them on `config` instance.
-                # I can import them if I expose them in config module. 
-                from arcade_scanner.config import DEFAULT_EXCLUSIONS, HOME_DIR
+
+                # GET Settings
+                # Interceptor: Inject user-specific smart_collections into the response
+                settings_dump = config.settings.model_dump()
                 
-                response = {
-                    "scan_targets": s.scan_targets,
-                    "exclude_paths": s.exclude_paths,
-                    "disabled_defaults": s.disabled_defaults,
-                    "saved_views": [v for v in s.saved_views], # Pydantic model to list
-                    "smart_collections": [c for c in s.smart_collections],  # Smart collections
-                    "min_size_mb": s.min_size_mb,
-                    "bitrate_threshold_kbps": s.bitrate_threshold_kbps,
-                    "enable_fun_facts": s.enable_fun_facts,
-                    "enable_optimizer": s.enable_optimizer,
-                    "enable_deovr": s.enable_deovr,
-                    "available_tags": s.available_tags,
-                    "enable_optimizer": s.enable_optimizer,
-                    "available_tags": s.available_tags,
-                    "theme": s.theme,
-                    "sensitive_dirs": s.sensitive_dirs,
-                    "sensitive_tags": s.sensitive_tags,
-                    "sensitive_collections": s.sensitive_collections,
-                    "default_scan_targets": [HOME_DIR],
-                    "default_exclusions": DEFAULT_EXCLUSIONS
-                }
+                user_name = self.get_current_user()
+                if user_name:
+                    u = user_db.get_user(user_name)
+                    if u:
+                        settings_dump["smart_collections"] = u.data.smart_collections
+                        settings_dump["scan_targets"] = u.data.scan_targets
+                        settings_dump["exclude_paths"] = u.data.exclude_paths
+                        settings_dump["available_tags"] = u.data.available_tags
+                    else:
+                        settings_dump["smart_collections"] = []
+                        settings_dump["scan_targets"] = []
+                        settings_dump["exclude_paths"] = []
+                        settings_dump["available_tags"] = []
+                else:
+                    settings_dump["smart_collections"] = []
+                    settings_dump["scan_targets"] = []
+                    settings_dump["exclude_paths"] = []
+                    settings_dump["available_tags"] = []
+
                 self.send_response(200)
-                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-type", "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps(response).encode("utf-8"))
+                self.wfile.write(json.dumps(settings_dump, default=str).encode())
+                return
             
             elif self.path == "/api/deovr/library.json":
                 # iOS app library endpoint (uses simplified format)
@@ -736,15 +817,62 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             
             # --- TAG SYSTEM ENDPOINTS ---
             elif self.path == "/api/tags":
-                # GET: Return all available tags
-                tags = config.settings.available_tags
+                # GET: Return all available tags from User data
+                user_name = self.get_current_user()
+                if not user_name:
+                    # Return empty if not auth? Or return default global?
+                    # For now, require auth.
+                    self.send_error(401)
+                    return
+
+                u = user_db.get_user(user_name)
+                tags = u.data.available_tags if u else []
+                
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(tags).encode("utf-8"))
             
+            elif self.path == "/api/videos":
+                # GET: Return all videos, filtered by user's scan targets
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                
+                u = user_db.get_user(user_name)
+                if not u:
+                    self.send_error(401)
+                    return
+                
+                # Filter videos
+                all_videos = [e.model_dump(by_alias=True) for e in db.get_all()]
+                user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
+                
+                # If user has no targets, they see nothing (or maybe we allow strict isolation?)
+                # If user is admin? Admin typically sees all? 
+                # Request was "include and excludes already different for every user?".
+                # Implies users only see what they define.
+                
+                filtered_videos = []
+                if user_targets:
+                    for v in all_videos:
+                        v_path = os.path.abspath(v["FilePath"])
+                        if any(v_path.startswith(t) for t in user_targets):
+                             filtered_videos.append(v)
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(filtered_videos, default=str).encode("utf-8"))
+            
             elif self.path.startswith("/api/video/tags?"):
                 # GET: Return tags for a specific video
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                
                 params = parse_qs(urlparse(self.path).query)
                 path = params.get("path", [None])[0]
                 
@@ -753,42 +881,49 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     return
                 
                 abs_path = os.path.abspath(path)
-                entry = db.get(abs_path)
+                u = user_db.get_user(user_name)
+                tags = []
+                if u and abs_path in u.data.tags:
+                    tags = u.data.tags[abs_path]
                 
-                if entry:
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"tags": entry.tags}).encode("utf-8"))
-                else:
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"tags": []}).encode("utf-8"))
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"tags": tags}).encode("utf-8"))
             
             elif self.path.startswith("/api/tags?"):
                 # DELETE: Remove a tag (handled in do_GET for simplicity with query params)
-                # This is a workaround since we're using GET with action=delete
+                # Auth Check
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                # Admin check? Or anyone can delete global tags? 
+                # Let's restrict to implicit admin (authenticated) for now.
+                
                 params = parse_qs(urlparse(self.path).query)
                 action = params.get("action", [None])[0]
                 tag_name = params.get("name", [None])[0]
                 
                 if action == "delete" and tag_name:
-                    # Remove tag from available_tags
-                    current_tags = list(config.settings.available_tags)
-                    updated_tags = [t for t in current_tags if t.get("name") != tag_name]
+                    # Remove tag from USER's available_tags
+                    u = user_db.get_user(user_name)
+                    if u:
+                        current_tags = list(u.data.available_tags)
+                        updated_tags = [t for t in current_tags if t.get("name") != tag_name]
+                        u.data.available_tags = updated_tags
+                        
+                        # Remove this tag from this User's video data as well?
+                        # Usually yes, if we delete the definition.
+                        modified = False
+                        for path, tags in u.data.tags.items():
+                            if tag_name in tags:
+                                u.data.tags[path] = [t for t in tags if t != tag_name]
+                                modified = True
+                        
+                        user_db.save()
                     
-                    # Also remove this tag from all videos
-                    for entry in db.get_all():
-                        if tag_name in entry.tags:
-                            entry.tags = [t for t in entry.tags if t != tag_name]
-                            db.upsert(entry)
-                    db.save()
-                    
-                    # Save updated tags list
-                    config.save({"available_tags": updated_tags})
-                    
-                    print(f"🏷️ Deleted tag: {tag_name}")
+                    print(f"🏷️ Deleted tag for user {user_name}: {tag_name}")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
@@ -819,67 +954,122 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             print(f"Error handling HEAD request: {e}")
 
-    def log_message(self, format, *args):
-        return
 
     def do_POST(self):
+        print(f"DEBUG: POST Request received for path: {self.path}", flush=True)
+
         try:
+            if self.path.startswith("/api/login"):
+                content_len = int(self.headers.get('Content-Length', 0))
+                post_body = self.rfile.read(content_len)
+                try:
+                    data = json.loads(post_body)
+                    username = data.get("username")
+                    password = data.get("password")
+                    
+                    # Check auth
+                    username = username.strip() if username else ""
+                    # password = password.strip() if password else "" # Passwords might have spaces
+
+                    print(f"LOGIN DEBUG: Attempting login for user: '{username}'", flush=True)
+                    
+                    u = user_db.get_user(username)
+                    if u:
+                        print(f"LOGIN DEBUG: User found in DB. Salt: {u.salt}", flush=True)
+                    else:
+                        print(f"LOGIN DEBUG: User '{username}' NOT found", flush=True)
+
+                    is_valid = user_db.verify_password(username, password)
+                    print(f"LOGIN DEBUG: verify_password result: {is_valid}", flush=True)
+                    
+                    if is_valid:
+                        token = session_manager.create_session(username)
+                        
+                        self.send_response(200)
+                        cookie = SimpleCookie()
+                        cookie["session_token"] = token
+                        cookie["session_token"]["path"] = "/"
+                        cookie["session_token"]["httponly"] = True
+                        cookie["session_token"]["max-age"] = 86400 * 30
+                        
+                        for morsel in cookie.values():
+                            self.send_header("Set-Cookie", morsel.OutputString())
+                        
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"success": True}).encode())
+                    else:
+                        self.send_error(401, "Invalid credentials")
+                        
+                except Exception as e:
+                    print(f"Login error: {e}")
+                    self.send_error(400)
+                return
+
+            elif self.path == "/api/logout":
+                if "Cookie" in self.headers:
+                    cookie = SimpleCookie(self.headers["Cookie"])
+                    if "session_token" in cookie:
+                        session_manager.revoke_session(cookie["session_token"].value)
+                
+                self.send_response(200)
+                cookie = SimpleCookie()
+                cookie["session_token"] = ""
+                cookie["session_token"]["path"] = "/"
+                cookie["session_token"]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
+                for morsel in cookie.values():
+                    self.send_header("Set-Cookie", morsel.OutputString())
+                self.end_headers()
+                return
+
             if self.path == "/api/settings":
                 try:
                     # Security Fix H-2: DoS Protection - Limit request size
                     content_length = int(self.headers.get("Content-Length", 0))
-                    
                     if content_length > MAX_REQUEST_SIZE:
-                        print(f"🚨 Rejected oversized request: {content_length} bytes")
-                        self.send_error(413, "Request Entity Too Large")
+                        self.send_error(413, "Request payload too large")
                         return
+
+                    post_body = self.rfile.read(content_length)
+                    new_settings = json.loads(post_body)
                     
-                    if content_length == 0:
-                        self.send_error(400, "Empty request body")
-                        return
+                    # Interceptor: Extract smart_collections for user_db
+                    user_collections = new_settings.pop("smart_collections", None)
+                    user_targets = new_settings.pop("scan_targets", None)
+                    user_excludes = new_settings.pop("exclude_paths", None)
+                    user_tags = new_settings.pop("available_tags", None)
                     
-                    # Read and parse JSON body
-                    body = self.rfile.read(content_length).decode("utf-8")
-                    new_settings = json.loads(body)
-                    
-                    # Type validation via Pydantic
-                    from arcade_scanner.config import AppSettings
-                    from pydantic import ValidationError
-                    
-                    # Validate structure before applying
-                    try:
-                        validated = AppSettings(**new_settings)
-                    except ValidationError as e:
-                        print(f"🚨 Settings validation failed: {e}")
-                        self.send_error(400, f"Invalid settings: {e}")
-                        return
-                    
-                    # Update with validated values
-                    update_data = {
-                        "scan_targets": new_settings.get("scan_targets", []),
-                        "exclude_paths": new_settings.get("exclude_paths", []),
-                        "disabled_defaults": new_settings.get("disabled_defaults", []),
-                        "saved_views": new_settings.get("saved_views", config.settings.saved_views),
-                        "smart_collections": new_settings.get("smart_collections", config.settings.smart_collections),
-                        "min_size_mb": new_settings.get("min_size_mb", 100),
-                        "bitrate_threshold_kbps": new_settings.get("bitrate_threshold_kbps", 15000),
-                        "enable_fun_facts": new_settings.get("enable_fun_facts", True),
-                        "enable_optimizer": new_settings.get("enable_optimizer", True),
-                        "enable_deovr": new_settings.get("enable_deovr", False),
-                        "available_tags": new_settings.get("available_tags", config.settings.available_tags),
-                        "theme": new_settings.get("theme", config.settings.theme),
-                        "sensitive_dirs": new_settings.get("sensitive_dirs", []),
-                        "sensitive_tags": new_settings.get("sensitive_tags", []),
-                        "sensitive_collections": new_settings.get("sensitive_collections", [])
-                    }
-                    
-                    if config.save(update_data):
-                        print(f"✅ Settings saved: {len(update_data['scan_targets'])} targets, {len(update_data['exclude_paths'])} excludes")
-                        
+                    if config.save(new_settings):
+                        # Save user collections if present
+                        user_name = self.get_current_user()
+                        if user_name:
+                            u = user_db.get_user(user_name)
+                            if u:
+                                modified = False
+                                if user_collections is not None:
+                                    u.data.smart_collections = user_collections
+                                    modified = True
+                                if user_targets is not None:
+                                    u.data.scan_targets = user_targets
+                                    modified = True
+                                if user_excludes is not None:
+                                    u.data.exclude_paths = user_excludes
+                                    modified = True
+                                if user_tags is not None:
+                                    u.data.available_tags = user_tags
+                                    modified = True
+                                
+                                if modified:
+                                    user_db.save()
+
                         # Regenerate HTML report to bake in new settings (Theme, etc.)
                         try:
-                            current_port = self.server.server_address[1]
+                            # We need to import db to get results
+                            # results = [e.model_dump(by_alias=True) for e in db.get_all()]
+                            # But simple way is to rely on scanner manager or just trigger a re-render if possible.
+                            # Actually, we can just fetch db here since it's imported.
                             results = [e.model_dump(by_alias=True) for e in db.get_all()]
+                            current_port = config.PORT if hasattr(config, 'PORT') else 8000
+                            # generate_html_report is imported
                             generate_html_report(results, config.report_file, server_port=current_port)
                             print("✅ HTML Report regenerated with new settings")
                         except Exception as e:
@@ -890,17 +1080,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.end_headers()
                         self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
                     else:
-                        self.send_response(500)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": False, "error": "Failed to save"}).encode("utf-8"))
-                
-                except json.JSONDecodeError as e:
-                    print(f"🚨 Invalid JSON in settings POST: {e}")
-                    self.send_error(400, "Invalid JSON")
+                        self.send_error(500, "Failed to save settings")
                 except Exception as e:
-                    print(f"❌ Error saving settings: {e}")
-                    self.send_error(500, str(e))
+                    print(f"Error saving settings: {e}")
+                    self.send_error(500)
+                return
             
             elif self.path == "/api/restore":
                 try:
@@ -983,6 +1167,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             
             elif self.path.startswith("/api/video/tags"):
                 # POST: Set tags for a video
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                
                 try:
                     content_length = int(self.headers.get("Content-Length", 0))
                     if content_length > MAX_REQUEST_SIZE:
@@ -996,35 +1185,22 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     tags = data.get("tags", [])
                     
                     if not video_path:
-                        self.send_error(400, "Video path is required")
-                        return
-                    
+                         self.send_error(400, "Path required")
+                         return
+
                     abs_path = os.path.abspath(video_path)
-                    entry = db.get(abs_path)
+                    u = user_db.get_user(user_name)
+                    if u:
+                        u.data.tags[abs_path] = tags
+                        user_db.save()
+                        print(f"Updated tags for {user_name} on {os.path.basename(abs_path)}: {tags}")
                     
-                    if not entry:
-                        # Create minimal entry if not found
-                        from arcade_scanner.models.video_entry import VideoEntry
-                        entry = VideoEntry(FilePath=abs_path, Size_MB=0)
-                    
-                    # Validate tags exist in available_tags
-                    available_tag_names = [t.get("name") for t in config.settings.available_tags]
-                    valid_tags = [t for t in tags if t in available_tag_names]
-                    
-                    entry.tags = valid_tags
-                    db.upsert(entry)
-                    db.save()
-                    
-                    print(f"🏷️ Updated tags for {os.path.basename(abs_path)}: {valid_tags}")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({"tags": valid_tags}).encode("utf-8"))
-                    
-                except json.JSONDecodeError:
-                    self.send_error(400, "Invalid JSON")
+                    self.wfile.write(json.dumps({"success": True, "tags": tags}).encode("utf-8"))
                 except Exception as e:
-                    print(f"❌ Error setting video tags: {e}")
+                    print(f"Error setting tags: {e}")
                     self.send_error(500, str(e))
             
             else:

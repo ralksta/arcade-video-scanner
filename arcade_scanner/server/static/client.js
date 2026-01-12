@@ -159,6 +159,15 @@ function setWorkspaceMode(mode, preserveCollection = false) {
         // Set workspace data attribute for CSS theming
         document.body.setAttribute('data-workspace', mode);
 
+        // CLEAR SEARCH ON LOBBY RETURN
+        if (mode === 'lobby' && !preserveCollection) {
+            searchTerm = '';
+            document.getElementById('mobileSearchInput').value = '';
+            // If the user had a search filter active, simple filter update happens below
+            // But we might need to reset 'currentFilter' if it was search-bound?
+            // Usually filterAndSort uses 'searchTerm' global.
+        }
+
         // Update nav items with enhanced active states
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.classList.remove('active');
@@ -4681,9 +4690,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.handleCategoryChange = handleCategoryChange;
     window.toggleNewCategoryInput = toggleNewCategoryInput;
 
+    // --- USER DATA HYDRATION ---
+    async function loadUserData() {
+        try {
+            console.log("Hydrating user data...");
+            const res = await fetch('/api/user/data');
+            if (res.ok) {
+                const data = await res.json();
+                const favSet = new Set(data.favorites || []);
+                const vaultSet = new Set(data.vaulted || []);
+                const tagMap = data.tags || {};
+
+                // Apply to global ALL_VIDEOS
+                if (window.ALL_VIDEOS) {
+                    window.ALL_VIDEOS.forEach(v => {
+                        v.favorite = favSet.has(v.FilePath);
+                        v.hidden = vaultSet.has(v.FilePath);
+                        v.tags = tagMap[v.FilePath] || [];
+                    });
+                }
+                console.log(`✅ User data loaded: ${favSet.size} favs, ${vaultSet.size} vaulted.`);
+            } else {
+                console.warn("User data load failed:", res.status);
+                // If unauthorized (session expired?), reload to trigger login check
+                if (res.status === 401 || res.status === 403) window.location.reload();
+            }
+        } catch (e) {
+            console.error("Error loading user data:", e);
+        }
+    }
+
     // 1. Load Settings FIRST (async)
     // This ensures userSettings.smart_collections is populated before we parse URL
     await loadSettings();
+
+    // 1a. Load Videos for this user (Isolation)
+    await loadVideoData();
+
+    // 1b. Load User Data (Hydrate Global Video List)
+    await loadUserData();
 
     // 2. Initial Render (Sidebar etc)
     initialRender();
@@ -4710,3 +4755,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         filterAndSort();
     }, 500);
 });
+
+async function loadVideoData() {
+    try {
+        const res = await fetch('/api/videos');
+        if (res.ok) {
+            window.ALL_VIDEOS = await res.json();
+            console.log(`✅ Loaded ${window.ALL_VIDEOS.length} videos from API`);
+        } else {
+            console.error("Failed to load videos", res.status);
+        }
+    } catch (e) {
+        console.error("Error loading videos:", e);
+    }
+}
+
+async function logout() {
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.reload();
+    } catch (e) {
+        console.error("Logout failed", e);
+        window.location.reload();
+    }
+}

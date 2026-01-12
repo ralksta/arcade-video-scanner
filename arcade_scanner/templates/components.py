@@ -215,6 +215,10 @@ HEADER_COMPONENT = """
         <button onclick="toggleTheme()" class="hover:bg-black/5 dark:hover:bg-white/10 p-1.5 rounded-lg transition-colors text-gray-500 hover:text-arcade-gold dark:text-gray-400" title="Switch Theme">
             <span class="material-icons text-[18px]" id="themeIcon">light_mode</span>
         </button>
+        <span class="text-black/10 dark:text-white/20">|</span>
+        <button onclick="logout()" class="hover:bg-red-500/10 p-1.5 rounded-lg transition-colors text-gray-500 hover:text-red-400" title="Logout">
+            <span class="material-icons text-[18px]">logout</span>
+        </button>
     </div>
     
     <!-- Mobile Actions (Settings) -->
@@ -272,7 +276,7 @@ NAVIGATION_COMPONENT = """
         </div>
     </div>
     
-    <div class="mt-auto border-t border-white/5 pt-3">
+    <div class="mt-auto border-t border-white/5 pt-3 space-y-1">
         <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
             <span class="material-icons text-[20px]">settings</span>
             <span>Settings</span>

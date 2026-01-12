@@ -11,8 +11,10 @@ from .validators import (
     validate_filename,
     is_path_allowed,
     is_safe_directory_traversal,
+    is_safe_directory_traversal,
     SecurityError
 )
+from .auth import session_manager
 
 __all__ = [
     'PathValidator',
@@ -20,5 +22,6 @@ __all__ = [
     'validate_filename',
     'is_path_allowed',
     'is_safe_directory_traversal',
-    'SecurityError'
+    'SecurityError',
+    'session_manager'
 ]

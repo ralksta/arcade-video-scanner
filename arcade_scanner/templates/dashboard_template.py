@@ -41,7 +41,21 @@ def generate_html_report(results, report_file, server_port=8000):
     
     # Prepare JSON Data
     folders_json = json.dumps(folders_data)
-    all_videos_json = json.dumps(results)
+    
+    # Strip user-specific data from static dump for multi-user support
+    # (The frontend will hydrate this via /api/user/data)
+    clean_results = []
+    for r in results:
+        # Create a copy to modify without affecting the passed dict references (if they are mutable)
+        # Assuming r is a dict from model_dump
+        r_clean = r.copy()
+        # Reset user fields to defaults
+        r_clean["favorite"] = False
+        r_clean["hidden"] = False # aliased from vaulted
+        r_clean["tags"] = []
+        clean_results.append(r_clean)
+        
+    all_videos_json = json.dumps(clean_results)
     user_settings_json = json.dumps(config.settings.model_dump())
     
     # Logic for enabled state: Must be installed AND enabled in settings
@@ -132,7 +146,7 @@ def generate_html_report(results, report_file, server_port=8000):
     scripts_html = f"""
         window.SERVER_PORT = {server_port};
         window.FOLDERS_DATA = {folders_json};
-        window.ALL_VIDEOS = {all_videos_json};
+        window.ALL_VIDEOS = []; /* Loaded via API for user isolation */
         window.userSettings = {user_settings_json};
         window.OPTIMIZER_AVAILABLE = {opt_avail_str};
         window.ENABLE_OPTIMIZER = {opt_enabled_str};
