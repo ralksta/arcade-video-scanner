@@ -4713,6 +4713,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const vaultSet = new Set(data.vaulted || []);
                 const tagMap = data.tags || {};
 
+                // Hydrate Sensitive Settings (Safe Mode) - Migrated from global config
+                if (!window.userSettings) window.userSettings = {};
+                window.userSettings.sensitive_dirs = data.sensitive_dirs || [];
+                window.userSettings.sensitive_tags = data.sensitive_tags || [];
+                window.userSettings.sensitive_collections = data.sensitive_collections || [];
+
                 // Apply to global ALL_VIDEOS
                 if (window.ALL_VIDEOS) {
                     window.ALL_VIDEOS.forEach(v => {
