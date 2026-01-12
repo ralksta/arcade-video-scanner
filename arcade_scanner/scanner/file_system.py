@@ -136,6 +136,9 @@ class AsyncFileSystem:
         return False
 
     def _is_video(self, filename: str) -> bool:
+        # Skip macOS resource fork files (e.g., ._video.mp4)
+        if filename.startswith("._"):
+            return False
         return any(filename.lower().endswith(ext) for ext in self.VIDEO_EXTENSIONS)
 
     def _is_valid_size(self, path: str) -> bool:

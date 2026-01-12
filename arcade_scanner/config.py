@@ -54,6 +54,7 @@ if not IS_WIN:
         {"path": "~/Pictures/Photos Library.photoslibrary", "desc": "Apple Photos library"},
         {"path": "~/Library/CloudStorage/", "desc": "iCloud & cloud services"},
         {"path": "~/Library/Containers/", "desc": "App sandbox data"},
+        {"path": "~/.Trash/", "desc": "Trash Folder"},
         {"path": "~/Library/Mobile Documents/", "desc": "iCloud documents"},
     ]
 else:
@@ -113,10 +114,10 @@ class AppSettings(BaseSettings):
     disabled_defaults: List[str] = Field(default_factory=list)
     saved_views: List[Dict[str, Any]] = Field(default_factory=list)
     smart_collections: List[Dict[str, Any]] = Field(default_factory=list)  # Smart collections with filter criteria
-    
+
     min_size_mb: int = Field(100)
     bitrate_threshold_kbps: int = Field(15000)
-    
+
 
     enable_fun_facts: bool = Field(True)
     enable_optimizer: bool = Field(True)
@@ -140,7 +141,7 @@ class ConfigManager:
     def __init__(self):
         self._ensure_directories()
         self.settings = self._load_settings()
-        
+
     def _ensure_directories(self):
         for d in [HIDDEN_DATA_DIR, THUMB_DIR]:
             if not os.path.exists(d):
@@ -153,36 +154,36 @@ class ConfigManager:
             try:
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                     file_data = json.load(f)
-                
+
                 # Check for missing defaults and update file if needed
                 dirty = False
                 for k, v in DEFAULT_SETTINGS_JSON.items():
                     if k not in file_data:
                         file_data[k] = v
                         dirty = True
-                
+
                 if dirty:
                     self._save_json_raw(file_data)
-                    
+
             except Exception as e:
                 print(f"⚠️ Warning: Could not read settings.json: {e}")
-        
+
         # Initialize proper settings from file data (env vars will override defaults if set)
         # Note: Pydantic BaseSettings usually loads files via _env_file, but here we explicitly pass dict
         settings = AppSettings(**file_data)
-        
+
         # SECURITY FIX: If scan_targets is empty, default to HOME_DIR
         # This prevents the security whitelist from blocking everything
         if not settings.scan_targets:
             settings.scan_targets = [HOME_DIR]
             print(f"ℹ️ No scan targets configured, defaulting to: {HOME_DIR}")
-        
+
         # Remove duplicates while preserving order
         seen = set()
         settings.scan_targets = [x for x in settings.scan_targets if not (x in seen or seen.add(x))]
-        
+
         return settings
-        
+
     def _save_json_raw(self, data: Dict[str, Any]):
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -201,13 +202,13 @@ class ConfigManager:
             if os.path.exists(SETTINGS_FILE):
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                     current_raw = json.load(f)
-            
+
             # Update raw dict
             current_raw.update(updates)
-            
+
             # Save raw dict
             self._save_json_raw(current_raw)
-            
+
             # Update internal model
             self.settings = AppSettings(**current_raw)
             return True
@@ -219,16 +220,16 @@ class ConfigManager:
     def active_scan_targets(self) -> List[str]:
         # Add HOME_DIR as default if not already present
         targets = self.settings.scan_targets if self.settings.scan_targets else [HOME_DIR]
-        
+
         # Ensure HOME_DIR is included (but avoid duplicates)
         if HOME_DIR not in targets:
             targets = [HOME_DIR] + targets
-        
+
         return targets
-        
+
     @property
     def active_exclude_paths(self) -> List[str]:
-        default_paths = [e["path"] for e in DEFAULT_EXCLUSIONS 
+        default_paths = [e["path"] for e in DEFAULT_EXCLUSIONS
                         if e["path"] not in self.settings.disabled_defaults]
         return default_paths + self.settings.exclude_paths
 
@@ -239,21 +240,21 @@ class ConfigManager:
     @property
     def optimizer_available(self) -> bool:
         return os.path.exists(self.optimizer_path)
-        
+
     @property
     def cache_file(self) -> str:
         return CACHE_FILE
-        
+
     @property
     def report_file(self) -> str:
         return REPORT_FILE
-        
+
     @property
     def thumb_dir(self) -> str:
         return THUMB_DIR
 
 
-        
+
     @property
     def static_dir(self) -> str:
         return STATIC_DIR

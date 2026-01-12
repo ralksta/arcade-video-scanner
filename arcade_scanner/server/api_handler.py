@@ -78,7 +78,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             elif self.path.startswith("/thumbnails/"):
                 try:
                     rel_path = unquote(self.path[12:])  # remove /thumbnails/
-                    print(f"📸 Thumbnail request: {rel_path}")
                     
                     # Security Fix C-4: Prevent path traversal
                     thumb_dir_abs = os.path.abspath(config.thumb_dir)
@@ -254,6 +253,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     audio_mode = params.get("audio", ["enhanced"])[0]
                     video_mode = params.get("video", ["compress"])[0]
                     q_val = params.get("q", [None])[0]
+                    ss = params.get("ss", [None])[0]  # Trim start time
+                    to = params.get("to", [None])[0]  # Trim end time
                     
                     # Validate audio_mode (whitelist)
                     if audio_mode not in ["enhanced", "standard"]:
@@ -473,7 +474,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
             elif self.path.startswith("/batch_compress?paths="):
                 try:
-                    paths = unquote(self.path.split("paths=")[1]).split(",")
+                    # Use ||| as separator to avoid issues with commas in filenames
+                    paths = unquote(self.path.split("paths=")[1]).split("|||")
                     current_port = self.server.server_address[1]
                     
                     # Validate all paths first
@@ -518,7 +520,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         # macOS: Single terminal window
                         safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
                         print(f"🚀 Launching Batch Controller: {len(validated_paths)} files")
-                        applescript = f'tell application "Terminal" to do script "{safe_cmd}"'
+                        # Escape backslashes and quotes for AppleScript string
+                        escaped_cmd = safe_cmd.replace('\\', '\\\\').replace('"', '\\"')
+                        applescript = f'tell application "Terminal" to do script "{escaped_cmd}"'
                         subprocess.run(["osascript", "-e", applescript])
                     
                     self.send_response(204)

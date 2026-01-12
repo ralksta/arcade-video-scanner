@@ -63,6 +63,12 @@ class ScannerManager:
                     try:
                         # Basic existence check and stat
                         file_stat = os.stat(path)
+                        # Check if file size changed significantly (more than 10MB difference)
+                        # This catches files that were optimized/replaced
+                        current_size_mb = file_stat.st_size / (1024 * 1024)
+                        if abs(current_size_mb - cached_entry.size_mb) > 10:  # 10MB threshold
+                            needs_update = True
+                            print(f"📊 Size changed: {os.path.basename(path)} ({cached_entry.size_mb:.1f}MB → {current_size_mb:.1f}MB)")
                     except OSError:
                         needs_update = True
 

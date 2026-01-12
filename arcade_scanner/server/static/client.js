@@ -793,7 +793,7 @@ function createVideoCard(v) {
                     <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
                   ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? `
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${encodeURIComponent(v.FilePath)}', 'h_frame')">
+                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${encodeURIComponent(v.FilePath)}&audio=standard', 'h_frame')">
                     <span class="material-icons">bolt</span>
                  </button>` : ''}
              </div>
@@ -1191,13 +1191,62 @@ function cinemaOptimize() {
 // ESC handler moved to setupTreemapInteraction section
 
 // --- BATCH ---
+const BATCH_MIN_SIZE_MB = 50; // Files smaller than this are skipped by optimizer
+
 function updateBatchSelection() {
-    const count = document.querySelectorAll('.video-card-container input:checked').length;
+    const selectedCheckboxes = document.querySelectorAll('.video-card-container input:checked');
+    const count = selectedCheckboxes.length;
     const bar = document.getElementById('batchBar');
-    document.getElementById('batchCount').innerText = count;
+
+    // Calculate how many will be skipped due to size
+    let processableCount = 0;
+    let skippedCount = 0;
+
+    selectedCheckboxes.forEach(cb => {
+        const container = cb.closest('.video-card-container');
+        const path = container.getAttribute('data-path');
+        const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
+        if (video) {
+            if (video.Size_MB >= BATCH_MIN_SIZE_MB) {
+                processableCount++;
+            } else {
+                skippedCount++;
+            }
+        }
+    });
+
+    // Update display
+    const countEl = document.getElementById('batchCount');
+    const skipWarning = document.getElementById('batchSkipWarning');
+
+    if (countEl) countEl.innerText = count;
+
+    // Show/create skip warning
+    if (skippedCount > 0 && count > 0) {
+        if (!skipWarning) {
+            // Create warning element if it doesn't exist
+            const warningSpan = document.createElement('span');
+            warningSpan.id = 'batchSkipWarning';
+            warningSpan.className = 'batch-skip-warning';
+            warningSpan.style.cssText = 'color: #F4B342; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;';
+            const countSpan = document.getElementById('batchCount');
+            if (countSpan && countSpan.parentElement) {
+                countSpan.parentElement.insertAdjacentElement('afterend', warningSpan);
+            }
+        }
+        const warning = document.getElementById('batchSkipWarning');
+        if (warning) {
+            warning.innerHTML = `<span class="material-icons" style="font-size: 16px;">warning</span> ${skippedCount} under ${BATCH_MIN_SIZE_MB}MB`;
+            warning.title = `${skippedCount} file(s) will be skipped because they are already under ${BATCH_MIN_SIZE_MB}MB`;
+        }
+    } else if (skipWarning) {
+        skipWarning.innerHTML = '';
+    }
+
     if (count > 0) bar.classList.add('active');
     else bar.classList.remove('active');
 }
+
 
 function clearSelection() {
     document.querySelectorAll('.video-card-container input:checked').forEach(i => i.checked = false);
@@ -1273,12 +1322,57 @@ function triggerBatchHide(state) {
 function triggerBatchCompress() {
     const selected = document.querySelectorAll('.video-card-container input:checked');
     const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
-    if (confirm(`Möchtest du ${paths.length} Videos nacheinander optimieren?`)) {
-        fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join(',')));
-        alert("Batch Optimierung gestartet!");
+
+    if (paths.length === 0) return;
+
+    // Categorize files by processable vs skipped
+    const processable = [];
+    const skipped = [];
+
+    paths.forEach(path => {
+        const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
+        if (video) {
+            const filename = path.split(/[\\/]/).pop();
+            if (video.Size_MB >= BATCH_MIN_SIZE_MB) {
+                processable.push({ path, filename, size: video.Size_MB });
+            } else {
+                skipped.push({ path, filename, size: video.Size_MB });
+            }
+        }
+    });
+
+    // Build detailed confirmation message
+    let message = `🎬 Batch Compression Summary\n${'─'.repeat(40)}\n`;
+    message += `✅ Will process: ${processable.length} file(s)\n`;
+
+    if (skipped.length > 0) {
+        message += `⚠️ Will skip: ${skipped.length} file(s) (under ${BATCH_MIN_SIZE_MB}MB)\n`;
+        message += `\n📦 Skipped files (already compact):\n`;
+        skipped.slice(0, 5).forEach(f => {
+            const shortName = f.filename.length > 40 ? f.filename.substring(0, 37) + '...' : f.filename;
+            message += `   • ${shortName} (${f.size.toFixed(1)} MB)\n`;
+        });
+        if (skipped.length > 5) {
+            message += `   ... and ${skipped.length - 5} more\n`;
+        }
+    }
+
+    if (processable.length === 0) {
+        alert(`⚠️ No files to process!\n\nAll ${skipped.length} selected file(s) are under ${BATCH_MIN_SIZE_MB}MB and will be skipped.\n\nThese files are already compact and don't need optimization.`);
+        return;
+    }
+
+    message += `\n${'─'.repeat(40)}\nProceed with ${processable.length} file(s)?`;
+
+    if (confirm(message)) {
+        // Use ||| as separator to avoid issues with commas in filenames
+        fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')));
+        alert(`🚀 Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
         clearSelection();
     }
 }
+
+
 
 // --- BATCH TAGGING (Modern Redesign) ---
 let batchTagActions = {}; // { tagName: 'add' | 'remove' | null }
@@ -2838,6 +2932,12 @@ function openCollectionModal(editId = null) {
         }
     }
 
+    // Populate and sync category dropdown
+    populateCategoryDropdown(editId ? (userSettings.smart_collections || []).find(c => c.id === editId)?.category : null);
+    // Reset new category input state
+    document.getElementById('newCategoryInput')?.classList.add('hidden');
+    document.getElementById('collectionCategory')?.classList.remove('hidden');
+
     // Sync UI with new criteria
     syncSmartCollectionUI();
 
@@ -2943,11 +3043,22 @@ function saveCollection() {
         };
     }
 
+    // Get category - check if new category input is visible and has value
+    const newCatInput = document.getElementById('newCategoryInput');
+    const catSelect = document.getElementById('collectionCategory');
+    let category = null;
+    if (newCatInput && !newCatInput.classList.contains('hidden') && newCatInput.value.trim()) {
+        category = newCatInput.value.trim();
+    } else if (catSelect) {
+        category = catSelect.value || null;
+    }
+
     const collection = {
         id: editingCollectionId || 'col_' + Date.now(),
         name: name,
         icon: icon,
         color: color,
+        category: category,
         criteria: collectionCriteriaNew ? JSON.parse(JSON.stringify(collectionCriteriaNew)) : {
             status: collectionCriteria.status,
             codec: collectionCriteria.codec,
@@ -3530,7 +3641,6 @@ function renderCollections() {
     let collections = allCollections;
     if (safeMode) {
         let sensitiveCols = window.userSettings?.sensitive_collections || [];
-        // Normalize sensitive list: trim and lowercase
         sensitiveCols = sensitiveCols.map(s => s.trim().toLowerCase()).filter(s => s);
 
         collections = allCollections.filter(c => {
@@ -3544,27 +3654,92 @@ function renderCollections() {
         return;
     }
 
-    container.innerHTML = collections.map(col => {
-        const count = getCollectionCount(col);
-        const isActive = col.id === activeCollectionId;
+    // Group by category
+    const groups = {};
+    collections.forEach(col => {
+        const cat = col.category || 'Uncategorized';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(col);
+    });
 
-        return `
-            <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 border border-transparent'}" 
-                    onclick="applyCollection('${col.id}')"
-                    ondblclick="openCollectionModal('${col.id}')">
-                <span class="material-icons text-[18px]" style="color: ${col.color}">${col.icon}</span>
-                <span class="flex-1 text-left truncate">${col.name}</span>
-                
-                <button onclick="event.stopPropagation(); openCollectionModal('${col.id}')" 
-                        class="${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white transition-opacity"
-                        title="Edit Collection">
-                    <span class="material-icons text-[14px]">edit</span>
+    // Get collapsed state from localStorage
+    const collapsed = JSON.parse(localStorage.getItem('collapsedCategories') || '{}');
+
+    // Sort categories (Uncategorized last)
+    const sortedCategories = Object.keys(groups).sort((a, b) => {
+        if (a === 'Uncategorized') return 1;
+        if (b === 'Uncategorized') return -1;
+        return a.localeCompare(b);
+    });
+
+    // If only one category exists and it's Uncategorized, render flat list
+    if (sortedCategories.length === 1 && sortedCategories[0] === 'Uncategorized') {
+        container.innerHTML = groups['Uncategorized'].map(col => renderCollectionItem(col)).join('');
+        return;
+    }
+
+    let html = '';
+    sortedCategories.forEach(category => {
+        const isCollapsed = collapsed[category] || false;
+        const catCollections = groups[category];
+        const safeKey = category.replace(/[^a-zA-Z0-9]/g, '_');
+
+        html += `
+            <div class="category-group mb-1">
+                <button onclick="toggleCategoryCollapse('${category}')" 
+                        class="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-gray-300 transition-colors rounded hover:bg-white/5">
+                    <span class="material-icons text-[14px] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}"
+                          id="cat-arrow-${safeKey}">expand_more</span>
+                    <span class="flex-1 text-left">${category}</span>
+                    <span class="text-gray-600 font-mono">${catCollections.length}</span>
                 </button>
-                
-                <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-black/40 text-arcade-cyan border border-arcade-cyan/30' : 'bg-black/5 dark:bg-white/5 text-gray-400 dark:text-gray-500'} font-mono">${count}</span>
+                <div id="cat-items-${safeKey}" 
+                     class="space-y-0.5 overflow-hidden transition-all duration-200 ${isCollapsed ? 'max-h-0' : 'max-h-[2000px]'}">
+                    ${catCollections.map(col => renderCollectionItem(col)).join('')}
+                </div>
             </div>
         `;
-    }).join('');
+    });
+
+    container.innerHTML = html;
+}
+
+function renderCollectionItem(col) {
+    const count = getCollectionCount(col);
+    const isActive = col.id === activeCollectionId;
+
+    return `
+        <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 border border-transparent'}" 
+                onclick="applyCollection('${col.id}')"
+                ondblclick="openCollectionModal('${col.id}')">
+            <span class="material-icons text-[18px]" style="color: ${col.color}">${col.icon}</span>
+            <span class="flex-1 text-left truncate">${col.name}</span>
+            
+            <button onclick="event.stopPropagation(); openCollectionModal('${col.id}')" 
+                    class="${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white transition-opacity"
+                    title="Edit Collection">
+                <span class="material-icons text-[14px]">edit</span>
+            </button>
+            
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-black/40 text-arcade-cyan border border-arcade-cyan/30' : 'bg-black/5 dark:bg-white/5 text-gray-400 dark:text-gray-500'} font-mono">${count}</span>
+        </div>
+    `;
+}
+
+function toggleCategoryCollapse(category) {
+    const collapsed = JSON.parse(localStorage.getItem('collapsedCategories') || '{}');
+    collapsed[category] = !collapsed[category];
+    localStorage.setItem('collapsedCategories', JSON.stringify(collapsed));
+
+    const safeKey = category.replace(/[^a-zA-Z0-9]/g, '_');
+    const items = document.getElementById('cat-items-' + safeKey);
+    const arrow = document.getElementById('cat-arrow-' + safeKey);
+
+    if (items) {
+        items.classList.toggle('max-h-0');
+        items.classList.toggle('max-h-[2000px]');
+    }
+    if (arrow) arrow.classList.toggle('-rotate-90');
 }
 
 function applyCollection(collectionId) {
@@ -3633,7 +3808,7 @@ function applyCollection(collectionId) {
 }
 
 // --- OPTIMIZATION PANEL LOGIC ---
-let currentOptAudio = 'enhanced';
+let currentOptAudio = 'standard';
 
 function cinemaOptimize() {
     // Open the panel
@@ -3649,7 +3824,7 @@ function cinemaOptimize() {
     if (window.ENABLE_OPTIMIZER !== true || window.userSettings?.enable_optimizer === false) return;
 
     // Populate Initial State
-    currentOptAudio = 'enhanced'; // Reset to default
+    currentOptAudio = 'standard'; // Reset to default (audio enhancement off)
     updateOptAudioUI();
     clearTrim(); // Reset trim
 
@@ -4445,6 +4620,66 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.onpopstate = (event) => {
         loadFromURL();
     };
+
+    // --- CATEGORY MANAGEMENT FUNCTIONS ---
+    function getAvailableCategories() {
+        const collections = userSettings.smart_collections || [];
+        const categories = new Set();
+        collections.forEach(c => {
+            if (c.category && c.category !== 'Uncategorized') {
+                categories.add(c.category);
+            }
+        });
+        return Array.from(categories).sort();
+    }
+
+    function populateCategoryDropdown(selectedCategory = null) {
+        const select = document.getElementById('collectionCategory');
+        if (!select) return;
+
+        const categories = getAvailableCategories();
+
+        select.innerHTML = '<option value="">Uncategorized</option>' +
+            categories.map(cat =>
+                `<option value="${cat}" ${cat === selectedCategory ? 'selected' : ''}>${cat}</option>`
+            ).join('');
+    }
+
+    function handleCategoryChange(selectEl) {
+        // Just track changes - saving happens in saveCollection
+    }
+
+    function toggleNewCategoryInput() {
+        const select = document.getElementById('collectionCategory');
+        const input = document.getElementById('newCategoryInput');
+        const btn = document.getElementById('addCategoryBtn');
+
+        if (!select || !input || !btn) return;
+
+        const isHidden = input.classList.contains('hidden');
+
+        if (isHidden) {
+            // Show input, hide select
+            select.classList.add('hidden');
+            input.classList.remove('hidden');
+            input.focus();
+            btn.innerHTML = '<span class="material-icons text-sm">close</span>';
+            btn.title = "Cancel";
+        } else {
+            // Hide input, show select
+            select.classList.remove('hidden');
+            input.classList.add('hidden');
+            input.value = '';
+            btn.innerHTML = '<span class="material-icons text-sm">add</span>';
+            btn.title = "Add new category";
+        }
+    }
+
+    // Expose to window
+    window.toggleCategoryCollapse = toggleCategoryCollapse;
+    window.populateCategoryDropdown = populateCategoryDropdown;
+    window.handleCategoryChange = handleCategoryChange;
+    window.toggleNewCategoryInput = toggleNewCategoryInput;
 
     // 1. Load Settings FIRST (async)
     // This ensures userSettings.smart_collections is populated before we parse URL

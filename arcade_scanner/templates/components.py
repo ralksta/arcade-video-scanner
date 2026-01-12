@@ -953,6 +953,28 @@ COLLECTION_MODAL_COMPONENT = """
                         </div>
                     </div>
                 </div>
+                
+                <!-- Category Selector -->
+                <div class="mt-3">
+                    <label class="text-xs text-gray-400 mb-1.5 block">Category (for sidebar grouping)</label>
+                    <div class="flex gap-2">
+                        <select id="collectionCategory" 
+                                class="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none"
+                                onchange="handleCategoryChange(this)">
+                            <option value="">Uncategorized</option>
+                            <!-- Populated by JS -->
+                        </select>
+                        <input type="text" id="newCategoryInput" 
+                               placeholder="New category..." 
+                               class="hidden flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none">
+                        <button onclick="toggleNewCategoryInput()" 
+                                id="addCategoryBtn"
+                                class="px-3 py-2 text-arcade-cyan hover:text-cyan-300 border border-white/10 rounded-lg hover:border-arcade-cyan/30 transition-colors"
+                                title="Add new category">
+                            <span class="material-icons text-sm">add</span>
+                        </button>
+                    </div>
+                </div>
             </section>
             
             <!-- Filter Rules Section -->
