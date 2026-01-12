@@ -1,4 +1,4 @@
-# Arcade Video Scanner 6.2.0
+# Arcade Video Scanner 6.3.0
 
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
@@ -10,7 +10,24 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.2.0 Highlights (New!)
+## 🚀 Version 6.3.0 Highlights (New!)
+
+This release adds **Image Support**, **Cinema Keyboard Navigation**, and **Media Type Detection**.
+
+### 📸 Image Support
+- **Unified Media Library**: Scan both videos AND images (`.jpg`, `.png`, `.gif`, `.webp`, `.heic`, etc.).
+- **Image Viewer**: Click any image to open it in the cinema modal with proper image display (not video player).
+- **Visual Indicators**: Image cards display a purple "IMG" badge for easy identification.
+- **Image-Specific Metadata**: Info panel shows image-appropriate data (Resolution, Size, Type).
+- **Per-User Setting**: Enable/disable image scanning in Settings → "Scan Images" toggle.
+
+### ⌨️ Keyboard Navigation
+- **Arrow Keys in Cinema**: Use ← and → to navigate through your library without closing the modal.
+- **Wrap-Around**: Navigation seamlessly loops from last to first item and vice-versa.
+
+---
+
+## 🚀 Version 6.2.0 Highlights
 
 This major release introduces **Multi-User Support**, a **SQLite Database Migration**, **Deep Filtering**, and **Layout Precision**.
 

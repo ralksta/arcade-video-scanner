@@ -20,6 +20,7 @@ class UserVideoData(BaseModel):
     # Scan Paths
     scan_targets: List[str] = Field(default_factory=list, description="User specific scan directories")
     exclude_paths: List[str] = Field(default_factory=list, description="User specific exclusion patterns")
+    scan_images: bool = Field(False, description="Enable scanning of image files (jpg, png, etc.)")
     
     # Available Tags (Definitions)
     available_tags: List[Dict[str, str]] = Field(default_factory=list, description="User specific tag definitions")

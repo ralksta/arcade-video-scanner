@@ -11,6 +11,7 @@ class VideoEntry(BaseModel):
     size_mb: float = Field(..., alias="Size_MB", description="File size in Megabytes")
     bitrate_mbps: float = Field(0.0, alias="Bitrate_Mbps", description="Video bitrate in Mbps")
     status: str = Field("OK", alias="Status", description="Optimization status (OK, HIGH, etc.)")
+    media_type: str = Field("video", description="Type of media (video/image)")
     
     # Optional metadata (might be missing in partial scans)
     codec: Optional[str] = Field("unknown", alias="codec")

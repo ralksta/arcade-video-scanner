@@ -19,11 +19,20 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ### 🟢 User Experience
 - [ ] Customizable grid layout (card size, columns)
-- [ ] Keyboard shortcuts for common actions (space = play, f = favorite, etc.)
+- [x] Keyboard shortcuts for common actions (arrows = navigate in cinema)
 
 ---
 
 ## Completed Features
+
+### ✅ Version 6.3.0 (2026-01-12)
+- **Image Support**: Unified media scanner supporting both videos and images.
+- **Image Viewer**: Dedicated image display in cinema modal (not video player).
+- **Visual Badges**: Purple "IMG" indicator on image cards.
+- **Image Metadata**: Appropriate metadata display for images (no duration/bitrate).
+- **Keyboard Navigation**: Left/Right arrow keys to navigate in cinema mode.
+- **Media Type Model**: New `media_type` field on `VideoEntry` model.
+- **MediaAsset Conversion**: Proper conversion from scanner output to database storage.
 
 ### ✅ Version 6.2.0 (2026-01-12)
 - **Multi-User Support**: Individual accounts with isolated scan targets, favorites, tags, and collections.
@@ -100,4 +109,4 @@ Features are prioritized based on:
 
 ---
 
-*Last updated: 2025-12-31*
+*Last updated: 2026-01-12*

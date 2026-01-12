@@ -10,9 +10,10 @@ class AsyncFileSystem:
     """
     
     VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.avi', '.mov', '.m4v', '.wmv', '.flv', '.webm', '.ts')
+    IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic')
 
     def __init__(self):
-        pass  # Settings are loaded fresh at scan time
+        self.allow_images = False # Toggled by ScannerManager based on user settings
 
     def _load_settings(self):
         """Reload settings from config (called at scan start)."""
@@ -103,7 +104,15 @@ class AsyncFileSystem:
         # Skip macOS resource fork files (e.g., ._video.mp4)
         if filename.startswith("._"):
             return False
-        return any(filename.lower().endswith(ext) for ext in self.VIDEO_EXTENSIONS)
+        
+        is_video = any(filename.lower().endswith(ext) for ext in self.VIDEO_EXTENSIONS)
+        if is_video:
+            return True
+            
+        if self.allow_images:
+            return any(filename.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS)
+            
+        return False
 
     def _is_valid_size(self, path: str) -> bool:
         # Optimization check

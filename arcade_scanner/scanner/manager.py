@@ -6,8 +6,11 @@ from typing import Callable, Optional, List, Set
 from ..config import config
 from ..database import db
 from ..models.video_entry import VideoEntry
+from ..models.media_asset import MediaAsset
 from .file_system import fs_scanner
 from .media_probe import MediaProbe
+from .video_inspector import VideoInspector
+from .image_inspector import ImageInspector
 from ..core.video_processor import create_thumbnail
 
 class ScannerManager:
@@ -22,6 +25,14 @@ class ScannerManager:
         self.is_scanning = False
         self._stop_event = asyncio.Event()
         self.probe = MediaProbe() # Own the probe (ProcessPool)
+        self.video_inspector = VideoInspector(self.probe)
+        self.image_inspector = ImageInspector()
+        
+        # Concurrency Lans
+        # Heavy Lane (FFprobe/FFmpeg) - CPU bound
+        self.sem_video = asyncio.Semaphore(os.cpu_count() or 4)
+        # Fast Lane (Sips/Headers) - IO bound
+        self.sem_image = asyncio.Semaphore(50) 
 
     async def run_scan(self, progress_callback: Optional[Callable[[str], None]] = None, force_rescan: bool = False) -> int:
         """
@@ -36,6 +47,20 @@ class ScannerManager:
         start_time = time.time()
         print(f"🚀 Starting Scan on: {config.active_scan_targets}")
         
+        # Configure Image Scanning (Phase 2 Check)
+        try:
+            from ..database.user_store import user_db
+            scan_images = False
+            for u in user_db.get_all_users():
+                if getattr(u.data, 'scan_images', False):
+                    scan_images = True
+                    break
+            fs_scanner.allow_images = scan_images
+            if scan_images:
+                print("📸 Image scanning enabled (Fast Lane Active)")
+        except Exception as e:
+            pass
+        
         # 1. Load Cache
         db.load()
         existing_paths = {entry.file_path for entry in db.get_all()}
@@ -43,13 +68,25 @@ class ScannerManager:
         
         processed_count = 0
         
-        # Concurrency Control
-        concurrency = os.cpu_count() or 4
-        # We allow multiple tasks to be in flight; actual CPU work limit is handled by MediaProbe's ProcessPoolExecutor
-        sem = asyncio.Semaphore(concurrency * 3)
+        processed_count = 0
+        
+        # Concurrency: Using self.sem_video and self.sem_image defined in __init__
         pending_tasks = set()
 
         async def _process_path(path: str):
+            # 1. Lane Selection
+            inspector = None
+            sem = None
+            if self.video_inspector.can_handle(path):
+                inspector = self.video_inspector
+                sem = self.sem_video
+            elif self.image_inspector.can_handle(path):
+                inspector = self.image_inspector
+                sem = self.sem_image
+            
+            if not inspector or not sem:
+                return
+
             async with sem:
                 if self._stop_event.is_set():
                     return
@@ -76,8 +113,13 @@ class ScannerManager:
                     if progress_callback:
                         progress_callback(f"Analyzing {os.path.basename(path)}")
                     
-                    # 3. Probe with concurrency limit handled by MediaProbe's pool (WAITING)
-                    entry = await self.probe.get_metadata(path)
+                    # 3. Probe using Selected Inspector
+                    entry: Optional[MediaAsset] = None
+                    try:
+                        entry = await inspector.inspect(path)
+                    except Exception as e:
+                        print(f"❌ Inspect failed for {path}: {e}")
+                        entry = None
                     
                     if entry:
                         # Apply business logic (Bitrate Threshold)

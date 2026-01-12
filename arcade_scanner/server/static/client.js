@@ -567,7 +567,7 @@ function filterAndSort(scrollToTop = false) {
         // Sort
         if (workspaceMode !== 'optimized') {
             filteredVideos.sort((a, b) => {
-                if (currentSort === 'bitrate') return b.Bitrate_Mbps - a.Bitrate_Mbps;
+                if (currentSort === 'bitrate') return (b.Bitrate_Mbps || 0) - (a.Bitrate_Mbps || 0);
                 if (currentSort === 'size') return b.Size_MB - a.Size_MB;
                 if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
                 if (currentSort === 'date') return (b.mtime || 0) - (a.mtime || 0); // Newest first
@@ -778,7 +778,7 @@ function createVideoCard(v) {
     container.setAttribute('data-path', v.FilePath); // Keep this for JS logic
 
     const isHevc = (v.codec || '').includes('hevc') || (v.codec || '').includes('h265');
-    const barW = Math.min(100, (v.Bitrate_Mbps / 25) * 100);
+    const barW = Math.min(100, ((v.Bitrate_Mbps || 0) / 25) * 100);
     const fileName = v.FilePath.split(/[\\\\/]/).pop();
     const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
     const dirName = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
@@ -788,6 +788,14 @@ function createVideoCard(v) {
         <div class="card-media relative aspect-video bg-black overflow-hidden group cursor-pointer" 
              onclick="openCinema(this)">
              
+             <!-- Image Type Indicator -->
+             ${v.media_type === 'image' ? `
+                 <div class="absolute top-2 left-10 z-20 bg-purple-900/80 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-bold text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                     <span class="material-icons text-[12px]">image</span>
+                     IMG
+                 </div>
+             ` : ''}
+
              <!-- Corner Checkbox -->
              <div class="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                 <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-black/50 text-arcade-cyan focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
@@ -994,15 +1002,39 @@ function openCinema(container) {
 
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
+    const image = document.getElementById('cinemaImage');
     document.getElementById('cinemaTitle').innerText = fileName;
 
-    video.src = `/stream?path=` + encodeURIComponent(path);
+    const streamUrl = `/stream?path=` + encodeURIComponent(path);
+
+    // Check if this is an image
+    if (currentCinemaVideo && currentCinemaVideo.media_type === 'image') {
+        // IMAGE MODE
+        video.classList.add('hidden');
+        video.pause();
+        video.src = '';
+
+        if (image) {
+            image.classList.remove('hidden');
+            image.src = streamUrl;
+        }
+    } else {
+        // VIDEO MODE
+        if (image) {
+            image.classList.add('hidden');
+            image.src = '';
+        }
+        video.classList.remove('hidden');
+
+        video.src = streamUrl;
+        video.load();
+        video.play().catch(() => {
+            video.muted = true;
+            video.play();
+        });
+    }
+
     modal.classList.add('active');
-    video.load();
-    video.play().catch(() => {
-        video.muted = true;
-        video.play();
-    });
 
     // Update button states
     updateCinemaButtons();
@@ -1017,7 +1049,7 @@ function openCinema(container) {
     // Use capturing phase to ensure we catch it before video element swallows it
     // Force focus handling for ESC
     // Use capturing phase to ensure we catch it before video element swallows it
-    window.addEventListener('keydown', cinemaEscHandler, true);
+    window.addEventListener('keydown', cinemaKeyHandler, true);
 
     // Also try to focus the modal container to steal focus from video initially
     if (modal) {
@@ -1026,29 +1058,67 @@ function openCinema(container) {
     }
 }
 
-function cinemaEscHandler(e) {
+function cinemaKeyHandler(e) {
     if (e.key === 'Escape') {
         console.log('ESC pressed in cinema mode (captured)');
         e.preventDefault();
         e.stopPropagation(); // Stop it from reaching video element
         closeCinema();
+    } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigateCinema(-1); // Previous
+    } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigateCinema(1);  // Next
+    }
+}
+
+function navigateCinema(direction) {
+    if (!currentCinemaPath) return;
+
+    // Find current index in filteredVideos
+    const currentIndex = filteredVideos.findIndex(v => v.FilePath === currentCinemaPath);
+    if (currentIndex === -1) return;
+
+    // Calculate new index with wrap-around
+    let newIndex = currentIndex + direction;
+    if (newIndex < 0) newIndex = filteredVideos.length - 1;
+    if (newIndex >= filteredVideos.length) newIndex = 0;
+
+    // Get the new video and open it
+    const newVideo = filteredVideos[newIndex];
+    if (newVideo) {
+        // Create a dummy container-like object with the path
+        const dummyContainer = document.createElement('div');
+        dummyContainer.setAttribute('data-path', newVideo.FilePath);
+        openCinema(dummyContainer);
     }
 }
 
 function closeCinema() {
 
     // Remove the special handler
-    window.removeEventListener('keydown', cinemaEscHandler, true);
+    window.removeEventListener('keydown', cinemaKeyHandler, true);
 
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
+    const image = document.getElementById('cinemaImage');
     const infoPanel = document.getElementById('cinemaInfoPanel');
     const tagPanel = document.getElementById('cinemaTagPanel');
+
     modal.classList.remove('active');
     infoPanel.classList.remove('active');
     if (tagPanel) tagPanel.classList.add('hidden');
+
     video.pause();
     video.src = '';
+
+    // Reset image as well
+    if (image) {
+        image.src = '';
+        image.classList.add('hidden');
+    }
+
     currentCinemaPath = null;
     currentCinemaVideo = null;
 }
@@ -1087,52 +1157,74 @@ function updateCinemaInfo() {
         return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(2)} MB`;
     };
 
-    content.innerHTML = `
-        <div class="info-row">
-            <span class="info-label">Format</span>
-            <span class="info-value">${v.Container || 'unknown'}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Resolution</span>
-            <span class="info-value">${v.Width} × ${v.Height}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Duration</span>
-            <span class="info-value">${formatDuration(v.Duration_Sec)}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Frame Rate</span>
-            <span class="info-value">${v.FrameRate || '?'} fps</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Video Codec</span>
-            <span class="info-value">${v.codec} ${(v.Profile) ? `(${v.Profile})` : ''}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Pixel Format</span>
-            <span class="info-value">${v.PixelFormat || '-'}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Audio Codec</span>
-            <span class="info-value">${v.AudioCodec || '-'}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Channels</span>
-            <span class="info-value">${v.AudioChannels || '-'}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Bitrate</span>
-            <span class="info-value">${(v.Bitrate_Mbps * 1000).toLocaleString()} kbps</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">File Size</span>
-            <span class="info-value">${formatSize(v.Size_MB)}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Status</span>
-            <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
-        </div>
-    `;
+    // Different info for images vs videos
+    if (v.media_type === 'image') {
+        content.innerHTML = `
+            <div class="info-row">
+                <span class="info-label">Type</span>
+                <span class="info-value">Image (${(v.Container || v.FilePath.split('.').pop()).toUpperCase()})</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Resolution</span>
+                <span class="info-value">${v.Width || '?'} × ${v.Height || '?'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">File Size</span>
+                <span class="info-value">${formatSize(v.Size_MB)}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Status</span>
+                <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
+            </div>
+        `;
+    } else {
+        content.innerHTML = `
+            <div class="info-row">
+                <span class="info-label">Format</span>
+                <span class="info-value">${v.Container || 'unknown'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Resolution</span>
+                <span class="info-value">${v.Width} × ${v.Height}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Duration</span>
+                <span class="info-value">${formatDuration(v.Duration_Sec)}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Frame Rate</span>
+                <span class="info-value">${v.FrameRate || '?'} fps</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Video Codec</span>
+                <span class="info-value">${v.codec} ${(v.Profile) ? `(${v.Profile})` : ''}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Pixel Format</span>
+                <span class="info-value">${v.PixelFormat || '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Audio Codec</span>
+                <span class="info-value">${v.AudioCodec || '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Channels</span>
+                <span class="info-value">${v.AudioChannels || '-'}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Bitrate</span>
+                <span class="info-value">${((v.Bitrate_Mbps || 0) * 1000).toLocaleString()} kbps</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">File Size</span>
+                <span class="info-value">${formatSize(v.Size_MB)}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Status</span>
+                <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
+            </div>
+        `;
+    }
 
     console.log('Cinema info updated successfully');
 }

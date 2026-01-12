@@ -434,6 +434,8 @@ CINEMA_MODAL_COMPONENT = """
     
     <video id="cinemaVideo" controls preload="metadata" class="max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg outline-none"></video>
     
+    <img id="cinemaImage" class="hidden max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg object-contain" src="">
+    
     <div id="cinemaInfoPanel" class="absolute top-20 right-4 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 transform translate-x-[120%] transition-transform duration-300 z-40 text-sm text-gray-300">
         <div class="flex items-center gap-2 mb-3 text-white font-bold border-b border-white/10 pb-2">
             <span class="material-icons text-sm">info</span>
@@ -1411,6 +1413,18 @@ SETTINGS_MODAL_COMPONENT = """
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="settingsOptimizer" class="sr-only peer" checked onchange="markSettingsUnsaved()">
                                 <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-gold"></div>
+                            </label>
+                        </div>
+
+                        <!-- SCAN IMAGES -->
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Scan Images</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Include <span class="text-arcade-cyan">.jpg, .png, .gif</span> etc. in library</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingsScanImages" class="sr-only peer" onchange="markSettingsUnsaved()">
+                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-purple"></div>
                             </label>
                         </div>
                         

@@ -744,6 +744,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         settings_dump["scan_targets"] = u.data.scan_targets
                         settings_dump["exclude_paths"] = u.data.exclude_paths
                         settings_dump["available_tags"] = u.data.available_tags
+                        
+                        # Inject User-Specific Settings
+                        settings_dump["scan_images"] = u.data.scan_images
+                        settings_dump["sensitive_dirs"] = u.data.sensitive_dirs
+                        settings_dump["sensitive_tags"] = u.data.sensitive_tags
+                        settings_dump["sensitive_collections"] = u.data.sensitive_collections
                     else:
                         settings_dump["smart_collections"] = []
                         settings_dump["scan_targets"] = []
@@ -887,7 +893,10 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 # Implies users only see what they define.
                 
                 filtered_videos = []
-                if user_targets:
+                # ADMIN OVERRIDE: If no targets defined, Admin sees all.
+                if not user_targets and u.is_admin:
+                    filtered_videos = all_videos
+                elif user_targets:
                     for v in all_videos:
                         v_path = os.path.abspath(v["FilePath"])
                         if any(v_path.startswith(t) for t in user_targets):
@@ -1065,10 +1074,17 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     new_settings = json.loads(post_body)
                     
                     # Interceptor: Extract smart_collections for user_db
+                    # Interceptor: Extract smart_collections for user_db
                     user_collections = new_settings.pop("smart_collections", None)
                     user_targets = new_settings.pop("scan_targets", None)
                     user_excludes = new_settings.pop("exclude_paths", None)
                     user_tags = new_settings.pop("available_tags", None)
+                    
+                    # New User-Specific Settings
+                    user_scan_images = new_settings.pop("scan_images", None)
+                    user_sensitive_dirs = new_settings.pop("sensitive_dirs", None)
+                    user_sensitive_tags = new_settings.pop("sensitive_tags", None)
+                    user_sensitive_collections = new_settings.pop("sensitive_collections", None)
                     
                     if config.save(new_settings):
                         # Save user collections if present
@@ -1088,6 +1104,20 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                                     modified = True
                                 if user_tags is not None:
                                     u.data.available_tags = user_tags
+                                    modified = True
+                                
+                                if user_scan_images is not None:
+                                    u.data.scan_images = user_scan_images
+                                    modified = True
+                                    
+                                if user_sensitive_dirs is not None:
+                                    u.data.sensitive_dirs = user_sensitive_dirs
+                                    modified = True
+                                if user_sensitive_tags is not None:
+                                    u.data.sensitive_tags = user_sensitive_tags
+                                    modified = True
+                                if user_sensitive_collections is not None:
+                                    u.data.sensitive_collections = user_sensitive_collections
                                     modified = True
                                 
                                 if modified:

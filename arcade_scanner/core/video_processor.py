@@ -35,6 +35,26 @@ def create_thumbnail(video_path: str) -> str:
     thumb_path = os.path.join(config.thumb_dir, thumb_name)
     
     if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+        # Check if image (Image processing without seeking)
+        IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic')
+        is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
+        
+        if is_image:
+             vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
+             cmd = [
+                "ffmpeg", "-i", video_path,
+                "-vframes", "1", "-q:v", "4",
+                "-vf", vf_filter,
+                thumb_path, "-y", "-loglevel", "quiet"
+             ]
+             try:
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+                    return thumb_name
+             except:
+                pass
+             return ""
+
         # Get duration for smart seeking
         duration = 0
         try:
