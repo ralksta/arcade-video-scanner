@@ -1,4 +1,4 @@
-# Arcade Video Scanner 7.0.0
+# Arcade Video Scanner 6.2.0
 
 Arcade Video Scanner is a self-hosted media inventory tool that turns your local video library into a searchable, visual dashboard. It is specifically built for users with massive video collections (e.g., recorded gameplay, arcade collections, project archives) who need to regain disk space without losing track of their files.
 
@@ -10,34 +10,40 @@ Arcade Video Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 7.0.0 Highlights (New!)
+## 🚀 Version 6.2.0 Highlights (New!)
 
-This major release introduces **Multi-User Support**, a **SQLite Database Migration**, and complete **Data Isolation**.
+This major release introduces **Multi-User Support**, a **SQLite Database Migration**, **Deep Filtering**, and **Layout Precision**.
 
-### 👤 Multi-User Support
+### 👤 Multi-User Support & Data Isolation
 - **User Accounts**: Create multiple user accounts with secure password hashing (`PBKDF2`).
-- **Data Isolation**: Each user has their own:
-  - **Scan Targets**: Configure your own folders to scan.
-  - **Favorites & Vaulted**: Personal libraries, even if files are shared.
-  - **Tags**: Create your own private tags ("To Watch", "Project A") that other users can't see.
-- **Admin Tools**: CLI tools (`scripts/manage_users.py`) for managing users and resetting passwords.
+- **Data Isolation**: Each user has their own **Scan Targets**, **Favorites**, **Vaulted** items, and **Private Tags**.
+- **Admin Tools**: CLI ecosystem for managing users (`scripts/manage_users.py`).
 
 ### 🗄️ SQLite Database
 - **Scalability**: Migrated from flat JSON files to a robust **SQLite** backend.
 - **Performance**: Instant startup times and efficient querying for libraries with 10,000+ files.
 - **Security**: Binary storage prevents casual data snooping.
 
+### 🔎 Advanced Filtering
+- **Negative Tag Filters**: Click a tag twice to **Exclude** it (marked in red). Search for "HD" but exclude "Project X".
+- **Precision Size & Date**: Filter videos by specific file size (e.g., "> 1GB") or import date (Last 24h, 7d, 30d). 
+- **Smart Collection Upgrades**: Collections now persist all advanced filters (Size, Date, Exclusions) and apply immediately upon saving.
+
+### 📐 Layout & Workflow
+- **Perfect List View**: Fixed thumbnail sizing and layout consistency across desktop and mobile.
+- **State Persistence**: Your view preference (Grid/List/Tree) is now saved in the URL (`?view=list`), allowing for easy bookmarking and refreshing.
+
 ### 🧹 Automatic Cleanup
 - **Seamless Migration**: Automatically imports your legacy `settings.json` and `users.json` on first run.
-- **Self-Cleaning**: Legacy configuration keys are automatically removed to keep your setup clean.
 
 ---
 
-## 🚀 Version 6.2.0 Highlights
+## 🚀 Version 6.1.0 Highlights
 
 This release introduces a powerful **Query Builder**, **Custom Tags**, and full **Light/Dark Mode** support, powered by a new semantic theming engine.
 
 ### 🎨 Global Theming & Light Mode
+
 - **Theme Architecture**: New `theme.py` system decouples styles from logic.
 - **Multiple Themes**: 
   - **Arcade**: The classic Neon Dark mode.

@@ -25,14 +25,11 @@ This document outlines planned features and improvements for the Arcade Video Sc
 
 ## Completed Features
 
-### ✅ Version 7.0.0 (2026-01-12)
+### ✅ Version 6.2.0 (2026-01-12)
 - **Multi-User Support**: Individual accounts with isolated scan targets, favorites, tags, and collections.
 - **SQLite Database**: Migrated from JSON for performance and scalability.
 - **Data Isolation**: Complete privacy between users.
 - **User Management Tools**: CLI scripts for managing users.
-- **Legacy Cleanup**: Automated migration and cleanup of legacy settings.
-
-### ✅ Version 6.2.0 (2026-01-10)
 - **Deep Filtering**: Negative tag filters, precision size/date filters.
 - **Layout Precision**: Desktop/Mobile list view parity.
 - **State Persistence**: URL-based view state (`?view=list`).
