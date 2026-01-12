@@ -598,7 +598,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         else:
                             if abs_path in u.data.vaulted:
                                 u.data.vaulted.remove(abs_path)
-                        user_db.save()
+                        user_db.add_user(u)
                         print(f"Updated vault state for {user_name}: {os.path.basename(abs_path)} -> hidden={state}")
                     
                 self.send_response(204)
@@ -626,7 +626,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             if abs_p in u.data.vaulted:
                                 u.data.vaulted.remove(abs_p)
                                 updated_count += 1
-                    user_db.save()
+                    user_db.add_user(u)
                     print(f"Batch updated vault state for {user_name} ({updated_count} files) -> hidden={state}")
                 self.send_response(204)
                 self.end_headers()
@@ -649,7 +649,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         else:
                             if abs_path in u.data.favorites:
                                 u.data.favorites.remove(abs_path)
-                        user_db.save()
+                        user_db.add_user(u)
                         print(f"Updated favorite state for {user_name}: {os.path.basename(abs_path)} -> favorite={state}")
                         
                 self.send_response(204)
@@ -678,7 +678,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                                 if abs_path in u.data.favorites:
                                     u.data.favorites.remove(abs_path)
                                     updated_count += 1
-                    user_db.save()
+                    user_db.add_user(u)
                     print(f"Batch updated favorite state for {user_name} ({updated_count} files) -> favorite={state}")
                 self.send_response(204)
                 self.end_headers()
@@ -828,6 +828,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 u = user_db.get_user(user_name)
                 tags = u.data.available_tags if u else []
                 
+                print(f"DEBUG: GET /api/tags returning: {tags}", flush=True)
+
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -921,7 +923,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                                 u.data.tags[path] = [t for t in tags if t != tag_name]
                                 modified = True
                         
-                        user_db.save()
+                        user_db.add_user(u)
                     
                     print(f"🏷️ Deleted tag for user {user_name}: {tag_name}")
                     self.send_response(200)
@@ -1059,7 +1061,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                                     modified = True
                                 
                                 if modified:
-                                    user_db.save()
+                                    user_db.add_user(u)
 
                         # Regenerate HTML report to bake in new settings (Theme, etc.)
                         try:
@@ -1140,8 +1142,19 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.send_error(400, "Tag name is required")
                         return
                     
+                    # Auth Check
+                    user_name = self.get_current_user()
+                    if not user_name:
+                        self.send_error(401, "Unauthorized")
+                        return
+
+                    u = user_db.get_user(user_name)
+                    if not u:
+                        self.send_error(404, "User not found")
+                        return
+
                     # Check if tag already exists
-                    current_tags = list(config.settings.available_tags)
+                    current_tags = u.data.available_tags
                     existing_names = [t.get("name", "").lower() for t in current_tags]
                     
                     if tag_name.lower() in existing_names:
@@ -1150,8 +1163,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     
                     # Add new tag
                     new_tag = {"name": tag_name, "color": tag_color}
-                    current_tags.append(new_tag)
-                    config.save({"available_tags": current_tags})
+                    u.data.available_tags.append(new_tag)
+                    user_db.add_user(u)
                     
                     print(f"🏷️ Created tag: {tag_name} ({tag_color})")
                     self.send_response(201)
@@ -1192,7 +1205,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     u = user_db.get_user(user_name)
                     if u:
                         u.data.tags[abs_path] = tags
-                        user_db.save()
+                        user_db.add_user(u)
                         print(f"Updated tags for {user_name} on {os.path.basename(abs_path)}: {tags}")
                     
                     self.send_response(200)
