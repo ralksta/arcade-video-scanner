@@ -1088,6 +1088,18 @@ function navigateCinema(direction) {
     // Get the new video and open it
     const newVideo = filteredVideos[newIndex];
     if (newVideo) {
+        // IMPORTANT: Clean up current streams to avoid file handle leak
+        const video = document.getElementById('cinemaVideo');
+        const image = document.getElementById('cinemaImage');
+        if (video) {
+            video.pause();
+            video.src = '';
+            video.load(); // Force release of network resources
+        }
+        if (image) {
+            image.src = '';
+        }
+
         // Create a dummy container-like object with the path
         const dummyContainer = document.createElement('div');
         dummyContainer.setAttribute('data-path', newVideo.FilePath);
