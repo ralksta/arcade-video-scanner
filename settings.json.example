@@ -1,6 +1,6 @@
 {
   "scan_targets": [
-    "/Volumes/T5 Media",
+    "/Volumes/YourDisk",
     "/mnt/media_drive"
   ],
   "exclude_paths": [
