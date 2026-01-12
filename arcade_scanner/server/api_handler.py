@@ -281,6 +281,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
 
             elif self.path.startswith("/compress?"):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 try:
                     params = parse_qs(urlparse(self.path).query)
                     file_path = params.get("path", [None])[0]
@@ -366,6 +371,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(500, str(e))
 
             elif self.path.startswith("/api/keep_optimized?"):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 try:
                     params = parse_qs(urlparse(self.path).query)
                     original_path = params.get("original", [None])[0]
@@ -436,6 +446,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(500, str(e))
 
             elif self.path.startswith("/api/discard_optimized?"):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 try:
                     params = parse_qs(urlparse(self.path).query)
                     path = params.get("path", [None])[0]
@@ -465,6 +480,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
             # --- RESCAN ---
             elif self.path == "/api/rescan":
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 print("🔄 Scan requested via API...")
                 try:
                     # Run Async Scanner via sync wrapper or asyncio.run_coroutine_threadsafe if we had a loop.
@@ -497,6 +517,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             elif self.path == "/api/backup":
                 try:
                     # Security Fix: Ensure only authenticated/local users (implicitly local)
+                    user_name = self.get_current_user()
+                    if not user_name:
+                        self.send_error(401, "Unauthorized")
+                        return
+
                     print("💾 Backup requested...")
                     
                     # Force save first to ensure latest memory state is on disk?
@@ -521,6 +546,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(500, str(e))
 
             elif self.path.startswith("/batch_compress?paths="):
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 try:
                     # Use ||| as separator to avoid issues with commas in filenames
                     paths = unquote(self.path.split("paths=")[1]).split("|||")
