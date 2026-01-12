@@ -190,7 +190,7 @@ HEADER_COMPONENT = """
         <div class="text-arcade-gold font-bold tracking-wider text-xs md:text-xl uppercase flex items-center gap-2">
             <span class="md:hidden">Arcade Scanner</span>
             <span class="hidden md:inline text-transparent bg-clip-text bg-gradient-to-r from-arcade-gold to-yellow-500 dark:to-yellow-200 drop-shadow-sm">
-                ARCADE VIDEO SCANNER
+                ARCADE MEDIA SCANNER
             </span>
         </div>
     </div>

@@ -1,4 +1,4 @@
-# 💡 Ideen & Vorschläge für Arcade Video Scanner
+# 💡 Ideen & Vorschläge für Arcade Media Scanner
 
 Basierend auf der aktuellen Roadmap und der Code-Struktur habe ich ein paar Konzepte entwickelt, die das Projekt auf die nächste Stufe heben könnten.
 

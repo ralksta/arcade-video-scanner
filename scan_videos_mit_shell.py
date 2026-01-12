@@ -1,5 +1,5 @@
 """
-Arcade Video Scanner 6.0 (Legacy Wrapper)
+Arcade Media Scanner 6.3 (Legacy Wrapper)
 This script wraps the modular arcade_scanner package.
 DEPRECATED: Please use `python -m arcade_scanner.main` or `arcade-scanner` command.
 """

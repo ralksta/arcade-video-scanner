@@ -11,7 +11,7 @@ from arcade_scanner.server.web_server import start_server
 from arcade_scanner.core.maintenance import purge_media, cleanup_orphans, purge_broken_media, purge_thumbnails
 
 def run_scanner(args_list=None):
-    parser = argparse.ArgumentParser(description="Arcade Video Scanner 6.0")
+    parser = argparse.ArgumentParser(description="Arcade Media Scanner 6.3")
     parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
     parser.add_argument("--rebuild-thumbs", action="store_true", help="Delete only thumbnails and regenerate them.")
 
@@ -19,7 +19,7 @@ def run_scanner(args_list=None):
     parser.add_argument("--ssl", action="store_true", help="Enable HTTPS mode with self-signed certificate.")
     args, unknown = parser.parse_known_args(args_list)
 
-    print("--- Arcade Video Scanner 6.0 (Refactored) ---")
+    print("--- Arcade Media Scanner 6.3 ---")
     
     # 0. Maintenance
     if args.rebuild:

@@ -1,6 +1,6 @@
 # Contributing to the Roadmap
 
-Thank you for your interest in contributing to Arcade Video Scanner! This guide will help you suggest features and contribute to the project roadmap.
+Thank you for your interest in contributing to Arcade Media Scanner! This guide will help you suggest features and contribute to the project roadmap.
 
 ## 🗺️ Understanding the Roadmap
 
@@ -120,7 +120,7 @@ Features are prioritized based on:
 
 ## 🙏 Thank You!
 
-Every contribution, whether it's code, documentation, bug reports, or feature suggestions, helps make Arcade Video Scanner better for everyone!
+Every contribution, whether it's code, documentation, bug reports, or feature suggestions, helps make Arcade Media Scanner better for everyone!
 
 ---
 

@@ -28,5 +28,5 @@ if [ $? -ne 0 ]; then
 fi
 
 # Use the cleaner python -m syntax which resolves path issues better
-echo "🕹️  Starting Arcade Video Scanner..."
+echo "🕹️  Starting Arcade Media Scanner..."
 python3 -m arcade_scanner.main "$@"

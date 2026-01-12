@@ -1,6 +1,6 @@
-# Arcade Video Scanner - Roadmap
+# Arcade Media Scanner - Roadmap
 
-This document outlines planned features and improvements for the Arcade Video Scanner project.
+This document outlines planned features and improvements for the Arcade Media Scanner project.
 
 ## Legend
 - 🟢 **Planned** - Feature is defined and ready for implementation

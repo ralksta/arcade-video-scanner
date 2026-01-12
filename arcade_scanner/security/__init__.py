@@ -1,5 +1,5 @@
 """
-Security utilities for Arcade Video Scanner.
+Security utilities for Arcade Media Scanner.
 
 This module provides path validation, sanitization, and security checks
 to prevent path traversal, command injection, and unauthorized file access.

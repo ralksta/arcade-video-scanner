@@ -18,7 +18,7 @@ struct SettingsView: View {
                     Toggle("Dark Mode", isOn: $viewModel.isDarkMode)
                 }
                 
-                Section(footer: Text("Enter the full URL of your Arcade Video Scanner server.")) {
+                Section(footer: Text("Enter the full URL of your Arcade Media Scanner server.")) {
                     Button("Save") {
                         Task {
                             await viewModel.refreshLibrary()

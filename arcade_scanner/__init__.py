@@ -1,1 +1,1 @@
-# Arcade Video Scanner package
+# Arcade Media Scanner package
