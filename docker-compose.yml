@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  arcade-scanner:
+    container_name: arcade-media-scanner
+    image: arcade-scanner:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Media library (read-only recommended)
+      - /path/to/your/media:/media:ro
+      # Persistent configuration and database
+      - arcade-config:/config
+      # Persistent thumbnails and cache
+      - arcade-cache:/cache
+    environment:
+      - PORT=8000
+      - SKIP_SETUP=true
+      - PUID=1000
+      - PGID=1000
+      # Uncomment for GPU support (NVIDIA only)
+      # - NVIDIA_VISIBLE_DEVICES=all
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Uncomment for NVIDIA GPU support
+    # runtime: nvidia
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu, video]
+
+volumes:
+  arcade-config:
+    driver: local
+  arcade-cache:
+    driver: local

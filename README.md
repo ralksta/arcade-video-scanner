@@ -203,6 +203,29 @@ All settings can be configured through the **Settings UI** (gear icon) or by edi
 
 ---
 
+---
+
+## 🐳 Docker Deployment
+
+Run Arcade Media Scanner in Docker for easy deployment:
+
+```bash
+# Using Docker Compose (Recommended)
+docker-compose up -d
+
+# Access at http://localhost:8000
+# Default login: admin/admin (change immediately!)
+```
+
+**📖 Full Docker Guide**: See [DOCKER.md](DOCKER.md) for:
+- Volume configuration
+- GPU support (NVIDIA)
+- Environment variables
+- Troubleshooting
+- Backup/restore
+
+---
+
 ## 🛠 Installation & Usage
 
 ### Prerequisites

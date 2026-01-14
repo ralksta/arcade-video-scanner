@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# User data (shouldn't be in image)
+arcade_data/
+*.db
+*.json
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+.Trash-*/
+
+# Documentation
+*.md
+!README.md
+!DOCKER.md
+docs/
+
+# Scripts (include only necessary ones)
+scripts/
+check_db_setting.py
+
+# Artifacts
+.gemini/

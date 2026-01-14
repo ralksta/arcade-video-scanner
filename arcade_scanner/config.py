@@ -26,8 +26,18 @@ def find_free_port(start_port: int) -> int:
     return start_port
 
 # Data Directories
-HIDDEN_DATA_DIR = os.path.join(PROJECT_ROOT, "arcade_data")
-THUMB_DIR = os.path.join(HIDDEN_DATA_DIR, "thumbnails")
+# Support Docker volume mounts via environment variables
+_CONFIG_DIR_OVERRIDE = os.getenv("CONFIG_DIR")
+_CACHE_DIR_OVERRIDE = os.getenv("CACHE_DIR")
+
+if _CONFIG_DIR_OVERRIDE:
+    # Docker mode: use /config for all persistent data
+    HIDDEN_DATA_DIR = _CONFIG_DIR_OVERRIDE
+    THUMB_DIR = os.path.join(_CACHE_DIR_OVERRIDE or _CONFIG_DIR_OVERRIDE, "thumbnails")
+else:
+    # Local mode: use project directory
+    HIDDEN_DATA_DIR = os.path.join(PROJECT_ROOT, "arcade_data")
+    THUMB_DIR = os.path.join(HIDDEN_DATA_DIR, "thumbnails")
 
 CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
 REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
