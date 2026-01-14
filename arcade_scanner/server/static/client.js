@@ -2511,6 +2511,7 @@ async function saveSettings() {
         sensitive_tags: document.getElementById('settingsSensitiveTags').value.split(',').map(s => s.trim()).filter(s => s),
         sensitive_collections: document.getElementById('settingsSensitiveCollections').value.split(/[\n,]/).map(s => s.trim()).filter(s => s),
         min_size_mb: parseInt(document.getElementById('settingsMinSize').value) || 100,
+        min_image_size_kb: parseInt(document.getElementById('settingsMinImageSize').value) || 100,
         bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000,
 
         enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
@@ -5592,12 +5593,12 @@ function loadSetupDirectories() {
         .then(data => {
             const listEl = document.getElementById('setupDirectoryList');
             if (!listEl) return;
-            
+
             if (!data.directories || data.directories.length === 0) {
                 listEl.innerHTML = '<div class="text-center py-8 text-gray-500">No directories found</div>';
                 return;
             }
-            
+
             listEl.innerHTML = data.directories.map(dir => {
                 const sizeGB = (dir.size_bytes / (1024 * 1024 * 1024)).toFixed(2);
                 const displayName = dir.name || dir.path;
@@ -5618,7 +5619,7 @@ function loadSetupDirectories() {
 function toggleSetupDirectory(path) {
     const card = document.querySelector(`.setup-dir-card[data-path="${path}"]`);
     if (!card) return;
-    
+
     const isSelected = card.classList.contains('selected');
     if (isSelected) {
         card.classList.remove('selected');
@@ -5629,13 +5630,13 @@ function toggleSetupDirectory(path) {
         card.querySelector('.setup-dir-checkbox').classList.remove('hidden');
         selectedSetupDirectories.push(path);
     }
-    
+
     document.getElementById('setupCompleteBtn').disabled = selectedSetupDirectories.length === 0;
 }
 
 function completeSetup() {
     if (selectedSetupDirectories.length === 0) return;
-    
+
     fetch('/api/setup/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5644,13 +5645,13 @@ function completeSetup() {
             scan_images: document.getElementById('setupScanImages')?.checked || false
         })
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            hideSetupWizard();
-            location.reload();
-        }
-    });
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                hideSetupWizard();
+                location.reload();
+            }
+        });
 }
 
 function skipSetup() {
@@ -5659,7 +5660,7 @@ function skipSetup() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scan_targets: ['/media'], scan_images: false })
     })
-    .then(() => location.reload());
+        .then(() => location.reload());
 }
 
 document.addEventListener('DOMContentLoaded', () => {
