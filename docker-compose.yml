@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   arcade-scanner:
     container_name: arcade-media-scanner
