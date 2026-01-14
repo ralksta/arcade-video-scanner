@@ -89,6 +89,8 @@ DEFAULT_SETTINGS_JSON = {
     "saved_views": [],
     "_comment_min_size_mb": "Ignore videos smaller than this size.",
     "min_size_mb": 100,
+    "_comment_min_image_size_kb": "Ignore images smaller than this (KB). E.g., 500 filters out tiny icons.",
+    "min_image_size_kb": 100,
     "_comment_bitrate": "Mark videos above this kbps as HIGH bitrate.",
     "bitrate_threshold_kbps": 15000,
 
@@ -127,6 +129,7 @@ class AppSettings(BaseSettings):
     saved_views: List[Dict[str, Any]] = Field(default_factory=list)
 
     min_size_mb: int = Field(100)
+    min_image_size_kb: int = Field(100)
     bitrate_threshold_kbps: int = Field(15000)
 
 
