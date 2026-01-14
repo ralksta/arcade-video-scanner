@@ -172,11 +172,11 @@ class UserStore:
         salt = os.urandom(16)
         pwd_hash = self.hash_password("admin", salt)
         
-        # Docker mode: Auto-configure /media as scan target
+        # Docker mode: Trigger setup wizard on first login
         user_data = UserVideoData()
         if os.getenv("CONFIG_DIR"):
-            print("🐳 Docker mode detected - adding /media to scan targets")
-            user_data.scan_targets = ["/media"]
+            print("🐳 Docker mode - setup wizard will appear on first login")
+            user_data.setup_complete = False
         
         admin_user = User(
             username="admin",

@@ -975,6 +975,75 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps(tags).encode("utf-8"))
             
+            elif self.path == "/api/setup/directories":
+                # GET: List available directories in /media for setup wizard
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+
+                directories = []
+                media_root = "/media"
+                
+                try:
+                    if os.path.exists(media_root) and os.path.isdir(media_root):
+                        # Add root /media directory
+                        try:
+                            total_size = sum(os.path.getsize(os.path.join(media_root, f)) 
+                                           for f in os.listdir(media_root) if os.path.isfile(os.path.join(media_root, f)))
+                            file_count = sum(1 for f in os.listdir(media_root) if os.path.isfile(os.path.join(media_root, f)))
+                            
+                            directories.append({
+                                "path": media_root,
+                                "size_bytes": total_size,
+                                "file_count": file_count,
+                                "is_root": True
+                            })
+                        except PermissionError:
+                            pass
+                        
+                        # Add immediate subdirectories
+                        for item in os.listdir(media_root):
+                            item_path = os.path.join(media_root, item)
+                            if os.path.isdir(item_path):
+                                try:
+                                    total_size = sum(os.path.getsize(os.path.join(dp, f)) 
+                                                   for dp, dn, filenames in os.walk(item_path) 
+                                                   for f in filenames)
+                                    file_count = sum(len(filenames) for dp, dn, filenames in os.walk(item_path))
+                                    
+                                    directories.append({
+                                        "path": item_path,
+                                        "name": item,
+                                        "size_bytes": total_size,
+                                        "file_count": file_count,
+                                        "is_root": False
+                                    })
+                                except (PermissionError, OSError):
+                                    pass
+                except Exception as e:
+                    print(f"⚠️ Error scanning /media: {e}")
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"directories": directories}).encode("utf-8"))
+            
+            elif self.path == "/api/setup/status":
+                # GET: Check if setup is complete
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+                
+                u = user_db.get_user(user_name)
+                setup_complete = getattr(u.data, 'setup_complete', True) if u else True
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"setup_complete": setup_complete}).encode("utf-8"))
+            
             elif self.path == "/api/videos":
                 # GET: Return all videos, filtered by user's scan targets
                 user_name = self.get_current_user()

@@ -92,6 +92,9 @@ class UserVideoData(BaseModel):
     exclude_paths: List[str] = Field(default_factory=list, description="User specific exclusion patterns")
     scan_images: bool = Field(False, description="Enable scanning of image files (jpg, png, etc.)")
     
+    # Setup Status
+    setup_complete: bool = Field(True, description="Whether first-run setup wizard has been completed")
+    
     # Available Tags (Definitions)
     available_tags: List[Dict[str, str]] = Field(default_factory=list, description="User specific tag definitions")
 
