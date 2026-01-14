@@ -14,8 +14,6 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ### 🟢 Performance & Optimization
 - [x] Database migration from JSON to SQLite for better performance with large libraries
-- [ ] Implement incremental scanning (only scan new/modified files)
-- [ ] Add background worker for preview generation to avoid blocking UI
 
 ### 🟢 User Experience
 - [ ] Customizable grid layout (card size, columns)
@@ -34,8 +32,10 @@ This document outlines planned features and improvements for the Arcade Media Sc
 - **Duplicate Rescan Button**: Manual rescan option with cache clearing in duplicate view.
 - **Duplicate Group Removal**: Entire duplicate group vanishes after deleting a file (case resolved).
 - **Bookmarkable Duplicates**: Added `/duplicates` URL route for direct access and bookmarking.
+- **Default Smart Collections**: New users automatically receive 5 curated collections (All Photos, All Videos, Large Files, High Bitrate, Recent Imports).
 - **Settings Persistence**: Fixed "Scan Images" toggle resetting on reload.
 - **Security Validation**: Fixed path validation error preventing optimization of files in allowed directories.
+- **Connection Leak Fix**: Resolved critical "Too many open files" error by properly closing SQLite connections.
 
 ### ✅ Version 6.4.0 (2026-01-14)
 - **Duplicate Detection**: Find and manage duplicate videos/images with content-verified matching.

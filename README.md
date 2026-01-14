@@ -27,6 +27,18 @@ This release enhances **Image Support**, improves **Duplicate Detection UX**, an
 - **Improved Stability**: Fixed "Scan Images" toggle persistence and optimized path security validation.
 - **Bookmarkable URL**: Direct access to duplicates view via `/duplicates` URL.
 
+### 🎁 Default Smart Collections
+- **Library Overview**: New users automatically get 5 curated smart collections:
+  - 📸 **All Photos** - Filter by image media type
+  - 🎬 **All Videos** - Filter by video media type  
+  - 💾 **Large Files** - Files over 1GB
+  - 💎 **High Bitrate** - Videos flagged for optimization
+  - 📅 **Recent Imports** - Media added in the last 7 days
+
+### 🐛 Critical Bug Fixes
+- **Connection Leak**: Fixed "Too many open files" error caused by SQLite connections not being properly closed.
+- **Path Validation**: Resolved compression endpoint crash when accessing files in allowed directories.
+
 ---
 
 ## 🚀 Version 6.4.0 Highlights

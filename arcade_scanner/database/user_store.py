@@ -31,21 +31,25 @@ class UserStore:
 
     def _init_db(self):
         """Initialize the users table."""
+        conn = None
         try:
-            with self._get_conn() as conn:
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        username TEXT PRIMARY KEY,
-                        password_hash TEXT NOT NULL,
-                        salt TEXT NOT NULL,
-                        is_admin INTEGER DEFAULT 0,
-                        created_at INTEGER,
-                        user_data TEXT
-                    )
-                """)
-                conn.commit()
+            conn = self._get_conn()
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    username TEXT PRIMARY KEY,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    is_admin INTEGER DEFAULT 0,
+                    created_at INTEGER,
+                    user_data TEXT
+                )
+            """)
+            conn.commit()
         except Exception as e:
             print(f"❌ Error initializing User DB: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def _migrate_from_json_file(self):
         """Migrates existing users.json to SQLite if present."""
@@ -86,51 +90,62 @@ class UserStore:
         pass
 
     def get_user(self, username: str) -> Optional[User]:
+        conn = None
         try:
-            with self._get_conn() as conn:
-                cursor = conn.execute("SELECT * FROM users WHERE username = ?", (username,))
-                row = cursor.fetchone()
-                if row:
-                    data_json = row["user_data"]
-                    user_data = UserVideoData(**json.loads(data_json)) if data_json else UserVideoData()
-                    
-                    return User(
-                        username=row["username"],
-                        password_hash=row["password_hash"],
-                        salt=row["salt"],
-                        created_at=row["created_at"],
-                        is_admin=bool(row["is_admin"]),
-                        data=user_data
-                    )
+            conn = self._get_conn()
+            cursor = conn.execute("SELECT * FROM users WHERE username = ?", (username,))
+            row = cursor.fetchone()
+            if row:
+                data_json = row["user_data"]
+                user_data = UserVideoData(**json.loads(data_json)) if data_json else UserVideoData()
+                
+                return User(
+                    username=row["username"],
+                    password_hash=row["password_hash"],
+                    salt=row["salt"],
+                    created_at=row["created_at"],
+                    is_admin=bool(row["is_admin"]),
+                    data=user_data
+                )
         except Exception as e:
             print(f"⚠️ Error get_user {username}: {e}")
+        finally:
+            if conn:
+                conn.close()
         return None
 
     def add_user(self, user: User) -> None:
         """Adds or updates a user."""
+        conn = None
         try:
-            with self._get_conn() as conn:
-                conn.execute("""
-                    INSERT OR REPLACE INTO users (username, password_hash, salt, is_admin, created_at, user_data)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    user.username,
-                    user.password_hash,
-                    user.salt,
-                    1 if user.is_admin else 0,
-                    user.created_at,
-                    user.data.model_dump_json()
-                ))
-                conn.commit()
+            conn = self._get_conn()
+            conn.execute("""
+                INSERT OR REPLACE INTO users (username, password_hash, salt, is_admin, created_at, user_data)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                user.username,
+                user.password_hash,
+                user.salt,
+                1 if user.is_admin else 0,
+                user.created_at,
+                json.dumps(user.data.model_dump())
+            ))
+            conn.commit()
         except Exception as e:
             print(f"❌ Error adding user {user.username}: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def get_all_users(self) -> List[User]:
         users = []
+        conn = None
         try:
-            with self._get_conn() as conn:
-                cursor = conn.execute("SELECT * FROM users")
-                for row in cursor.fetchall():
+            conn = self._get_conn()
+            cursor = conn.execute("SELECT * FROM users")
+            rows = cursor.fetchall()
+            for row in rows:
+                try:
                     data_json = row["user_data"]
                     user_data = UserVideoData(**json.loads(data_json)) if data_json else UserVideoData()
                     
@@ -142,8 +157,13 @@ class UserStore:
                         is_admin=bool(row["is_admin"]),
                         data=user_data
                     ))
+                except Exception as e:
+                    print(f"⚠️ Failed to load user: {e}")
         except Exception as e:
             print(f"⚠️ Error getting all users: {e}")
+        finally:
+            if conn:
+                conn.close()
         return users
 
     def create_default_admin(self):
