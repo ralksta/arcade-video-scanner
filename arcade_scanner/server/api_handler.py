@@ -290,13 +290,32 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 try:
                     file_path = unquote(self.path.split("path=")[1])
                     print(f"🔍 Reveal requested for: {file_path}")
-                    
+
+                    # Check if file is in a hidden folder (starts with .)
+                    from pathlib import Path
+                    abs_path = os.path.abspath(file_path)
+                    is_hidden = any(part.startswith('.') for part in Path(abs_path).parts if part != '/')
+
+                    if is_hidden:
+                        # File exists in hidden folder - return helpful response instead of blocking
+                        print(f"📁 File in hidden folder: {abs_path}")
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        response = json.dumps({
+                            "status": "hidden_folder",
+                            "path": abs_path,
+                            "message": "This file is located in a hidden system folder"
+                        })
+                        self.wfile.write(response.encode())
+                        return
+
                     # Security Fix C-3: Validate path is within allowed directories
                     if not is_path_allowed(file_path):
                         print(f"🚨 Unauthorized reveal attempt blocked: {file_path}")
                         self.send_error(403, "Forbidden - Path not in scan directories")
                         return
-                    
+
                     if not os.path.exists(file_path):
                         print(f"❌ Error: File does not exist: {file_path}")
                         self.send_error(404, "File not found")
@@ -316,7 +335,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         parent_dir = os.path.dirname(file_path)
                         print(f"🚀 Running: xdg-open '{parent_dir}'")
                         subprocess.run(["xdg-open", parent_dir])
-                            
+
                     self.send_response(204)
                     self.end_headers()
                 except SecurityError as e:

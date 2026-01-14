@@ -698,7 +698,7 @@ function createComparisonCard(pair) {
                 <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
             
-            <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="window.open('/reveal?path=${encodeURIComponent(orig.FilePath)}', 'h_frame')">
+            <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
         </div>
@@ -735,7 +735,7 @@ function createComparisonCard(pair) {
                 <span class="truncate font-medium text-gray-300" title="${opt.FilePath}">${opt.FilePath.split(/[\\\\/]/).pop()}</span>
                 <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
-             <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="window.open('/reveal?path=${encodeURIComponent(opt.FilePath)}', 'h_frame')">
+             <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
         </div>
@@ -820,7 +820,7 @@ function createVideoCard(v) {
              
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); window.open('/reveal?path=${encodeURIComponent(v.FilePath)}', 'h_frame')">
+                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
                     <span class="material-icons">folder_open</span>
                  </button>
                  <button class="w-12 h-12 rounded-full bg-arcade-cyan/20 hover:bg-arcade-cyan text-arcade-cyan hover:text-black border border-arcade-cyan/50 flex items-center justify-center backdrop-blur transition-all transform hover:scale-110 shadow-[0_0_15px_rgba(0,255,208,0.3)]" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
@@ -1314,7 +1314,7 @@ function cinemaVault() {
 
 function cinemaLocate() {
     if (!currentCinemaPath) return;
-    window.open(`/reveal?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
+    revealInFinder(currentCinemaPath);
 }
 
 function cinemaOptimize() {
@@ -2791,19 +2791,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 500);
 });
 
-// Keyboard Shortcuts for Settings Modal
+// Keyboard Shortcuts for Settings Modal and Collection Modal
 document.addEventListener('keydown', (e) => {
     const settingsModal = document.getElementById('settingsModal');
     const isSettingsOpen = settingsModal && settingsModal.classList.contains('active');
 
-    if (isSettingsOpen) {
-        // ESC to close
-        if (e.key === 'Escape') {
+    const collectionModal = document.getElementById('collectionModal');
+    const isCollectionOpen = collectionModal && collectionModal.classList.contains('active');
+
+    // ESC to close modals (collection modal takes priority if both somehow open)
+    if (e.key === 'Escape') {
+        if (isCollectionOpen) {
+            e.preventDefault();
+            closeCollectionModal();
+            return;
+        }
+        if (isSettingsOpen) {
             e.preventDefault();
             closeSettings();
             showToast('Settings closed', 'info');
+            return;
         }
+    }
 
+    if (isSettingsOpen) {
         // Cmd+S (Mac) or Ctrl+S (Windows/Linux) to save
         if ((e.metaKey || e.ctrlKey) && e.key === 's') {
             e.preventDefault();
@@ -2840,6 +2851,83 @@ function showToast(message, type = 'info') {
         setTimeout(() => toast.remove(), 300);
     }, 2000);
 }
+
+// --- HIDDEN PATH MODAL ---
+let currentHiddenPath = '';
+
+function showHiddenPathModal(path) {
+    currentHiddenPath = path;
+    const modal = document.getElementById('hiddenPathModal');
+    const pathDisplay = document.getElementById('hiddenPathDisplay');
+
+    if (modal && pathDisplay) {
+        pathDisplay.textContent = path;
+        // Reset copy button state
+        const copyIcon = document.getElementById('copyPathIcon');
+        const copyText = document.getElementById('copyPathText');
+        if (copyIcon) copyIcon.textContent = 'content_copy';
+        if (copyText) copyText.textContent = 'Copy Path to Clipboard';
+
+        modal.classList.add('active');
+    }
+}
+
+function closeHiddenPathModal() {
+    const modal = document.getElementById('hiddenPathModal');
+    if (modal) modal.classList.remove('active');
+    currentHiddenPath = '';
+}
+
+async function copyHiddenPath() {
+    if (!currentHiddenPath) return;
+
+    try {
+        await navigator.clipboard.writeText(currentHiddenPath);
+        // Update button to show success
+        const copyIcon = document.getElementById('copyPathIcon');
+        const copyText = document.getElementById('copyPathText');
+        if (copyIcon) copyIcon.textContent = 'check';
+        if (copyText) copyText.textContent = 'Copied!';
+
+        // Reset after 2 seconds
+        setTimeout(() => {
+            if (copyIcon) copyIcon.textContent = 'content_copy';
+            if (copyText) copyText.textContent = 'Copy Path to Clipboard';
+        }, 2000);
+    } catch (err) {
+        console.error('Failed to copy path:', err);
+        showToast('Failed to copy path', 'error');
+    }
+}
+
+// Smart reveal function that handles hidden folders
+async function revealInFinder(path) {
+    try {
+        const response = await fetch(`/reveal?path=${encodeURIComponent(path)}`);
+
+        if (response.status === 204) {
+            // Success - file was revealed
+            return;
+        }
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.status === 'hidden_folder') {
+                // Show helpful modal for hidden folder
+                showHiddenPathModal(data.path);
+                return;
+            }
+        }
+
+        // Other errors
+        console.error('Reveal failed:', response.status);
+        showToast('Could not reveal file', 'error');
+    } catch (err) {
+        console.error('Reveal error:', err);
+        showToast('Could not reveal file', 'error');
+    }
+}
+
 // --- RESCAN ---
 function rescanLibrary() {
     const btn = document.getElementById('refreshBtn');
@@ -3078,6 +3166,24 @@ function openCollectionModal(editId = null) {
     // Sync UI with new criteria
     syncSmartCollectionUI();
 
+    // Reset accordion sections to collapsed state
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    const metadataPanel = document.getElementById('metadataPanel');
+    const propertiesChevron = document.getElementById('propertiesChevron');
+    const metadataChevron = document.getElementById('metadataChevron');
+
+    if (propertiesPanel) {
+        propertiesPanel.classList.add('hidden');
+        if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
+    }
+    if (metadataPanel) {
+        metadataPanel.classList.add('hidden');
+        if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
+    }
+
+    // Update badge counts for sections
+    updateAllFilterBadges();
+
     modal.classList.add('active');
 }
 
@@ -3087,6 +3193,68 @@ function closeCollectionModal() {
     editingCollectionId = null;
     document.getElementById('collectionIconPicker')?.classList.add('hidden');
     document.getElementById('collectionColorPicker')?.classList.add('hidden');
+}
+
+// Accordion toggle for Smart Collection filter sections
+function toggleFilterAccordion(sectionName) {
+    const panel = document.getElementById(`${sectionName}Panel`);
+    const chevron = document.getElementById(`${sectionName}Chevron`);
+    const button = chevron?.closest('button');
+
+    if (!panel || !chevron) return;
+
+    if (panel.classList.contains('hidden')) {
+        // Open this section
+        panel.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+        button?.setAttribute('aria-expanded', 'true');
+    } else {
+        // Close this section
+        panel.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+        button?.setAttribute('aria-expanded', 'false');
+    }
+}
+
+// Update badge count for a filter section
+function updateFilterSectionBadge(sectionName) {
+    const badge = document.getElementById(`${sectionName}Badge`);
+    const panel = document.getElementById(`${sectionName}Panel`);
+
+    if (!badge || !panel) return;
+
+    // Count active filter chips in this section
+    const activeFilters = panel.querySelectorAll('.filter-chip.active:not([data-filter="favorites"][data-value="null"]), .filter-chip.exclude').length;
+
+    // Check for non-default values in inputs/selects
+    let additionalFilters = 0;
+
+    if (sectionName === 'metadata') {
+        const dateFilter = document.getElementById('collectionDateFilter');
+        if (dateFilter && dateFilter.value !== 'all') additionalFilters++;
+
+        const minSize = document.getElementById('collectionMinSize');
+        const maxSize = document.getElementById('collectionMaxSize');
+        if ((minSize && minSize.value) || (maxSize && maxSize.value)) additionalFilters++;
+
+        const searchTerm = document.getElementById('collectionSearch');
+        if (searchTerm && searchTerm.value.trim()) additionalFilters++;
+    }
+
+    const totalActive = activeFilters + additionalFilters;
+
+    if (totalActive > 0) {
+        badge.textContent = `${totalActive} active`;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Update all section badges (call when modal opens or after editing collection)
+function updateAllFilterBadges() {
+    updateFilterSectionBadge('properties');
+    updateFilterSectionBadge('metadata');
 }
 
 function syncCollectionModalUI() {
@@ -3517,6 +3685,7 @@ function toggleSmartFilterChip(chip) {
     const includeArr = collectionCriteriaNew.include[filterType];
 
     chip.classList.toggle('active');
+    chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
 
     if (chip.classList.contains('active')) {
         if (!includeArr.includes(value)) includeArr.push(value);
@@ -3526,6 +3695,13 @@ function toggleSmartFilterChip(chip) {
     }
 
     updateCollectionPreviewCount();
+
+    // Update the badge for the section this chip is in
+    const section = chip.closest('[id$="Panel"]');
+    if (section) {
+        const sectionName = section.id.replace('Panel', '');
+        updateFilterSectionBadge(sectionName);
+    }
 }
 
 // Toggle tag chip for new collection
@@ -3569,9 +3745,11 @@ function setFavoritesFilter(value) {
     document.querySelectorAll('[data-filter="favorites"]').forEach(btn => {
         const btnValue = btn.dataset.value === 'null' ? null : btn.dataset.value === 'true';
         btn.classList.toggle('active', btnValue === value);
+        btn.setAttribute('aria-pressed', btnValue === value ? 'true' : 'false');
     });
 
     updateCollectionPreviewCount();
+    updateFilterSectionBadge('metadata');
 }
 
 // Render tags list for smart collection modal
@@ -3769,8 +3947,16 @@ function syncSmartCollectionUI() {
     const searchInput = document.getElementById('collectionSearch');
     if (searchInput) searchInput.value = collectionCriteriaNew.search || '';
 
+    // Update aria-pressed attributes for all chips
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
+    });
+
     renderSmartCollectionTagsList();
     updateCollectionPreviewCount();
+
+    // Update section badges after syncing all chips
+    updateAllFilterBadges();
 }
 
 // Count videos matching collection criteria (updated for new schema)
@@ -5251,7 +5437,7 @@ function renderDuplicatesView() {
                                         </div>
                                         
                                         <!-- Reveal in Finder Button -->
-                                        <button onclick="window.open('/reveal?path=${encodeURIComponent(file.path)}', 'h_frame')" 
+                                        <button onclick="revealInFinder('${file.path.replace(/'/g, "\\'")}')"
                                                 class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">folder_open</span>
                                             Reveal in Finder
