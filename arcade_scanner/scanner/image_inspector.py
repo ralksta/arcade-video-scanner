@@ -109,6 +109,47 @@ class ImageInspector(MediaInspector):
         return data
 
     async def _inspect_ffmpeg(self, filepath: str) -> Optional[MediaAsset]:
-        # Implementation placeholder / fallback
-        # Can use similar logic to VideoInspector but simplified
-        return None
+        """
+        Fallback for non-macOS environments (Docker/Linux).
+        Uses Pillow (PIL) for cross-platform image inspection.
+        """
+        try:
+            from PIL import Image
+            import os
+            
+            # Open image with Pillow
+            loop = asyncio.get_event_loop()
+            
+            def _load_image():
+                with Image.open(filepath) as img:
+                    width, height = img.size
+                    fmt = img.format or 'unknown'
+                    return width, height, fmt
+            
+            # Run in thread to avoid blocking
+            width, height, fmt = await loop.run_in_executor(None, _load_image)
+            
+            # Create image metadata
+            i_meta = ImageMetadata(
+                width=width,
+                height=height,
+                format=fmt.lower()
+            )
+            
+            # Get file stats
+            file_stat = await asyncio.to_thread(lambda: __import__('os').stat(filepath))
+            size_mb = file_stat.st_size / (1024 * 1024)
+            mtime = int(file_stat.st_mtime)
+            
+            return MediaAsset(
+                FilePath=filepath,
+                Size_MB=size_mb,
+                media_type=MediaType.IMAGE,
+                image_metadata=i_meta,
+                mtime=mtime,
+                imported_at=0  # Will be set by manager
+            )
+            
+        except Exception as e:
+            print(f"❌ Error inspecting image {filepath}: {e}")
+            return None

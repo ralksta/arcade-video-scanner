@@ -2617,6 +2617,10 @@ async function loadSettings() {
                 ...window.userSettings,
                 ...data
             };
+
+            // Set Docker detection flag
+            window.IS_DOCKER = data.is_docker || false;
+
             console.log("Settings loaded:", window.userSettings);
 
             // Check for deep links (e.g., /collections/Name)

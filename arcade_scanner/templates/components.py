@@ -1619,6 +1619,35 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-cyan">image</span>
+                                Image Size Threshold
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Ignore images smaller than this. Filters out tiny icons/thumbnails.</p>
+                        </div>
+                        
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Minimum Size</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Images below this are skipped</div>
+                            </div>
+                            <div class="flex items-center gap-2 bg-black/50 rounded-lg border border-white/10 p-1">
+                                <button class="w-9 h-9 rounded-md hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinImageSize', -50)">
+                                    <span class="material-icons text-lg">remove</span>
+                                </button>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" id="settingsMinImageSize" value="100" min="0" max="5000" step="50" class="bg-transparent text-white font-mono text-center w-14 focus:outline-none" oninput="markSettingsUnsaved()">
+                                    <span class="text-gray-500 text-sm">KB</span>
+                                </div>
+                                <button class="w-9 h-9 rounded-md hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinImageSize', 50)">
+                                    <span class="material-icons text-lg">add</span>
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
                                 <span class="material-icons text-lg text-arcade-pink">local_fire_department</span>
                                 Bitrate Classification
                             </h3>
