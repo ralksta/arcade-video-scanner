@@ -25,6 +25,16 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Version 6.4.1 (2026-01-14)
+- **Image Smart Collections**: Filter images by media type and format (JPG, PNG, RAW, etc.) in smart collections.
+- **RAW Image Support**: Extended scanner to support 12 RAW formats (CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW, RWL).
+- **Image-Specific UI**: Removed irrelevant bitrate display from image tiles, added separate image count in header.
+- **Enhanced Header Stats**: Top info bar now shows video count, image count (when present), and combined total size.
+- **Duplicate Cache Persistence**: Scan results saved to disk, no need to rescan on refresh/restart.
+- **Duplicate Rescan Button**: Manual rescan option with cache clearing in duplicate view.
+- **Duplicate Group Removal**: Entire duplicate group vanishes after deleting a file (case resolved).
+- **Bookmarkable Duplicates**: Added `/duplicates` URL route for direct access and bookmarking.
+
 ### ✅ Version 6.4.0 (2026-01-14)
 - **Duplicate Detection**: Find and manage duplicate videos/images with content-verified matching.
 - **Quality Scoring**: Smart recommendations for which file to keep (bitrate, resolution, codec).

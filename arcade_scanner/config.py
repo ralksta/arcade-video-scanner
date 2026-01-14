@@ -32,6 +32,7 @@ THUMB_DIR = os.path.join(HIDDEN_DATA_DIR, "thumbnails")
 CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
 REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
 SETTINGS_FILE = os.path.join(HIDDEN_DATA_DIR, "settings.json")
+DUPLICATES_CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "duplicates_cache.json")
 STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # Security Constants
@@ -96,7 +97,9 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_sensitive_collections": "List of collection names to be hidden in safe mode.",
     "sensitive_collections": [],
     "_comment_deovr": "Generate DeoVR-compatible JSON for VR headset viewing.",
-    "enable_deovr": False
+    "enable_deovr": False,
+    "_comment_image_scanning": "Include image files in the scanning process.",
+    "enable_image_scanning": False
 }
 
 # ==============================================================================
@@ -122,6 +125,7 @@ class AppSettings(BaseSettings):
 
     theme: str = Field("arcade")
     enable_deovr: bool = Field(False)
+    enable_image_scanning: bool = Field(False)
 
     class Config:
         env_prefix = "ARCADE_"

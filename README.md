@@ -1,16 +1,35 @@
-# Arcade Media Scanner 6.4.0
+# Arcade Media Scanner 6.4.1
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
 ### Core Features:
 - **Visual Analysis**: Instantly see which videos are "High Bitrate" (candidates for compression) vs. "Optimized".
 - **Privacy-First**: No data ever leaves your computer. The scan, database, and web dashboard run 100% locally.
-- **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, or file size to pinpoint storage hogs.
+- **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, file size, media type, and image formats.
 - **Interactive Previews**: Hover over any video to see a 5-second preview clip.
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.4.0 Highlights (New!)
+## 🚀 Version 6.4.1 Highlights (New!)
+
+This release enhances **Image Support**, improves **Duplicate Detection UX**, and adds **RAW Image Formats**.
+
+### 📸 Enhanced Image Support
+- **Image Smart Collections**: Filter by media type (Videos/Images) and image formats (JPG, PNG, GIF, WebP, HEIC) in smart collections.
+- **RAW Format Support**: Extended scanner to handle 12 RAW formats including CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW, and RWL.
+- **Image-Specific UI**: Removed irrelevant bitrate display from image tiles.
+- **Separate Image Count**: Header now shows video count and image count separately (when images are present).
+- **Combined Total Size**: Header size stat includes both videos and images.
+
+### 🔍 Duplicate Detection Improvements
+- **Persistent Cache**: Scan results saved to disk - no need to rescan on page refresh or server restart.
+- **Manual Rescan**: New "Rescan" button in duplicate view to force a fresh analysis.
+- **Smart Group Removal**: Entire duplicate group automatically vanishes after deleting any file (case resolved).
+- **Bookmarkable URL**: Direct access to duplicates view via `/duplicates` URL.
+
+---
+
+## 🚀 Version 6.4.0 Highlights
 
 This release adds **Duplicate Detection**, **First-Run Setup Wizard**, and **Database Cleanup Tools**.
 

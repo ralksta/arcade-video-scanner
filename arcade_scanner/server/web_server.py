@@ -2,7 +2,7 @@ import socketserver
 import threading
 import os
 from arcade_scanner.config import config, PORT, find_free_port
-from arcade_scanner.server.api_handler import FinderHandler
+from arcade_scanner.server.api_handler import FinderHandler, load_duplicate_cache
 
 def start_server(use_ssl=False):
     """
@@ -12,7 +12,10 @@ def start_server(use_ssl=False):
         use_ssl (bool): If True, wraps the socket in SSL with a self-signed cert.
     """
     global PORT_ACTUAL
-    
+
+    # Load cached duplicate results if available
+    load_duplicate_cache()
+
     # Allow address reuse to prevent "Address already in use" errors if the script is restarted quickly
     server = socketserver.ThreadingTCPServer(("", PORT), FinderHandler, bind_and_activate=False)
     server.allow_reuse_address = True

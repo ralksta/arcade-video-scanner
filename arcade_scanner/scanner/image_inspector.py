@@ -13,7 +13,23 @@ class ImageInspector(MediaInspector):
     Falls back to ffmpeg if sips is missing (cross-platform safety).
     """
     def __init__(self):
-        self.IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic')
+        self.IMAGE_EXTENSIONS = (
+            # Standard formats
+            '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic',
+            # RAW formats
+            '.cr2',   # Canon RAW
+            '.cr3',   # Canon RAW (newer)
+            '.nef',   # Nikon RAW
+            '.arw',   # Sony RAW
+            '.dng',   # Adobe Digital Negative (universal RAW)
+            '.raf',   # Fujifilm RAW
+            '.orf',   # Olympus RAW
+            '.rw2',   # Panasonic RAW
+            '.pef',   # Pentax RAW
+            '.srw',   # Samsung RAW
+            '.raw',   # Generic RAW
+            '.rwl'    # Leica RAW
+        )
         self.has_sips = shutil.which('sips') is not None
 
     def can_handle(self, filepath: str) -> bool:

@@ -107,7 +107,12 @@ def render_header(theme: BaseTheme, hostname: str, count: int, size_gb: str) -> 
         <span class="opacity-20">|</span>
         <div class="flex items-center gap-2">
             <span class="material-icons text-[14px] text-arcade-cyan">movie</span>
-            <span id="header-count">{count}</span> Videos
+            <span id="header-video-count">{count}</span> Videos
+        </div>
+        <span class="opacity-20" id="image-separator" style="display:none;">|</span>
+        <div class="flex items-center gap-2" id="image-count-section" style="display:none;">
+            <span class="material-icons text-[14px] text-purple-400">image</span>
+            <span id="header-image-count">0</span> Images
         </div>
         <span class="opacity-20">|</span>
         <div class="flex items-center gap-2">

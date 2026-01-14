@@ -355,6 +355,7 @@ function updateURL() {
         if (workspaceMode === 'optimized') path = '/review';
         else if (workspaceMode === 'favorites') path = '/favorites';
         else if (workspaceMode === 'vault') path = '/vault';
+        else if (workspaceMode === 'duplicates') path = '/duplicates';
         else if (path.startsWith('/collections/')) { } // Keep existing path for collections
         else path = '/lobby';
 
@@ -383,6 +384,7 @@ function loadFromURL() {
     if (path === '/favorites') mode = 'favorites';
     else if (path === '/review') mode = 'optimized';
     else if (path === '/vault') mode = 'vault';
+    else if (path === '/duplicates') mode = 'duplicates';
     else if (path === '/treeview') {
         mode = 'lobby';
         layout = 'treemap';
@@ -856,7 +858,7 @@ function createVideoCard(v) {
             <div class="flex items-center justify-between mt-1 text-xs font-mono text-gray-400">
                 <div class="flex items-center gap-2">
                     <span class="bg-white/5 px-1.5 py-0.5 rounded text-[10px]">${v.Size_MB.toFixed(0)} MB</span>
-                    <span>${v.Bitrate_Mbps.toFixed(1)} Mb/s</span>
+                    ${v.media_type === 'video' ? `<span>${v.Bitrate_Mbps.toFixed(1)} Mb/s</span>` : ''}
                 </div>
                 
                 <button class="text-gray-600 hover:text-white transition-colors hide-toggle-btn" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
@@ -2434,6 +2436,9 @@ async function openSettings() {
         const optimizerCheckbox = document.getElementById('settingsOptimizer');
         if (optimizerCheckbox) optimizerCheckbox.checked = data.enable_optimizer !== false;
 
+        const imageScanCheckbox = document.getElementById('settingsScanImages');
+        if (imageScanCheckbox) imageScanCheckbox.checked = data.enable_image_scanning === true;
+
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
             `Standard: ${data.default_scan_targets.slice(0, 2).join(', ')}${data.default_scan_targets.length > 2 ? '...' : ''}`;
@@ -2510,6 +2515,7 @@ async function saveSettings() {
 
         enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
+        enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
         enable_deovr: document.getElementById('settingsDeoVR')?.checked || false,
         theme: document.getElementById('settingsTheme').value || 'arcade'
     };
@@ -3245,14 +3251,18 @@ function getDefaultCollectionCriteria() {
             codec: [],
             tags: [],
             resolution: [],
-            orientation: []
+            orientation: [],
+            media_type: [], // 'video', 'image'
+            format: [] // image formats: jpg, png, gif, webp, etc.
         },
         exclude: {
             status: [],
             codec: [],
             tags: [],
             resolution: [],
-            orientation: []
+            orientation: [],
+            media_type: [],
+            format: []
         },
         favorites: null, // true = only, false = exclude, null = any
         date: {
@@ -3358,12 +3368,29 @@ function evaluateCollectionMatch(video, criteria) {
     const duration = video.duration || 0;
     // Use consistent Size_MB
     const sizeMB = video.Size_MB || 0;
+    const mediaType = video.media_type || 'video';
+
+    // Extract format - could be from image_metadata.format or from file extension
+    let format = '';
+    if (video.format) {
+        format = video.format.toLowerCase();
+    } else if (video.FilePath) {
+        // Fallback: extract from file extension
+        const ext = video.FilePath.split('.').pop().toLowerCase();
+        format = ext;
+    }
 
     // Hidden videos are never included
     if (isHidden) return false;
 
     // --- EXCLUSIONS (if ANY match, reject) ---
     const exc = criteria.exclude || {};
+
+    // Media type exclusion
+    if (exc.media_type?.length > 0 && exc.media_type.includes(mediaType)) return false;
+
+    // Format exclusion
+    if (exc.format?.length > 0 && isExcluded(format, exc.format)) return false;
 
     // Status exclusion
     if (exc.status?.length > 0 && isExcluded(status, exc.status)) return false;
@@ -3388,6 +3415,12 @@ function evaluateCollectionMatch(video, criteria) {
 
     // --- INCLUSIONS (must satisfy all that are set) ---
     const inc = criteria.include || {};
+
+    // Media type inclusion
+    if (inc.media_type?.length > 0 && !inc.media_type.includes(mediaType)) return false;
+
+    // Format inclusion
+    if (inc.format?.length > 0 && !matchesAny(format, inc.format)) return false;
 
     // Status inclusion
     if (inc.status?.length > 0) {
@@ -3649,11 +3682,31 @@ function updateCollectionPreviewCount() {
         tempCriteria.size = null;
     }
 
-    // Count matching videos
+    // Count matching media items
     const allVideos = window.ALL_VIDEOS || [];
     const matchingVideos = allVideos.filter(v => evaluateCollectionMatch(v, tempCriteria));
     const count = matchingVideos.length;
     countEl.textContent = count;
+
+    // Update label and icon based on media type filter
+    const labelEl = document.getElementById('matchCountLabel');
+    const iconEl = document.getElementById('matchCountIcon');
+    const mediaTypes = tempCriteria.include?.media_type || [];
+
+    if (labelEl && iconEl) {
+        if (mediaTypes.length === 1) {
+            if (mediaTypes[0] === 'video') {
+                labelEl.textContent = count === 1 ? 'video' : 'videos';
+                iconEl.textContent = 'movie';
+            } else if (mediaTypes[0] === 'image') {
+                labelEl.textContent = count === 1 ? 'image' : 'images';
+                iconEl.textContent = 'image';
+            }
+        } else {
+            labelEl.textContent = count === 1 ? 'item' : 'items';
+            iconEl.textContent = 'perm_media';
+        }
+    }
 
     // Animate if changed
     countEl.closest('.px-3')?.classList.add('animate-pulse');
@@ -3665,6 +3718,18 @@ function updateCollectionPreviewCount() {
 // Sync modal UI with collectionCriteriaNew state
 function syncSmartCollectionUI() {
     if (!collectionCriteriaNew) return;
+
+    // Sync media type chips
+    document.querySelectorAll('[data-filter="media_type"]').forEach(chip => {
+        const value = chip.dataset.value;
+        chip.classList.toggle('active', collectionCriteriaNew.include.media_type.includes(value));
+    });
+
+    // Sync format chips
+    document.querySelectorAll('[data-filter="format"]').forEach(chip => {
+        const value = chip.dataset.value;
+        chip.classList.toggle('active', collectionCriteriaNew.include.format.includes(value));
+    });
 
     // Sync status chips
     document.querySelectorAll('[data-filter="status"]').forEach(chip => {
@@ -4890,11 +4955,58 @@ async function loadVideoData() {
         if (res.ok) {
             window.ALL_VIDEOS = await res.json();
             console.log(`✅ Loaded ${window.ALL_VIDEOS.length} videos from API`);
+            updateHeaderStats();
         } else {
             console.error("Failed to load videos", res.status);
         }
     } catch (e) {
         console.error("Error loading videos:", e);
+    }
+}
+
+function updateHeaderStats() {
+    if (!window.ALL_VIDEOS) return;
+
+    // Count videos and images
+    let videoCount = 0;
+    let imageCount = 0;
+    let totalSize = 0;
+
+    window.ALL_VIDEOS.forEach(item => {
+        const mediaType = item.media_type || 'video';
+        if (mediaType === 'video') {
+            videoCount++;
+        } else if (mediaType === 'image') {
+            imageCount++;
+        }
+        totalSize += item.Size_MB || 0;
+    });
+
+    // Update video count
+    const videoCountEl = document.getElementById('header-video-count');
+    if (videoCountEl) {
+        videoCountEl.textContent = videoCount;
+    }
+
+    // Update image count and show section if there are images
+    const imageCountEl = document.getElementById('header-image-count');
+    const imageSection = document.getElementById('image-count-section');
+    const imageSeparator = document.getElementById('image-separator');
+
+    if (imageCount > 0) {
+        if (imageCountEl) imageCountEl.textContent = imageCount;
+        if (imageSection) imageSection.style.display = 'flex';
+        if (imageSeparator) imageSeparator.style.display = 'block';
+    } else {
+        if (imageSection) imageSection.style.display = 'none';
+        if (imageSeparator) imageSeparator.style.display = 'none';
+    }
+
+    // Update total size (including both videos and images)
+    const sizeEl = document.getElementById('header-size');
+    if (sizeEl) {
+        const sizeGB = (totalSize / 1024).toFixed(1);
+        sizeEl.textContent = sizeGB + ' GB';
     }
 }
 
@@ -5061,9 +5173,15 @@ function renderDuplicatesView() {
                             </p>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <div class="text-2xl font-bold text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
-                        <div class="text-xs text-gray-500 uppercase tracking-wider">Potential Savings</div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wider">Potential Savings</div>
+                        </div>
+                        <button onclick="rescanDuplicates()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-white text-sm font-medium transition-colors flex items-center gap-2">
+                            <span class="material-icons text-[18px]">refresh</span>
+                            Rescan
+                        </button>
                     </div>
                 </div>
             </div>
@@ -5182,7 +5300,35 @@ async function deleteDuplicate(encodedPath) {
             const result = await res.json();
             console.log(`✅ Deleted: ${result.deleted.length} files, freed ${result.freed_mb} MB`);
 
-            // Refresh view
+            // Find and remove the group containing this file
+            if (duplicateData && duplicateData.groups) {
+                const groupIndex = duplicateData.groups.findIndex(group =>
+                    group.files.some(file => file.path === path)
+                );
+
+                if (groupIndex !== -1) {
+                    // Remove the entire group since the duplicate case is resolved
+                    duplicateData.groups.splice(groupIndex, 1);
+
+                    // Update summary counts
+                    duplicateData.summary.total_groups = duplicateData.groups.length;
+
+                    // Recalculate savings
+                    duplicateData.summary.potential_savings_mb = duplicateData.groups.reduce(
+                        (sum, group) => sum + group.potential_savings_mb, 0
+                    );
+
+                    // Recalculate video/image group counts
+                    duplicateData.summary.video_groups = duplicateData.groups.filter(
+                        g => g.media_type === 'video'
+                    ).length;
+                    duplicateData.summary.image_groups = duplicateData.groups.filter(
+                        g => g.media_type === 'image'
+                    ).length;
+                }
+            }
+
+            // Refresh view with updated data
             renderDuplicatesView();
         } else {
             alert('Failed to delete file');
@@ -5190,5 +5336,33 @@ async function deleteDuplicate(encodedPath) {
     } catch (e) {
         console.error('Delete error:', e);
         alert('Error deleting file');
+    }
+}
+
+async function rescanDuplicates() {
+    if (!confirm('This will clear the cached duplicate results and perform a fresh scan. Continue?')) {
+        return;
+    }
+
+    try {
+        // Clear the cache
+        const clearRes = await fetch('/api/duplicates/clear', {
+            method: 'POST'
+        });
+
+        if (!clearRes.ok) {
+            alert('Failed to clear cache');
+            return;
+        }
+
+        // Clear client-side data
+        duplicateData = null;
+
+        // Trigger a new scan by re-rendering (which will auto-start scan if no data)
+        renderDuplicatesView();
+
+    } catch (e) {
+        console.error('Rescan error:', e);
+        alert('Error triggering rescan');
     }
 }

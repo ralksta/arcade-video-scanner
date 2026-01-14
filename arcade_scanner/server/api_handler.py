@@ -10,7 +10,7 @@ import socket
 import ssl
 from urllib.parse import unquote, urlparse, parse_qs
 import shlex
-from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE
+from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE, DUPLICATES_CACHE_FILE
 from arcade_scanner.database import db, user_db
 from arcade_scanner.security import session_manager
 from http.cookies import SimpleCookie
@@ -27,33 +27,75 @@ DUPLICATE_SCAN_STATE = {
 }
 DUPLICATE_RESULTS_CACHE = None
 
+def load_duplicate_cache():
+    """Load cached duplicate results from disk."""
+    global DUPLICATE_RESULTS_CACHE
+    try:
+        if os.path.exists(DUPLICATES_CACHE_FILE):
+            with open(DUPLICATES_CACHE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                DUPLICATE_RESULTS_CACHE = data.get('groups', [])
+                print(f"✅ Loaded {len(DUPLICATE_RESULTS_CACHE)} duplicate groups from cache")
+                return True
+    except Exception as e:
+        print(f"⚠️ Could not load duplicate cache: {e}")
+    return False
+
+def save_duplicate_cache():
+    """Save duplicate results to disk."""
+    try:
+        if DUPLICATE_RESULTS_CACHE is not None:
+            cache_data = {
+                'groups': DUPLICATE_RESULTS_CACHE,
+                'timestamp': time.time()
+            }
+            with open(DUPLICATES_CACHE_FILE, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f)
+            print(f"✅ Saved {len(DUPLICATE_RESULTS_CACHE)} duplicate groups to cache")
+    except Exception as e:
+        print(f"⚠️ Could not save duplicate cache: {e}")
+
+def clear_duplicate_cache():
+    """Clear the duplicate cache from memory and disk."""
+    global DUPLICATE_RESULTS_CACHE
+    DUPLICATE_RESULTS_CACHE = None
+    try:
+        if os.path.exists(DUPLICATES_CACHE_FILE):
+            os.remove(DUPLICATES_CACHE_FILE)
+            print("🗑️ Cleared duplicate cache")
+    except Exception as e:
+        print(f"⚠️ Could not remove duplicate cache file: {e}")
+
 def background_duplicate_scan():
     """Background worker for duplicate detection."""
     global DUPLICATE_RESULTS_CACHE
     from arcade_scanner.core.duplicate_detector import DuplicateDetector
     import threading
-    
+
     DUPLICATE_SCAN_STATE["is_running"] = True
     DUPLICATE_SCAN_STATE["progress"] = 0
     DUPLICATE_SCAN_STATE["message"] = "Initializing scan..."
-    
+
     try:
         def progress_cb(msg, pct):
             DUPLICATE_SCAN_STATE["message"] = msg
             DUPLICATE_SCAN_STATE["progress"] = int(pct)
-            
+
         detector = DuplicateDetector()
         # Get all videos (thread-safe enough for read)
         all_videos = db.get_all()
-        
+
         results = detector.find_all_duplicates(all_videos, progress_cb)
-        
+
         # Serialize results slightly earlier to avoid main thread blocking later
         DUPLICATE_RESULTS_CACHE = [g.to_dict() for g in results]
-        
+
+        # Save to disk for future sessions
+        save_duplicate_cache()
+
         DUPLICATE_SCAN_STATE["message"] = "Scan complete"
         DUPLICATE_SCAN_STATE["progress"] = 100
-        
+
     except Exception as e:
         print(f"❌ Error in duplicate scan: {e}")
         DUPLICATE_SCAN_STATE["message"] = f"Error: {e}"
@@ -111,7 +153,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # Normalize path to ignore query parameters for routing
             clean_path = self.path.split('?')[0]
             
-            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview"]
+            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates"]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
                 
                 # AUTH CHECK for Root
@@ -787,8 +829,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         settings_dump["exclude_paths"] = u.data.exclude_paths
                         settings_dump["available_tags"] = u.data.available_tags
                         
-                        # Inject User-Specific Settings
-                        settings_dump["scan_images"] = u.data.scan_images
+                        # Inject User-Specific Settings (Override Global)
+                        settings_dump["enable_image_scanning"] = getattr(u.data, 'scan_images', False)
                         settings_dump["sensitive_dirs"] = u.data.sensitive_dirs
                         settings_dump["sensitive_tags"] = u.data.sensitive_tags
                         settings_dump["sensitive_collections"] = u.data.sensitive_collections
@@ -797,6 +839,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         settings_dump["scan_targets"] = []
                         settings_dump["exclude_paths"] = []
                         settings_dump["available_tags"] = []
+                        settings_dump["enable_image_scanning"] = False
                 else:
                     settings_dump["smart_collections"] = []
                     settings_dump["scan_targets"] = []
@@ -1170,7 +1213,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     user_tags = new_settings.pop("available_tags", None)
                     
                     # New User-Specific Settings
+                    # Fix: Frontend sends 'enable_image_scanning', map to 'scan_images'
                     user_scan_images = new_settings.pop("scan_images", None)
+                    if user_scan_images is None:
+                        user_scan_images = new_settings.pop("enable_image_scanning", None)
+                        
                     user_sensitive_dirs = new_settings.pop("sensitive_dirs", None)
                     user_sensitive_tags = new_settings.pop("sensitive_tags", None)
                     user_sensitive_collections = new_settings.pop("sensitive_collections", None)
@@ -1466,7 +1513,21 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as e:
                     print(f"❌ Error deleting duplicates: {e}")
                     self.send_error(500, str(e))
-            
+
+            elif self.path == "/api/duplicates/clear":
+                # Clear duplicate cache and force rescan
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+
+                clear_duplicate_cache()
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "cleared"}).encode("utf-8"))
+
             else:
                 self.send_error(404)
         except Exception as e:

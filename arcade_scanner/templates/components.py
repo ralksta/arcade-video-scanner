@@ -998,7 +998,20 @@ COLLECTION_MODAL_COMPONENT = """
                     <!-- Left Column: Technical Specs -->
                     <div class="space-y-4">
                         <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 border-b border-white/5 pb-1">Properties</h3>
-                        
+
+                        <!-- Media Type -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Media Type</label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button class="filter-chip" data-filter="media_type" data-value="video" onclick="toggleSmartFilterChip(this)">
+                                    <span class="material-icons text-xs">movie</span>Videos
+                                </button>
+                                <button class="filter-chip" data-filter="media_type" data-value="image" onclick="toggleSmartFilterChip(this)">
+                                    <span class="material-icons text-xs">image</span>Images
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Status -->
                         <div class="filter-rule-row">
                             <label class="text-xs text-gray-400 mb-1.5 block">Status</label>
@@ -1043,6 +1056,23 @@ COLLECTION_MODAL_COMPONENT = """
                                 <button class="filter-chip" data-filter="orientation" data-value="square" onclick="toggleSmartFilterChip(this)">
                                     <span class="material-icons text-xs">crop_square</span>Square
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- Format (Images) -->
+                        <div class="filter-rule-row">
+                            <label class="text-xs text-gray-400 mb-1.5 block">Format</label>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button class="filter-chip" data-filter="format" data-value="jpg" onclick="toggleSmartFilterChip(this)">JPG</button>
+                                <button class="filter-chip" data-filter="format" data-value="png" onclick="toggleSmartFilterChip(this)">PNG</button>
+                                <button class="filter-chip" data-filter="format" data-value="gif" onclick="toggleSmartFilterChip(this)">GIF</button>
+                                <button class="filter-chip" data-filter="format" data-value="webp" onclick="toggleSmartFilterChip(this)">WebP</button>
+                                <button class="filter-chip" data-filter="format" data-value="heic" onclick="toggleSmartFilterChip(this)">HEIC</button>
+                                <button class="filter-chip" data-filter="format" data-value="cr2" onclick="toggleSmartFilterChip(this)">CR2</button>
+                                <button class="filter-chip" data-filter="format" data-value="dng" onclick="toggleSmartFilterChip(this)">DNG</button>
+                                <button class="filter-chip" data-filter="format" data-value="raf" onclick="toggleSmartFilterChip(this)">RAF</button>
+                                <button class="filter-chip" data-filter="format" data-value="nef" onclick="toggleSmartFilterChip(this)">NEF</button>
+                                <button class="filter-chip" data-filter="format" data-value="arw" onclick="toggleSmartFilterChip(this)">ARW</button>
                             </div>
                         </div>
                     </div>
@@ -1115,8 +1145,8 @@ COLLECTION_MODAL_COMPONENT = """
         <div class="p-4 border-t border-white/5 flex items-center justify-between shrink-0 bg-[#0a0a12]">
             <div class="flex items-center gap-3">
                 <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-arcade-cyan/10 text-arcade-cyan text-sm font-medium">
-                    <span class="material-icons text-sm">movie</span>
-                    <span id="matchCountNumber">0</span> videos
+                    <span class="material-icons text-sm" id="matchCountIcon">movie</span>
+                    <span id="matchCountNumber">0</span> <span id="matchCountLabel">items</span>
                 </span>
                 <button id="deleteCollectionBtn" onclick="deleteCurrentCollection()" class="hidden text-sm text-red-400 hover:text-red-300 transition-colors">
                     <span class="material-icons text-sm align-middle mr-1">delete</span>Delete

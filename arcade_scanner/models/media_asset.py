@@ -114,6 +114,7 @@ class MediaAsset(BaseModel):
         elif self.image_metadata:
              d['Width'] = self.image_metadata.width
              d['Height'] = self.image_metadata.height
+             d['format'] = self.image_metadata.format
         return d
 
     class Config:
