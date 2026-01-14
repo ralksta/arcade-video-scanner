@@ -12,6 +12,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 .env
 
 # macOS system files
@@ -23,10 +24,27 @@ server_log.txt
 status.txt
 
 # Debug/Development files
-debug_scan.py
+debug_*.py
+check_*.py
+verify_*.py
+*_test.py
+test_*.py
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
 
 # Scripts (Local paths)
 *.sh
 *.zip
-!scan_videos_mit_shell.py
 !run.sh
+
+# Generated HTML report (user-specific)
+video_dashboard.html
