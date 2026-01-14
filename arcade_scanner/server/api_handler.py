@@ -865,6 +865,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     settings_dump["exclude_paths"] = []
                     settings_dump["available_tags"] = []
 
+                # Add Docker detection
+                settings_dump["is_docker"] = bool(os.getenv("CONFIG_DIR"))
+
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()

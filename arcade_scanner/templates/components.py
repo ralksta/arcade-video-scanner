@@ -491,7 +491,7 @@ CINEMA_MODAL_COMPONENT = """
             <span class="text-[10px] tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity">Vault</span>
         </button>
         
-        <button class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors group" onclick="cinemaLocate()" title="Locate">
+        <button id="cinemaLocateBtn" class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors group" onclick="cinemaLocate()" title="Locate">
             <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-all">
                 <span class="material-icons text-lg">folder_special</span>
             </div>

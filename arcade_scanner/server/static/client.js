@@ -697,10 +697,11 @@ function createComparisonCard(pair) {
                 <span class="truncate font-medium text-gray-300" title="${orig.FilePath}">${orig.FilePath.split(/[\\\\/]/).pop()}</span>
                 <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
-            
+            ${!window.IS_DOCKER ? `
             <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
+            ` : ''}
         </div>
 
         <!-- Stats Center -->
@@ -735,9 +736,11 @@ function createComparisonCard(pair) {
                 <span class="truncate font-medium text-gray-300" title="${opt.FilePath}">${opt.FilePath.split(/[\\\\/]/).pop()}</span>
                 <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
+             ${!window.IS_DOCKER ? `
              <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
+            ` : ''}
         </div>
     `;
 
@@ -820,9 +823,11 @@ function createVideoCard(v) {
              
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
+                 ${!window.IS_DOCKER ? `
                  <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
                     <span class="material-icons">folder_open</span>
                  </button>
+                 ` : ''}
                  <button class="w-12 h-12 rounded-full bg-arcade-cyan/20 hover:bg-arcade-cyan text-arcade-cyan hover:text-black border border-arcade-cyan/50 flex items-center justify-center backdrop-blur transition-all transform hover:scale-110 shadow-[0_0_15px_rgba(0,255,208,0.3)]" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
                     <span class="material-icons text-3xl">play_arrow</span>
                  </button>
@@ -2620,6 +2625,12 @@ async function loadSettings() {
 
             // Set Docker detection flag
             window.IS_DOCKER = data.is_docker || false;
+
+            // Hide Locate button in Docker mode
+            if (window.IS_DOCKER) {
+                const locateBtn = document.getElementById('cinemaLocateBtn');
+                if (locateBtn) locateBtn.style.display = 'none';
+            }
 
             console.log("Settings loaded:", window.userSettings);
 
@@ -5441,13 +5452,15 @@ function renderDuplicatesView() {
                                             <span class="ml-auto bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Q: ${file.quality_score.toFixed(0)}</span>
                                         </div>
                                         
+                                        ${!window.IS_DOCKER ? `
                                         <!-- Reveal in Finder Button -->
                                         <button onclick="revealInFinder('${file.path.replace(/'/g, "\\'")}')"
                                                 class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">folder_open</span>
                                             Reveal in Finder
                                         </button>
-                                        
+                                        ` : ''}
+                                    </div>    
                                         ${!isKeep ? `
                                             <button onclick="deleteDuplicate('${encodeURIComponent(file.path)}')" 
                                                     class="w-full py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1">
