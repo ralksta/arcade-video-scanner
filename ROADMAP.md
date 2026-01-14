@@ -23,6 +23,20 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Version 6.6.0 (2026-01-14)
+- **Binary Search Quality**: Video optimizer now uses binary search to find optimal quality in O(log n) passes instead of linear search.
+- **Early Size Abort**: Encoding stops mid-pass if output exceeds 95% of original size, saving time on doomed encodes.
+- **Fallback Mode**: When strict targets (20% savings + 0.960 SSIM) can't be met, uses best acceptable result (SSIM >= 0.945).
+- **Keep/Discard Fix**: Fixed "Keep" button in Review not replacing original with optimized file (was a Python import shadowing bug).
+- **Error Handling**: Added proper error responses and browser alerts for failed file operations.
+- **JS Module Extraction**: Refactored monolithic `client.js` into `engine.js`, `cinema.js`, `collections.js`, and `formatters.js`.
+- **JSDoc Documentation**: Added comprehensive JSDoc to all major JavaScript functions.
+
+### ✅ Version 6.5.0 (2026-01-14)
+- **Cinema Tags Display**: See assigned tags in Cinema overlay with one-click removal.
+- **Tag System Stability**: Fixed cache-busting, deletion, and duplicate validation.
+- **Docker Dev Experience**: Live code reloading via volume mounts.
+
 ### ✅ Version 6.4.1 (2026-01-14)
 - **Image Smart Collections**: Filter images by media type and format (JPG, PNG, RAW, etc.) in smart collections.
 - **RAW Image Support**: Extended scanner to support 12 RAW formats (CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW, RWL).
@@ -129,4 +143,4 @@ Features are prioritized based on:
 
 ---
 
-*Last updated: 2026-01-14*
+*Last updated: 2026-01-15*

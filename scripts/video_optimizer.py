@@ -470,19 +470,27 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     print("-" * 52)
 
     start_q, end_q, step = profile['quality_range']
-    quality = start_q
-    
-    # Override starting quality if provided manually
+
+    # Build list of quality values for binary search
+    # quality_direction > 0: higher Q = worse quality (NVENC, QSV, libx265)
+    # quality_direction < 0: higher Q = better quality (VideoToolbox)
+    if profile['quality_direction'] > 0:
+        quality_values = list(range(start_q, end_q + 1, abs(step)))
+    else:
+        quality_values = list(range(start_q, end_q - 1, step))  # step is negative
+
+    # Override with manual quality if provided (use linear search from that point)
+    use_binary_search = q_override is None
     if q_override is not None:
-        print(f"{Y}Manual Start Quality:{NC} Q={q_override}")
+        print(f"{Y}Manual Start Quality:{NC} Q={q_override} (linear search)")
         quality = q_override
 
     file_start_time = time.time()
-    
+
     def should_continue(q):
         if video_mode == 'copy':
             return False # Only one pass for copy mode
-        
+
         if profile['quality_direction'] > 0:
             return q <= end_q
         else:
@@ -574,43 +582,44 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
              batch_stats['failed'] += 1
              return (False, 0)
 
-    while should_continue(quality):
-        print(f"{G}Pass:{NC} Q={quality}")
-        
-        cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to, video_mode='compress')
+    # Helper function to run a single encode pass
+    def run_encode_pass(quality_val):
+        """Run a single encode pass and return (success, size_after, ssim, error_reason)."""
+        print(f"{G}Pass:{NC} Q={quality_val}")
+
+        cmd = build_ffmpeg_command(input_path, output_path, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress')
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        
+
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}
         encode_start = time.time()
-        captured_errors = [] # Reset errors
-        
+        captured_errors = []
+        early_abort = False
+        abort_threshold = size_to_compare * 0.95
+
         # Start Non-Blocking Reader
-        q = queue.Queue()
-        t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
-        t.daemon = True
-        t.start()
-        
+        prog_queue = queue.Queue()
+        reader_thread = threading.Thread(target=enqueue_output, args=(process.stdout, prog_queue))
+        reader_thread.daemon = True
+        reader_thread.start()
+
         try:
             while True:
                 try:
-                    line = q.get(timeout=2.0)
+                    line = prog_queue.get(timeout=2.0)
                 except queue.Empty:
                     if process.poll() is not None:
                         break
-                    # Still running but silent? likely faststart
-                    # Calculate percentage based on duration if we can
                     sys.stdout.write(f"\r {G}{profile['codec']}{NC} [Moving Atoms / Finalizing...] ({time.time()-encode_start:.0f}s)    ")
                     sys.stdout.flush()
                     continue
 
-                if not line: # Should not happen with Thread logic usually unless empty string put in queue
+                if not line:
                     if process.poll() is not None:
                         break
-                
-                # Capture potential errors (everything not progress info)
+
                 if line.strip() and not any(k in line for k in ['bitrate=', 'speed=', 'out_time_ms=', 'total_size=', 'frame=']):
-                     captured_errors.append(line.strip())
-                
+                    captured_errors.append(line.strip())
+
                 if 'bitrate=' in line:
                     cur_stats["bitrate"] = line.split('=')[1].strip()
                 elif 'speed=' in line:
@@ -625,69 +634,164 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
                             show_progress(ms / 1000000, duration_to_show, profile['codec'], cur_stats["bitrate"], cur_stats["speed"], elapsed)
                         except ValueError:
                             pass
-            
+                elif 'total_size=' in line:
+                    val = line.split('=')[1].strip()
+                    if val != 'N/A':
+                        try:
+                            current_size = int(val)
+                            if current_size >= abort_threshold:
+                                print(f"\n {R}-> Size exceeded mid-encode ({format_size(current_size)} >= {format_size(abort_threshold)}). Aborting pass...{NC}")
+                                process.terminate()
+                                early_abort = True
+                                break
+                        except ValueError:
+                            pass
+
             process.wait()
             print()
-            
+
+            if early_abort:
+                if output_path.exists(): output_path.unlink()
+                return (False, 0, 0, 'early_abort')
+
             if process.returncode != 0:
                 print(f"{R}FFmpeg error during encoding.{NC}")
                 for err in captured_errors[-10:]:
                     print(f"  {R}{err}{NC}")
                 if output_path.exists(): output_path.unlink()
-                batch_stats['failed'] += 1
-                return (False, 0)
+                return (False, 0, 0, 'ffmpeg_error')
 
             size_after = output_path.stat().st_size
-            
-            # If trimming, we cannot compare size properly against original or do SSIM easily (durations differ)
-            # FIXED: We now use projected size and offset SSIM
-            # if is_trim:
-            #     file_time = time.time() - file_start_time
-            #     print(f" {BG}>>> SUCCESS (TRIM)! Saved to {output_path.name} in {format_time(file_time)}.{NC}")
-            #     batch_stats['total_time'] += file_time
-            #     batch_stats['success'] += 1
-            #     if port: notify_server(port, input_path)
-            #     return (True, 0)
 
             if size_after >= size_to_compare:
-                print(f" {R}-> File larger ({format_size(size_after)} > {format_size(size_to_compare)}). Adjusting quality...{NC}")
-                quality += step
-                continue
+                print(f" {R}-> File larger ({format_size(size_after)} > {format_size(size_to_compare)}).{NC}")
+                return (False, size_after, 0, 'too_large')
 
             # SSIM verification
-            # If trimming, use trim_duration for sampling points
             dur_for_samples = trim_duration if is_trim else info['duration']
-            
             p1 = dur_for_samples * 0.25
             p2 = dur_for_samples * 0.75
-            
-            # Ensure p2 + sample is within bounds
             if p2 + SAMPLE_DURATION > dur_for_samples:
                 p2 = max(0, dur_for_samples - SAMPLE_DURATION - 1)
-            
-            # For orig file, add start_offset. For opt file, starts at 0.
+
             orig_p1 = start_offset + p1
             orig_p2 = start_offset + p2
-            
-            # print(f"DEBUG: SSIM Check P1: Orig@{orig_p1} vs Opt@{p1}")
-            
+
             ssim1 = get_ssim(input_path, output_path, orig_p1, p1, SAMPLE_DURATION)
             ssim2 = get_ssim(input_path, output_path, orig_p2, p2, SAMPLE_DURATION)
             ssim = min(ssim1, ssim2)
-            
+
             saved_bytes = size_to_compare - size_after
             saved_pct = saved_bytes * 100 / size_to_compare
-            print(f" {G}-> Result:{NC} Q={quality} | Saved: {saved_pct:.2f}% | SSIM: {ssim:.4f}")
+            print(f" {G}-> Result:{NC} Q={quality_val} | Saved: {saved_pct:.2f}% | SSIM: {ssim:.4f}")
 
-            if (saved_pct >= MIN_SAVINGS and ssim >= MIN_QUALITY) or \
-               (saved_pct >= 50.0 and ssim >= 0.945):
+            return (True, size_after, ssim, None)
+
+        except KeyboardInterrupt:
+            print(f"\n{R}>>> Abort. Cleaning up...{NC}")
+            process.terminate()
+            if output_path.exists(): output_path.unlink()
+            sys.exit(1)
+
+    # Binary search for optimal quality
+    if use_binary_search and len(quality_values) > 1:
+        print(f"{Y}Binary Search Mode:{NC} Testing {len(quality_values)} quality levels [{quality_values[0]}..{quality_values[-1]}]")
+
+        # Binary search: find the best (most compression) quality that meets SSIM threshold
+        # For direction > 0: higher index = worse quality = more compression
+        # For direction < 0: lower index = worse quality = more compression
+        low, high = 0, len(quality_values) - 1
+        best_result = None  # (quality, size_after, ssim, saved_bytes, saved_pct)
+        best_acceptable = None  # Backup: best result with acceptable SSIM even if savings not met
+
+        while low <= high:
+            mid = (low + high) // 2
+            quality = quality_values[mid]
+
+            success, size_after, ssim, error = run_encode_pass(quality)
+
+            if error == 'ffmpeg_error':
+                batch_stats['failed'] += 1
+                return (False, 0)
+
+            if error in ('early_abort', 'too_large'):
+                # Need less compression (better quality)
+                if profile['quality_direction'] > 0:
+                    high = mid - 1  # Try lower Q values
+                else:
+                    low = mid + 1   # Try higher Q values
+                continue
+
+            if not success:
+                # Unexpected failure
+                if profile['quality_direction'] > 0:
+                    high = mid - 1
+                else:
+                    low = mid + 1
+                continue
+
+            # Check SSIM threshold
+            if ssim < 0.940:
+                print(f" {R}   -> Quality too low for this level.{NC}")
+                # Need better quality (less compression)
+                if profile['quality_direction'] > 0:
+                    high = mid - 1
+                else:
+                    low = mid + 1
+                if output_path.exists(): output_path.unlink()
+                continue
+
+            saved_bytes = size_to_compare - size_after
+            saved_pct = saved_bytes * 100 / size_to_compare
+
+            # Check if meets targets
+            meets_targets = (saved_pct >= MIN_SAVINGS and ssim >= MIN_QUALITY) or \
+                           (saved_pct >= 50.0 and ssim >= 0.945)
+
+            # Track best acceptable result (SSIM >= 0.945 and some savings) as backup
+            if ssim >= 0.945 and saved_pct > 0:
+                if best_acceptable is None or saved_pct > best_acceptable[4]:
+                    best_acceptable = (quality, size_after, ssim, saved_bytes, saved_pct)
+
+            if meets_targets:
+                best_result = (quality, size_after, ssim, saved_bytes, saved_pct)
+                # Try for more compression
+                if profile['quality_direction'] > 0:
+                    low = mid + 1   # Try higher Q values (more compression)
+                else:
+                    high = mid - 1  # Try lower Q values (more compression)
+                if output_path.exists(): output_path.unlink()
+            else:
+                # SSIM OK but savings not enough, need more compression
+                if profile['quality_direction'] > 0:
+                    low = mid + 1
+                else:
+                    high = mid - 1
+                if output_path.exists(): output_path.unlink()
+
+        # Use best result if found, or fall back to best acceptable
+        final_result = best_result or best_acceptable
+        if final_result:
+            quality, size_after, ssim, saved_bytes, saved_pct = final_result
+            is_fallback = best_result is None
+
+            # Re-encode at best quality to get final file
+            if is_fallback:
+                print(f"\n{Y}>>> No perfect match. Using best acceptable Q={quality} (saved {saved_pct:.1f}%, SSIM {ssim:.4f}){NC}")
+            else:
+                print(f"\n{BG}>>> Final encode at optimal Q={quality}{NC}")
+
+            success, size_after, ssim, error = run_encode_pass(quality)
+
+            if success and ssim >= 0.940:
+                saved_bytes = size_to_compare - size_after
+                saved_pct = saved_bytes * 100 / size_to_compare
                 file_time = time.time() - file_start_time
                 print(f" {BG}>>> SUCCESS! {format_size(saved_bytes)} saved in {format_time(file_time)}.{NC}")
                 batch_stats['total_saved_bytes'] += saved_bytes
                 batch_stats['total_time'] += file_time
                 batch_stats['success'] += 1
-                
-                # Populate result for logging
+
                 last_encode_result['filename'] = input_path.name
                 last_encode_result['status'] = 'success'
                 last_encode_result['quality'] = quality
@@ -696,34 +800,85 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
                 last_encode_result['saved_bytes'] = saved_bytes
                 last_encode_result['duration'] = file_time
                 last_encode_result['reason'] = None
-                
+
                 if port:
                     notify_server(port, input_path)
-                    
+
                 return (True, saved_bytes)
-            
-            if ssim < 0.940:
-                print(f" {R}   -> Quality too low. Aborting.{NC}")
-                if output_path.exists(): output_path.unlink()
-                batch_stats['failed'] += 1
-                file_time = time.time() - file_start_time
-                last_encode_result['filename'] = input_path.name
-                last_encode_result['status'] = 'failed'
-                last_encode_result['quality'] = quality
-                last_encode_result['ssim'] = ssim
-                last_encode_result['reason'] = f'Quality too low (SSIM {ssim:.4f} < 0.940)'
-                last_encode_result['duration'] = file_time
-                return (False, 0)
 
-            print(f" {R}   -> Not optimal. Next pass...{NC}")
+        # Binary search failed - show why
+        batch_stats['failed'] += 1
+        file_time = time.time() - file_start_time
+        last_encode_result['filename'] = input_path.name
+        last_encode_result['status'] = 'failed'
+        if best_acceptable:
+            last_encode_result['reason'] = f'Best result (Q={best_acceptable[0]}) had {best_acceptable[4]:.1f}% savings, SSIM {best_acceptable[2]:.4f} - did not meet targets'
+        else:
+            last_encode_result['reason'] = 'Binary search: no quality level produced acceptable results'
+        last_encode_result['duration'] = file_time
+        print(f" {R}>>> FAILED: {last_encode_result['reason']}{NC}")
+        return (False, 0)
+
+    # Fallback: Linear search (used when q_override is set or only 1 quality value)
+    quality = q_override if q_override is not None else quality_values[0]
+
+    while should_continue(quality):
+        success, size_after, ssim, error = run_encode_pass(quality)
+
+        if error == 'ffmpeg_error':
+            batch_stats['failed'] += 1
+            return (False, 0)
+
+        if error in ('early_abort', 'too_large'):
             quality += step
+            continue
 
-        except KeyboardInterrupt:
-            print(f"\n{R}>>> Abort. Cleaning up...{NC}")
-            process.terminate()
+        if not success:
+            quality += step
+            continue
+
+        if ssim < 0.940:
+            print(f" {R}   -> Quality too low. Aborting.{NC}")
             if output_path.exists(): output_path.unlink()
-            sys.exit(1)
-    
+            batch_stats['failed'] += 1
+            file_time = time.time() - file_start_time
+            last_encode_result['filename'] = input_path.name
+            last_encode_result['status'] = 'failed'
+            last_encode_result['quality'] = quality
+            last_encode_result['ssim'] = ssim
+            last_encode_result['reason'] = f'Quality too low (SSIM {ssim:.4f} < 0.940)'
+            last_encode_result['duration'] = file_time
+            return (False, 0)
+
+        saved_bytes = size_to_compare - size_after
+        saved_pct = saved_bytes * 100 / size_to_compare
+
+        if (saved_pct >= MIN_SAVINGS and ssim >= MIN_QUALITY) or \
+           (saved_pct >= 50.0 and ssim >= 0.945):
+            file_time = time.time() - file_start_time
+            print(f" {BG}>>> SUCCESS! {format_size(saved_bytes)} saved in {format_time(file_time)}.{NC}")
+            batch_stats['total_saved_bytes'] += saved_bytes
+            batch_stats['total_time'] += file_time
+            batch_stats['success'] += 1
+
+            last_encode_result['filename'] = input_path.name
+            last_encode_result['status'] = 'success'
+            last_encode_result['quality'] = quality
+            last_encode_result['ssim'] = ssim
+            last_encode_result['saved_pct'] = saved_pct
+            last_encode_result['saved_bytes'] = saved_bytes
+            last_encode_result['duration'] = file_time
+            last_encode_result['reason'] = None
+
+            if port:
+                notify_server(port, input_path)
+
+            return (True, saved_bytes)
+
+        print(f" {R}   -> Not optimal. Next pass...{NC}")
+        if output_path.exists(): output_path.unlink()
+        quality += step
+
     batch_stats['failed'] += 1
     file_time = time.time() - file_start_time
     last_encode_result['filename'] = input_path.name

@@ -45,5 +45,18 @@ Ein "Social Media" Toolkit direkt im Browser.
 
 Zusätzlich zu `ROADMAP.md`:
 
-2.  **Hardware Health Check**: Warnung, wenn die Platte, auf der das Archiv liegt, zu voll läuft (Disk Space Monitoring im Dashboard header).
-3.  **Docker/Unraid Template**: Wenn du das veröffentlichst, wäre ein Docker-Container der #1 Request.
+1.  **Hardware Health Check**: Warnung, wenn die Platte, auf der das Archiv liegt, zu voll läuft (Disk Space Monitoring im Dashboard header).
+2.  **Docker/Unraid Template**: Wenn du das veröffentlichst, wäre ein Docker-Container der #1 Request. ✅ (Implemented in 6.4.0)
+
+---
+
+## ✅ Umgesetzte Ideen
+
+### Binary Search Quality Optimization (6.6.0)
+- Statt linear durch alle Quality-Stufen zu iterieren, nutzt der Optimizer jetzt Binary Search.
+- Findet optimale Qualität in O(log n) statt O(n) Durchläufen.
+- Early Abort wenn Dateigröße schon bei 95% des Originals liegt.
+
+### Smart Fallback Mode (6.6.0)
+- Wenn strenge Ziele (20% Ersparnis + 0.960 SSIM) nicht erreichbar sind, wird automatisch das beste akzeptable Ergebnis verwendet.
+- Besseres Feedback warum Optimierung erfolgreich war oder fehlgeschlagen ist.

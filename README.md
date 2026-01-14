@@ -1,4 +1,4 @@
-# Arcade Media Scanner 6.4.1
+# Arcade Media Scanner 6.6.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -10,7 +10,29 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.5.0 Highlights (New!)
+## 🚀 Version 6.6.0 Highlights (New!)
+
+This release focuses on **Video Optimizer Intelligence**, **Review Workflow**, and **Code Refactoring**.
+
+### ⚡ Smart Video Optimizer
+- **Binary Search Quality**: New algorithm finds optimal quality in O(log n) passes instead of linear search - up to 50% fewer encode passes.
+- **Early Size Abort**: Encoding stops mid-pass if output exceeds 95% of original size, saving time on files that would fail anyway.
+- **Fallback Mode**: When strict targets can't be met, automatically uses best acceptable result (SSIM >= 0.945).
+- **Better Feedback**: Clear status messages explaining why optimization succeeded or failed.
+
+### 🔄 Review Workflow
+- **Keep/Discard Fixed**: The "Keep" button now correctly replaces the original with the optimized file.
+- **Error Handling**: Proper error messages shown in browser when file operations fail.
+- **Docker Compatible**: Keep/Discard operations work correctly in containerized deployments.
+
+### 🧹 Code Refactoring
+- **JavaScript Modules**: Extracted `cinema.js`, `collections.js`, and `formatters.js` from monolithic `engine.js`.
+- **JSDoc Documentation**: Added comprehensive documentation to all major functions.
+- **Import Cleanup**: Fixed Python import shadowing issues causing runtime errors.
+
+---
+
+## 🚀 Version 6.5.0 Highlights
 
 This release focuses on **Cinema Mode Usability**, **Tag Management Stability**, and **Developer Experience**.
 

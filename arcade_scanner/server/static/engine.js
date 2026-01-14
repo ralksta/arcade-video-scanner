@@ -1,23 +1,67 @@
-let currentFilter = 'all';
-let currentCodec = 'all';
-let currentSort = 'bitrate';
-let currentLayout = 'grid'; // grid, list, or treemap
-let workspaceMode = 'lobby'; // lobby, mixed, vault
-let currentFolder = 'all';
-let minSizeMB = null;
-let maxSizeMB = null;
-let dateFilter = 'all'; // all, 1d, 7d, 30d
-let activeTags = []; // Array of tag names currently selected for filtering
-let filterUntaggedOnly = false;
-let availableTags = []; // Loaded from API
-let searchTerm = '';
-let activeSmartCollectionCriteria = null; // Stores current smart collection rules
-let activeCollectionId = null; // Stores currently active collection ID for UI highlighting
-let safeMode = localStorage.getItem('safe_mode') === 'true'; // Safe Mode State
+/**
+ * Application State - Grouped globals for better organization
+ * TODO: Future refactor should migrate these to a proper state management system
+ */
 
-let filteredVideos = [];
-let renderedCount = 0;
+// --- FILTER STATE ---
+const filterState = {
+    status: 'all',          // Status filter (all, HIGH, OK, optimized_files)
+    codec: 'all',           // Codec filter (all, h264, hevc, etc.)
+    folder: 'all',          // Folder filter
+    search: '',             // Search term
+    date: 'all',            // Date filter (all, 1d, 7d, 30d)
+    size: {
+        min: null,          // Min size in MB
+        max: null           // Max size in MB
+    },
+    tags: {
+        active: [],         // Array of tag names currently selected
+        untaggedOnly: false // Show only untagged items
+    }
+};
+
+// --- VIEW STATE ---
+const viewState = {
+    layout: 'grid',         // Current layout (grid, list, treemap)
+    workspace: 'lobby',     // Current workspace (lobby, mixed, vault, favorites, duplicates)
+    sort: 'bitrate'         // Sort order (bitrate, size, name, date)
+};
+
+// --- COLLECTION STATE ---
+const collectionState = {
+    activeId: null,         // Currently active collection ID for UI highlighting
+    activeCriteria: null    // Stores current smart collection filter rules
+};
+
+// --- UI STATE ---
+const uiState = {
+    safeMode: localStorage.getItem('safe_mode') === 'true',
+    renderedCount: 0
+};
+
+// --- DATA STATE ---
+let availableTags = [];     // Loaded from API
+let filteredVideos = [];    // Result of filter/sort
 const BATCH_SIZE = 40;
+
+// Legacy variable aliases for backward compatibility
+// These will be deprecated in future versions
+let currentFilter = filterState.status;
+let currentCodec = filterState.codec;
+let currentSort = viewState.sort;
+let currentLayout = viewState.layout;
+let workspaceMode = viewState.workspace;
+let currentFolder = filterState.folder;
+let minSizeMB = filterState.size.min;
+let maxSizeMB = filterState.size.max;
+let dateFilter = filterState.date;
+let activeTags = filterState.tags.active;
+let filterUntaggedOnly = filterState.tags.untaggedOnly;
+let searchTerm = filterState.search;
+let activeSmartCollectionCriteria = collectionState.activeCriteria;
+let activeCollectionId = collectionState.activeId;
+let safeMode = uiState.safeMode;
+let renderedCount = uiState.renderedCount;
 
 // --- GLOBAL AUTH INTERCEPTOR ---
 const originalFetch = window.fetch;
@@ -32,6 +76,11 @@ window.fetch = async function (...args) {
 };
 
 // --- THEME LOGIC ---
+
+/**
+ * Toggle between light and dark theme
+ * Persists preference to localStorage and updates theme icon
+ */
 function toggleTheme() {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
@@ -41,8 +90,14 @@ function toggleTheme() {
 }
 
 // --- SAFE MODE LOGIC ---
-// Safe Mode is now toggled via Settings modal
 
+/**
+ * Check if a video/image should be hidden in Safe Mode
+ * Checks against user-configured sensitive tags and directory paths
+ *
+ * @param {Object} video - Video object to check
+ * @returns {boolean} True if the video is considered sensitive
+ */
 function isSensitive(video) {
     if (!video) return false;
 
@@ -89,6 +144,11 @@ function isSensitive(video) {
 
 // --- DEBOUNCED SEARCH ---
 let searchTimeout;
+
+/**
+ * Handle search input with debouncing to prevent excessive filtering
+ * Waits 300ms after user stops typing before triggering filter
+ */
 function onSearchInput() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
@@ -105,6 +165,11 @@ function onSearchInput() {
 }
 
 // --- UI LOGIC ---
+
+/**
+ * Set the status filter and trigger re-filtering
+ * @param {string} f - Filter value ('all', 'HIGH', 'OK', 'optimized_files')
+ */
 function setFilter(f) {
     currentFilter = f;
     // Reset codec filter when showing all videos
@@ -115,26 +180,37 @@ function setFilter(f) {
     filterAndSort();
 }
 
+/**
+ * Set the codec filter and trigger re-filtering
+ * @param {string} c - Codec value ('all', 'h264', 'hevc', etc.)
+ */
 function setCodecFilter(c) {
     currentCodec = c;
     filterAndSort();
 }
 
-function setCodecFilter(c) {
-    currentCodec = c;
-    filterAndSort();
-}
-
+/**
+ * Set minimum file size filter
+ * @param {string|number|null} val - Minimum size in MB, or null to clear
+ */
 function setMinSize(val) {
     minSizeMB = val ? parseFloat(val) : null;
     filterAndSort();
 }
 
+/**
+ * Set maximum file size filter
+ * @param {string|number|null} val - Maximum size in MB, or null to clear
+ */
 function setMaxSize(val) {
     maxSizeMB = val ? parseFloat(val) : null;
     filterAndSort();
 }
 
+/**
+ * Set date filter for recently imported/modified files
+ * @param {string} val - Date filter ('all', '1d', '7d', '30d')
+ */
 function setDateFilter(val) {
     dateFilter = val;
     // Update active class
@@ -148,17 +224,27 @@ function setDateFilter(val) {
     filterAndSort();
 }
 
+/**
+ * Set sort order for the video list
+ * @param {string} s - Sort key ('bitrate', 'size', 'name', 'date')
+ */
 function setSort(s) {
     currentSort = s;
     filterAndSort();
 }
 
-// --- SEARCHABLE FOLDER DROPDOWN LOGIC ---
+// --- WORKSPACE & LAYOUT ---
 
-
+/**
+ * Switch between workspace modes (lobby, vault, favorites, duplicates, optimized)
+ * Updates UI theming, navigation highlights, and triggers appropriate filtering
+ *
+ * @param {string} mode - Workspace mode to activate
+ * @param {boolean} [preserveCollection=false] - If true, keeps active collection filter
+ */
 function setWorkspaceMode(mode, preserveCollection = false) {
     try {
-        console.log("Setting workspace mode:", mode);
+        // Debug: console.log("Setting workspace mode:", mode);
         workspaceMode = mode;
 
         // Clear active smart collection when changing workspace unless executing a collection load
@@ -241,11 +327,15 @@ function setWorkspaceMode(mode, preserveCollection = false) {
     }
 }
 
+/**
+ * Cycle through layout modes: grid -> list -> treemap -> grid
+ * Updates the toggle button icon to indicate the next mode
+ */
 function toggleLayout() {
     const modes = ['grid', 'list', 'treemap'];
     const icons = {
         grid: 'view_list',      // Shows what's NEXT
-        list: 'dashboard',      // Shows what's NEXT  
+        list: 'dashboard',      // Shows what's NEXT
         treemap: 'view_module'  // Shows what's NEXT
     };
 
@@ -260,6 +350,14 @@ function toggleLayout() {
     btn.innerHTML = `<span class="material-icons">${icons[nextMode]}</span>`;
 }
 
+/**
+ * Set the display layout mode
+ * Handles switching between grid, list, and treemap views with proper
+ * show/hide of relevant UI elements and animations
+ *
+ * @param {string} layout - Layout mode ('grid', 'list', 'treemap')
+ * @param {boolean} [skipURLUpdate=false] - If true, don't update browser URL
+ */
 function setLayout(layout, skipURLUpdate = false) {
     currentLayout = layout;
 
@@ -336,8 +434,11 @@ function setLayout(layout, skipURLUpdate = false) {
     }
 }
 
-// Update URL to reflect current state
-// Update URL to reflect current state
+/**
+ * Update browser URL to reflect current application state
+ * Enables deep linking and browser back/forward navigation
+ * Maps workspace modes to paths: /lobby, /favorites, /vault, /duplicates, /review
+ */
 function updateURL() {
     let path = '/';
 
@@ -372,7 +473,11 @@ function updateURL() {
     }
 }
 
-// Load state from URL on page load
+/**
+ * Initialize application state from current URL on page load
+ * Parses path and query params to restore workspace, layout, and collection filters
+ * Supports deep links to /favorites, /vault, /duplicates, /review, /treeview, /collections/*
+ */
 function loadFromURL() {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
@@ -428,6 +533,21 @@ function loadFromURL() {
 }
 
 // --- PERFORMANCE ENGINE: FILTER & SORT ---
+
+/**
+ * Main filtering and sorting pipeline for the video library
+ * Applies all active filters (status, codec, search, tags, size, date, workspace)
+ * and sorts the result according to the current sort order.
+ *
+ * @param {boolean} [scrollToTop=false] - Whether to scroll to top after filtering
+ *
+ * Flow:
+ * 1. If in 'optimized' workspace, finds original/optimized file pairs
+ * 2. Otherwise, filters ALL_VIDEOS based on all active criteria
+ * 3. Applies smart collection criteria if active
+ * 4. Sorts the filtered results
+ * 5. Updates UI counts and triggers re-render
+ */
 function filterAndSort(scrollToTop = false) {
     try {
         let vCount = 0; let tSize = 0;
@@ -483,92 +603,89 @@ function filterAndSort(scrollToTop = false) {
 
         } else {
             filteredVideos = window.ALL_VIDEOS.filter(v => {
-                // 0. Smart Collection Override
-                let matchesCollection = true;
-                if (activeSmartCollectionCriteria) {
-                    matchesCollection = evaluateCollectionMatch(v, activeSmartCollectionCriteria);
-                }
-
-                if (!matchesCollection) return false;
-
+                // Extract common values once
                 const name = v.FilePath.split(/[\\/]/).pop().toLowerCase();
-                const status = v.Status;
                 const codec = v.codec || 'unknown';
                 const isHidden = v.hidden || false;
                 const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
                 const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
                 const videoTags = v.tags || [];
 
-                // --- SAFE MODE CHECK ---
+                // --- EARLY RETURNS (fail fast) ---
+
+                // Smart Collection filter
+                if (activeSmartCollectionCriteria && !evaluateCollectionMatch(v, activeSmartCollectionCriteria)) {
+                    return false;
+                }
+
+                // Safe Mode filter
                 if (safeMode && isSensitive(v)) {
                     return false;
                 }
 
-                let matchesFilter = false;
-                if (currentFilter === 'all') matchesFilter = true;
-                else if (currentFilter === 'optimized_files') matchesFilter = v.FilePath.includes('_opt') || v.FilePath.includes('_trim');
-                else matchesFilter = (status === currentFilter);
+                // Workspace filter (lobby/vault/favorites)
+                if (workspaceMode === 'lobby' && isHidden) return false;
+                if (workspaceMode === 'vault' && !isHidden) return false;
+                if (workspaceMode === 'favorites' && !v.favorite) return false;
 
-                const matchesCodec = (currentCodec === 'all' || codec.includes(currentCodec));
-                const matchesSearch = name.includes(searchTerm) || v.FilePath.toLowerCase().includes(searchTerm);
-                const matchesFolder = (currentFolder === 'all' || folder === currentFolder);
+                // Status filter
+                if (currentFilter !== 'all') {
+                    if (currentFilter === 'optimized_files') {
+                        if (!v.FilePath.includes('_opt') && !v.FilePath.includes('_trim')) return false;
+                    } else if (v.Status !== currentFilter) {
+                        return false;
+                    }
+                }
 
-                let matchesWorkspace = true;
-                // Note: When in a Collection (activeSmartCollectionCriteria is set), 
-                // typically workspaceMode is still 'lobby' or whatever was active.
-                // Should collection override workspace mode rules? 
-                // User expects collection contents. Usually collections span the whole library (except hidden/vault)?
-                // Let's assume collection contents respect vault hiding unless collection specifically asks for hidden.
-                // EXISTING BEHAVIOR: standard workspace rules apply. 
+                // Codec filter
+                if (currentCodec !== 'all' && !codec.includes(currentCodec)) {
+                    return false;
+                }
 
-                if (workspaceMode === 'lobby') matchesWorkspace = !isHidden;
-                else if (workspaceMode === 'vault') matchesWorkspace = isHidden;
-                else if (workspaceMode === 'favorites') matchesWorkspace = v.favorite || false;
+                // Search filter
+                if (searchTerm && !name.includes(searchTerm) && !v.FilePath.toLowerCase().includes(searchTerm)) {
+                    return false;
+                }
 
-                // Size Filter
-                let matchesSize = true;
-                if (minSizeMB !== null && v.Size_MB < minSizeMB) matchesSize = false;
-                if (maxSizeMB !== null && v.Size_MB > maxSizeMB) matchesSize = false;
+                // Folder filter
+                if (currentFolder !== 'all' && folder !== currentFolder) {
+                    return false;
+                }
 
-                // Date Filter (Imported At or fallback to mtime)
-                let matchesDate = true;
+                // Size filter
+                if (minSizeMB !== null && v.Size_MB < minSizeMB) return false;
+                if (maxSizeMB !== null && v.Size_MB > maxSizeMB) return false;
+
+                // Date filter
                 if (dateFilter !== 'all') {
                     const now = Date.now() / 1000;
                     const fileTime = v.imported_at > 0 ? v.imported_at : (v.mtime || 0);
-                    const diff = now - fileTime;
-
-                    if (dateFilter === '1d' && diff > 86400) matchesDate = false;
-                    else if (dateFilter === '7d' && diff > 7 * 86400) matchesDate = false;
-                    else if (dateFilter === '30d' && diff > 30 * 86400) matchesDate = false;
+                    const ageSec = now - fileTime;
+                    const maxAge = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 }[dateFilter];
+                    if (maxAge && ageSec > maxAge) return false;
                 }
 
-                // Tag filtering with Tri-State support (Include vs Exclude)
-                let matchesTags = true;
-                if (activeTags.length > 0) {
+                // Tag filter (with tri-state include/exclude support)
+                if (filterUntaggedOnly) {
+                    if (videoTags.length > 0) return false;
+                } else if (activeTags.length > 0) {
                     const positiveTags = activeTags.filter(t => !t.startsWith('!'));
                     const negativeTags = activeTags.filter(t => t.startsWith('!')).map(t => t.substring(1));
 
                     // Must have ALL positive tags
-                    if (positiveTags.length > 0) {
-                        const hasAllPos = positiveTags.every(pt => videoTags.includes(pt));
-                        if (!hasAllPos) matchesTags = false;
+                    if (positiveTags.length > 0 && !positiveTags.every(pt => videoTags.includes(pt))) {
+                        return false;
                     }
-
                     // Must have NONE of the negative tags
-                    if (matchesTags && negativeTags.length > 0) {
-                        const hasAnyNeg = negativeTags.some(nt => videoTags.includes(nt));
-                        if (hasAnyNeg) matchesTags = false;
+                    if (negativeTags.length > 0 && negativeTags.some(nt => videoTags.includes(nt))) {
+                        return false;
                     }
                 }
 
-                // Untagged filter: show only videos with no tags
-                if (filterUntaggedOnly) {
-                    matchesTags = videoTags.length === 0;
-                }
-
-                const ok = matchesFilter && matchesCodec && matchesSearch && matchesWorkspace && matchesFolder && matchesTags && matchesSize && matchesDate;
-                if (ok) { vCount++; tSize += v.Size_MB; }
-                return ok;
+                // Passed all filters - count and include
+                vCount++;
+                tSize += v.Size_MB;
+                return true;
             });
         }
 
@@ -600,13 +717,18 @@ function filterAndSort(scrollToTop = false) {
     }
 }
 
-function formatSize(mb) {
-    if (mb > 1024 * 1024) return (mb / (1024 * 1024)).toFixed(2) + " TB";
-    if (mb > 1024) return (mb / 1024).toFixed(2) + " GB";
-    return mb.toFixed(0) + " MB";
-}
+// formatSize is now defined in formatters.js
+// This comment preserves the location for reference
 
 // --- PERFORMANCE ENGINE: INFINITE SCROLL ---
+
+/**
+ * Main render function that manages the video grid/list display
+ * Uses batch rendering for performance with large libraries
+ *
+ * @param {boolean} reset - If true, clears existing content and starts fresh
+ * @param {boolean} [scrollToTop=false] - If true, scrolls viewport to top
+ */
 function renderUI(reset, scrollToTop = false) {
     // If in treemap mode, re-render treemap instead
     if (currentLayout === 'treemap') {
@@ -627,6 +749,11 @@ function renderUI(reset, scrollToTop = false) {
     renderNextBatch();
 }
 
+/**
+ * Render the next batch of video cards using document fragment for performance
+ * Called by IntersectionObserver when user scrolls near the bottom
+ * Uses BATCH_SIZE constant to limit DOM operations per call
+ */
 function renderNextBatch() {
     if (renderedCount >= filteredVideos.length) {
         document.getElementById('loadingSentinel').style.opacity = '0';
@@ -657,6 +784,15 @@ function renderNextBatch() {
     }
 }
 
+/**
+ * Create a side-by-side comparison card for original vs optimized video pairs
+ * Used in the 'optimized' workspace to help users decide which version to keep
+ *
+ * @param {Object} pair - Object containing original and optimized video data
+ * @param {Object} pair.original - Original video metadata
+ * @param {Object} pair.optimized - Optimized video metadata
+ * @returns {HTMLElement} DOM element for the comparison card
+ */
 function createComparisonCard(pair) {
     const orig = pair.original;
     const opt = pair.optimized;
@@ -673,9 +809,8 @@ function createComparisonCard(pair) {
     // Explicitly set grid span here, though class handles it usually, but existing grid logic might override without it if it was inline style before
     container.style.gridColumn = "span 2";
 
-    // Format Display Stats
-    const formatSize = (mb) => mb.toFixed(1) + " MB";
-    const formatBitrate = (mbps) => mbps.toFixed(1) + " Mbps";
+    // Use shared formatters from formatters.js
+    // formatSizeCompact and formatBitrate are available globally
 
     container.innerHTML = `
         <!-- Original Column -->
@@ -690,7 +825,7 @@ function createComparisonCard(pair) {
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
                  </div>
-                 <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/80 text-white font-mono font-bold backdrop-blur">${formatSize(orig.Size_MB)}</span>
+                 <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/80 text-white font-mono font-bold backdrop-blur">${formatSizeCompact(orig.Size_MB)}</span>
             </div>
             
             <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
@@ -729,7 +864,7 @@ function createComparisonCard(pair) {
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
                  </div>
-                 <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-arcade-cyan/20 text-arcade-cyan font-mono font-bold backdrop-blur border border-arcade-cyan/30">${formatSize(opt.Size_MB)}</span>
+                 <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-arcade-cyan/20 text-arcade-cyan font-mono font-bold backdrop-blur border border-arcade-cyan/30">${formatSizeCompact(opt.Size_MB)}</span>
             </div>
             
             <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
@@ -752,11 +887,18 @@ function createComparisonCard(pair) {
 function keepOptimized(orig, opt) {
     if (!confirm("Replace original with optimized version? This cannot be undone.")) return;
     fetch(`/api/keep_optimized?original=${orig}&optimized=${opt}`)
-        .then(() => {
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             // Remove from view
             setTimeout(() => {
                 location.reload(); // Simplest way to refresh state
             }, 500);
+        })
+        .catch(err => {
+            console.error('keepOptimized error:', err);
+            alert('Failed to keep optimized file: ' + err.message);
         });
 }
 
@@ -770,15 +912,26 @@ function discardOptimized(opt) {
         });
 }
 
-// Helper for duration formatting
-function formatDuration(seconds) {
-    if (!seconds) return '';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `${m}:${s.toString().padStart(2, '0')}`;
-}
+// formatDuration is now defined in formatters.js
+// This comment preserves the location for reference
 
+/**
+ * Create a video/image card element for the grid or list view
+ * Includes thumbnail, metadata badges, action buttons, and tag display
+ *
+ * @param {Object} v - Video/image metadata object
+ * @param {string} v.FilePath - Full path to the file
+ * @param {number} v.Size_MB - File size in megabytes
+ * @param {number} v.Bitrate_Mbps - Video bitrate in Mbps
+ * @param {string} v.Status - Quality status ('HIGH' or 'OK')
+ * @param {string} v.codec - Video codec name
+ * @param {string} v.thumb - Thumbnail filename
+ * @param {string} [v.media_type] - Type of media ('video' or 'image')
+ * @param {boolean} [v.favorite] - Whether item is favorited
+ * @param {boolean} [v.hidden] - Whether item is in vault
+ * @param {string[]} [v.tags] - Array of tag names
+ * @returns {HTMLElement} DOM element for the video card
+ */
 function createVideoCard(v) {
     const container = document.createElement('div');
     // Using utility classes for the card wrapper
@@ -889,7 +1042,14 @@ const scrollObserver = new IntersectionObserver((entries) => {
 }, { rootMargin: '400px' });
 scrollObserver.observe(sentinel);
 
-// --- ACTIONS ---
+// --- CARD ACTIONS ---
+
+/**
+ * Toggle hidden/vault state for a video card
+ * Updates local state, sends to server, and animates card out if no longer visible
+ *
+ * @param {HTMLElement} card - The video card container element
+ */
 function toggleHidden(card) {
     const path = card.getAttribute('data-path');
     const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
@@ -916,6 +1076,12 @@ function toggleHidden(card) {
     }
 }
 
+/**
+ * Toggle favorite state for a video card
+ * Updates local state, sends to server, and updates star icon
+ *
+ * @param {HTMLElement} card - The video card container element
+ */
 function toggleFavorite(card) {
     const path = card.getAttribute('data-path');
     const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
@@ -934,7 +1100,7 @@ function toggleFavorite(card) {
     } else {
         starBtn.classList.remove('active');
         starIcon.innerText = 'star_border';
-        starBtn.title = 'Zu Favoriten hinzufügen';
+        starBtn.title = 'Add to Favorites';
     }
 
     if (workspaceMode === 'favorites' && !video.favorite) {
@@ -949,6 +1115,12 @@ function toggleFavorite(card) {
     }
 }
 
+/**
+ * Set favorite state for all selected videos
+ * Batch operation that updates multiple items at once
+ *
+ * @param {boolean} state - True to favorite, false to unfavorite
+ */
 function triggerBatchFavorite(state) {
     const selected = document.querySelectorAll('.video-card-container input[type="checkbox"]:checked');
     if (selected.length === 0) return;
@@ -977,7 +1149,7 @@ function triggerBatchFavorite(state) {
         } else {
             starBtn.classList.remove('active');
             starIcon.innerText = 'star_border';
-            starBtn.title = 'Zu Favoriten hinzufügen';
+            starBtn.title = 'Add to Favorites';
         }
     });
 
@@ -987,414 +1159,18 @@ function triggerBatchFavorite(state) {
     }
 }
 
-
-
-// --- CINEMA ---
-// --- CINEMA (VIDEO PLAYER) ---
-let currentCinemaPath = null;
-let currentCinemaVideo = null;
-
-function openCinema(container) {
-    // 1. Try to find path on the clicked container itself (for specific video overrrides)
-    let path = container.getAttribute('data-path');
-
-    // 2. If not found, fall back to the main card container (default behavior)
-    if (!path) {
-        const card = container.closest('.video-card-container');
-        if (card) path = card.getAttribute('data-path');
-    }
-
-    if (!path) return;
-
-    const fileName = path.split(/[\\\/]/).pop();
-
-    currentCinemaPath = path; // Store for action buttons
-
-    // Find the video object from allVideos
-    currentCinemaVideo = window.ALL_VIDEOS.find(v => v.FilePath === path);
-
-    const modal = document.getElementById('cinemaModal');
-    const video = document.getElementById('cinemaVideo');
-    const image = document.getElementById('cinemaImage');
-    document.getElementById('cinemaTitle').innerText = fileName;
-
-    const streamUrl = `/stream?path=` + encodeURIComponent(path);
-
-    // Check if this is an image
-    if (currentCinemaVideo && currentCinemaVideo.media_type === 'image') {
-        // IMAGE MODE
-        video.classList.add('hidden');
-        video.pause();
-        video.src = '';
-
-        if (image) {
-            image.classList.remove('hidden');
-            image.src = streamUrl;
-        }
-    } else {
-        // VIDEO MODE
-        if (image) {
-            image.classList.add('hidden');
-            image.src = '';
-        }
-        video.classList.remove('hidden');
-
-        video.src = streamUrl;
-        video.load();
-        video.play().catch(() => {
-            video.muted = true;
-            video.play();
-        });
-    }
-
-    modal.classList.add('active');
-
-    // Update button states
-    updateCinemaButtons();
-
-    // Populate info panel
-    updateCinemaInfo();
-
-    // Populate tag picker
-    updateCinemaTags();
-
-    // Force focus handling for ESC
-    // Use capturing phase to ensure we catch it before video element swallows it
-    // Force focus handling for ESC
-    // Use capturing phase to ensure we catch it before video element swallows it
-    window.addEventListener('keydown', cinemaKeyHandler, true);
-
-    // Also try to focus the modal container to steal focus from video initially
-    if (modal) {
-        modal.tabIndex = -1;
-        modal.focus();
-    }
-}
-
-function cinemaKeyHandler(e) {
-    // Skip if typing in an input field
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-    const key = e.key.toLowerCase();
-
-    if (e.key === 'Escape') {
-        console.log('ESC pressed in cinema mode (captured)');
-        e.preventDefault();
-        e.stopPropagation();
-        closeCinema();
-    } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        navigateCinema(-1);
-    } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        navigateCinema(1);
-    } else if (key === 'f') {
-        // F = Favorite
-        e.preventDefault();
-        if (currentCinemaPath) {
-            cinemaFavorite();
-            showCinemaToast('Favorite toggled');
-        }
-    } else if (key === 'v') {
-        // V = Vault
-        e.preventDefault();
-        if (currentCinemaPath) {
-            cinemaVault();
-            showCinemaToast('Moved to Vault');
-        }
-    } else {
-        // Check custom tag shortcuts (A-Z except reserved)
-        const reservedKeys = ['f', 'v', ' ', 'escape', 'arrowleft', 'arrowright'];
-        if (key.length === 1 && /[a-z]/i.test(key) && !reservedKeys.includes(key)) {
-            const availableTags = window.userSettings?.available_tags || [];
-            const matchingTag = availableTags.find(t =>
-                t.shortcut && t.shortcut.toLowerCase() === key
-            );
-            if (matchingTag && currentCinemaPath) {
-                e.preventDefault();
-                toggleCinemaTag(matchingTag.name);
-                showCinemaToast(`Tag: ${matchingTag.name}`);
-            }
-        }
-    }
-}
-
-function showCinemaToast(message) {
-    // Remove existing toast
-    let toast = document.getElementById('cinemaToast');
-    if (toast) toast.remove();
-
-    toast = document.createElement('div');
-    toast.id = 'cinemaToast';
-    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 text-white rounded-lg backdrop-blur border border-white/20 text-sm font-medium z-[10001] animate-fade-in';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-
-    setTimeout(() => toast.remove(), 1500);
-}
-
-async function toggleCinemaTag(tagName) {
-    if (!currentCinemaPath) return;
-
-    // Get current tags for this file
-    const response = await fetch(`/api/video/tags?path=${encodeURIComponent(currentCinemaPath)}`);
-    const data = await response.json();
-    const currentTags = data.tags || [];
-
-    // Toggle the tag
-    const hasTag = currentTags.includes(tagName);
-    const method = hasTag ? 'DELETE' : 'POST';
-
-    await fetch(`/api/tags?path=${encodeURIComponent(currentCinemaPath)}&tag=${encodeURIComponent(tagName)}`, {
-        method: method
-    });
-}
-
-function navigateCinema(direction) {
-    if (!currentCinemaPath) return;
-
-    // Find current index in filteredVideos
-    const currentIndex = filteredVideos.findIndex(v => v.FilePath === currentCinemaPath);
-    if (currentIndex === -1) return;
-
-    // Calculate new index with wrap-around
-    let newIndex = currentIndex + direction;
-    if (newIndex < 0) newIndex = filteredVideos.length - 1;
-    if (newIndex >= filteredVideos.length) newIndex = 0;
-
-    // Get the new video and open it
-    const newVideo = filteredVideos[newIndex];
-    if (newVideo) {
-        // IMPORTANT: Clean up current streams to avoid file handle leak
-        const video = document.getElementById('cinemaVideo');
-        const image = document.getElementById('cinemaImage');
-        if (video) {
-            video.pause();
-            video.src = '';
-            video.load(); // Force release of network resources
-        }
-        if (image) {
-            image.src = '';
-        }
-
-        // Create a dummy container-like object with the path
-        const dummyContainer = document.createElement('div');
-        dummyContainer.setAttribute('data-path', newVideo.FilePath);
-        openCinema(dummyContainer);
-    }
-}
-
-function closeCinema() {
-
-    // Remove the special handler
-    window.removeEventListener('keydown', cinemaKeyHandler, true);
-
-    const modal = document.getElementById('cinemaModal');
-    const video = document.getElementById('cinemaVideo');
-    const image = document.getElementById('cinemaImage');
-    const infoPanel = document.getElementById('cinemaInfoPanel');
-    const tagPanel = document.getElementById('cinemaTagPanel');
-
-    modal.classList.remove('active');
-    infoPanel.classList.remove('active');
-    if (tagPanel) tagPanel.classList.add('hidden');
-
-    video.pause();
-    video.src = '';
-
-    // Reset image as well
-    if (image) {
-        image.src = '';
-        image.classList.add('hidden');
-    }
-
-    currentCinemaPath = null;
-    currentCinemaVideo = null;
-}
-
-function toggleCinemaInfo() {
-    const panel = document.getElementById('cinemaInfoPanel');
-    panel.classList.toggle('active');
-}
-
-function updateCinemaInfo() {
-    if (!currentCinemaVideo) {
-        console.log('No currentCinemaVideo set');
-        return;
-    }
-
-    const v = currentCinemaVideo;
-    const content = document.getElementById('cinemaInfoContent');
-
-    if (!content) {
-        console.log('cinemaInfoContent element not found');
-        return;
-    }
-
-    console.log('Updating cinema info for:', v.FilePath);
-
-    // Format duration
-    const formatDuration = (seconds) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = Math.floor(seconds % 60);
-        return h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
-    };
-
-    // Format file size
-    const formatSize = (mb) => {
-        return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(2)} MB`;
-    };
-
-    // Different info for images vs videos
-    if (v.media_type === 'image') {
-        content.innerHTML = `
-            <div class="info-row">
-                <span class="info-label">Type</span>
-                <span class="info-value">Image (${(v.Container || v.FilePath.split('.').pop()).toUpperCase()})</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Resolution</span>
-                <span class="info-value">${v.Width || '?'} × ${v.Height || '?'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">File Size</span>
-                <span class="info-value">${formatSize(v.Size_MB)}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Status</span>
-                <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
-            </div>
-        `;
-    } else {
-        content.innerHTML = `
-            <div class="info-row">
-                <span class="info-label">Format</span>
-                <span class="info-value">${v.Container || 'unknown'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Resolution</span>
-                <span class="info-value">${v.Width} × ${v.Height}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Duration</span>
-                <span class="info-value">${formatDuration(v.Duration_Sec)}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Frame Rate</span>
-                <span class="info-value">${v.FrameRate || '?'} fps</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Video Codec</span>
-                <span class="info-value">${v.codec} ${(v.Profile) ? `(${v.Profile})` : ''}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Pixel Format</span>
-                <span class="info-value">${v.PixelFormat || '-'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Audio Codec</span>
-                <span class="info-value">${v.AudioCodec || '-'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Channels</span>
-                <span class="info-value">${v.AudioChannels || '-'}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Bitrate</span>
-                <span class="info-value">${((v.Bitrate_Mbps || 0) * 1000).toLocaleString()} kbps</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">File Size</span>
-                <span class="info-value">${formatSize(v.Size_MB)}</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Status</span>
-                <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
-            </div>
-        `;
-    }
-
-    console.log('Cinema info updated successfully');
-}
-
-function updateCinemaButtons() {
-    if (!currentCinemaVideo) return;
-
-    // Update Favorite button
-    const favBtn = document.querySelector('.cinema-action-btn[onclick="cinemaFavorite()"]');
-    if (favBtn) {
-        if (currentCinemaVideo.favorite) {
-            favBtn.style.opacity = '0.6';
-            favBtn.title = 'Already a Favorite';
-        } else {
-            favBtn.style.opacity = '1';
-            favBtn.title = 'Add to Favorites';
-        }
-    }
-
-    // Update Vault button
-    const vaultBtn = document.querySelector('.cinema-action-btn[onclick="cinemaVault()"]');
-    if (vaultBtn) {
-        if (currentCinemaVideo.hidden) {
-            vaultBtn.style.opacity = '0.6';
-            vaultBtn.title = 'Already in Vault';
-        } else {
-            vaultBtn.style.opacity = '1';
-            vaultBtn.title = 'Move to Vault';
-        }
-    }
-}
-
-function cinemaFavorite() {
-    if (!currentCinemaPath || !currentCinemaVideo) return;
-
-    // Toggle favorite state
-    const newState = !currentCinemaVideo.favorite;
-
-    fetch(`/favorite?path=` + encodeURIComponent(currentCinemaPath) + `&state=${newState}`)
-        .then(() => {
-            // Update local video object
-            currentCinemaVideo.favorite = newState;
-
-            // Update in ALL_VIDEOS array
-            const videoInArray = window.ALL_VIDEOS.find(v => v.FilePath === currentCinemaPath);
-            if (videoInArray) {
-                videoInArray.favorite = newState;
-            }
-
-            // Update button appearance
-            updateCinemaButtons();
-
-            // Re-filter and re-render the grid (this updates the favorites view)
-            filterAndSort();
-        });
-}
-
-function cinemaVault() {
-    if (!currentCinemaPath) return;
-
-    fetch(`/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`)
-        .then(() => {
-            closeCinema();
-            location.reload(); // Refresh to update UI
-        });
-}
-
-function cinemaLocate() {
-    if (!currentCinemaPath) return;
-    revealInFinder(currentCinemaPath);
-}
-
-function cinemaOptimize() {
-    if (!currentCinemaPath) return;
-    window.open(`/compress?path=` + encodeURIComponent(currentCinemaPath), 'h_frame');
-}
-// ESC handler moved to setupTreemapInteraction section
-
-// --- BATCH ---
+// --- CINEMA MODULE ---
+// Cinema functionality has been extracted to cinema.js
+// Functions available: openCinema, closeCinema, navigateCinema, cinemaFavorite,
+// cinemaVault, cinemaLocate, toggleCinemaInfo, toggleCinemaTagPanel, toggleCinemaTag
+
+// --- BATCH OPERATIONS ---
 const BATCH_MIN_SIZE_MB = 50; // Files smaller than this are skipped by optimizer
 
+/**
+ * Update the batch action bar UI based on current selection
+ * Shows/hides the bar and updates count display including skip warnings
+ */
 function updateBatchSelection() {
     const selectedCheckboxes = document.querySelectorAll('.video-card-container input:checked');
     const count = selectedCheckboxes.length;
@@ -1450,6 +1226,9 @@ function updateBatchSelection() {
 }
 
 
+/**
+ * Clear all checkbox selections and update the batch bar
+ */
 function clearSelection() {
     document.querySelectorAll('.video-card-container input:checked').forEach(i => i.checked = false);
     updateBatchSelection();
@@ -1458,6 +1237,13 @@ function clearSelection() {
 // --- BATCH SELECTION HELPERS ---
 let lastCheckedPath = null;
 
+/**
+ * Handle checkbox toggle with shift-click range selection support
+ *
+ * @param {HTMLInputElement} checkbox - The checkbox element
+ * @param {MouseEvent} event - Click event to check for shift key
+ * @param {string} path - File path of the video
+ */
 function toggleSelection(checkbox, event, path) {
     if (event.shiftKey && lastCheckedPath) {
         // Shift+Click Logic
@@ -1494,6 +1280,9 @@ function toggleSelection(checkbox, event, path) {
     updateBatchSelection();
 }
 
+/**
+ * Select all videos currently visible in the filtered list
+ */
 function selectAllVisible() {
     // Select all videos in the current filtered list
     filteredVideos.forEach(video => {
@@ -1506,6 +1295,11 @@ function selectAllVisible() {
     updateBatchSelection();
 }
 
+/**
+ * Set hidden/vault state for all selected videos
+ *
+ * @param {boolean} state - True to hide (move to vault), false to restore
+ */
 function triggerBatchHide(state) {
     const selected = document.querySelectorAll('.video-card-container input:checked');
     const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
@@ -1521,6 +1315,11 @@ function triggerBatchHide(state) {
     clearSelection();
 }
 
+/**
+ * Start batch compression for all selected videos
+ * Filters out files under BATCH_MIN_SIZE_MB and shows confirmation dialog
+ * with details about which files will be processed vs skipped
+ */
 function triggerBatchCompress() {
     const selected = document.querySelectorAll('.video-card-container input:checked');
     const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
@@ -1933,22 +1732,37 @@ async function applyBatchTags() {
     const removedStr = tagsToRemove.length > 0 ? `- ${tagsToRemove.join(', ')} ` : '';
     console.log(`✅ Updated ${successCount}/${paths.length} videos: ${addedStr} ${removedStr}`.trim());
 }
+
 // --- FOLDER SIDEBAR ---
+
+/**
+ * Toggle the folder sidebar visibility
+ */
 function toggleFolderSidebar() {
     document.getElementById('folderSidebar').classList.toggle('active');
     renderFolderSidebar();
 }
 
+/**
+ * Set the folder filter to show only videos from a specific directory
+ * @param {string} folder - Folder path or 'all' for no filter
+ */
 function setFolderFilter(folder) {
     currentFolder = folder;
     filterAndSort();
     renderFolderSidebar();
 }
 
+/**
+ * Initial render call for folder sidebar
+ */
 function initialRender() {
     renderFolderSidebar();
 }
 
+/**
+ * Render the folder sidebar with folder list sorted by size
+ */
 function renderFolderSidebar() {
     const list = document.getElementById('folderList');
     if (!list.parentElement.classList.contains('active')) return;
@@ -1984,6 +1798,9 @@ function renderFolderSidebar() {
     });
 }
 
+/**
+ * Reset all filters and return to default dashboard view
+ */
 function resetDashboard() {
     currentFilter = 'all';
     currentCodec = 'all';
@@ -2007,11 +1824,19 @@ function resetDashboard() {
 let treemapCurrentFolder = null; // null = show all folders, string = show files in that folder
 let treemapUseLog = false; // Log scale toggle
 
+/**
+ * Toggle between linear and logarithmic scale for treemap sizing
+ */
 function toggleTreemapScale() {
     treemapUseLog = document.getElementById('treemapLogToggle').checked;
     renderTreemap();
 }
 
+/**
+ * Render the treemap visualization
+ * Shows either folder view (all folders) or file view (files in selected folder)
+ * Uses canvas for efficient rendering of potentially thousands of items
+ */
 function renderTreemap() {
     const container = document.getElementById('treemapContainer');
     if (!container) return;
@@ -2696,7 +2521,7 @@ async function loadSettings() {
                 if (locateBtn) locateBtn.style.display = 'none';
             }
 
-            console.log("Settings loaded:", window.userSettings);
+            // Settings loaded successfully
 
             // Check for deep links (e.g., /collections/Name)
             checkDeepLinks();
@@ -2716,7 +2541,7 @@ function checkDeepLinks() {
         const collection = collections.find(c => c.name === name);
 
         if (collection) {
-            console.log("Deep link to collection:", collection.name);
+            // Deep link to collection
             applyCollection(collection.id);
         } else {
             console.warn("Deep link collection not found:", name);
@@ -2904,7 +2729,11 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Toast Notification Helper
+/**
+ * Show a toast notification message
+ * @param {string} message - Message to display
+ * @param {string} [type='info'] - Toast type ('info', 'success', 'error')
+ */
 function showToast(message, type = 'info') {
     // Remove existing toast if any
     const existingToast = document.querySelector('.settings-toast');
@@ -2935,6 +2764,11 @@ function showToast(message, type = 'info') {
 // --- HIDDEN PATH MODAL ---
 let currentHiddenPath = '';
 
+/**
+ * Show modal with path info when file is in a hidden folder
+ * Provides copy-to-clipboard functionality as an alternative to reveal
+ * @param {string} path - Full path to the file
+ */
 function showHiddenPathModal(path) {
     currentHiddenPath = path;
     const modal = document.getElementById('hiddenPathModal');
@@ -2952,12 +2786,18 @@ function showHiddenPathModal(path) {
     }
 }
 
+/**
+ * Close the hidden path modal
+ */
 function closeHiddenPathModal() {
     const modal = document.getElementById('hiddenPathModal');
     if (modal) modal.classList.remove('active');
     currentHiddenPath = '';
 }
 
+/**
+ * Copy the current hidden path to clipboard
+ */
 async function copyHiddenPath() {
     if (!currentHiddenPath) return;
 
@@ -2980,7 +2820,11 @@ async function copyHiddenPath() {
     }
 }
 
-// Smart reveal function that handles hidden folders
+/**
+ * Reveal a file in the system file browser (Finder/Explorer)
+ * Handles hidden folders by showing a modal with the path instead
+ * @param {string} path - Full path to reveal
+ */
 async function revealInFinder(path) {
     try {
         const response = await fetch(`/reveal?path=${encodeURIComponent(path)}`);
@@ -3009,6 +2853,11 @@ async function revealInFinder(path) {
 }
 
 // --- RESCAN ---
+
+/**
+ * Trigger a full library rescan
+ * Shows loading state and reloads page when complete
+ */
 function rescanLibrary() {
     const btn = document.getElementById('refreshBtn');
     const originalContent = btn.innerHTML;
@@ -3022,13 +2871,12 @@ function rescanLibrary() {
             if (response.ok) return response.json();
             throw new Error('Scan failed');
         })
-        .then(data => {
-            console.log('Rescan complete', data);
+        .then(() => {
             location.reload();
         })
         .catch(e => {
             console.error(e);
-            alert('Fehler beim Scannen: ' + e.message);
+            alert('Scan error: ' + e.message);
             btn.innerHTML = originalContent;
             btn.style.pointerEvents = 'auto';
             document.body.style.opacity = '1';
@@ -3059,7 +2907,7 @@ function renderSavedViews() {
 }
 
 function saveCurrentView() {
-    const name = prompt("Name für diese Ansicht:", "");
+    const name = prompt("Name for this view:", "");
     if (!name) return;
 
     if (!userSettings.saved_views) userSettings.saved_views = [];
@@ -3109,9 +2957,14 @@ function loadView(id) {
     updateURL();
 }
 
+/**
+ * Delete a saved view
+ * @param {string} id - View ID to delete
+ * @param {Event} [event] - Click event to stop propagation
+ */
 function deleteView(id, event) {
     if (event) event.stopPropagation();
-    if (!confirm("Ansicht löschen?")) return;
+    if (!confirm("Delete this view?")) return;
 
     if (userSettings.saved_views) {
         userSettings.saved_views = userSettings.saved_views.filter(v => v.id !== id);
@@ -3120,7 +2973,10 @@ function deleteView(id, event) {
     }
 }
 
-// reusing the logic from closeSettings but without closing UI
+/**
+ * Save current settings to server without closing UI or reloading
+ * Used for background saves (views, collections, etc.)
+ */
 function saveSettingsWithoutReload() {
     fetch(`/api/settings`, {
         method: 'POST',
@@ -3128,1150 +2984,25 @@ function saveSettingsWithoutReload() {
         body: JSON.stringify(userSettings)
     }).then(r => r.json()).then(data => {
         if (data.success) {
-            console.log("Settings saved (views)");
+            // Views saved
         }
     });
 }
 
-// --- SMART COLLECTIONS ---
-let editingCollectionId = null;
-let collectionCriteria = {
-    status: 'all',
-    codec: 'all',
-    tags: [],
-    search: ''
-};
+// --- SMART COLLECTIONS MODULE ---
+// Smart Collections functionality has been extracted to collections.js
+// Functions available: openCollectionModal, closeCollectionModal, saveCollection,
+// deleteCurrentCollection, applyCollection, renderCollections, evaluateCollectionMatch,
+// getDefaultCollectionCriteria, toggleFilterAccordion, and related UI functions
 
-// DEBUG FUNCTION
-window.runDeepDebug = function () {
-    console.log('🔍 --- DEEP DEBUG START ---');
-    console.log('Criteria:', JSON.parse(JSON.stringify(collectionCriteriaNew)));
-
-    const all = window.ALL_VIDEOS || [];
-    console.log(`Total Videos: ${all.length}`);
-
-    // Check favorites specifically
-    const favs = all.filter(v => v.favorite || v.Favorite || v.isFavorite || v.IsFavorite);
-    console.log(`Expected Favorites Count: ${favs.length}`);
-
-    if (favs.length > 0) {
-        console.log('Sample Favorite Video:', favs[0]);
-        console.log('Sample Favorite Keys:', Object.keys(favs[0]));
-
-        // Test evaluation on sample
-        const match = evaluateCollectionMatch(favs[0], collectionCriteriaNew);
-        console.log('Does sample match current criteria?', match);
-    } else {
-        console.warn('⚠️ NO FAVORITES FOUND IN ALL_VIDEOS!');
-    }
-    console.log('🔍 --- DEEP DEBUG END ---');
-    alert('Debug info logged to console! Please check output.');
-};
-
-function openCollectionModal(editId = null) {
-    const modal = document.getElementById('collectionModal');
-    if (!modal) return;
-
-    editingCollectionId = editId;
-
-    // Reset form
-    document.getElementById('collectionName').value = '';
-    document.getElementById('collectionSearch').value = '';
-    document.getElementById('collectionDateFilter').value = 'all';
-    document.getElementById('collectionMinSize').value = '';
-    document.getElementById('collectionMaxSize').value = '';
-    document.getElementById('collectionColor').value = '#64FFDA';
-    document.getElementById('collectionColorBtn').style.backgroundColor = '#64FFDA';
-    document.getElementById('selectedCollectionIcon').innerText = 'folder_special';
-
-    // Initialize new criteria schema
-    collectionCriteriaNew = getDefaultCollectionCriteria();
-
-    // Also reset legacy for backward compat
-    collectionCriteria = { status: 'all', codec: 'all', tags: [], search: '' };
-
-    // Update UI title
-    document.getElementById('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
-    document.getElementById('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
-
-    // If editing, load existing data
-    if (editId) {
-        const existing = (userSettings.smart_collections || []).find(c => c.id === editId);
-        if (existing) {
-            document.getElementById('collectionName').value = existing.name || '';
-            document.getElementById('collectionSearch').value = existing.criteria?.search || '';
-
-            // Populate New Fields
-            document.getElementById('collectionDateFilter').value = existing.criteria?.date || 'all';
-            document.getElementById('collectionMinSize').value = existing.criteria?.size?.min || '';
-            document.getElementById('collectionMaxSize').value = existing.criteria?.size?.max || '';
-
-            document.getElementById('collectionColor').value = existing.color || '#64FFDA';
-            document.getElementById('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
-            document.getElementById('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
-
-            // Check if using new schema
-            if (existing.criteria?.include || existing.criteria?.exclude) {
-                // Deep copy the criteria
-                collectionCriteriaNew = JSON.parse(JSON.stringify(existing.criteria));
-            } else {
-                // Convert legacy schema to new
-                collectionCriteriaNew = getDefaultCollectionCriteria();
-                if (existing.criteria?.status && existing.criteria.status !== 'all') {
-                    collectionCriteriaNew.include.status = [existing.criteria.status];
-                }
-                if (existing.criteria?.codec && existing.criteria.codec !== 'all') {
-                    collectionCriteriaNew.include.codec = [existing.criteria.codec];
-                }
-                if (existing.criteria?.tags) {
-                    collectionCriteriaNew.include.tags = [...existing.criteria.tags];
-                }
-                collectionCriteriaNew.search = existing.criteria?.search || '';
-
-                // Preserve new fields if they were mixed in (Migration fix)
-                if (existing.criteria?.size) collectionCriteriaNew.size = existing.criteria.size;
-                if (existing.criteria?.date) collectionCriteriaNew.date = existing.criteria.date;
-                if (existing.criteria?.duration) collectionCriteriaNew.duration = existing.criteria.duration;
-                if (existing.criteria?.favorites) collectionCriteriaNew.favorites = existing.criteria.favorites;
-            }
-        }
-    }
-
-    // Populate and sync category dropdown
-    populateCategoryDropdown(editId ? (userSettings.smart_collections || []).find(c => c.id === editId)?.category : null);
-    // Reset new category input state
-    document.getElementById('newCategoryInput')?.classList.add('hidden');
-    document.getElementById('collectionCategory')?.classList.remove('hidden');
-
-    // Sync UI with new criteria
-    syncSmartCollectionUI();
-
-    // Reset accordion sections to collapsed state
-    const propertiesPanel = document.getElementById('propertiesPanel');
-    const metadataPanel = document.getElementById('metadataPanel');
-    const propertiesChevron = document.getElementById('propertiesChevron');
-    const metadataChevron = document.getElementById('metadataChevron');
-
-    if (propertiesPanel) {
-        propertiesPanel.classList.add('hidden');
-        if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
-    }
-    if (metadataPanel) {
-        metadataPanel.classList.add('hidden');
-        if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
-    }
-
-    // Update badge counts for sections
-    updateAllFilterBadges();
-
-    modal.classList.add('active');
-}
-
-function closeCollectionModal() {
-    const modal = document.getElementById('collectionModal');
-    if (modal) modal.classList.remove('active');
-    editingCollectionId = null;
-    document.getElementById('collectionIconPicker')?.classList.add('hidden');
-    document.getElementById('collectionColorPicker')?.classList.add('hidden');
-}
-
-// Accordion toggle for Smart Collection filter sections
-function toggleFilterAccordion(sectionName) {
-    const panel = document.getElementById(`${sectionName}Panel`);
-    const chevron = document.getElementById(`${sectionName}Chevron`);
-    const button = chevron?.closest('button');
-
-    if (!panel || !chevron) return;
-
-    if (panel.classList.contains('hidden')) {
-        // Open this section
-        panel.classList.remove('hidden');
-        chevron.style.transform = 'rotate(180deg)';
-        button?.setAttribute('aria-expanded', 'true');
-    } else {
-        // Close this section
-        panel.classList.add('hidden');
-        chevron.style.transform = 'rotate(0deg)';
-        button?.setAttribute('aria-expanded', 'false');
-    }
-}
-
-// Update badge count for a filter section
-function updateFilterSectionBadge(sectionName) {
-    const badge = document.getElementById(`${sectionName}Badge`);
-    const panel = document.getElementById(`${sectionName}Panel`);
-
-    if (!badge || !panel) return;
-
-    // Count active filter chips in this section
-    const activeFilters = panel.querySelectorAll('.filter-chip.active:not([data-filter="favorites"][data-value="null"]), .filter-chip.exclude').length;
-
-    // Check for non-default values in inputs/selects
-    let additionalFilters = 0;
-
-    if (sectionName === 'metadata') {
-        const dateFilter = document.getElementById('collectionDateFilter');
-        if (dateFilter && dateFilter.value !== 'all') additionalFilters++;
-
-        const minSize = document.getElementById('collectionMinSize');
-        const maxSize = document.getElementById('collectionMaxSize');
-        if ((minSize && minSize.value) || (maxSize && maxSize.value)) additionalFilters++;
-
-        const searchTerm = document.getElementById('collectionSearch');
-        if (searchTerm && searchTerm.value.trim()) additionalFilters++;
-    }
-
-    const totalActive = activeFilters + additionalFilters;
-
-    if (totalActive > 0) {
-        badge.textContent = `${totalActive} active`;
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
-    }
-}
-
-// Update all section badges (call when modal opens or after editing collection)
-function updateAllFilterBadges() {
-    updateFilterSectionBadge('properties');
-    updateFilterSectionBadge('metadata');
-}
-
-function syncCollectionModalUI() {
-    // Sync filter chips with current criteria
-    document.querySelectorAll('.collection-filter-chip[data-filter="status"]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.value === collectionCriteria.status);
-    });
-    document.querySelectorAll('.collection-filter-chip[data-filter="codec"]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.value === collectionCriteria.codec);
-    });
-}
-
-function setCollectionFilter(filterType, value) {
-    collectionCriteria[filterType] = value;
-    syncCollectionModalUI();
-}
-
-function renderCollectionTagsList() {
-    const container = document.getElementById('collectionTagsList');
-    if (!container) return;
-
-    if (availableTags.length === 0) {
-        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags created</span>';
-        return;
-    }
-
-    container.innerHTML = availableTags.map(tag => `
-        <button class="collection-filter-chip ${collectionCriteria.tags.includes(tag.name) ? 'active' : ''}" 
-                onclick="toggleCollectionTag('${tag.name}')"
-                style="border-color: ${collectionCriteria.tags.includes(tag.name) ? tag.color : 'rgba(255,255,255,0.1)'}">
-            <span class="tag-dot" style="background-color: ${tag.color}; width: 6px; height: 6px; border-radius: 50%; display: inline-block;"></span>
-            ${tag.name}
-        </button>
-    `).join('');
-}
-
-function toggleCollectionTag(tagName) {
-    const idx = collectionCriteria.tags.indexOf(tagName);
-    if (idx >= 0) {
-        collectionCriteria.tags.splice(idx, 1);
-    } else {
-        collectionCriteria.tags.push(tagName);
-    }
-    renderCollectionTagsList();
-}
-
-function toggleCollectionIconPicker() {
-    document.getElementById('collectionColorPicker')?.classList.add('hidden');
-    document.getElementById('collectionIconPicker')?.classList.toggle('hidden');
-}
-
-function selectCollectionIcon(icon) {
-    document.getElementById('selectedCollectionIcon').innerText = icon;
-    document.getElementById('collectionIconPicker')?.classList.add('hidden');
-}
-
-function toggleCollectionColorPicker() {
-    document.getElementById('collectionIconPicker')?.classList.add('hidden');
-    document.getElementById('collectionColorPicker')?.classList.toggle('hidden');
-}
-
-function selectCollectionColor(color) {
-    document.getElementById('collectionColor').value = color;
-    document.getElementById('collectionColorBtn').style.backgroundColor = color;
-    document.getElementById('collectionColorPicker')?.classList.add('hidden');
-}
-
-function saveCollection() {
-    const name = document.getElementById('collectionName').value.trim();
-    if (!name) {
-        alert('Please enter a collection name');
-        return;
-    }
-
-    const icon = document.getElementById('selectedCollectionIcon').innerText;
-    const color = document.getElementById('collectionColor').value;
-    const search = document.getElementById('collectionSearch').value.trim();
-
-    // New Inputs
-    const dateVal = document.getElementById('collectionDateFilter').value;
-    const sizeMin = document.getElementById('collectionMinSize').value;
-    const sizeMax = document.getElementById('collectionMaxSize').value;
-
-    // Update criteria
-    if (collectionCriteriaNew) {
-        collectionCriteriaNew.search = search;
-        collectionCriteriaNew.date = (dateVal && dateVal !== 'all') ? dateVal : null;
-        collectionCriteriaNew.size = {
-            min: sizeMin ? parseInt(sizeMin) : null,
-            max: sizeMax ? parseInt(sizeMax) : null
-        };
-    }
-
-    // Get category - check if new category input is visible and has value
-    const newCatInput = document.getElementById('newCategoryInput');
-    const catSelect = document.getElementById('collectionCategory');
-    let category = null;
-    if (newCatInput && !newCatInput.classList.contains('hidden') && newCatInput.value.trim()) {
-        category = newCatInput.value.trim();
-    } else if (catSelect) {
-        category = catSelect.value || null;
-    }
-
-    const collection = {
-        id: editingCollectionId || 'col_' + Date.now(),
-        name: name,
-        icon: icon,
-        color: color,
-        category: category,
-        criteria: collectionCriteriaNew ? JSON.parse(JSON.stringify(collectionCriteriaNew)) : {
-            status: collectionCriteria.status,
-            codec: collectionCriteria.codec,
-            tags: [...collectionCriteria.tags],
-            search: search
-        }
-    };
-
-    if (!userSettings.smart_collections) userSettings.smart_collections = [];
-
-    if (editingCollectionId) {
-        // Update existing
-        const idx = userSettings.smart_collections.findIndex(c => c.id === editingCollectionId);
-        if (idx >= 0) {
-            userSettings.smart_collections[idx] = collection;
-        }
-    } else {
-        // Add new
-        userSettings.smart_collections.push(collection);
-    }
-
-    saveSettingsWithoutReload();
-    renderCollections();
-
-    // If we just edited the currently active collection, re-apply it so changes take effect immediately
-    if (editingCollectionId && editingCollectionId === activeCollectionId) {
-        applyCollection(editingCollectionId); // This uses the updated userSettings
-    }
-
-    closeCollectionModal();
-}
-
-function deleteCurrentCollection() {
-    if (!editingCollectionId) return;
-    if (!confirm('Delete this collection?')) return;
-
-    if (userSettings.smart_collections) {
-        userSettings.smart_collections = userSettings.smart_collections.filter(c => c.id !== editingCollectionId);
-        saveSettingsWithoutReload();
-        renderCollections();
-    }
-    closeCollectionModal();
-}
-
-// --- SMART COLLECTION QUERY BUILDER ---
-
-// Default criteria structure for new collections
-function getDefaultCollectionCriteria() {
-    return {
-        tagLogic: 'any', // 'any' (OR) or 'all' (AND)
-        include: {
-            status: [],
-            codec: [],
-            tags: [],
-            resolution: [],
-            orientation: [],
-            media_type: [], // 'video', 'image'
-            format: [] // image formats: jpg, png, gif, webp, etc.
-        },
-        exclude: {
-            status: [],
-            codec: [],
-            tags: [],
-            resolution: [],
-            orientation: [],
-            media_type: [],
-            format: []
-        },
-        favorites: null, // true = only, false = exclude, null = any
-        date: {
-            type: 'any', // 'any', 'relative', 'absolute'
-            relative: null, // '24h', '7d', '30d', '90d'
-            from: null,
-            to: null
-        },
-        duration: {
-            min: null, // seconds
-            max: null
-        },
-        size: {
-            min: null, // bytes
-            max: null
-        },
-        search: ''
-    };
-}
-
-// Get video resolution category
-function getVideoResolution(video) {
-    // Check both lowercase and uppercase (model alias may differ)
-    const width = video.width || video.Width || 0;
-    const height = video.height || video.Height || 0;
-    const maxDim = Math.max(width, height);
-
-    if (maxDim >= 3840) return '4k';
-    if (maxDim >= 1920) return '1080p';
-    if (maxDim >= 1280) return '720p';
-    return 'sd';
-}
-
-// Get video orientation
-function getVideoOrientation(video) {
-    const width = video.width || video.Width || 0;
-    const height = video.height || video.Height || 0;
-
-    if (width === 0 || height === 0) return 'unknown';
-
-    const ratio = width / height;
-    if (ratio > 1.1) return 'landscape';
-    if (ratio < 0.9) return 'portrait';
-    return 'square';
-}
-
-// Check if video matches date filter
-function matchesDateFilter(video, dateFilter) {
-    // dateFilter can be string 'all', '1d' etc, or object {type: 'relative', relative: '1d'}
-    if (!dateFilter || dateFilter === 'all' || (dateFilter.type && dateFilter.type === 'all')) return true;
-
-    // Use imported_at if available (new logic), fallback to mtime
-    const timestamp = (video.imported_at > 0 ? video.imported_at : video.mtime) || 0;
-    if (timestamp === 0) return false; // No date info
-
-    const now = Math.floor(Date.now() / 1000); // Current unix timestamp
-    const videoTime = timestamp;
-
-    let relativeKey = typeof dateFilter === 'string' ? dateFilter : dateFilter.relative;
-
-    if (relativeKey) {
-        const secondsMap = {
-            '1d': 24 * 60 * 60,
-            '7d': 7 * 24 * 60 * 60,
-            '30d': 30 * 24 * 60 * 60,
-            '90d': 90 * 24 * 60 * 60,
-            '1y': 365 * 24 * 60 * 60
-        };
-        const cutoff = now - (secondsMap[relativeKey] || 0);
-        return videoTime >= cutoff;
-    }
-
-    if (dateFilter.type === 'absolute') {
-        // Absolute not fully reimagined for modal yet, but keeping logic structure
-        // Assuming videoTime is seconds, and from/to are date strings or millis?
-        // Let's defer absolute for now as modal only has relative select.
-    }
-
-    return true;
-}
-
-// Main evaluation function for Smart Collection matching
-function evaluateCollectionMatch(video, criteria) {
-    if (!criteria) return true;
-
-    // Utility: check if video matches any value in array
-    const matchesAny = (videoVal, arr) => arr.length === 0 || arr.some(v =>
-        videoVal?.toLowerCase?.().includes?.(v.toLowerCase()) || videoVal === v
-    );
-
-    // Utility: check if excluded
-    const isExcluded = (videoVal, arr) => arr.length > 0 && arr.some(v =>
-        videoVal?.toLowerCase?.().includes?.(v.toLowerCase()) || videoVal === v
-    );
-
-    const status = video.Status || '';
-    const codec = (video.codec || '').toLowerCase();
-    const videoTags = video.tags || [];
-    const resolution = getVideoResolution(video);
-    const orientation = getVideoOrientation(video);
-    const isHidden = video.hidden || false;
-    const isFavorite = video.favorite || false;
-    const duration = video.duration || 0;
-    // Use consistent Size_MB
-    const sizeMB = video.Size_MB || 0;
-    const mediaType = video.media_type || 'video';
-
-    // Extract format - could be from image_metadata.format or from file extension
-    let format = '';
-    if (video.format) {
-        format = video.format.toLowerCase();
-    } else if (video.FilePath) {
-        // Fallback: extract from file extension
-        const ext = video.FilePath.split('.').pop().toLowerCase();
-        format = ext;
-    }
-
-    // Hidden videos are never included
-    if (isHidden) return false;
-
-    // --- EXCLUSIONS (if ANY match, reject) ---
-    const exc = criteria.exclude || {};
-
-    // Media type exclusion
-    if (exc.media_type?.length > 0 && exc.media_type.includes(mediaType)) return false;
-
-    // Format exclusion
-    if (exc.format?.length > 0 && isExcluded(format, exc.format)) return false;
-
-    // Status exclusion
-    if (exc.status?.length > 0 && isExcluded(status, exc.status)) return false;
-
-    // Codec exclusion
-    if (exc.codec?.length > 0) {
-        for (const excCodec of exc.codec) {
-            if (codec.includes(excCodec.toLowerCase())) return false;
-        }
-    }
-
-    // Tags exclusion
-    if (exc.tags?.length > 0) {
-        if (exc.tags.some(t => videoTags.includes(t))) return false;
-    }
-
-    // Resolution exclusion
-    if (exc.resolution?.length > 0 && exc.resolution.includes(resolution)) return false;
-
-    // Orientation exclusion
-    if (exc.orientation?.length > 0 && exc.orientation.includes(orientation)) return false;
-
-    // --- INCLUSIONS (must satisfy all that are set) ---
-    const inc = criteria.include || {};
-
-    // Media type inclusion
-    if (inc.media_type?.length > 0 && !inc.media_type.includes(mediaType)) return false;
-
-    // Format inclusion
-    if (inc.format?.length > 0 && !matchesAny(format, inc.format)) return false;
-
-    // Status inclusion
-    if (inc.status?.length > 0) {
-        const statusMatch = inc.status.some(s => {
-            if (s === 'optimized_files') return video.FilePath?.includes('_opt');
-            return status === s;
-        });
-        if (!statusMatch) return false;
-    }
-
-    // Codec inclusion
-    if (inc.codec?.length > 0) {
-        const codecMatch = inc.codec.some(c => codec.includes(c.toLowerCase()));
-        if (!codecMatch) return false;
-    }
-
-    // Tags inclusion
-    if (inc.tags?.length > 0) {
-        if (criteria.tagLogic === 'all') {
-            // ALL must match
-            if (!inc.tags.every(t => videoTags.includes(t))) return false;
-        } else {
-            // ANY must match
-            if (!inc.tags.some(t => videoTags.includes(t))) return false;
-        }
-    }
-
-    // Resolution inclusion
-    if (inc.resolution?.length > 0 && !inc.resolution.includes(resolution)) return false;
-
-    // Orientation inclusion
-    if (inc.orientation?.length > 0 && !inc.orientation.includes(orientation)) return false;
-
-    // --- FAVORITES ---
-    // Check both boolean True and string "true"
-    const wantOnlyFavorites = criteria.favorites === true || criteria.favorites === 'true';
-    const wantExcludeFavorites = criteria.favorites === false || criteria.favorites === 'false';
-
-    if (wantOnlyFavorites || wantExcludeFavorites) {
-        // Robust check for favorite property in video object (case-insensitive)
-        const isFav = !!(video.favorite || video.Favorite || video.isFavorite || video.IsFavorite);
-
-        if (wantOnlyFavorites && !isFav) return false;
-        if (wantExcludeFavorites && isFav) return false;
-    }
-
-    // --- DATE FILTER ---
-    // Support both simple string '7d' logic and complex object logic
-    if (criteria.date && !matchesDateFilter(video, criteria.date)) return false;
-
-    // --- DURATION FILTER ---
-    if (criteria.duration) {
-        if (criteria.duration.min !== null && duration < criteria.duration.min) return false;
-        if (criteria.duration.max !== null && duration > criteria.duration.max) return false;
-    }
-
-    // --- SIZE FILTER ---
-    if (criteria.size) {
-        // criteria.size.min/max are expected in MB now because UI inputs are MB
-        if (criteria.size.min !== null && sizeMB < criteria.size.min) return false;
-        if (criteria.size.max !== null && sizeMB > criteria.size.max) return false;
-    }
-
-    // --- SEARCH ---
-    if (criteria.search) {
-        const searchLower = criteria.search.toLowerCase();
-        const filename = video.FilePath?.split(/[\\/]/).pop()?.toLowerCase() || '';
-        if (!filename.includes(searchLower) && !video.FilePath?.toLowerCase()?.includes(searchLower)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-// --- SMART COLLECTION MODAL UI FUNCTIONS ---
-
-// State variable for new collection criteria
-let collectionCriteriaNew = null;
-
-// Initialize new criteria state when opening modal
-function initNewCollectionCriteria() {
-    collectionCriteriaNew = getDefaultCollectionCriteria();
-    updateCollectionPreviewCount();
-}
-
-// Toggle filter chip active state (include mode)
-function toggleSmartFilterChip(chip) {
-    const filterType = chip.dataset.filter;
-    const value = chip.dataset.value;
-
-    if (!collectionCriteriaNew) initNewCollectionCriteria();
-
-    const includeArr = collectionCriteriaNew.include[filterType];
-
-    chip.classList.toggle('active');
-    chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
-
-    if (chip.classList.contains('active')) {
-        if (!includeArr.includes(value)) includeArr.push(value);
-    } else {
-        const idx = includeArr.indexOf(value);
-        if (idx > -1) includeArr.splice(idx, 1);
-    }
-
-    updateCollectionPreviewCount();
-
-    // Update the badge for the section this chip is in
-    const section = chip.closest('[id$="Panel"]');
-    if (section) {
-        const sectionName = section.id.replace('Panel', '');
-        updateFilterSectionBadge(sectionName);
-    }
-}
-
-// Toggle tag chip for new collection
-function toggleSmartTagChip(tagName) {
-    if (!collectionCriteriaNew) initNewCollectionCriteria();
-
-    const includeArr = collectionCriteriaNew.include.tags;
-    const idx = includeArr.indexOf(tagName);
-
-    if (idx > -1) {
-        includeArr.splice(idx, 1);
-    } else {
-        includeArr.push(tagName);
-    }
-
-    renderSmartCollectionTagsList();
-    updateCollectionPreviewCount();
-}
-
-// Toggle tag logic between ANY and ALL
-function toggleTagLogic() {
-    if (!collectionCriteriaNew) initNewCollectionCriteria();
-
-    collectionCriteriaNew.tagLogic = collectionCriteriaNew.tagLogic === 'any' ? 'all' : 'any';
-
-    const btn = document.getElementById('tagLogicBtn');
-    if (btn) {
-        btn.textContent = collectionCriteriaNew.tagLogic.toUpperCase();
-    }
-
-    updateCollectionPreviewCount();
-}
-
-// Set favorites filter (true = only, false = exclude, null = any)
-function setFavoritesFilter(value) {
-    if (!collectionCriteriaNew) initNewCollectionCriteria();
-
-    collectionCriteriaNew.favorites = value;
-
-    // Update UI
-    document.querySelectorAll('[data-filter="favorites"]').forEach(btn => {
-        const btnValue = btn.dataset.value === 'null' ? null : btn.dataset.value === 'true';
-        btn.classList.toggle('active', btnValue === value);
-        btn.setAttribute('aria-pressed', btnValue === value ? 'true' : 'false');
-    });
-
-    updateCollectionPreviewCount();
-    updateFilterSectionBadge('metadata');
-}
-
-// Render tags list for smart collection modal
-function renderSmartCollectionTagsList() {
-    const container = document.getElementById('collectionTagsList');
-    if (!container) return;
-
-    if (availableTags.length === 0) {
-        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags created</span>';
-        return;
-    }
-
-    const includedTags = collectionCriteriaNew?.include?.tags || [];
-    const excludedTags = collectionCriteriaNew?.exclude?.tags || [];
-
-    container.innerHTML = availableTags.map(tag => {
-        const isIncluded = includedTags.includes(tag.name);
-        const isExcluded = excludedTags.includes(tag.name);
-
-        let style = '';
-        let classes = 'filter-chip';
-
-        if (isIncluded) {
-            style = `border-color: ${tag.color}; background: ${tag.color}20;`;
-            classes += ' active';
-        } else if (isExcluded) {
-            // Red style for exclusion
-            style = `border-color: #ef4444; background: rgba(239, 68, 68, 0.15); color: #ef4444; text-decoration: line-through; opacity: 0.8;`;
-            classes += ' exclude';
-        }
-
-        return `
-        <button class="${classes}" 
-                onclick="toggleSmartTagChip('${tag.name}')"
-                style="${style}">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${isExcluded ? '#ef4444' : tag.color}"></span>
-            ${tag.name}
-        </button>
-        `;
-    }).join('');
-}
-
-// Toggle tag chip (Unselected -> Included -> Excluded -> Unselected)
-function toggleSmartTagChip(tagName) {
-    if (!collectionCriteriaNew) initNewCollectionCriteria();
-
-    // Ensure arrays exist
-    if (!collectionCriteriaNew.include.tags) collectionCriteriaNew.include.tags = [];
-    if (!collectionCriteriaNew.exclude.tags) collectionCriteriaNew.exclude.tags = [];
-
-    const incIdx = collectionCriteriaNew.include.tags.indexOf(tagName);
-    const excIdx = collectionCriteriaNew.exclude.tags.indexOf(tagName);
-
-    if (incIdx === -1 && excIdx === -1) {
-        // State 0 -> 1: Include it
-        collectionCriteriaNew.include.tags.push(tagName);
-    } else if (incIdx !== -1) {
-        // State 1 -> 2: Exclude it
-        collectionCriteriaNew.include.tags.splice(incIdx, 1);
-        collectionCriteriaNew.exclude.tags.push(tagName);
-    } else if (excIdx !== -1) {
-        // State 2 -> 0: Remove it
-        collectionCriteriaNew.exclude.tags.splice(excIdx, 1);
-    }
-
-    renderSmartCollectionTagsList();
-    updateCollectionPreviewCount();
-}
-
-// Update the real-time match count badge
-function updateCollectionPreviewCount() {
-    const countEl = document.getElementById('matchCountNumber');
-    if (!countEl) return;
-
-    if (!collectionCriteriaNew) {
-        countEl.textContent = '0';
-        return;
-    }
-
-    // Clone base structure from valid criteria
-    // We only want to override the fields that have input elements (Search, Date, Size)
-    // The chip-based criteria (Status, Codec, Tags, etc.) are already updated in `collectionCriteriaNew` by their toggle functions.
-    const tempCriteria = JSON.parse(JSON.stringify(collectionCriteriaNew));
-
-    // 1. Search
-    const searchInput = document.getElementById('collectionSearch');
-    if (searchInput) {
-        tempCriteria.search = searchInput.value.trim();
-    }
-
-    // 2. Date
-    const dateInput = document.getElementById('collectionDateFilter');
-    if (dateInput) {
-        const val = dateInput.value;
-        tempCriteria.date = (val && val !== 'all') ? val : null;
-    }
-
-    // 3. Size
-    const minSizeInput = document.getElementById('collectionMinSize');
-    const maxSizeInput = document.getElementById('collectionMaxSize');
-
-    const minVal = minSizeInput && minSizeInput.value ? parseInt(minSizeInput.value) : null;
-    const maxVal = maxSizeInput && maxSizeInput.value ? parseInt(maxSizeInput.value) : null;
-
-    if (minVal !== null || maxVal !== null) {
-        tempCriteria.size = { min: minVal, max: maxVal };
-    } else {
-        tempCriteria.size = null;
-    }
-
-    // Count matching media items
-    const allVideos = window.ALL_VIDEOS || [];
-    const matchingVideos = allVideos.filter(v => evaluateCollectionMatch(v, tempCriteria));
-    const count = matchingVideos.length;
-    countEl.textContent = count;
-
-    // Update label and icon based on media type filter
-    const labelEl = document.getElementById('matchCountLabel');
-    const iconEl = document.getElementById('matchCountIcon');
-    const mediaTypes = tempCriteria.include?.media_type || [];
-
-    if (labelEl && iconEl) {
-        if (mediaTypes.length === 1) {
-            if (mediaTypes[0] === 'video') {
-                labelEl.textContent = count === 1 ? 'video' : 'videos';
-                iconEl.textContent = 'movie';
-            } else if (mediaTypes[0] === 'image') {
-                labelEl.textContent = count === 1 ? 'image' : 'images';
-                iconEl.textContent = 'image';
-            }
-        } else {
-            labelEl.textContent = count === 1 ? 'item' : 'items';
-            iconEl.textContent = 'perm_media';
-        }
-    }
-
-    // Animate if changed
-    countEl.closest('.px-3')?.classList.add('animate-pulse');
-    setTimeout(() => {
-        countEl.closest('.px-3')?.classList.remove('animate-pulse');
-    }, 300);
-}
-
-// Sync modal UI with collectionCriteriaNew state
-function syncSmartCollectionUI() {
-    if (!collectionCriteriaNew) return;
-
-    // Sync media type chips
-    document.querySelectorAll('[data-filter="media_type"]').forEach(chip => {
-        const value = chip.dataset.value;
-        chip.classList.toggle('active', collectionCriteriaNew.include.media_type.includes(value));
-    });
-
-    // Sync format chips
-    document.querySelectorAll('[data-filter="format"]').forEach(chip => {
-        const value = chip.dataset.value;
-        chip.classList.toggle('active', collectionCriteriaNew.include.format.includes(value));
-    });
-
-    // Sync status chips
-    document.querySelectorAll('[data-filter="status"]').forEach(chip => {
-        const value = chip.dataset.value;
-        chip.classList.toggle('active', collectionCriteriaNew.include.status.includes(value));
-    });
-
-    // Sync codec chips
-    document.querySelectorAll('[data-filter="codec"]').forEach(chip => {
-        const value = chip.dataset.value;
-        chip.classList.toggle('active', collectionCriteriaNew.include.codec.includes(value));
-    });
-
-    // Sync resolution chips
-    document.querySelectorAll('[data-filter="resolution"]').forEach(chip => {
-        const value = chip.dataset.value;
-        chip.classList.toggle('active', collectionCriteriaNew.include.resolution.includes(value));
-    });
-
-    // Sync orientation chips
-    document.querySelectorAll('[data-filter="orientation"]').forEach(chip => {
-        const value = chip.dataset.value;
-        chip.classList.toggle('active', collectionCriteriaNew.include.orientation.includes(value));
-    });
-
-    // Sync tag logic button
-    const tagLogicBtn = document.getElementById('tagLogicBtn');
-    if (tagLogicBtn) tagLogicBtn.textContent = (collectionCriteriaNew.tagLogic || 'any').toUpperCase();
-
-    // Sync favorites
-    document.querySelectorAll('[data-filter="favorites"]').forEach(btn => {
-        const btnValue = btn.dataset.value === 'null' ? null : btn.dataset.value === 'true';
-        btn.classList.toggle('active', btnValue === collectionCriteriaNew.favorites);
-    });
-
-    // Sync search
-    const searchInput = document.getElementById('collectionSearch');
-    if (searchInput) searchInput.value = collectionCriteriaNew.search || '';
-
-    // Update aria-pressed attributes for all chips
-    document.querySelectorAll('.filter-chip').forEach(chip => {
-        chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
-    });
-
-    renderSmartCollectionTagsList();
-    updateCollectionPreviewCount();
-
-    // Update section badges after syncing all chips
-    updateAllFilterBadges();
-}
-
-// Count videos matching collection criteria (updated for new schema)
-function getCollectionCount(collection) {
-    if (!window.ALL_VIDEOS || !collection.criteria) return 0;
-
-    // Check if using new schema (has include/exclude) vs legacy (status/codec/tags)
-    const isNewSchema = collection.criteria.include || collection.criteria.exclude;
-
-    if (isNewSchema) {
-        return window.ALL_VIDEOS.filter(v => evaluateCollectionMatch(v, collection.criteria)).length;
-    }
-
-    // Legacy compatibility for old collections
-    return window.ALL_VIDEOS.filter(v => {
-        const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
-        const status = v.Status;
-        const codec = v.codec || 'unknown';
-        const videoTags = v.tags || [];
-        const isHidden = v.hidden || false;
-
-        // Must be visible (not in vault)
-        if (isHidden) return false;
-
-        // Status filter
-        if (collection.criteria.status && collection.criteria.status !== 'all') {
-            if (collection.criteria.status === 'optimized_files') {
-                if (!v.FilePath.includes('_opt')) return false;
-            } else if (status !== collection.criteria.status) {
-                return false;
-            }
-        }
-
-        // Codec filter
-        if (collection.criteria.codec && collection.criteria.codec !== 'all') {
-            if (!codec.includes(collection.criteria.codec)) return false;
-        }
-
-        // Tags filter (match ANY)
-        if (collection.criteria.tags && collection.criteria.tags.length > 0) {
-            const hasMatchingTag = collection.criteria.tags.some(t => videoTags.includes(t));
-            if (!hasMatchingTag) return false;
-        }
-
-        // Search filter
-        if (collection.criteria.search) {
-            const searchLower = collection.criteria.search.toLowerCase();
-            if (!name.includes(searchLower) && !v.FilePath.toLowerCase().includes(searchLower)) {
-                return false;
-            }
-        }
-
-        return true;
-    }).length;
-}
-
-function renderCollections() {
-    const container = document.getElementById('collectionsNav');
-    if (!container) return;
-
-    const allCollections = userSettings.smart_collections || [];
-
-    // Filter out sensitive collections if Safe Mode is ON
-    let collections = allCollections;
-    if (safeMode) {
-        let sensitiveCols = window.userSettings?.sensitive_collections || [];
-        sensitiveCols = sensitiveCols.map(s => s.trim().toLowerCase()).filter(s => s);
-
-        collections = allCollections.filter(c => {
-            const name = (c.name || '').trim().toLowerCase();
-            return !sensitiveCols.includes(name);
-        });
-    }
-
-    if (collections.length === 0) {
-        container.innerHTML = '<p class="text-xs text-gray-600 italic px-3 py-2">No collections yet</p>';
-        return;
-    }
-
-    // Group by category
-    const groups = {};
-    collections.forEach(col => {
-        const cat = col.category || 'Uncategorized';
-        if (!groups[cat]) groups[cat] = [];
-        groups[cat].push(col);
-    });
-
-    // Get collapsed state from localStorage
-    const collapsed = JSON.parse(localStorage.getItem('collapsedCategories') || '{}');
-
-    // Sort categories (Uncategorized last)
-    const sortedCategories = Object.keys(groups).sort((a, b) => {
-        if (a === 'Uncategorized') return 1;
-        if (b === 'Uncategorized') return -1;
-        return a.localeCompare(b);
-    });
-
-    // If only one category exists and it's Uncategorized, render flat list
-    if (sortedCategories.length === 1 && sortedCategories[0] === 'Uncategorized') {
-        container.innerHTML = groups['Uncategorized'].map(col => renderCollectionItem(col)).join('');
-        return;
-    }
-
-    let html = '';
-    sortedCategories.forEach(category => {
-        const isCollapsed = collapsed[category] || false;
-        const catCollections = groups[category];
-        const safeKey = category.replace(/[^a-zA-Z0-9]/g, '_');
-
-        html += `
-            <div class="category-group mb-1">
-                <button onclick="toggleCategoryCollapse('${category}')" 
-                        class="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-gray-300 transition-colors rounded hover:bg-white/5">
-                    <span class="material-icons text-[14px] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}"
-                          id="cat-arrow-${safeKey}">expand_more</span>
-                    <span class="flex-1 text-left">${category}</span>
-                    <span class="text-gray-600 font-mono">${catCollections.length}</span>
-                </button>
-                <div id="cat-items-${safeKey}" 
-                     class="space-y-0.5 overflow-hidden transition-all duration-200 ${isCollapsed ? 'max-h-0' : 'max-h-[2000px]'}">
-                    ${catCollections.map(col => renderCollectionItem(col)).join('')}
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
-}
-
-function renderCollectionItem(col) {
-    const count = getCollectionCount(col);
-    const isActive = col.id === activeCollectionId;
-
-    return `
-        <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 border border-transparent'}" 
-                onclick="applyCollection('${col.id}')"
-                ondblclick="openCollectionModal('${col.id}')">
-            <span class="material-icons text-[18px]" style="color: ${col.color}">${col.icon}</span>
-            <span class="flex-1 text-left truncate">${col.name}</span>
-            
-            <button onclick="event.stopPropagation(); openCollectionModal('${col.id}')" 
-                    class="${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white transition-opacity"
-                    title="Edit Collection">
-                <span class="material-icons text-[14px]">edit</span>
-            </button>
-            
-            <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-black/40 text-arcade-cyan border border-arcade-cyan/30' : 'bg-black/5 dark:bg-white/5 text-gray-400 dark:text-gray-500'} font-mono">${count}</span>
-        </div>
-    `;
-}
-
-function toggleCategoryCollapse(category) {
-    const collapsed = JSON.parse(localStorage.getItem('collapsedCategories') || '{}');
-    collapsed[category] = !collapsed[category];
-    localStorage.setItem('collapsedCategories', JSON.stringify(collapsed));
-
-    const safeKey = category.replace(/[^a-zA-Z0-9]/g, '_');
-    const items = document.getElementById('cat-items-' + safeKey);
-    const arrow = document.getElementById('cat-arrow-' + safeKey);
-
-    if (items) {
-        items.classList.toggle('max-h-0');
-        items.classList.toggle('max-h-[2000px]');
-    }
-    if (arrow) arrow.classList.toggle('-rotate-90');
-}
-
-function applyCollection(collectionId) {
-    const collection = (userSettings.smart_collections || []).find(c => c.id === collectionId);
-    if (!collection || !collection.criteria) return;
-
-    // Reset to lobby workspace first (this clears any previous active collection)
-    setWorkspaceMode('lobby');
-
-    // CONVERT LEGACY TO NEW SCHEMA IF NEEDED
-    let criteria = collection.criteria;
-
-    // Check if using new schema (has include/exclude)
-    const isNewSchema = criteria.include || criteria.exclude;
-
-    if (!isNewSchema) {
-        // Convert legacy schema to new format on the fly for viewing
-        const converted = getDefaultCollectionCriteria();
-
-        if (criteria.status && criteria.status !== 'all') {
-            converted.include.status = [criteria.status];
-        }
-        if (criteria.codec && criteria.codec !== 'all') {
-            converted.include.codec = [criteria.codec];
-        }
-        if (criteria.tags) {
-            converted.include.tags = [...criteria.tags];
-        }
-        converted.search = criteria.search || '';
-
-        // Preserve new fields if they were mixed in (Migration fix)
-        if (criteria.size) converted.size = criteria.size;
-        if (criteria.date) converted.date = criteria.date;
-        if (criteria.duration) converted.duration = criteria.duration;
-        if (criteria.favorites) converted.favorites = criteria.favorites;
-
-        criteria = converted;
-    }
-
-    // Update URL history for deep linking
-    const newUrl = '/collections/' + encodeURIComponent(collection.name);
-    // Don't push duplicate state
-    if (window.location.pathname !== newUrl) {
-        history.pushState({ id: collectionId }, '', newUrl);
-    }
-
-    // Set the active smart collection criteria and ID
-    activeSmartCollectionCriteria = criteria;
-    activeCollectionId = collectionId;
-
-    // Update search UI to match (visual only)
-    if (criteria.search) {
-        searchTerm = criteria.search;
-        document.getElementById('mobileSearchInput').value = searchTerm;
-    } else {
-        searchTerm = '';
-        document.getElementById('mobileSearchInput').value = '';
-    }
-
-    // Execute filter
-    filterAndSort(true);
-    renderCollections(); // Update sidebar UI to show active state
-
-    // Show toast
-    showToast(`Applied collection: ${collection.name}`, 'info');
-}
 
 // --- OPTIMIZATION PANEL LOGIC ---
 let currentOptAudio = 'standard';
 
+/**
+ * Open the video optimization panel in cinema mode
+ * Shows compression options, quality settings, and trim controls
+ */
 function cinemaOptimize() {
     // Open the panel
     const panel = document.getElementById('optimizePanel');
@@ -4323,12 +3054,19 @@ function cinemaOptimize() {
     if (actions) actions.style.display = 'none';
 }
 
+/**
+ * Close the optimization panel
+ */
 function closeOptimize() {
     document.getElementById('optimizePanel').classList.remove('active');
     const actions = document.getElementById('cinemaActions');
     if (actions) actions.style.display = 'flex';
 }
 
+/**
+ * Set audio optimization mode
+ * @param {string} mode - 'standard' (passthrough) or 'enhanced' (normalize/denoise)
+ */
 function setOptAudio(mode) {
     currentOptAudio = mode;
     updateOptAudioUI();
@@ -4336,11 +3074,18 @@ function setOptAudio(mode) {
 
 let currentOptVideo = 'compress';
 
+/**
+ * Set video optimization mode
+ * @param {string} mode - 'compress' (HEVC encode) or 'copy' (passthrough)
+ */
 function setOptVideo(mode) {
     currentOptVideo = mode;
     updateOptVideoUI();
 }
 
+/**
+ * Update video mode button UI to reflect current selection
+ */
 function updateOptVideoUI() {
     const compressBtn = document.getElementById('optVideoCompress');
     const copyBtn = document.getElementById('optVideoCopy');
@@ -4758,7 +3503,7 @@ function loadAvailableTags() {
         .then(res => res.json())
         .then(tags => {
             availableTags = tags || [];
-            console.log("Loaded tags:", availableTags.length);
+            // Tags loaded
             try {
                 renderFilterTagsList();
             } catch (e) {
@@ -4837,106 +3582,8 @@ function renderVideoCardTags(tags) {
     return html;
 }
 
-// --- CINEMA MODAL TAG PICKER ---
-function toggleCinemaTagPanel() {
-    const panel = document.getElementById('cinemaTagPanel');
-    if (panel) {
-        panel.classList.toggle('hidden');
-        // Ensure tags are populated when opening
-        if (!panel.classList.contains('hidden')) {
-            updateCinemaTags();
-        }
-    }
-}
-
-function updateCinemaTags() {
-    const container = document.getElementById('cinemaTagPicker');
-    if (!container || !currentCinemaVideo) return;
-
-    const videoTags = currentCinemaVideo.tags || [];
-
-    // Update Assigned Tags Display (Visible Chips)
-    const assignedContainer = document.getElementById('cinemaAssignedTags');
-    if (assignedContainer) {
-        if (videoTags.length === 0) {
-            assignedContainer.innerHTML = '';
-        } else {
-            assignedContainer.innerHTML = videoTags.map(tagName => {
-                const tagData = availableTags.find(t => t.name === tagName);
-                const color = tagData?.color || '#888';
-                return `
-                 <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-white/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none">
-                     <span class="w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]" style="background-color: ${color}; --color: ${color}"></span>
-                     <span class="text-xs text-white font-semibold tracking-wide drop-shadow-md">${tagName}</span>
-                     <button onclick="event.stopPropagation(); toggleCinemaTag('${tagName}')" class="ml-1 text-white/40 hover:text-red-400 hover:bg-white/10 rounded-full p-0.5 transition-colors" title="Remove Tag">
-                         <span class="material-icons text-[14px] font-bold">close</span>
-                     </button>
-                 </div>
-                 `;
-            }).join('');
-        }
-    }
-
-    if (availableTags.length === 0) {
-        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags available</span>';
-        return;
-    }
-
-    container.innerHTML = availableTags.map(tag => `
-        <button class="cinema-tag-chip ${videoTags.includes(tag.name) ? 'active' : ''}" 
-                onclick="toggleCinemaTag('${tag.name}')"
-                style="--tag-color: ${tag.color}">
-            <span class="tag-dot" style="background-color: ${tag.color}"></span>
-            ${tag.name}
-        </button>
-    `).join('');
-}
-
-function toggleCinemaTag(tagName) {
-    if (!currentCinemaPath || !currentCinemaVideo) return;
-
-    const currentTags = currentCinemaVideo.tags || [];
-    let newTags;
-
-    if (currentTags.includes(tagName)) {
-        newTags = currentTags.filter(t => t !== tagName);
-    } else {
-        newTags = [...currentTags, tagName];
-    }
-
-    // Optimistic UI update
-    currentCinemaVideo.tags = newTags;
-    updateCinemaTags();
-
-    // Update in ALL_VIDEOS array
-    const videoInArray = window.ALL_VIDEOS.find(v => v.FilePath === currentCinemaPath);
-    if (videoInArray) {
-        videoInArray.tags = newTags;
-    }
-
-    // Save to server
-    fetch('/api/video/tags', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            path: currentCinemaPath,
-            tags: newTags
-        })
-    })
-        .then(res => res.json())
-        .then(data => {
-            console.log('Tags updated:', data.tags);
-            // Re-render the grid to show updated tags on cards
-            filterAndSort();
-        })
-        .catch(err => {
-            console.error('Failed to update tags:', err);
-            // Revert on error
-            currentCinemaVideo.tags = currentTags;
-            if (videoInArray) videoInArray.tags = currentTags;
-            updateCinemaTags();
-        });
-}
+// Cinema tag functions are now in cinema.js
+// (toggleCinemaTagPanel, updateCinemaTags, toggleCinemaTag)
 
 // --- TAG MANAGER MODAL ---
 function openTagManager() {
@@ -5043,7 +3690,7 @@ function renderExistingTagsList() {
 
     // Use global availableTags which is updated by loadAvailableTags()
     const tags = availableTags || [];
-    console.log("Rendering existing tags:", tags);
+    // Rendering existing tags
 
     const header = document.getElementById('manageTagsHeader');
 

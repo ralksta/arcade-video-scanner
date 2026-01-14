@@ -292,7 +292,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"🔍 Reveal requested for: {file_path}")
 
                     # Check if file is in a hidden folder (starts with .)
-                    from pathlib import Path
                     abs_path = os.path.abspath(file_path)
                     is_hidden = any(part.startswith('.') for part in Path(abs_path).parts if part != '/')
 
@@ -483,10 +482,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     params = parse_qs(urlparse(self.path).query)
                     original_path = params.get("original", [None])[0]
                     optimized_path = params.get("optimized", [None])[0]
-                    
+
+                    print(f"🔄 keep_optimized: original={original_path}")
+                    print(f"🔄 keep_optimized: optimized={optimized_path}")
+
                     if original_path and optimized_path:
                         orig_abs = os.path.abspath(original_path)
                         opt_abs = os.path.abspath(optimized_path)
+
+                        print(f"🔄 keep_optimized: orig_abs={orig_abs} exists={os.path.exists(orig_abs)}")
+                        print(f"🔄 keep_optimized: opt_abs={opt_abs} exists={os.path.exists(opt_abs)}")
                         
                         if os.path.exists(opt_abs):
                             # Move opt to original (replace)
