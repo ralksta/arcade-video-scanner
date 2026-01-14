@@ -28,11 +28,11 @@ class ScannerManager:
         self.video_inspector = VideoInspector(self.probe)
         self.image_inspector = ImageInspector()
         
-        # Concurrency Lans
+        # Concurrency Lanes
         # Heavy Lane (FFprobe/FFmpeg) - CPU bound
         self.sem_video = asyncio.Semaphore(os.cpu_count() or 4)
-        # Fast Lane (Sips/Headers) - IO bound
-        self.sem_image = asyncio.Semaphore(50) 
+        # Fast Lane (Pillow) - IO bound, increased for image speed
+        self.sem_image = asyncio.Semaphore(200) 
 
     async def run_scan(self, progress_callback: Optional[Callable[[str], None]] = None, force_rescan: bool = False) -> int:
         """
@@ -168,8 +168,8 @@ class ScannerManager:
                         nonlocal processed_count
                         processed_count += 1
                         
-                        # Quick Save periodically?
-                        if processed_count % 50 == 0:
+                        # Quick Save periodically (every 500 for speed)
+                        if processed_count % 500 == 0:
                             db.save()
 
         try:
