@@ -1072,18 +1072,82 @@ function openCinema(container) {
 }
 
 function cinemaKeyHandler(e) {
+    // Skip if typing in an input field
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    const key = e.key.toLowerCase();
+
     if (e.key === 'Escape') {
         console.log('ESC pressed in cinema mode (captured)');
         e.preventDefault();
-        e.stopPropagation(); // Stop it from reaching video element
+        e.stopPropagation();
         closeCinema();
     } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        navigateCinema(-1); // Previous
+        navigateCinema(-1);
     } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        navigateCinema(1);  // Next
+        navigateCinema(1);
+    } else if (key === 'f') {
+        // F = Favorite
+        e.preventDefault();
+        if (currentCinemaPath) {
+            cinemaFavorite();
+            showCinemaToast('Favorite toggled');
+        }
+    } else if (key === 'v') {
+        // V = Vault
+        e.preventDefault();
+        if (currentCinemaPath) {
+            cinemaVault();
+            showCinemaToast('Moved to Vault');
+        }
+    } else {
+        // Check custom tag shortcuts (A-Z except reserved)
+        const reservedKeys = ['f', 'v', ' ', 'escape', 'arrowleft', 'arrowright'];
+        if (key.length === 1 && /[a-z]/i.test(key) && !reservedKeys.includes(key)) {
+            const availableTags = window.userSettings?.available_tags || [];
+            const matchingTag = availableTags.find(t =>
+                t.shortcut && t.shortcut.toLowerCase() === key
+            );
+            if (matchingTag && currentCinemaPath) {
+                e.preventDefault();
+                toggleCinemaTag(matchingTag.name);
+                showCinemaToast(`Tag: ${matchingTag.name}`);
+            }
+        }
     }
+}
+
+function showCinemaToast(message) {
+    // Remove existing toast
+    let toast = document.getElementById('cinemaToast');
+    if (toast) toast.remove();
+
+    toast = document.createElement('div');
+    toast.id = 'cinemaToast';
+    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 text-white rounded-lg backdrop-blur border border-white/20 text-sm font-medium z-[10001] animate-fade-in';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), 1500);
+}
+
+async function toggleCinemaTag(tagName) {
+    if (!currentCinemaPath) return;
+
+    // Get current tags for this file
+    const response = await fetch(`/api/video/tags?path=${encodeURIComponent(currentCinemaPath)}`);
+    const data = await response.json();
+    const currentTags = data.tags || [];
+
+    // Toggle the tag
+    const hasTag = currentTags.includes(tagName);
+    const method = hasTag ? 'DELETE' : 'POST';
+
+    await fetch(`/api/tags?path=${encodeURIComponent(currentCinemaPath)}&tag=${encodeURIComponent(tagName)}`, {
+        method: method
+    });
 }
 
 function navigateCinema(direction) {
@@ -4690,12 +4754,21 @@ function removeActiveFilter(type, label) {
 
 // --- TAG MANAGEMENT ---
 function loadAvailableTags() {
-    fetch('/api/tags')
+    fetch(`/api/tags?t=${new Date().getTime()}`)
         .then(res => res.json())
         .then(tags => {
             availableTags = tags || [];
-            renderFilterTagsList();
-            renderExistingTagsList();
+            console.log("Loaded tags:", availableTags.length);
+            try {
+                renderFilterTagsList();
+            } catch (e) {
+                console.error("Error rendering filters:", e);
+            }
+            try {
+                renderExistingTagsList();
+            } catch (e) {
+                console.error("Error rendering existing tags:", e);
+            }
         })
         .catch(err => {
             console.error('Failed to load tags:', err);
@@ -4781,6 +4854,28 @@ function updateCinemaTags() {
     if (!container || !currentCinemaVideo) return;
 
     const videoTags = currentCinemaVideo.tags || [];
+
+    // Update Assigned Tags Display (Visible Chips)
+    const assignedContainer = document.getElementById('cinemaAssignedTags');
+    if (assignedContainer) {
+        if (videoTags.length === 0) {
+            assignedContainer.innerHTML = '';
+        } else {
+            assignedContainer.innerHTML = videoTags.map(tagName => {
+                const tagData = availableTags.find(t => t.name === tagName);
+                const color = tagData?.color || '#888';
+                return `
+                 <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-white/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none">
+                     <span class="w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]" style="background-color: ${color}; --color: ${color}"></span>
+                     <span class="text-xs text-white font-semibold tracking-wide drop-shadow-md">${tagName}</span>
+                     <button onclick="event.stopPropagation(); toggleCinemaTag('${tagName}')" class="ml-1 text-white/40 hover:text-red-400 hover:bg-white/10 rounded-full p-0.5 transition-colors" title="Remove Tag">
+                         <span class="material-icons text-[14px] font-bold">close</span>
+                     </button>
+                 </div>
+                 `;
+            }).join('');
+        }
+    }
 
     if (availableTags.length === 0) {
         container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags available</span>';
@@ -4875,19 +4970,32 @@ function selectTagColor(color) {
 function createNewTag() {
     const nameInput = document.getElementById('newTagName');
     const colorInput = document.getElementById('newTagColor');
+    const shortcutInput = document.getElementById('newTagShortcut');
 
     const name = nameInput?.value?.trim();
     const color = colorInput?.value || '#00ffd0';
+    let shortcut = shortcutInput?.value?.trim().toUpperCase() || '';
 
     if (!name) {
         alert('Please enter a tag name');
         return;
     }
 
+    // Validate shortcut
+    const reservedKeys = ['F', 'V'];
+    if (shortcut && reservedKeys.includes(shortcut)) {
+        alert(`Shortcut "${shortcut}" is reserved. Please use a different letter.`);
+        return;
+    }
+    if (shortcut && !/^[A-Z]$/.test(shortcut)) {
+        alert('Shortcut must be a single letter A-Z');
+        return;
+    }
+
     fetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, color })
+        body: JSON.stringify({ name, color, shortcut: shortcut || null })
     })
         .then(res => {
             if (res.status === 409) {
@@ -4898,8 +5006,9 @@ function createNewTag() {
         })
         .then(data => {
             if (data) {
-                // Clear input
+                // Clear inputs
                 nameInput.value = '';
+                if (shortcutInput) shortcutInput.value = '';
                 // Refresh lists
                 loadAvailableTags();
             }
@@ -4932,22 +5041,79 @@ function renderExistingTagsList() {
     const container = document.getElementById('existingTagsList');
     if (!container) return;
 
-    if (availableTags.length === 0) {
-        container.innerHTML = '<p class="text-sm text-gray-600 italic">No tags created yet</p>';
+    // Use global availableTags which is updated by loadAvailableTags()
+    const tags = availableTags || [];
+    console.log("Rendering existing tags:", tags);
+
+    const header = document.getElementById('manageTagsHeader');
+
+    if (header) {
+        header.textContent = `Manage Existing Tags (${tags.length})`;
+        header.style.color = '';
+    } else {
+        // Fallback to find header if id is missing
+        const h3s = container.parentElement.querySelectorAll('h3');
+        if (h3s.length > 0) {
+            h3s[0].textContent = `Manage Existing Tags (${tags.length})`;
+            h3s[0].id = 'manageTagsHeader';
+        }
+    }
+
+    if (tags.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 text-sm italic py-4">No tags yet</div>';
         return;
     }
 
-    container.innerHTML = availableTags.map(tag => `
-        <div class="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-            <div class="flex items-center gap-2">
-                <span class="w-4 h-4 rounded-full" style="background-color: ${tag.color}"></span>
-                <span class="text-sm text-white">${tag.name}</span>
+    container.innerHTML = tags.map(t => {
+        const shortcutValue = t.shortcut ? t.shortcut.toUpperCase() : '';
+        const shortcutDisplay = shortcutValue
+            ? `<span class="text-xs px-1.5 py-0.5 rounded bg-white/10 text-gray-400 cursor-pointer hover:bg-white/20" onclick="editTagShortcut('${t.name}', '${shortcutValue}')" title="Click to edit">(${shortcutValue})</span>`
+            : `<span class="text-xs text-gray-600 cursor-pointer hover:text-gray-400" onclick="editTagShortcut('${t.name}', '')" title="Click to add shortcut">+ key</span>`;
+        return `
+        <div class="flex items-center justify-between py-2 px-3 bg-black/30 rounded-lg border border-white/5 group" id="tag-row-${t.name}">
+            <div class="flex items-center gap-3">
+                <span class="w-4 h-4 rounded-full" style="background-color: ${t.color}"></span>
+                <span class="text-white text-sm">${t.name}</span>
+                ${shortcutDisplay}
             </div>
-            <button onclick="deleteTag('${tag.name}')" class="text-gray-500 hover:text-arcade-pink transition-colors">
-                <span class="material-icons text-sm">delete</span>
+            <button onclick="deleteTag('${t.name}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                <span class="material-icons text-lg">delete</span>
             </button>
         </div>
-    `).join('');
+    `;
+    }).join('');
+}
+
+function editTagShortcut(tagName, currentShortcut) {
+    const newShortcut = prompt(`Enter shortcut key for "${tagName}" (A-Z, or leave empty to remove):`, currentShortcut);
+
+    if (newShortcut === null) return; // Cancelled
+
+    const shortcut = newShortcut.trim().toUpperCase();
+
+    // Validate
+    if (shortcut && !/^[A-Z]$/.test(shortcut)) {
+        alert('Shortcut must be a single letter A-Z');
+        return;
+    }
+    if (['F', 'V'].includes(shortcut)) {
+        alert(`"${shortcut}" is reserved. Please use a different letter.`);
+        return;
+    }
+
+    // Update tag
+    fetch('/api/tags/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: tagName, shortcut: shortcut || null })
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadAvailableTags();
+            }
+        })
+        .catch(err => console.error('Failed to update tag:', err));
 }
 
 // --- VIDEO TAG ASSIGNMENT ---
@@ -5474,7 +5640,6 @@ function renderDuplicatesView() {
                                             </div>
                                         `}
                                     </div>
-                                </div>
                             `;
         }).join('')}
                     </div>

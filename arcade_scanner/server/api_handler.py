@@ -959,19 +959,49 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps(stats).encode("utf-8"))
             
             # --- TAG SYSTEM ENDPOINTS ---
-            elif self.path == "/api/tags":
-                # GET: Return all available tags from User data
+            # --- TAG SYSTEM ENDPOINTS ---
+            elif self.path.startswith("/api/tags"):
+                # GET: Return all available tags OR handle delete action
                 user_name = self.get_current_user()
                 if not user_name:
-                    # Return empty if not auth? Or return default global?
-                    # For now, require auth.
                     self.send_error(401)
                     return
+                
+                params = parse_qs(urlparse(self.path).query)
+                action = params.get("action", [None])[0]
 
+                # HANDLE DELETE ACTION
+                if action == "delete":
+                    tag_name = params.get("name", [None])[0]
+                    if tag_name:
+                         u = user_db.get_user(user_name)
+                         if u:
+                             current_tags = list(u.data.available_tags)
+                             updated_tags = [t for t in current_tags if t.get("name") != tag_name]
+                             u.data.available_tags = updated_tags
+                             
+                             # Remove this tag from user's videos
+                             for path, tags in u.data.tags.items():
+                                 if tag_name in tags:
+                                     u.data.tags[path] = [t for t in tags if t != tag_name]
+                             
+                             user_db.add_user(u)
+                             print(f"🏷️ Deleted tag for user {user_name}: {tag_name}")
+                        
+                         self.send_response(200)
+                         self.send_header("Content-Type", "application/json")
+                         self.end_headers()
+                         self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                         return
+                    else:
+                        self.send_error(400, "Missing name for delete")
+                        return
+
+                # DEFAULT: RETURN ALL TAGS
                 u = user_db.get_user(user_name)
                 tags = u.data.available_tags if u else []
                 
-                print(f"DEBUG: GET /api/tags returning: {tags}", flush=True)
+                # print(f"DEBUG: GET /api/tags returning: {tags}", flush=True)
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -1047,6 +1077,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"setup_complete": setup_complete}).encode("utf-8"))
             
+
+            
             elif self.path == "/api/videos":
                 # GET: Return all videos, filtered by user's scan targets
                 user_name = self.get_current_user()
@@ -1108,45 +1140,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"tags": tags}).encode("utf-8"))
             
-            elif self.path.startswith("/api/tags?"):
-                # DELETE: Remove a tag (handled in do_GET for simplicity with query params)
-                # Auth Check
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-                # Admin check? Or anyone can delete global tags? 
-                # Let's restrict to implicit admin (authenticated) for now.
-                
-                params = parse_qs(urlparse(self.path).query)
-                action = params.get("action", [None])[0]
-                tag_name = params.get("name", [None])[0]
-                
-                if action == "delete" and tag_name:
-                    # Remove tag from USER's available_tags
-                    u = user_db.get_user(user_name)
-                    if u:
-                        current_tags = list(u.data.available_tags)
-                        updated_tags = [t for t in current_tags if t.get("name") != tag_name]
-                        u.data.available_tags = updated_tags
-                        
-                        # Remove this tag from this User's video data as well?
-                        # Usually yes, if we delete the definition.
-                        modified = False
-                        for path, tags in u.data.tags.items():
-                            if tag_name in tags:
-                                u.data.tags[path] = [t for t in tags if t != tag_name]
-                                modified = True
-                        
-                        user_db.add_user(u)
-                    
-                    print(f"🏷️ Deleted tag for user {user_name}: {tag_name}")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
-                else:
-                    self.send_error(400, "Invalid action or missing name")
+            # Unreachable block removed
+
             
             # ================================================================
             # DUPLICATE DETECTION API
@@ -1544,6 +1539,48 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({"success": True, "tags": tags}).encode("utf-8"))
                 except Exception as e:
                     print(f"Error setting tags: {e}")
+                    self.send_error(500, str(e))
+            
+            elif self.path == "/api/tags/update":
+                try:
+                    user_name = self.get_current_user()
+                    if not user_name:
+                        self.send_error(401)
+                        return
+                        
+                    data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                    tag_name = data.get("name")
+                    new_shortcut = data.get("shortcut")
+                    
+                    if not tag_name:
+                        self.send_error(400, "Missing tag name")
+                        return
+                    
+                    u = user_db.get_user(user_name)
+                    if not u:
+                        self.send_error(404, "User not found")
+                        return
+                    
+                    # Find and update the tag
+                    tag_found = False
+                    for tag in u.data.available_tags:
+                        if tag.get("name") == tag_name:
+                            tag["shortcut"] = new_shortcut
+                            tag_found = True
+                            break
+                    
+                    if not tag_found:
+                        self.send_error(404, "Tag not found")
+                        return
+                    
+                    user_db.add_user(u)
+                    
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                except Exception as e:
+                    print(f"Error updating tag: {e}")
                     self.send_error(500, str(e))
             
             # ================================================================

@@ -451,6 +451,11 @@ CINEMA_MODAL_COMPONENT = """
         <div id="cinemaInfoContent" class="space-y-2 text-xs font-mono"></div>
     </div>
     
+    <!-- Assigned Tags Display (Visible List with Remove X) -->
+    <div id="cinemaAssignedTags" class="absolute top-20 left-4 max-w-sm flex flex-wrap gap-2 z-40 pointer-events-auto">
+        <!-- Populated by JS -->
+    </div>
+    
     <!-- Tag Picker Dropdown (appears above the Tags button) -->
     <div id="cinemaTagPanel" class="hidden absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-3 z-50 min-w-[200px] max-w-[320px]">
         <div class="flex items-center gap-2 mb-2 text-white/80 text-xs border-b border-white/10 pb-2">
@@ -847,37 +852,38 @@ TAG_MANAGER_MODAL_COMPONENT = """
             <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Create New Tag</h3>
             <div class="flex gap-2">
                 <input type="text" id="newTagName" placeholder="Tag name..." class="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none">
-                
-                <!-- Color Picker -->
-                <div class="relative">
-                    <button id="tagColorBtn" onclick="toggleTagColorPicker()" class="w-10 h-10 rounded-lg border border-white/10 flex items-center justify-center hover:border-white/30 transition-colors" style="background-color: #00ffd0;">
-                    </button>
-                    <input type="hidden" id="newTagColor" value="#00ffd0">
-                    
-                    <!-- Color Dropdown -->
-                    <div id="tagColorPicker" class="hidden absolute right-0 top-12 bg-[#1a1a24] border border-white/10 rounded-lg p-2 shadow-xl z-10 grid grid-cols-5 gap-1">
-                        <button onclick="selectTagColor('#00ffd0')" class="w-6 h-6 rounded" style="background-color: #00ffd0;"></button>
-                        <button onclick="selectTagColor('#F4B342')" class="w-6 h-6 rounded" style="background-color: #F4B342;"></button>
-                        <button onclick="selectTagColor('#DE1A58')" class="w-6 h-6 rounded" style="background-color: #DE1A58;"></button>
-                        <button onclick="selectTagColor('#8F0177')" class="w-6 h-6 rounded" style="background-color: #8F0177;"></button>
-                        <button onclick="selectTagColor('#6366f1')" class="w-6 h-6 rounded" style="background-color: #6366f1;"></button>
-                        <button onclick="selectTagColor('#22c55e')" class="w-6 h-6 rounded" style="background-color: #22c55e;"></button>
-                        <button onclick="selectTagColor('#f97316')" class="w-6 h-6 rounded" style="background-color: #f97316;"></button>
-                        <button onclick="selectTagColor('#06b6d4')" class="w-6 h-6 rounded" style="background-color: #06b6d4;"></button>
-                        <button onclick="selectTagColor('#ec4899')" class="w-6 h-6 rounded" style="background-color: #ec4899;"></button>
-                        <button onclick="selectTagColor('#a855f7')" class="w-6 h-6 rounded" style="background-color: #a855f7;"></button>
-                    </div>
-                </div>
-                
-                <button onclick="createNewTag()" class="px-4 py-2 bg-arcade-cyan text-black font-bold rounded-lg hover:bg-cyan-300 transition-colors">
-                    <span class="material-icons text-lg">add</span>
-                </button>
+                                <!-- Color Picker -->
+                            <div class="relative">
+                                <button type="button" id="tagColorBtn" class="w-10 h-10 rounded-lg border-2 border-white/20 hover:border-white/40 transition-colors" style="background-color: #00ffd0" onclick="toggleTagColorPicker()"></button>
+                                <input type="hidden" id="newTagColor" value="#00ffd0">
+                                <div id="tagColorPicker" class="hidden absolute bottom-full left-0 mb-2 p-2 bg-[#1a1a24] rounded-lg border border-white/10 flex gap-2 flex-wrap w-40 z-50">
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #00ffd0" onclick="selectTagColor('#00ffd0')"></button>
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #ff6b9d" onclick="selectTagColor('#ff6b9d')"></button>
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #a855f7" onclick="selectTagColor('#a855f7')"></button>
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #eab308" onclick="selectTagColor('#eab308')"></button>
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #ef4444" onclick="selectTagColor('#ef4444')"></button>
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #22c55e" onclick="selectTagColor('#22c55e')"></button>
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #3b82f6" onclick="selectTagColor('#3b82f6')"></button>
+                                    <button type="button" class="w-6 h-6 rounded" style="background: #f97316" onclick="selectTagColor('#f97316')"></button>
+                                </div>
+                            </div>
+                            
+                            <!-- Shortcut Key -->
+                            <input type="text" id="newTagShortcut" 
+                                   placeholder="Key" 
+                                   maxlength="1"
+                                   class="w-12 px-2 py-2 bg-black/40 border border-white/10 rounded-lg text-white text-center uppercase focus:outline-none focus:border-arcade-cyan/50"
+                                   title="Cinema mode keyboard shortcut (A-Z, except F and V)">
+                            
+                            <button type="button" onclick="createNewTag()" class="px-4 py-2 bg-arcade-cyan/20 text-arcade-cyan rounded-lg hover:bg-arcade-cyan/30 transition-colors text-sm font-medium">
+                                Add
+                            </button>
             </div>
         </div>
         
         <!-- Existing Tags List -->
         <div class="p-4 max-h-64 overflow-y-auto">
-            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Existing Tags</h3>
+            <h3 id="manageTagsHeader" class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Manage Existing Tags</h3>
             <div id="existingTagsList" class="space-y-2">
                 <!-- Tags injected by JS -->
                 <p class="text-sm text-gray-600 italic">No tags created yet</p>

@@ -50,11 +50,28 @@ def run_scanner(args_list=None):
         if should_force:
             print("Usage of rebuild flags will force a re-scan of metadata and assets.")
             
+        # Progress Tracker
+        scan_counter = 0
+        def print_progress(msg):
+            nonlocal scan_counter
+            scan_counter += 1
+            # Clean up message to just show filename
+            filename = msg.replace("Analyzing ", "")
+            if len(filename) > 60:
+                filename = filename[:57] + "..."
+            
+            # Use ANSI escape code to clear line and CR to go to start
+            # \033[K clears to end of line
+            import sys
+            sys.stdout.write(f"\r\033[K  🔍 Scanned {scan_counter} files... {filename}")
+            sys.stdout.flush()
+    
         asyncio.run(mgr.run_scan(
-            progress_callback=lambda x: print(f"  {x}"),
+            progress_callback=print_progress,
             force_rescan=should_force
         ))
-        
+        print() # Newline after scan completion
+            
         # 2. Asset Generation (Thumbs/Previews)
         pass # Handled in run_scan now
     except KeyboardInterrupt:

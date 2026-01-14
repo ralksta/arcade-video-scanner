@@ -14,6 +14,8 @@ services:
       # - /Users/username/Movies:/media:ro
       # - /Volumes/ExternalDrive/Videos:/media:ro
       - ${HOME}/Downloads:/media:ro # Change this to your media path!
+      # Mount source code for development (Live Updates)
+      - .:/app
       # Persistent configuration and database
       - arcade-config:/config
       # Persistent thumbnails and cache

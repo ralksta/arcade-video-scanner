@@ -10,7 +10,28 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.4.1 Highlights (New!)
+## 🚀 Version 6.5.0 Highlights (New!)
+
+This release focuses on **Cinema Mode Usability**, **Tag Management Stability**, and **Developer Experience**.
+
+### 🎬 Cinema Mode Upgrades
+- **Assigned Tags Display**: See assigned tags directly in the Cinema overlay (top-left) with one-click removal (X).
+- **Shortcut Fixes**: The 'F' key now correctly toggles favorites with immediate UI feedback.
+- **Improved Navigation**: Smoother keyboard handling.
+
+### 🏷️ Tag System 2.0
+- **Instant Updates**: New cache-busting logic ensures tags appear immediately after creation.
+- **Clean Deletion**: Removing a tag now reliably updates the backend and UI.
+- **Smart Validation**: Better handling of duplicate tag names and invalid inputs.
+
+### 🐳 Docker & Dev Experience
+- **Live Code Reloading**: `docker-compose.yml` updated to mount source code, enabling instant feedback during development.
+- **Log Noise Reduction**: Reduced terminal clutter during large scans with in-place progress updates.
+- **Layout Fixes**: Resolved grid breakage in Duplicates view for massive libraries.
+
+---
+
+## 🚀 Version 6.4.1 Highlights
 
 This release enhances **Image Support**, improves **Duplicate Detection UX**, and adds **RAW Image Formats**.
 
