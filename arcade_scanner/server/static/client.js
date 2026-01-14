@@ -5552,3 +5552,116 @@ async function rescanDuplicates() {
         alert('Error triggering rescan');
     }
 }
+
+// =============================================================================
+// FIRST-RUN SETUP WIZARD
+// =============================================================================
+
+let selectedSetupDirectories = [];
+
+function checkSetupRequired() {
+    fetch('/api/setup/status')
+        .then(res => res.json())
+        .then(data => {
+            if (!data.setup_complete) {
+                showSetupWizard();
+            }
+        });
+}
+
+function showSetupWizard() {
+    const wizard = document.getElementById('setupWizard');
+    if (wizard) {
+        wizard.classList.remove('hidden');
+        wizard.classList.add('active');
+        loadSetupDirectories();
+    }
+}
+
+function hideSetupWizard() {
+    const wizard = document.getElementById('setupWizard');
+    if (wizard) {
+        wizard.classList.remove('active');
+        setTimeout(() => wizard.classList.add('hidden'), 300);
+    }
+}
+
+function loadSetupDirectories() {
+    fetch('/api/setup/directories')
+        .then(res => res.json())
+        .then(data => {
+            const listEl = document.getElementById('setupDirectoryList');
+            if (!listEl) return;
+            
+            if (!data.directories || data.directories.length === 0) {
+                listEl.innerHTML = '<div class="text-center py-8 text-gray-500">No directories found</div>';
+                return;
+            }
+            
+            listEl.innerHTML = data.directories.map(dir => {
+                const sizeGB = (dir.size_bytes / (1024 * 1024 * 1024)).toFixed(2);
+                const displayName = dir.name || dir.path;
+                return `<div class="setup-dir-card" data-path="${dir.path}" onclick="toggleSetupDirectory('${dir.path}')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="material-icons text-arcade-cyan">${dir.is_root ? 'folder_open' : 'folder'}</span>
+                            <div><div class="text-white font-medium">${displayName}</div>
+                            <div class="text-xs text-gray-500">${sizeGB} GB • ${dir.file_count.toLocaleString()} files</div></div>
+                        </div>
+                        <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan">check_circle</span></div>
+                    </div>
+                </div>`;
+            }).join('');
+        });
+}
+
+function toggleSetupDirectory(path) {
+    const card = document.querySelector(`.setup-dir-card[data-path="${path}"]`);
+    if (!card) return;
+    
+    const isSelected = card.classList.contains('selected');
+    if (isSelected) {
+        card.classList.remove('selected');
+        card.querySelector('.setup-dir-checkbox').classList.add('hidden');
+        selectedSetupDirectories = selectedSetupDirectories.filter(p => p !== path);
+    } else {
+        card.classList.add('selected');
+        card.querySelector('.setup-dir-checkbox').classList.remove('hidden');
+        selectedSetupDirectories.push(path);
+    }
+    
+    document.getElementById('setupCompleteBtn').disabled = selectedSetupDirectories.length === 0;
+}
+
+function completeSetup() {
+    if (selectedSetupDirectories.length === 0) return;
+    
+    fetch('/api/setup/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            scan_targets: selectedSetupDirectories,
+            scan_images: document.getElementById('setupScanImages')?.checked || false
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            hideSetupWizard();
+            location.reload();
+        }
+    });
+}
+
+function skipSetup() {
+    fetch('/api/setup/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scan_targets: ['/media'], scan_images: false })
+    })
+    .then(() => location.reload());
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(checkSetupRequired, 500);
+});
