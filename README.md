@@ -24,7 +24,7 @@ This release enhances **Image Support**, improves **Duplicate Detection UX**, an
 ### 🔍 Duplicate Detection Improvements
 - **Persistent Cache**: Scan results saved to disk - no need to rescan on page refresh or server restart.
 - **Manual Rescan**: New "Rescan" button in duplicate view to force a fresh analysis.
-- **Smart Group Removal**: Entire duplicate group automatically vanishes after deleting any file (case resolved).
+- **Improved Stability**: Fixed "Scan Images" toggle persistence and optimized path security validation.
 - **Bookmarkable URL**: Direct access to duplicates view via `/duplicates` URL.
 
 ---

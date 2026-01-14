@@ -34,6 +34,8 @@ This document outlines planned features and improvements for the Arcade Media Sc
 - **Duplicate Rescan Button**: Manual rescan option with cache clearing in duplicate view.
 - **Duplicate Group Removal**: Entire duplicate group vanishes after deleting a file (case resolved).
 - **Bookmarkable Duplicates**: Added `/duplicates` URL route for direct access and bookmarking.
+- **Settings Persistence**: Fixed "Scan Images" toggle resetting on reload.
+- **Security Validation**: Fixed path validation error preventing optimization of files in allowed directories.
 
 ### ✅ Version 6.4.0 (2026-01-14)
 - **Duplicate Detection**: Find and manage duplicate videos/images with content-verified matching.

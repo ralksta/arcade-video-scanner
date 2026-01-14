@@ -97,7 +97,7 @@ def sanitize_path(path: str, allowed_dirs: Optional[List[str]] = None) -> str:
     from ..config import config
     
     if allowed_dirs is None:
-        allowed_dirs = config.settings.scan_targets
+        allowed_dirs = config.active_scan_targets
     
     validator = PathValidator(allowed_dirs)
     return validator.validate(path)
