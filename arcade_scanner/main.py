@@ -17,7 +17,13 @@ def run_scanner(args_list=None):
 
     parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
     parser.add_argument("--ssl", action="store_true", help="Enable HTTPS mode with self-signed certificate.")
+    parser.add_argument("--skip-setup", action="store_true", help="Skip the first-run setup wizard.")
     args, unknown = parser.parse_known_args(args_list)
+
+    # 0. First-Run Setup Wizard
+    if not args.skip_setup:
+        from arcade_scanner.onboarding import run_onboarding
+        run_onboarding()
 
     print("--- Arcade Media Scanner 6.3 ---")
     

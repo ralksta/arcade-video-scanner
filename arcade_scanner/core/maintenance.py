@@ -120,3 +120,67 @@ def cleanup_orphans(video_files: List[str]):
                         pass
                     
     print(f"✅ Cleanup complete. Removed {removed_count} orphan files.")
+
+
+def purge_missing_from_db():
+    """
+    Remove database entries for files that no longer exist on disk.
+    Call this after deleting files from Finder to clean up the database.
+    """
+    from arcade_scanner.database.json_store import db
+    
+    print("🧹 Checking database for missing files...")
+    
+    all_entries = db.get_all()
+    removed_count = 0
+    removed_paths = []
+    
+    for entry in all_entries:
+        if not os.path.exists(entry.file_path):
+            removed_paths.append(entry.file_path)
+            db.remove(entry.file_path)
+            removed_count += 1
+            print(f"  ❌ Removed: {os.path.basename(entry.file_path)}")
+    
+    if removed_count > 0:
+        db.save()
+        print(f"✅ Removed {removed_count} entries for missing files from database.")
+    else:
+        print("✅ All database entries point to existing files.")
+    
+    return removed_count
+
+
+def purge_previews_folder():
+    """
+    Delete all preview clips in the previews folder.
+    This folder is no longer actively used.
+    """
+    previews_dir = os.path.join(config.hidden_data_dir, "previews")
+    
+    if not os.path.exists(previews_dir):
+        print("ℹ️ Previews folder does not exist.")
+        return 0
+    
+    # Safety check
+    if "arcade_data" not in previews_dir:
+        print("❌ [Safety] Previews path looks suspicious. Aborting.")
+        return 0
+    
+    removed_count = 0
+    for filename in os.listdir(previews_dir):
+        file_path = os.path.join(previews_dir, filename)
+        # Only delete files, not directories, and only video files
+        if os.path.isfile(file_path) and filename.startswith("prev_"):
+            try:
+                os.remove(file_path)
+                removed_count += 1
+            except Exception as e:
+                print(f"  [Error] Failed to delete {filename}: {e}")
+    
+    if removed_count > 0:
+        print(f"✅ Removed {removed_count} preview files.")
+    else:
+        print("ℹ️ No preview files to remove.")
+    
+    return removed_count

@@ -25,6 +25,14 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Version 6.4.0 (2026-01-14)
+- **Duplicate Detection**: Find and manage duplicate videos/images with content-verified matching.
+- **Quality Scoring**: Smart recommendations for which file to keep (bitrate, resolution, codec).
+- **Content Sampling**: Hash-based verification eliminates false positives.
+- **First-Run Wizard**: Interactive ASCII terminal setup for new users.
+- **Database Cleanup**: Remove entries for files deleted from Finder.
+- **Maintenance Tools**: Purge orphan thumbnails and unused previews.
+
 ### ✅ Version 6.3.0 (2026-01-12)
 - **Image Support**: Unified media scanner supporting both videos and images.
 - **Image Viewer**: Dedicated image display in cinema modal (not video player).
@@ -109,4 +117,4 @@ Features are prioritized based on:
 
 ---
 
-*Last updated: 2026-01-12*
+*Last updated: 2026-01-14*

@@ -972,6 +972,54 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 else:
                     self.send_error(400, "Invalid action or missing name")
             
+            # ================================================================
+            # DUPLICATE DETECTION API
+            # ================================================================
+            elif self.path == "/api/duplicates" or self.path == "/api/duplicates/":
+                # GET: Find and return all duplicate groups
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                
+                try:
+                    from arcade_scanner.core.duplicate_detector import duplicate_detector
+                    
+                    # Get all media entries
+                    all_entries = db.get_all()
+                    
+                    # Find duplicates
+                    groups = duplicate_detector.find_all_duplicates(all_entries)
+                    
+                    # Calculate summary stats
+                    total_groups = len(groups)
+                    total_savings = sum(g.potential_savings_mb for g in groups)
+                    video_groups = len([g for g in groups if g.media_type == "video"])
+                    image_groups = len([g for g in groups if g.media_type == "image"])
+                    
+                    response = {
+                        "groups": [g.to_dict() for g in groups],
+                        "summary": {
+                            "total_groups": total_groups,
+                            "video_groups": video_groups,
+                            "image_groups": image_groups,
+                            "potential_savings_mb": round(total_savings, 2),
+                            "potential_savings_gb": round(total_savings / 1024, 2),
+                        }
+                    }
+                    
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response).encode("utf-8"))
+                    print(f"🔍 Duplicate scan: {total_groups} groups, {total_savings:.1f} MB potential savings")
+                    
+                except Exception as e:
+                    print(f"❌ Error in duplicate detection: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    self.send_error(500, str(e))
+            
             else:
                 # 404 for anything else
                 self.send_error(404)
@@ -1274,6 +1322,86 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({"success": True, "tags": tags}).encode("utf-8"))
                 except Exception as e:
                     print(f"Error setting tags: {e}")
+                    self.send_error(500, str(e))
+            
+            # ================================================================
+            # DUPLICATE DETECTION - DELETE FILES
+            # ================================================================
+            elif self.path == "/api/duplicates/delete":
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    if content_length > MAX_REQUEST_SIZE:
+                        self.send_error(413, "Request too large")
+                        return
+                    
+                    body = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(body)
+                    
+                    paths_to_delete = data.get("paths", [])
+                    
+                    if not paths_to_delete:
+                        self.send_error(400, "No paths provided")
+                        return
+                    
+                    deleted = []
+                    failed = []
+                    total_freed_mb = 0.0
+                    
+                    for path in paths_to_delete:
+                        try:
+                            abs_path = os.path.abspath(path)
+                            
+                            # Security check
+                            if not is_path_allowed(abs_path):
+                                failed.append({"path": path, "error": "Path not allowed"})
+                                continue
+                            
+                            if os.path.exists(abs_path):
+                                # Get size before deletion
+                                size_mb = os.path.getsize(abs_path) / (1024 * 1024)
+                                
+                                # Delete file
+                                os.remove(abs_path)
+                                
+                                # Remove from database
+                                db.remove(abs_path)
+                                
+                                deleted.append(abs_path)
+                                total_freed_mb += size_mb
+                                print(f"🗑️ Deleted duplicate: {os.path.basename(abs_path)} ({size_mb:.1f} MB)")
+                            else:
+                                failed.append({"path": path, "error": "File not found"})
+                                
+                        except Exception as e:
+                            failed.append({"path": path, "error": str(e)})
+                    
+                    # Save database changes
+                    if deleted:
+                        db.save()
+                    
+                    response = {
+                        "success": True,
+                        "deleted": deleted,
+                        "failed": failed,
+                        "freed_mb": round(total_freed_mb, 2),
+                        "freed_gb": round(total_freed_mb / 1024, 2),
+                    }
+                    
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response).encode("utf-8"))
+                    print(f"✅ Deleted {len(deleted)} duplicates, freed {total_freed_mb:.1f} MB")
+                    
+                except json.JSONDecodeError:
+                    self.send_error(400, "Invalid JSON")
+                except Exception as e:
+                    print(f"❌ Error deleting duplicates: {e}")
                     self.send_error(500, str(e))
             
             else:

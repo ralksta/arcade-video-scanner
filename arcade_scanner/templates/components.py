@@ -263,6 +263,13 @@ NAVIGATION_COMPONENT = """
         <span id="count-vault" class="ml-auto text-[11px] text-gray-400 dark:text-gray-500 font-mono"></span>
     </button>
     
+    <button id="m-duplicates" onclick="setWorkspaceMode('duplicates')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-purple-500 rounded-r opacity-0 transition-opacity"></div>
+        <span class="material-icons text-[20px] group-hover:text-purple-400 group-[.active]:text-purple-400">content_copy</span>
+        <span class="font-medium group-[.active]:text-black dark:group-[.active]:text-white">Duplicates</span>
+        <span id="count-duplicates" class="ml-auto text-[11px] text-gray-400 dark:text-gray-500 font-mono"></span>
+    </button>
+    
     <!-- Smart Collections Section -->
     <div class="mt-4 border-t border-black/5 dark:border-white/5 pt-3">
         <div class="flex items-center justify-between px-3 mb-2">

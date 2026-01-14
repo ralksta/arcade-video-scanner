@@ -1,4 +1,4 @@
-# Arcade Media Scanner 6.3.0
+# Arcade Media Scanner 6.4.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -10,7 +10,30 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.3.0 Highlights (New!)
+## 🚀 Version 6.4.0 Highlights (New!)
+
+This release adds **Duplicate Detection**, **First-Run Setup Wizard**, and **Database Cleanup Tools**.
+
+### 🔍 Duplicate Detection
+- **Smart Detection**: Finds duplicate videos and images using metadata matching + content verification.
+- **Content Sampling**: Hashes first/last 512KB of files to eliminate false positives.
+- **Quality Scoring**: Recommends which file to keep based on bitrate, resolution, and codec.
+- **Visual Comparison**: Side-by-side thumbnails with metadata and "Reveal in Finder" buttons.
+- **One-Click Cleanup**: Delete duplicates directly from the UI with space savings summary.
+
+### 🧙 First-Run Setup Wizard
+- **Interactive Onboarding**: ASCII-based terminal wizard guides new users through configuration.
+- **Auto-Detection**: Automatically finds ffmpeg/ffprobe on your system.
+- **Quick Setup**: Configure scan directories, exclusions, and thresholds in minutes.
+- **Optional Reset**: Wipe database and start fresh if upgrading from older versions.
+
+### 🧹 Maintenance Tools
+- **Database Cleanup**: Remove entries for files deleted from Finder.
+- **Orphan Cleanup**: Purge unused thumbnails and preview files.
+
+---
+
+## 🚀 Version 6.3.0 Highlights
 
 This release adds **Image Support**, **Cinema Keyboard Navigation**, and **Media Type Detection**.
 

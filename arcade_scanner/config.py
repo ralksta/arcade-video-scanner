@@ -52,7 +52,7 @@ DEFAULT_EXCLUSIONS = [
 if not IS_WIN:
     DEFAULT_EXCLUSIONS += [
         {"path": "~/Pictures/Photos Library.photoslibrary", "desc": "Apple Photos library"},
-        {"path": "~/Library/CloudStorage/", "desc": "iCloud & cloud services"},
+        {"path": "~/Library/", "desc": "iCloud & cloud services"},
         {"path": "~/Library/Containers/", "desc": "App sandbox data"},
         {"path": "~/.Trash/", "desc": "Trash Folder"},
         {"path": "~/Library/Mobile Documents/", "desc": "iCloud documents"},

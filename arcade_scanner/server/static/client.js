@@ -204,7 +204,8 @@ function setWorkspaceMode(mode, preserveCollection = false) {
             favorites: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' },
             optimized: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
             review: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
-            vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' }
+            vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' },
+            duplicates: { accent: '#a855f7', bg: 'rgba(168, 85, 247, 0.05)' }
         };
         const colors = wsColors[mode] || wsColors.lobby;
         const wsIndicator = document.querySelector('.workspace-indicator');
@@ -227,7 +228,12 @@ function setWorkspaceMode(mode, preserveCollection = false) {
             treemap.classList.add('animating');
         }
 
-        filterAndSort(true); // Scroll to top on workspace change
+        // Special handling for duplicates mode
+        if (mode === 'duplicates') {
+            renderDuplicatesView();
+        } else {
+            filterAndSort(true); // Scroll to top on workspace change
+        }
         updateURL();
     } catch (e) {
         alert("Error in setWorkspaceMode: " + e.message + "\\n" + e.stack);
@@ -4899,5 +4905,203 @@ async function logout() {
     } catch (e) {
         console.error("Logout failed", e);
         window.location.reload();
+    }
+}
+
+// ============================================================================
+// DUPLICATE DETECTION
+// ============================================================================
+let duplicateData = null;
+
+async function loadDuplicates() {
+    try {
+        const res = await fetch('/api/duplicates');
+        if (res.ok) {
+            duplicateData = await res.json();
+            console.log(`🔍 Found ${duplicateData.summary.total_groups} duplicate groups`);
+            return duplicateData;
+        }
+    } catch (e) {
+        console.error("Error loading duplicates:", e);
+    }
+    return null;
+}
+
+function renderDuplicatesView() {
+    const grid = document.getElementById('videoGrid');
+    if (!grid) return;
+
+    grid.innerHTML = `
+        <div class="col-span-full flex items-center justify-center py-12">
+            <div class="flex items-center gap-3 text-gray-400">
+                <span class="material-icons animate-spin">sync</span>
+                <span>Scanning for duplicates...</span>
+            </div>
+        </div>
+    `;
+
+    loadDuplicates().then(data => {
+        if (!data || data.groups.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                    <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
+                    <h3 class="text-xl font-bold text-gray-400 mb-2">No Duplicates Found</h3>
+                    <p class="text-sm text-gray-500">Your library is clean! No duplicate media detected.</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Update sidebar count
+        const countEl = document.getElementById('count-duplicates');
+        if (countEl) countEl.textContent = data.summary.total_groups;
+
+        // Render summary header
+        let html = `
+            <div class="col-span-full bg-gradient-to-r from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-6 mb-4">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/40">
+                            <span class="material-icons text-3xl text-purple-400">content_copy</span>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Duplicate Media</h2>
+                            <p class="text-sm text-gray-400">
+                                Found <span class="text-purple-400 font-bold">${data.summary.total_groups}</span> groups
+                                (<span class="text-cyan-400">${data.summary.video_groups}</span> videos,
+                                <span class="text-pink-400">${data.summary.image_groups}</span> images)
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-bold text-green-400">${data.summary.potential_savings_gb.toFixed(1)} GB</div>
+                        <div class="text-xs text-gray-500 uppercase tracking-wider">Potential Savings</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Render each duplicate group
+        data.groups.forEach((group, idx) => {
+            const isVideo = group.media_type === 'video';
+            const icon = isVideo ? 'movie' : 'image';
+            const color = isVideo ? 'cyan' : 'pink';
+
+            html += `
+                <div class="col-span-full bg-[#14141c] rounded-xl border border-white/5 hover:border-${color}-500/30 overflow-hidden mb-4 transition-all">
+                    <!-- Group Header -->
+                    <div class="p-4 border-b border-white/5 flex items-center justify-between flex-wrap gap-2 bg-white/[0.02]">
+                        <div class="flex items-center gap-3">
+                            <span class="material-icons text-${color}-400">${icon}</span>
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                                Group ${idx + 1} • ${group.match_type} match • ${group.files.length} files
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-sm font-mono text-green-400">
+                                +${group.potential_savings_mb.toFixed(0)} MB
+                            </span>
+                            <span class="text-xs text-gray-500 px-2 py-1 rounded bg-white/5">
+                                ${Math.round(group.confidence * 100)}% match
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Files Grid -->
+                    <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${Math.min(group.files.length, 4)} gap-4">
+                        ${group.files.map((file, fIdx) => {
+                const isKeep = file.path === group.recommended_keep;
+                const thumbSrc = file.thumb ? `/thumbnails/${file.thumb}` : '/static/placeholder.png';
+                return `
+                                <div class="relative rounded-lg border ${isKeep ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 bg-white/[0.02]'} overflow-hidden flex flex-col">
+                                    ${isKeep ? `
+                                        <div class="absolute top-2 right-2 z-10 px-2 py-0.5 rounded text-[10px] font-bold bg-green-500 text-black uppercase tracking-wider">
+                                            Keep
+                                        </div>
+                                    ` : ''}
+                                    
+                                    <!-- Thumbnail -->
+                                    <div class="relative aspect-video bg-black cursor-pointer group" onclick="openCinema(this)" data-path="${file.path}">
+                                        <img src="${thumbSrc}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+                                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="p-3 flex flex-col gap-2">
+                                        <div class="text-sm font-medium text-gray-200 truncate" title="${file.path}">
+                                            ${file.path.split(/[\\/]/).pop()}
+                                        </div>
+                                        
+                                        <div class="text-xs text-gray-500 truncate" title="${file.path}">
+                                            ${file.path.split(/[\\/]/).slice(-3, -1).join('/')}
+                                        </div>
+                                        
+                                        <div class="flex items-center gap-2 text-[10px] text-gray-400 font-mono flex-wrap">
+                                            <span class="bg-white/5 px-1.5 py-0.5 rounded">${file.size_mb.toFixed(0)} MB</span>
+                                            ${file.width && file.height ? `<span class="bg-white/5 px-1.5 py-0.5 rounded">${file.width}×${file.height}</span>` : ''}
+                                            ${file.bitrate_mbps ? `<span class="bg-white/5 px-1.5 py-0.5 rounded">${file.bitrate_mbps.toFixed(1)} Mbps</span>` : ''}
+                                            <span class="ml-auto bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Q: ${file.quality_score.toFixed(0)}</span>
+                                        </div>
+                                        
+                                        <!-- Reveal in Finder Button -->
+                                        <button onclick="window.open('/reveal?path=${encodeURIComponent(file.path)}', 'h_frame')" 
+                                                class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
+                                            <span class="material-icons text-sm">folder_open</span>
+                                            Reveal in Finder
+                                        </button>
+                                        
+                                        ${!isKeep ? `
+                                            <button onclick="deleteDuplicate('${encodeURIComponent(file.path)}')" 
+                                                    class="w-full py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1">
+                                                <span class="material-icons text-sm">delete</span>
+                                                Delete
+                                            </button>
+                                        ` : `
+                                            <div class="w-full py-2 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 text-xs font-bold text-center flex items-center justify-center gap-1">
+                                                <span class="material-icons text-sm">verified</span>
+                                                Best Quality
+                                            </div>
+                                        `}
+                                    </div>
+                                </div>
+                            `;
+            }).join('')}
+                    </div>
+                </div>
+            `;
+        });
+
+        grid.innerHTML = html;
+    });
+}
+
+async function deleteDuplicate(encodedPath) {
+    const path = decodeURIComponent(encodedPath);
+    const filename = path.split(/[\\/]/).pop();
+
+    if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/duplicates/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: [path] })
+        });
+
+        if (res.ok) {
+            const result = await res.json();
+            console.log(`✅ Deleted: ${result.deleted.length} files, freed ${result.freed_mb} MB`);
+
+            // Refresh view
+            renderDuplicatesView();
+        } else {
+            alert('Failed to delete file');
+        }
+    } catch (e) {
+        console.error('Delete error:', e);
+        alert('Error deleting file');
     }
 }
