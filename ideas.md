@@ -11,10 +11,6 @@ Integration von **OpenAI Whisper** (lokal, läuft super auf Mac/GPU) oder einfac
 - **Use Case**: Du suchst nach "Bossfight" oder einem Moment, wo jemand "Game Over" ruft? Die Suche findet die exakte Sekunde im Video.
 - **Machbarkeit**: Mittel (Whisper.cpp ist sehr effizient).
 
-### 👯 Smart Deduplication
-Nicht nur Dateinamen vergleichen, sondern **Perceptual Hashing** (pHash) nutzen.
-- **Idee**: Erkenne, dass `gameplay_final.mp4` und `gameplay_final_optimized.mp4` das gleiche Video sind, auch wenn Dateigröße und Codec völlig anders sind.
-- **Vorteil**: Massive Speicherbereinigung bei doppelten Bibliotheken.
 
 ---
 

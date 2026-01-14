@@ -17,6 +17,7 @@ from arcade_scanner.templates.components import (
     FILTER_PANEL_COMPONENT,
     TAG_MANAGER_MODAL_COMPONENT,
     COLLECTION_MODAL_COMPONENT,
+    HIDDEN_PATH_MODAL_COMPONENT,
     LIST_VIEW_COMPONENT,
     OPTIMIZE_PANEL_COMPONENT,
     SETTINGS_MODAL_COMPONENT,
@@ -136,6 +137,7 @@ def generate_html_report(results, report_file, server_port=8000):
     {FILTER_PANEL_COMPONENT}
     {TAG_MANAGER_MODAL_COMPONENT}
     {COLLECTION_MODAL_COMPONENT}
+    {HIDDEN_PATH_MODAL_COMPONENT}
     {BATCH_BAR_COMPONENT}
     
     <!-- Hidden frame for form submissions if needed -->
