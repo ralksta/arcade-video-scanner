@@ -138,6 +138,7 @@ def generate_html_report(results, report_file, server_port=8000):
     {FILTER_PANEL_COMPONENT}
     {TAG_MANAGER_MODAL_COMPONENT}
     {COLLECTION_MODAL_COMPONENT}
+    {SETUP_WIZARD_COMPONENT}
     {HIDDEN_PATH_MODAL_COMPONENT}
     {BATCH_BAR_COMPONENT}
     
