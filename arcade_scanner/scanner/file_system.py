@@ -115,9 +115,14 @@ class AsyncFileSystem:
         return False
 
     def _is_valid_size(self, path: str) -> bool:
-        # Images should not be subject to min size (photos are often < 1MB)
+        # Images use KB threshold (configurable, e.g., 500 KB)
         if any(path.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS):
-            return True
+            try:
+                size_bytes = os.path.getsize(path)
+                min_image_bytes = config.settings.min_image_size_kb * 1024
+                return size_bytes >= min_image_bytes
+            except OSError:
+                return False
             
         # Optimization check for videos
         if "_opt." in os.path.basename(path) or "_trim." in os.path.basename(path):
