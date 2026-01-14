@@ -90,12 +90,13 @@ class DuplicateDetector:
         self._group_counter += 1
         return f"dup_{self._group_counter:04d}"
     
-    def find_all_duplicates(self, entries: List) -> List[DuplicateGroup]:
+    def find_all_duplicates(self, entries: List, progress_callback=None) -> List[DuplicateGroup]:
         """
         Find all duplicates in the media library.
         
         Args:
             entries: List of VideoEntry objects from the database
+            progress_callback: Optional callable(str, float) to report status and progress (0-100)
             
         Returns:
             List of DuplicateGroup objects
@@ -107,16 +108,25 @@ class DuplicateDetector:
         groups = []
         
         # Find video duplicates
-        video_groups = self._find_video_duplicates(videos)
+        if progress_callback:
+            progress_callback("Scanning video metadata...", 10)
+            
+        video_groups = self._find_video_duplicates(videos, progress_callback)
         groups.extend(video_groups)
         
         # Find image duplicates
+        if progress_callback:
+            progress_callback("Scanning image metadata...", 80)
+            
         image_groups = self._find_image_duplicates(images)
         groups.extend(image_groups)
         
+        if progress_callback:
+            progress_callback("Scan complete", 100)
+            
         return groups
     
-    def _find_video_duplicates(self, videos: List) -> List[DuplicateGroup]:
+    def _find_video_duplicates(self, videos: List, progress_callback=None) -> List[DuplicateGroup]:
         """
         Find duplicate videos using exact match strategy.
         Groups by: size + duration + resolution, then verified by content sampling.
@@ -140,8 +150,18 @@ class DuplicateDetector:
         
         # Convert to DuplicateGroups with content verification
         groups = []
+        total_signatures = len(signature_map)
+        processed_signatures = 0
+        
         for signature, files in signature_map.items():
+            processed_signatures += 1
             if len(files) > 1:
+                # Update progress if callback provided
+                if progress_callback:
+                    # Map progress to 10-80% range
+                    pct = 10 + (processed_signatures / total_signatures) * 70
+                    progress_callback(f"Verifying group {processed_signatures}/{total_signatures}", pct)
+                
                 # Verify with content sampling to avoid false positives
                 verified_groups = self._verify_by_content_sample(files)
                 for verified_files in verified_groups:
@@ -181,10 +201,12 @@ class DuplicateDetector:
     def _verify_by_content_sample(self, files: List) -> List[List]:
         """
         Verify potential duplicates by comparing content samples.
+        Falls back to visual hash for re-encoded videos.
         Returns groups of files that have matching content.
         """
         # Calculate content hashes
         hash_map: Dict[str, List] = defaultdict(list)
+        unmatched = []
         
         for f in files:
             path = f.file_path
@@ -192,8 +214,119 @@ class DuplicateDetector:
             if content_hash:
                 hash_map[content_hash].append(f)
         
-        # Return only groups with actual duplicates
-        return [group for group in hash_map.values() if len(group) > 1]
+        # Collect exact match groups
+        result_groups = [group for group in hash_map.values() if len(group) > 1]
+        
+        # Collect files that didn't match by content hash
+        for group in hash_map.values():
+            if len(group) == 1:
+                unmatched.append(group[0])
+        
+        # If we have unmatched files and imagehash is available, try visual matching
+        if len(unmatched) >= 2 and IMAGEHASH_AVAILABLE:
+            visual_groups = self._verify_by_visual_hash(unmatched)
+            result_groups.extend(visual_groups)
+        
+        return result_groups
+    
+    def _get_video_frame_hash(self, video_path: str, position_sec: float = 2.0) -> Optional[str]:
+        """
+        Extract a frame from video and compute its perceptual hash.
+        Uses ffmpeg to extract frame, then imagehash for comparison.
+        """
+        import subprocess
+        import tempfile
+        
+        if not IMAGEHASH_AVAILABLE:
+            return None
+        
+        try:
+            # Create temp file for extracted frame
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                temp_path = tmp.name
+            
+            # Use ffmpeg to extract a frame
+            cmd = [
+                'ffmpeg', '-y', '-ss', str(position_sec),
+                '-i', video_path,
+                '-frames:v', '1',
+                '-q:v', '2',
+                temp_path
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0 or not os.path.exists(temp_path):
+                return None
+            
+            # Compute perceptual hash
+            with Image.open(temp_path) as img:
+                phash = imagehash.phash(img)
+                hash_str = str(phash)
+            
+            # Cleanup
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            
+            return hash_str
+            
+        except Exception:
+            return None
+    
+    def _verify_by_visual_hash(self, files: List, threshold: int = 8) -> List[List]:
+        """
+        Group files by visual similarity using frame extraction + perceptual hash.
+        Threshold: max hash difference to consider as duplicate (0=exact, higher=more lenient)
+        """
+        # Get visual hashes for all files
+        hash_data: List[Tuple[any, any]] = []  # (file, phash_obj)
+        
+        for f in files:
+            path = f.file_path
+            duration = getattr(f, 'duration_sec', 0) if hasattr(f, 'duration_sec') else 0
+            
+            # Sample frame from middle of video (or 2s in if short)
+            sample_pos = min(duration / 2, 2.0) if duration > 0 else 2.0
+            
+            hash_str = self._get_video_frame_hash(path, sample_pos)
+            if hash_str:
+                try:
+                    phash_obj = imagehash.hex_to_hash(hash_str)
+                    hash_data.append((f, phash_obj))
+                except:
+                    pass
+        
+        # Group by similar hashes
+        used = set()
+        groups = []
+        
+        for i, (file_a, hash_a) in enumerate(hash_data):
+            if i in used:
+                continue
+            
+            similar = [file_a]
+            used.add(i)
+            
+            for j, (file_b, hash_b) in enumerate(hash_data):
+                if j in used:
+                    continue
+                
+                # Compare hashes
+                diff = hash_a - hash_b
+                if diff <= threshold:
+                    similar.append(file_b)
+                    used.add(j)
+            
+            if len(similar) > 1:
+                groups.append(similar)
+        
+        return groups
     
     def _create_video_group(self, videos: List) -> DuplicateGroup:
         """Create a DuplicateGroup from a list of matching videos."""

@@ -4912,52 +4912,140 @@ async function logout() {
 // DUPLICATE DETECTION
 // ============================================================================
 let duplicateData = null;
+let duplicatePollInterval = null;
 
 async function loadDuplicates() {
     try {
+        // 1. Check if we already have results cached
         const res = await fetch('/api/duplicates');
         if (res.ok) {
-            duplicateData = await res.json();
-            console.log(`🔍 Found ${duplicateData.summary.total_groups} duplicate groups`);
-            return duplicateData;
+            const data = await res.json();
+            if (data.summary && data.summary.scan_run) {
+                duplicateData = data;
+                console.log(`🔍 Found cached results: ${duplicateData.summary.total_groups} groups`);
+                return duplicateData;
+            }
         }
+
+        // 2. If no cache, trigger a new scan
+        console.log("No cached results, triggering scan...");
+        const scanRes = await fetch('/api/duplicates/scan', { method: 'POST' });
+        if (scanRes.status === 202 || scanRes.status === 409) {
+            // Scan started or already running
+            return "scanning";
+        }
+
     } catch (e) {
         console.error("Error loading duplicates:", e);
     }
     return null;
 }
 
-function renderDuplicatesView() {
-    const grid = document.getElementById('videoGrid');
-    if (!grid) return;
+function pollDuplicateStatus(grid) {
+    // Clear any existing poll first
+    if (duplicatePollInterval) clearInterval(duplicatePollInterval);
 
-    grid.innerHTML = `
-        <div class="col-span-full flex items-center justify-center py-12">
-            <div class="flex items-center gap-3 text-gray-400">
-                <span class="material-icons animate-spin">sync</span>
-                <span>Scanning for duplicates...</span>
-            </div>
-        </div>
-    `;
+    const statusText = document.getElementById('scan-status-text');
+    const progressBar = document.getElementById('scan-progress-bar');
+    const progressText = document.getElementById('scan-progress-text');
 
-    loadDuplicates().then(data => {
-        if (!data || data.groups.length === 0) {
-            grid.innerHTML = `
-                <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
-                    <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
-                    <h3 class="text-xl font-bold text-gray-400 mb-2">No Duplicates Found</h3>
-                    <p class="text-sm text-gray-500">Your library is clean! No duplicate media detected.</p>
-                </div>
-            `;
+    duplicatePollInterval = setInterval(async () => {
+        // Stop polling if we navigated away
+        if (workspaceMode !== 'duplicates') {
+            clearInterval(duplicatePollInterval);
+            duplicatePollInterval = null;
             return;
         }
 
-        // Update sidebar count
-        const countEl = document.getElementById('count-duplicates');
-        if (countEl) countEl.textContent = data.summary.total_groups;
+        try {
+            const res = await fetch('/api/duplicates/status');
+            if (!res.ok) return;
 
-        // Render summary header
-        let html = `
+            const status = await res.json();
+
+            if (status.is_running) {
+                // Update UI
+                if (statusText) statusText.textContent = status.message || "Scanning...";
+                if (progressBar) progressBar.style.width = `${status.progress}%`;
+                if (progressText) progressText.textContent = `${status.progress}%`;
+            } else {
+                // Scan finished
+                clearInterval(duplicatePollInterval);
+                duplicatePollInterval = null;
+
+                // Fetch final results
+                const finalRes = await fetch('/api/duplicates');
+                if (finalRes.ok) {
+                    duplicateData = await finalRes.json();
+                    renderDuplicatesView(); // Re-render with data
+                }
+            }
+        } catch (e) {
+            console.error("Polling error:", e);
+            clearInterval(duplicatePollInterval);
+        }
+    }, 500);
+}
+
+function renderDuplicatesView() {
+    // Safety check: Don't render if we switched away
+    if (workspaceMode !== 'duplicates') return;
+
+    const grid = document.getElementById('videoGrid');
+    if (!grid) return;
+
+    // Initial state or Loading state
+    if (!duplicateData) {
+        grid.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-24 gap-6">
+                <!-- Spinner -->
+                <div class="relative w-20 h-20">
+                    <div class="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
+                    <div class="absolute inset-0 rounded-full border-4 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+                </div>
+                
+                <!-- Status Text -->
+                <div class="text-center">
+                    <h3 class="text-xl font-bold text-white mb-2" id="scan-status-text">Starting visual analysis...</h3>
+                    <p class="text-sm text-gray-400">This may take a minute for large libraries.</p>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="w-full max-w-md bg-white/5 rounded-full h-4 overflow-hidden relative border border-white/5">
+                    <div id="scan-progress-bar" class="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="text-xs text-gray-500 font-mono" id="scan-progress-text">0%</div>
+            </div>
+        `;
+
+        loadDuplicates().then(result => {
+            if (result === "scanning") {
+                pollDuplicateStatus(grid);
+            } else if (result && result.groups) {
+                renderDuplicatesView(); // Recursively call to render data
+            }
+        });
+        return;
+    }
+
+    // Empty State Check
+    if (duplicateData.groups.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
+                <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
+                <h3 class="text-xl font-bold text-gray-400 mb-2">No Duplicates Found</h3>
+                <p class="text-sm text-gray-500">Your library is clean! No duplicate media detected.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Update sidebar count
+    const countEl = document.getElementById('count-duplicates');
+    if (countEl) countEl.textContent = duplicateData.summary.total_groups;
+
+    // Render summary header
+    let html = `
             <div class="col-span-full bg-gradient-to-r from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-6 mb-4">
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div class="flex items-center gap-4">
@@ -4967,27 +5055,27 @@ function renderDuplicatesView() {
                         <div>
                             <h2 class="text-xl font-bold text-white">Duplicate Media</h2>
                             <p class="text-sm text-gray-400">
-                                Found <span class="text-purple-400 font-bold">${data.summary.total_groups}</span> groups
-                                (<span class="text-cyan-400">${data.summary.video_groups}</span> videos,
-                                <span class="text-pink-400">${data.summary.image_groups}</span> images)
+                                Found <span class="text-purple-400 font-bold">${duplicateData.summary.total_groups}</span> groups
+                                (<span class="text-cyan-400">${duplicateData.summary.video_groups}</span> videos,
+                                <span class="text-pink-400">${duplicateData.summary.image_groups}</span> images)
                             </p>
                         </div>
                     </div>
                     <div class="text-right">
-                        <div class="text-2xl font-bold text-green-400">${data.summary.potential_savings_gb.toFixed(1)} GB</div>
+                        <div class="text-2xl font-bold text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
                         <div class="text-xs text-gray-500 uppercase tracking-wider">Potential Savings</div>
                     </div>
                 </div>
             </div>
         `;
 
-        // Render each duplicate group
-        data.groups.forEach((group, idx) => {
-            const isVideo = group.media_type === 'video';
-            const icon = isVideo ? 'movie' : 'image';
-            const color = isVideo ? 'cyan' : 'pink';
+    // Render each duplicate group
+    duplicateData.groups.forEach((group, idx) => {
+        const isVideo = group.media_type === 'video';
+        const icon = isVideo ? 'movie' : 'image';
+        const color = isVideo ? 'cyan' : 'pink';
 
-            html += `
+        html += `
                 <div class="col-span-full bg-[#14141c] rounded-xl border border-white/5 hover:border-${color}-500/30 overflow-hidden mb-4 transition-all">
                     <!-- Group Header -->
                     <div class="p-4 border-b border-white/5 flex items-center justify-between flex-wrap gap-2 bg-white/[0.02]">
@@ -5010,9 +5098,9 @@ function renderDuplicatesView() {
                     <!-- Files Grid -->
                     <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${Math.min(group.files.length, 4)} gap-4">
                         ${group.files.map((file, fIdx) => {
-                const isKeep = file.path === group.recommended_keep;
-                const thumbSrc = file.thumb ? `/thumbnails/${file.thumb}` : '/static/placeholder.png';
-                return `
+            const isKeep = file.path === group.recommended_keep;
+            const thumbSrc = file.thumb ? `/thumbnails/${file.thumb}` : '/static/placeholder.png';
+            return `
                                 <div class="relative rounded-lg border ${isKeep ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 bg-white/[0.02]'} overflow-hidden flex flex-col">
                                     ${isKeep ? `
                                         <div class="absolute top-2 right-2 z-10 px-2 py-0.5 rounded text-[10px] font-bold bg-green-500 text-black uppercase tracking-wider">
@@ -5066,14 +5154,13 @@ function renderDuplicatesView() {
                                     </div>
                                 </div>
                             `;
-            }).join('')}
+        }).join('')}
                     </div>
                 </div>
             `;
-        });
-
-        grid.innerHTML = html;
     });
+
+    grid.innerHTML = html;
 }
 
 async function deleteDuplicate(encodedPath) {

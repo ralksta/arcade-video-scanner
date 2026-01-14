@@ -19,6 +19,48 @@ from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
+# Global state for duplicate scanning
+DUPLICATE_SCAN_STATE = {
+    "is_running": False,
+    "progress": 0,
+    "message": "",
+}
+DUPLICATE_RESULTS_CACHE = None
+
+def background_duplicate_scan():
+    """Background worker for duplicate detection."""
+    global DUPLICATE_RESULTS_CACHE
+    from arcade_scanner.core.duplicate_detector import DuplicateDetector
+    import threading
+    
+    DUPLICATE_SCAN_STATE["is_running"] = True
+    DUPLICATE_SCAN_STATE["progress"] = 0
+    DUPLICATE_SCAN_STATE["message"] = "Initializing scan..."
+    
+    try:
+        def progress_cb(msg, pct):
+            DUPLICATE_SCAN_STATE["message"] = msg
+            DUPLICATE_SCAN_STATE["progress"] = int(pct)
+            
+        detector = DuplicateDetector()
+        # Get all videos (thread-safe enough for read)
+        all_videos = db.get_all()
+        
+        results = detector.find_all_duplicates(all_videos, progress_cb)
+        
+        # Serialize results slightly earlier to avoid main thread blocking later
+        DUPLICATE_RESULTS_CACHE = [g.to_dict() for g in results]
+        
+        DUPLICATE_SCAN_STATE["message"] = "Scan complete"
+        DUPLICATE_SCAN_STATE["progress"] = 100
+        
+    except Exception as e:
+        print(f"❌ Error in duplicate scan: {e}")
+        DUPLICATE_SCAN_STATE["message"] = f"Error: {e}"
+    finally:
+        DUPLICATE_SCAN_STATE["is_running"] = False
+
+
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def get_current_user(self):
         """Returns the username from the session cookie, or None."""
@@ -975,49 +1017,48 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # ================================================================
             # DUPLICATE DETECTION API
             # ================================================================
+            elif self.path == "/api/duplicates/status":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(DUPLICATE_SCAN_STATE).encode("utf-8"))
+                return
+
             elif self.path == "/api/duplicates" or self.path == "/api/duplicates/":
-                # GET: Find and return all duplicate groups
+                # GET: Return cached duplicate results
                 user_name = self.get_current_user()
                 if not user_name:
                     self.send_error(401, "Unauthorized")
                     return
                 
                 try:
-                    from arcade_scanner.core.duplicate_detector import duplicate_detector
-                    
-                    # Get all media entries
-                    all_entries = db.get_all()
-                    
-                    # Find duplicates
-                    groups = duplicate_detector.find_all_duplicates(all_entries)
+                    # Return cached results or empty list if not run yet
+                    groups_data = DUPLICATE_RESULTS_CACHE if DUPLICATE_RESULTS_CACHE is not None else []
                     
                     # Calculate summary stats
-                    total_groups = len(groups)
-                    total_savings = sum(g.potential_savings_mb for g in groups)
-                    video_groups = len([g for g in groups if g.media_type == "video"])
-                    image_groups = len([g for g in groups if g.media_type == "image"])
+                    total_groups = len(groups_data)
+                    total_videos = sum(1 for g in groups_data if g.get("media_type") == "video")
+                    total_images = sum(1 for g in groups_data if g.get("media_type") == "image")
+                    potential_savings = sum(g.get("potential_savings_mb", 0) for g in groups_data)
                     
                     response = {
-                        "groups": [g.to_dict() for g in groups],
                         "summary": {
                             "total_groups": total_groups,
-                            "video_groups": video_groups,
-                            "image_groups": image_groups,
-                            "potential_savings_mb": round(total_savings, 2),
-                            "potential_savings_gb": round(total_savings / 1024, 2),
-                        }
+                            "video_groups": total_videos,
+                            "image_groups": total_images,
+                            "potential_savings_mb": potential_savings,
+                            "scan_run": DUPLICATE_RESULTS_CACHE is not None
+                        },
+                        "groups": groups_data
                     }
                     
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(json.dumps(response).encode("utf-8"))
-                    print(f"🔍 Duplicate scan: {total_groups} groups, {total_savings:.1f} MB potential savings")
                     
                 except Exception as e:
-                    print(f"❌ Error in duplicate detection: {e}")
-                    import traceback
-                    traceback.print_exc()
+                    print(f"❌ Error returning duplicates: {e}")
                     self.send_error(500, str(e))
             
             else:
@@ -1327,6 +1368,28 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # ================================================================
             # DUPLICATE DETECTION - DELETE FILES
             # ================================================================
+            elif self.path == "/api/duplicates/scan":
+                # POST: Start duplicate scan
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                
+                if DUPLICATE_SCAN_STATE["is_running"]:
+                    self.send_error(409, "Scan already in progress")
+                    return
+                
+                # Start background thread
+                import threading
+                t = threading.Thread(target=background_duplicate_scan)
+                t.daemon = True
+                t.start()
+                
+                self.send_response(202)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "started"}).encode("utf-8"))
+
             elif self.path == "/api/duplicates/delete":
                 user_name = self.get_current_user()
                 if not user_name:
