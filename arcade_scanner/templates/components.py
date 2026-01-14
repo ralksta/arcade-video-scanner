@@ -1363,6 +1363,115 @@ HIDDEN_PATH_MODAL_COMPONENT = """
 </style>
 """
 
+SETUP_WIZARD_COMPONENT = """
+<!-- First-Run Setup Wizard -->
+<div id="setupWizard" class="hidden fixed inset-0 z-[200] bg-gradient-to-br from-[#0a0a12] via-[#1a1a24] to-[#0a0a12] flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl">
+        
+        <!-- Welcome Header -->
+        <div class="text-center mb-8">
+            <div class="inline-block p-4 bg-arcade-cyan/10 rounded-full mb-4">
+                <span class="material-icons text-6xl text-arcade-cyan">rocket_launch</span>
+            </div>
+            <h1 class="text-4xl font-bold text-white mb-2">Welcome to Arcade Media Scanner!</h1>
+            <p class="text-gray-400 text-lg">Let's configure your media library in just a few steps</p>
+        </div>
+
+        <!-- Setup Card -->
+        <div class="bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 p-8">
+            
+            <!-- Step 1: Select Directories -->
+            <div class="mb-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="flex items-center justify-center w-8 h-8 rounded-full bg-arcade-cyan text-black font-bold text-sm">1</span>
+                    <h2 class="text-xl font-semibold text-white">Select Media Directories</h2>
+                </div>
+                <p class="text-sm text-gray-400 mb-4">Choose which directories to scan for videos and images. Your media is mounted at <code class="px-2 py-0.5 bg-black/40 rounded text-arcade-cyan">/media</code></p>
+                
+                <!-- Directory List -->
+                <div id="setupDirectoryList" class="space-y-2 max-h-64 overflow-y-auto">
+                    <!-- Populated dynamically -->
+                    <div class="flex items-center justify-center py-8 text-gray-500">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-arcade-cyan mr-3"></div>
+                        <span>Loading directories...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Image Scanning -->
+            <div class="mb-8 p-4 bg-black/20 rounded-lg border border-white/5">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="flex items-center justify-center w-8 h-8 rounded-full bg-arcade-cyan text-black font-bold text-sm">2</span>
+                    <h2 class="text-xl font-semibold text-white">Image Scanning</h2>
+                </div>
+                <label class="flex items-center gap-3 cursor-pointer select-none">
+                    <div class="relative inline-flex items-center">
+                        <input type="checkbox" id="setupScanImages" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-arcade-cyan/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-arcade-cyan"></div>
+                    </div>
+                    <div>
+                        <span class="text-white font-medium">Scan images (JPG, PNG, RAW, etc.)</span>
+                        <p class="text-xs text-gray-500">Enable if you have photo libraries</p>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-between pt-6 border-t border-white/10">
+                <button onclick="skipSetup()" class="px-6 py-2.5 text-gray-400 hover:text-white transition-colors text-sm">
+                    Skip for now
+                </button>
+                <button onclick="completeSetup()" id="setupCompleteBtn" disabled class="px-8 py-3 bg-arcade-cyan text-black font-bold rounded-lg hover:bg-cyan-300 transition-all shadow-lg shadow-arcade-cyan/20 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none">
+                    Complete Setup →
+                </button>
+            </div>
+        </div>
+
+        <!-- Help Text -->
+        <div class="text-center mt-6 text-sm text-gray-500">
+            You can change these settings later in <span class="text-arcade-cyan">Settings → General</span>
+        </div>
+    </div>
+</div>
+
+<style>
+    #setupWizard.active { display: flex !important; }
+    
+    /* Custom scrollbar for directory list */
+    #setupDirectoryList::-webkit-scrollbar {
+        width: 8px;
+    }
+    #setupDirectoryList::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+    }
+    #setupDirectoryList::-webkit-scrollbar-thumb {
+        background: rgba(100, 255, 218, 0.2);
+        border-radius: 4px;
+    }
+    #setupDirectoryList::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 255, 218, 0.3);
+    }
+    
+    .setup-dir-card {
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .setup-dir-card:hover {
+        background: rgba(100, 255, 218, 0.05);
+        border-color: rgba(100, 255, 218, 0.3);
+    }
+    .setup-dir-card.selected {
+        background: rgba(100, 255, 218, 0.15);
+        border-color: rgba(100, 255, 218, 0.5);
+    }
+</style>
+"""
+
 SETTINGS_MODAL_COMPONENT = """
 <div id="settingsModal" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
     <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-[#1a1a24] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/10 transform scale-95 transition-transform duration-300">

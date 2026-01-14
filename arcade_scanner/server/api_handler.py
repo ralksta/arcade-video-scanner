@@ -1372,6 +1372,49 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(500)
                 return
             
+            elif self.path == "/api/setup/complete":
+                # POST: Complete first-run setup wizard
+                try:
+                    content_len = int(self.headers.get('Content-Length', 0))
+                    post_body = self.rfile.read(content_len)
+                    payload = json.loads(post_body)
+                    
+                    user_name = self.get_current_user()
+                    if not user_name:
+                        self.send_error(401)
+                        return
+                    
+                    u = user_db.get_user(user_name)
+                    if not u:
+                        self.send_error(401)
+                        return
+                    
+                    # Extract configuration
+                    scan_targets = payload.get("scan_targets", [])
+                    scan_images = payload.get("scan_images", False)
+                    
+                    # Validate
+                    if not scan_targets:
+                        self.send_error(400, "At least one scan target required")
+                        return
+                    
+                    # Save configuration
+                    u.data.scan_targets = scan_targets
+                    u.data.scan_images = scan_images
+                    u.data.setup_complete = True
+                    user_db.add_user(u)
+                    
+                    print(f"✅ Setup completed for {user_name}: {scan_targets}")
+                    
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                except Exception as e:
+                    print(f"Error completing setup: {e}")
+                    self.send_error(500)
+                return
+            
             elif self.path == "/api/restore":
                 try:
                     content_length = int(self.headers.get("Content-Length", 0))
