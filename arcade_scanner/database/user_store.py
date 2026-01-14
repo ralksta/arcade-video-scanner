@@ -172,11 +172,18 @@ class UserStore:
         salt = os.urandom(16)
         pwd_hash = self.hash_password("admin", salt)
         
+        # Docker mode: Auto-configure /media as scan target
+        user_data = UserVideoData()
+        if os.getenv("CONFIG_DIR"):
+            print("🐳 Docker mode detected - adding /media to scan targets")
+            user_data.scan_targets = ["/media"]
+        
         admin_user = User(
             username="admin",
             password_hash=binascii.hexlify(pwd_hash).decode('ascii'),
             salt=binascii.hexlify(salt).decode('ascii'),
-            is_admin=True
+            is_admin=True,
+            data=user_data
         )
         self.add_user(admin_user)
 

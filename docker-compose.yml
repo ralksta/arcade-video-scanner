@@ -9,7 +9,11 @@ services:
       - "8000:8000"
     volumes:
       # Media library (read-only recommended)
-      - /path/to/your/media:/media:ro
+      # IMPORTANT: Update this path to your actual media directory!
+      # Examples:
+      # - /Users/username/Movies:/media:ro
+      # - /Volumes/ExternalDrive/Videos:/media:ro
+      - ${HOME}/Downloads:/media:ro # Change this to your media path!
       # Persistent configuration and database
       - arcade-config:/config
       # Persistent thumbnails and cache
