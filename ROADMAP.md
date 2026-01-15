@@ -23,6 +23,13 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Version 6.7.0 (2026-01-15)
+- **Batch Selection Mode**: Click one checkbox to enter selection mode, then click anywhere on other cards to toggle selection.
+- **Selection Visual Feedback**: Checkmark overlay on hover, cyan card highlight, and hidden action buttons during selection.
+- **List View Fix**: Fixed thumbnail sizing in list view (was displaying full-size images filling the screen).
+- **CSS Media Query Fix**: Fixed malformed media queries that applied mobile styles to desktop grid view.
+- **Stylesheet Loading**: Added missing `styles.css` link to dashboard template.
+
 ### ✅ Version 6.6.0 (2026-01-14)
 - **Binary Search Quality**: Video optimizer now uses binary search to find optimal quality in O(log n) passes instead of linear search.
 - **Early Size Abort**: Encoding stops mid-pass if output exceeds 95% of original size, saving time on doomed encodes.

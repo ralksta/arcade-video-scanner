@@ -140,28 +140,37 @@ BASE_LAYOUT = """<!DOCTYPE html>
         }}
 
         /* List View Overrides */
-        .list-view {{
+        #videoGrid.list-view {{
             grid-template-columns: 1fr !important;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0.5rem !important;
         }}
 
-        .list-view .video-card-container {{
+        #videoGrid.list-view .video-card-container {{
             flex-direction: row !important;
-            height: 140px;
-            align-items: center;
+            height: 90px !important;
+            align-items: center !important;
+            width: 100% !important;
+            max-width: none !important;
         }}
 
-        .list-view .card-media {{
-            width: 240px !important;
-            height: 100% !important;
-            flex-shrink: 0;
+        #videoGrid.list-view .card-media {{
+            width: 160px !important;
+            min-width: 160px !important;
+            max-width: 160px !important;
+            height: 90px !important;
+            max-height: 90px !important;
+            flex-shrink: 0 !important;
             aspect-ratio: auto !important;
+            overflow: hidden !important;
         }}
         
         .list-view .card-media img {{
-             object-fit: cover;
+             object-fit: cover !important;
+             width: 100% !important;
+             height: 100% !important;
+             max-height: 90px !important;
         }}
 
         .list-view h3 {{

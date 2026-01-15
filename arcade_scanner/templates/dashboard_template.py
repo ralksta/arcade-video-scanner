@@ -165,6 +165,7 @@ def generate_html_report(results, report_file, server_port=8000):
     """
     
     external_scripts = f"""
+    <link rel="stylesheet" href="/static/styles.css?v={int(time.time())}">
     <link rel="stylesheet" href="/static/timeline_scrubber.css?v={int(time.time())}">
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
     <script src="/static/formatters.js?v={int(time.time())}"></script>

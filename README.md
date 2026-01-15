@@ -1,4 +1,4 @@
-# Arcade Media Scanner 6.6.0
+# Arcade Media Scanner 6.7.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -10,7 +10,24 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.6.0 Highlights (New!)
+## 🚀 Version 6.7.0 Highlights (New!)
+
+This release focuses on **Batch Selection UX**, **List View Fixes**, and **CSS Architecture Cleanup**.
+
+### ✅ Batch Selection Mode
+- **Selection Mode**: Check one video to enter selection mode - then simply click any other video card to add/remove from selection (no need to hunt for tiny checkboxes).
+- **Visual Feedback**: Large checkmark overlay appears on hover when in selection mode, with cyan highlight on cards.
+- **Clean UI**: Action buttons (favorite, vault, optimize) hidden during selection mode to reduce clutter.
+- **Smart Exit**: Selection mode automatically deactivates when all items are deselected.
+
+### 🔧 List View & CSS Fixes
+- **List View Fixed**: Properly constrained thumbnail sizes in list view (was displaying full-size images).
+- **CSS Architecture**: Fixed malformed media queries that were applying mobile styles to desktop.
+- **Stylesheet Loading**: Added missing `styles.css` link to dashboard template.
+
+---
+
+## 🚀 Version 6.6.0 Highlights
 
 This release focuses on **Video Optimizer Intelligence**, **Review Workflow**, and **Code Refactoring**.
 

@@ -394,7 +394,16 @@ function setLayout(layout, skipURLUpdate = false) {
         renderTreemap();
         setupTreemapInteraction();
     } else {
-        grid.style.display = layout === 'list' ? 'flex' : 'grid';
+        // Toggle list-view class for CSS styling
+        if (layout === 'list') {
+            grid.classList.add('list-view');
+        } else {
+            grid.classList.remove('list-view');
+        }
+
+        // Ensure display mode is correct (let CSS handle flex/grid details via class)
+        grid.style.display = '';
+
         sentinel.style.display = 'flex';
         treemap.style.display = 'none';
 
@@ -526,6 +535,8 @@ function loadFromURL() {
     // Force layout if treeview
     if (layout === 'treemap') {
         setLayout('treemap');
+    } else if (layout === 'list') {
+        setLayout('list');
     }
 
     // Check for deep links (navigating back/forward)
@@ -954,8 +965,8 @@ function createVideoCard(v) {
 
     container.innerHTML = `
         <!-- Thumbnail (Card Media) -->
-        <div class="card-media relative aspect-video bg-black overflow-hidden group cursor-pointer" 
-             onclick="openCinema(this)">
+        <div class="card-media relative aspect-video bg-black overflow-hidden group cursor-pointer"
+             onclick="handleCardClick(event, this)">
              
              <!-- Image Type Indicator -->
              ${v.media_type === 'image' ? `
@@ -1228,6 +1239,16 @@ function updateBatchSelection() {
 
     if (count > 0) bar.classList.add('active');
     else bar.classList.remove('active');
+
+    // Toggle selection mode class on grid for visual feedback
+    const grid = document.getElementById('videoGrid');
+    if (grid) {
+        if (count > 0) {
+            grid.classList.add('selection-mode');
+        } else {
+            grid.classList.remove('selection-mode');
+        }
+    }
 }
 
 
@@ -1241,6 +1262,37 @@ function clearSelection() {
 
 // --- BATCH SELECTION HELPERS ---
 let lastCheckedPath = null;
+
+/**
+ * Check if selection mode is active (at least one video selected)
+ * @returns {boolean} True if any videos are selected
+ */
+function isSelectionMode() {
+    return document.querySelectorAll('.video-card-container input:checked').length > 0;
+}
+
+/**
+ * Handle card click - either toggle selection (if in selection mode) or open cinema
+ * @param {MouseEvent} event - Click event
+ * @param {HTMLElement} cardMedia - The card-media element that was clicked
+ */
+function handleCardClick(event, cardMedia) {
+    // If in selection mode, toggle checkbox instead of opening cinema
+    if (isSelectionMode()) {
+        event.preventDefault();
+        event.stopPropagation();
+        const container = cardMedia.closest('.video-card-container');
+        const checkbox = container.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+            checkbox.checked = !checkbox.checked;
+            const path = container.getAttribute('data-path');
+            toggleSelection(checkbox, event, path);
+        }
+        return;
+    }
+    // Normal behavior - open cinema
+    openCinema(cardMedia);
+}
 
 /**
  * Handle checkbox toggle with shift-click range selection support
@@ -3311,6 +3363,7 @@ window.clearTrim = clearTrim;
 window.closeOptimize = closeOptimize;
 window.triggerOptimization = triggerOptimization;
 window.toggleSelection = toggleSelection;
+window.handleCardClick = handleCardClick;
 window.exportSettings = exportSettings;
 window.importSettings = importSettings;
 

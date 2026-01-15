@@ -831,16 +831,19 @@ html {
     min-width: 180px !important;
     max-width: 180px !important;
     height: 100px !important;
-    aspect-ratio: 16/9;
+    max-height: 100px !important;
+    aspect-ratio: auto !important;
     flex-shrink: 0;
     border-radius: 8px;
     border: 1px solid var(--glass-border);
+    overflow: hidden;
 }
 
 #videoGrid.list-view .card-media img {
     object-fit: cover;
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100px !important;
 }
 
 #videoGrid.list-view .card-body {
@@ -1782,198 +1785,189 @@ html {
         margin-bottom: 8px;
     }
 
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    /* Slight spacing below */
-}
+    .grid-bg {
+        display: none;
+    }
 
-.grid-bg {
-    display: none;
-}
+    .logo-container {
+        width: auto;
+        filter: none;
+    }
 
-.logo-container {
-    width: auto;
-    filter: none;
-}
+    .glitch-wrapper {
+        animation: none;
+    }
 
-.glitch-wrapper {
-    animation: none;
-}
+    .video-scanner-text {
+        font-size: 14px;
+        letter-spacing: 1px;
+        filter: none;
+        -webkit-text-fill-color: var(--gold);
+        background: none;
+    }
 
-.video-scanner-text {
-    font-size: 14px;
-    letter-spacing: 1px;
-    filter: none;
-    -webkit-text-fill-color: var(--gold);
-    background: none;
-}
+    .stats-display {
+        display: none;
+    }
 
-.stats-display {
-    display: none;
-}
+    /* Hide desktop top bar, show mobile filter row */
+    .top-bar {
+        padding: 10px 0;
+    }
 
-/* Hide desktop top bar, show mobile filter row */
-.top-bar {
-    padding: 10px 0;
-}
+    .top-bar .controls {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
 
-.top-bar .controls {
-    flex-wrap: wrap;
-    gap: 8px;
-}
+    /* Horizontal scroll filters */
+    #searchBar {
+        width: 100%;
+        order: -1;
+        margin-bottom: 8px;
+        min-height: 44px;
+        font-size: 16px;
+        /* Prevents iOS zoom */
+    }
 
-/* Horizontal scroll filters */
-#searchBar {
-    width: 100%;
-    order: -1;
-    margin-bottom: 8px;
-    min-height: 44px;
-    font-size: 16px;
-    /* Prevents iOS zoom */
-}
+    #statusSelect,
+    #codecSelect,
+    #sortSelect {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 0 12px;
+        font-size: 12px;
+        flex: 1;
+    }
 
-#statusSelect,
-#codecSelect,
-#sortSelect {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0 12px;
-    font-size: 12px;
-    flex: 1;
-}
+    /* Hide some controls on mobile */
+    .filter-btn.action-btn:not(#settingsBtn):not(#refreshBtn) {
+        display: none;
+    }
 
-/* Hide some controls on mobile */
-.filter-btn.action-btn:not(#settingsBtn):not(#refreshBtn) {
-    display: none;
-}
+    #settingsBtn,
+    #refreshBtn {
+        min-width: 44px;
+        min-height: 44px;
+    }
 
-#settingsBtn,
-#refreshBtn {
-    min-width: 44px;
-    min-height: 44px;
-}
+    /* Hide redundant Desktop Workspace Bar on Mobile */
+    .workspace-bar {
+        display: none !important;
+    }
 
-/* Hide redundant Desktop Workspace Bar on Mobile */
-.workspace-bar {
-    display: none !important;
-}
+    /* Hide Batch Selection Bar on Mobile */
+    #batchBar {
+        display: none !important;
+    }
 
-/* Hide Batch Selection Bar on Mobile */
-#batchBar {
-    display: none !important;
-}
+    /* Single Column Grid on Mobile */
+    #videoGrid {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        padding: 16px;
+        gap: 16px;
+    }
 
-/* Single Column Grid on Mobile */
-#videoGrid {
-    display: flex !important;
-    flex-direction: column !important;
-    width: 100% !important;
-    padding: 16px;
-    gap: 16px;
-}
+    /* Responsive Width Cards */
+    .content-card {
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: 0;
+    }
 
-/* Responsive Width Cards */
-.content-card {
-    width: 100%;
-    max-width: 100%;
-    margin-bottom: 0;
-}
+    .card-select-overlay {
+        display: none !important;
+    }
 
-.card-select-overlay {
-    display: none !important;
-}
+    .card-body {
+        padding: 8px;
+    }
 
-.card-body {
-    padding: 8px;
-}
+    .file-name {
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-.file-name {
-    font-size: 0.8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+    .file-path {
+        display: none;
+        /* Hide path on mobile grid to save space */
+    }
 
-.file-path {
-    display: none;
-    /* Hide path on mobile grid to save space */
-}
+    .file-meta {
+        font-size: 0.7rem;
+    }
 
-.file-meta {
-    font-size: 0.7rem;
-}
+    .badge {
+        font-size: 0.6rem;
+        padding: 2px 6px;
+        min-height: auto;
+    }
 
-.badge {
-    font-size: 0.6rem;
-    padding: 2px 6px;
-    min-height: auto;
-}
+    /* Enforce aspect ratio on ALL cards */
+    .card-media {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16/9;
+        max-height: 160px;
+        /* Slightly larger for single column */
+        object-fit: cover;
+    }
 
-/* Enforce aspect ratio on ALL cards */
-.card-media {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 16/9;
-    max-height: 160px;
-    /* Slightly larger for single column */
-    object-fit: cover;
-}
+    .card-media img,
+    .card-media video {
+        max-height: 160px;
+        object-fit: cover;
+    }
 
-.card-media img,
-.card-media video {
-    max-height: 160px;
-    object-fit: cover;
-}
+    /* Hide Card Footer (Locate, Encode, Trash icons) on mobile */
+    .card-footer {
+        display: none !important;
+    }
 
-/* Hide Card Footer (Locate, Encode, Trash icons) on mobile */
-.card-footer {
-    display: none !important;
-}
+    /* Adjust modal size for mobile */
+    .cinema-modal-content {
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        max-height: none !important;
+        max-width: none !important;
+    }
 
-/* Adjust modal size for mobile */
-.cinema-modal-content {
-    width: 100% !important;
-    height: 100% !important;
-    border-radius: 0 !important;
-    max-height: none !important;
-    max-width: none !important;
-}
+    /* Adjust optimize panel height for mobile */
+    #optimizePanel {
+        height: 85vh;
+        z-index: 20000;
+    }
 
-/* Adjust optimize panel height for mobile */
-#optimizePanel {
-    height: 85vh;
-    z-index: 20000;
-}
+    /* Ensure buttons are reachable */
+    .cinema-actions {
+        bottom: 120px;
+        /* Push up to avoid potential bottom nav bars */
+        gap: 20px;
+    }
 
-/* Ensure buttons are reachable */
-.cinema-actions {
-    bottom: 120px;
-    /* Push up to avoid potential bottom nav bars */
-    gap: 20px;
-}
+    .cinema-action-btn {
+        width: 50px;
+        height: 50px;
+        background: rgba(0, 0, 0, 0.8);
+        /* More contrast */
+    }
 
-.cinema-action-btn {
-    width: 50px;
-    height: 50px;
-    background: rgba(0, 0, 0, 0.8);
-    /* More contrast */
-}
-
-/* Ensure close button is easy to hit */
-.cinema-close {
-    top: 20px;
-    right: 20px;
-    width: 44px;
-    height: 44px;
-    line-height: 44px;
-    font-size: 28px;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 50%;
-}
-
-@media (max-width: 768px) {
+    /* Ensure close button is easy to hit */
+    .cinema-close {
+        top: 20px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        line-height: 44px;
+        font-size: 28px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+    }
 
     /* Stack list view vertically on mobile */
     #videoGrid.list-view .video-card-container {
@@ -2053,6 +2047,78 @@ html {
 .logo-container {
     width: 100%;
 }
+
+/* --- SELECTION MODE --- */
+/* When in selection mode, always show checkboxes on all cards */
+#videoGrid.selection-mode .video-card-container input[type="checkbox"] {
+    opacity: 1 !important;
+}
+
+#videoGrid.selection-mode .video-card-container .absolute.top-2.left-2 {
+    opacity: 1 !important;
+}
+
+/* Hide action buttons (favorite, vault, optimize, play overlay) in selection mode */
+#videoGrid.selection-mode .video-card-container .favorite-btn,
+#videoGrid.selection-mode .video-card-container .card-media > .hidden.md\:flex {
+    display: none !important;
+}
+
+/* Visual indicator that card is clickable for selection */
+#videoGrid.selection-mode .video-card-container {
+    cursor: pointer;
+}
+
+#videoGrid.selection-mode .video-card-container:hover {
+    border-color: var(--cyan) !important;
+}
+
+/* Selection overlay indicator on hover */
+#videoGrid.selection-mode .video-card-container .card-media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 255, 208, 0.15);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+#videoGrid.selection-mode .video-card-container:hover .card-media::after {
+    opacity: 1;
+}
+
+/* Checkmark indicator icon on hover */
+#videoGrid.selection-mode .video-card-container .card-media::before {
+    content: 'check_circle';
+    font-family: 'Material Icons';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    font-size: 48px;
+    color: var(--cyan);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 10;
+    text-shadow: 0 0 20px rgba(0, 255, 208, 0.5);
+}
+
+#videoGrid.selection-mode .video-card-container:hover .card-media::before {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Already selected cards show filled check */
+#videoGrid.selection-mode .video-card-container:has(input:checked) .card-media::before {
+    content: 'check_circle';
+    opacity: 0.5;
+}
+
+#videoGrid.selection-mode .video-card-container:has(input:checked):hover .card-media::before {
+    content: 'remove_circle';
+    opacity: 0.9;
 }
 
 /* --- VIDEO CARD TAG CHIPS --- */
