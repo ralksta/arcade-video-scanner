@@ -487,6 +487,271 @@ function showCinemaToast(message) {
     setTimeout(() => toast.remove(), 1500);
 }
 
+// --- GIF EXPORT ---
+
+/**
+ * Open GIF export modal for current cinema video
+ */
+function cinemaExportGif() {
+    if (!currentCinemaPath || !currentCinemaVideo) return;
+
+    // Only allow GIF export for videos
+    if (currentCinemaVideo.media_type === 'image') {
+        showCinemaToast('GIF export only available for videos');
+        return;
+    }
+
+    // Create modal HTML
+    const modalHTML = `
+        <div id="gifExportModal" class="fixed inset-0 z-[10002] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-[#14141c] rounded-xl border border-white/10 max-w-md w-full p-6 shadow-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span class="material-icons text-arcade-cyan">gif</span>
+                        Export as GIF
+                    </h3>
+                    <button onclick="closeGifExportModal()" class="text-gray-400 hover:text-white">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <!-- Trim Controls -->
+                    <div class="bg-white/5 rounded-lg p-3 border border-white/10">
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Clip Selection</label>
+                        <div class="flex items-center gap-2 mb-2">
+                            <input type="text" id="gifTrimStart" placeholder="00:00" 
+                                   class="flex-1 bg-black/30 border border-white/10 text-white px-2 py-1.5 rounded text-sm font-mono text-center focus:border-arcade-cyan/50 focus:outline-none"
+                                   oninput="updateGifEstimate()">
+                            <button onclick="setGifTrimFromVideo('start')" 
+                                    class="px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-400 hover:text-white border border-white/10 transition-colors"
+                                    title="Set to current video time">
+                                <span class="material-icons text-sm">arrow_downward</span>
+                            </button>
+                            <span class="text-gray-500">-</span>
+                            <input type="text" id="gifTrimEnd" placeholder="END" 
+                                   class="flex-1 bg-black/30 border border-white/10 text-white px-2 py-1.5 rounded text-sm font-mono text-center focus:border-arcade-cyan/50 focus:outline-none"
+                                   oninput="updateGifEstimate()">
+                            <button onclick="setGifTrimFromVideo('end')" 
+                                    class="px-2 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs text-gray-400 hover:text-white border border-white/10 transition-colors"
+                                    title="Set to current video time">
+                                <span class="material-icons text-sm">arrow_downward</span>
+                            </button>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            Duration: <span id="gifDuration" class="text-arcade-cyan">${currentCinemaVideo.Duration_Sec ? currentCinemaVideo.Duration_Sec.toFixed(1) : '0.0'}s</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Preset Selection -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Quality Preset</label>
+                        <select id="gifPreset" class="w-full bg-black/30 border border-white/10 text-white px-3 py-2 rounded-lg focus:border-arcade-cyan/50 focus:outline-none"
+                                onchange="updateGifEstimate()">
+                            <option value="360p">360p (640×360) - Small</option>
+                            <option value="480p">480p (854×480) - Medium</option>
+                            <option value="720p" selected>720p (1280×720) - High</option>
+                            <option value="1080p">1080p (1920×1080) - Very High</option>
+                            <option value="original">Original (${currentCinemaVideo.Width}×${currentCinemaVideo.Height})</option>
+                        </select>
+                    </div>
+                    
+                    <!-- FPS Slider -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">
+                            Frame Rate: <span id="gifFpsValue" class="text-arcade-cyan">15</span> fps
+                        </label>
+                        <input type="range" id="gifFps" min="10" max="30" value="15" step="5" 
+                               class="w-full" 
+                               oninput="document.getElementById('gifFpsValue').textContent = this.value; updateGifEstimate()">
+                    </div>
+                    
+                    <!-- Quality Slider -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">
+                            Quality: <span id="gifQualityValue" class="text-arcade-cyan">80</span>%
+                        </label>
+                        <input type="range" id="gifQuality" min="50" max="100" value="80" step="10" 
+                               class="w-full"
+                               oninput="document.getElementById('gifQualityValue').textContent = this.value; updateGifEstimate()">
+                    </div>
+                    
+                    <!-- Estimated Size -->
+                    <div class="bg-white/5 rounded-lg p-3 border border-white/10">
+                        <div class="text-xs text-gray-400 mb-1">Estimated Size</div>
+                        <div id="gifEstimatedSize" class="text-lg font-bold text-arcade-cyan">~5.2 MB</div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button onclick="closeGifExportModal()" 
+                            class="flex-1 py-2.5 rounded-lg font-semibold text-gray-400 bg-white/5 hover:bg-white/10 hover:text-white transition-all">
+                        Cancel
+                    </button>
+                    <button onclick="startGifExport()" 
+                            class="flex-1 py-2.5 rounded-lg font-semibold text-black bg-arcade-cyan hover:bg-cyan-300 transition-all flex items-center justify-center gap-2">
+                        <span class="material-icons text-[18px]">download</span>
+                        Export GIF
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Initial size estimate
+    updateGifEstimate();
+}
+
+/**
+ * Update GIF size estimation based on current settings
+ */
+function updateGifEstimate() {
+    if (!currentCinemaVideo) return;
+
+    const preset = document.getElementById('gifPreset')?.value || '720p';
+    const fps = parseInt(document.getElementById('gifFps')?.value || 15);
+    const quality = parseInt(document.getElementById('gifQuality')?.value || 80);
+
+    // Get trim times
+    const startInput = document.getElementById('gifTrimStart')?.value || '';
+    const endInput = document.getElementById('gifTrimEnd')?.value || '';
+
+    let startTime = 0;
+    let endTime = currentCinemaVideo.Duration_Sec || 10;
+
+    // Parse start time (format: MM:SS or SS)
+    if (startInput) {
+        const parts = startInput.split(':');
+        if (parts.length === 2) {
+            startTime = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        } else {
+            startTime = parseInt(startInput) || 0;
+        }
+    }
+
+    // Parse end time
+    if (endInput) {
+        const parts = endInput.split(':');
+        if (parts.length === 2) {
+            endTime = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        } else {
+            endTime = parseInt(endInput) || endTime;
+        }
+    }
+
+    // Calculate duration
+    const duration = Math.max(0.1, endTime - startTime);
+
+    // Update duration display
+    const durationEl = document.getElementById('gifDuration');
+    if (durationEl) {
+        durationEl.textContent = duration.toFixed(1) + 's';
+    }
+
+    // Get dimensions based on preset
+    const presets = {
+        "360p": { w: 640, h: 360 },
+        "480p": { w: 854, h: 480 },
+        "720p": { w: 1280, h: 720 },
+        "1080p": { w: 1920, h: 1080 },
+        "original": { w: currentCinemaVideo.Width || 1920, h: currentCinemaVideo.Height || 1080 }
+    };
+
+    const dims = presets[preset] || presets["720p"];
+
+    // Estimate size (rough formula)
+    const pixelsPerFrame = dims.w * dims.h;
+    const frames = fps * duration;
+    const qualityFactor = quality / 100;
+    const baseBytesPerFrame = (pixelsPerFrame * 0.3) * qualityFactor;
+    const headerSize = 1024;
+    const totalBytes = (baseBytesPerFrame * frames) + headerSize;
+    const sizeMB = totalBytes / (1024 * 1024);
+
+    // Update display
+    const sizeEl = document.getElementById('gifEstimatedSize');
+    if (sizeEl) {
+        sizeEl.textContent = `~${sizeMB.toFixed(1)} MB`;
+    }
+}
+
+/**
+ * Set trim time from current video playback position
+ */
+function setGifTrimFromVideo(type) {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+
+    const currentTime = Math.floor(video.currentTime);
+    const minutes = Math.floor(currentTime / 60);
+    const seconds = currentTime % 60;
+    const timeStr = minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${seconds}`;
+
+    if (type === 'start') {
+        document.getElementById('gifTrimStart').value = timeStr;
+    } else {
+        document.getElementById('gifTrimEnd').value = timeStr;
+    }
+
+    updateGifEstimate();
+}
+
+/**
+ * Close GIF export modal
+ */
+function closeGifExportModal() {
+    const modal = document.getElementById('gifExportModal');
+    if (modal) modal.remove();
+}
+
+/**
+ * Start GIF export process
+ */
+async function startGifExport() {
+    if (!currentCinemaPath) return;
+
+    const preset = document.getElementById('gifPreset').value;
+    const fps = parseInt(document.getElementById('gifFps').value);
+    const quality = parseInt(document.getElementById('gifQuality').value);
+
+    closeGifExportModal();
+    showCinemaToast('Starting GIF export...');
+
+    try {
+        const response = await fetch('/api/export/gif', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                path: currentCinemaPath,
+                preset: preset,
+                fps: fps,
+                quality: quality
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+
+        const result = await response.json();
+
+        // Show success message
+        showCinemaToast(`GIF export started! (~${result.estimated_size_mb} MB)`);
+
+        // Wait a bit for processing, then trigger download
+        setTimeout(() => {
+            window.location.href = result.download_url;
+            showCinemaToast('Downloading GIF...');
+        }, 3000);
+
+    } catch (error) {
+        console.error('GIF export error:', error);
+        showCinemaToast('GIF export failed');
+    }
+}
+
 // --- EXPORTS ---
 // Expose functions to global scope for HTML onclick handlers
 window.openCinema = openCinema;
@@ -499,6 +764,11 @@ window.toggleCinemaInfo = toggleCinemaInfo;
 window.toggleCinemaTagPanel = toggleCinemaTagPanel;
 window.toggleCinemaTag = toggleCinemaTag;
 window.updateCinemaTags = updateCinemaTags;
+window.cinemaExportGif = cinemaExportGif;
+window.closeGifExportModal = closeGifExportModal;
+window.startGifExport = startGifExport;
+window.updateGifEstimate = updateGifEstimate;
+window.setGifTrimFromVideo = setGifTrimFromVideo;
 
 // Expose state for other modules that need it (e.g., optimizer panel)
 // Using defineProperty to create live bindings

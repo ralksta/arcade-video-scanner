@@ -10,6 +10,7 @@ import socket
 import ssl
 from urllib.parse import unquote, urlparse, parse_qs
 import shlex
+import tempfile
 from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE, DUPLICATES_CACHE_FILE
 from arcade_scanner.database import db, user_db
 from arcade_scanner.security import session_manager
@@ -1195,6 +1196,46 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error returning duplicates: {e}")
                     self.send_error(500, str(e))
             
+            elif self.path.startswith("/download_gif?file="):
+                # Download generated GIF file
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                
+                try:
+                    filename = unquote(self.path.split("file=")[1])
+                    
+                    # Security: Validate filename (no path traversal)
+                    if "/" in filename or "\\" in filename or ".." in filename:
+                        self.send_error(403, "Invalid filename")
+                        return
+                    
+                    gif_export_dir = os.path.join(tempfile.gettempdir(), "arcade_gif_exports")
+                    file_path = os.path.join(gif_export_dir, filename)
+                    
+                    if not os.path.exists(file_path):
+                        self.send_error(404, "GIF file not found or still processing")
+                        return
+                    
+                    # Serve the file
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/gif")
+                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                    
+                    file_size = os.path.getsize(file_path)
+                    self.send_header("Content-Length", str(file_size))
+                    self.end_headers()
+                    
+                    with open(file_path, 'rb') as f:
+                        self.wfile.write(f.read())
+                    
+                    print(f"📥 Downloaded GIF: {filename} ({file_size / (1024*1024):.1f} MB)")
+                    
+                except Exception as e:
+                    print(f"❌ Error downloading GIF: {e}")
+                    self.send_error(500, str(e))
+            
             else:
                 # 404 for anything else
                 self.send_error(404)
@@ -1703,6 +1744,182 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "cleared"}).encode("utf-8"))
+
+            # ================================================================
+            # GIF EXPORT
+            # ================================================================
+            elif self.path == "/api/export/gif":
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    if content_length > MAX_REQUEST_SIZE:
+                        self.send_error(413, "Request Entity Too Large")
+                        return
+                    
+                    body = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(body)
+                    
+                    video_path = data.get("path")
+                    preset = data.get("preset", "720p")
+                    fps = data.get("fps", 15)
+                    quality = data.get("quality", 80)
+                    start_time = data.get("start_time")  # Optional trim start
+                    end_time = data.get("end_time")      # Optional trim end
+                    
+                    if not video_path:
+                        self.send_error(400, "Missing video path")
+                        return
+                    
+                    # Security: Validate path
+                    try:
+                        video_path = sanitize_path(video_path)
+                    except (SecurityError, ValueError) as e:
+                        print(f"🚨 Security violation in GIF export: {e}")
+                        self.send_error(403, "Forbidden - Invalid path")
+                        return
+                    
+                    if not os.path.exists(video_path):
+                        self.send_error(404, "Video file not found")
+                        return
+                    
+                    # Get video info from database
+                    video_entry = db.get(os.path.abspath(video_path))
+                    if not video_entry:
+                        self.send_error(404, "Video not in database")
+                        return
+                    
+                    # Determine output dimensions based on preset
+                    presets = {
+                        "original": (video_entry.width or 1920, video_entry.height or 1080),
+                        "1080p": (1920, 1080),
+                        "720p": (1280, 720),
+                        "480p": (854, 480),
+                        "360p": (640, 360),
+                    }
+                    
+                    width, height = presets.get(preset, presets["720p"])
+                    
+                    # Calculate duration for size estimation
+                    duration = video_entry.duration_sec or 10
+                    if start_time is not None and end_time is not None:
+                        duration = max(0.1, end_time - start_time)
+                    elif start_time is not None:
+                        duration = max(0.1, duration - start_time)
+                    elif end_time is not None:
+                        duration = min(duration, end_time)
+                    
+                    estimated_size_mb = (width * height * fps * duration * (quality / 100) * 0.3) / (1024 * 1024)
+                    
+                    # Generate output filename
+                    base_name = os.path.splitext(os.path.basename(video_path))[0]
+                    output_filename = f"{base_name}_{preset}_{fps}fps.gif"
+                    
+                    # Create temp directory for GIF exports
+                    gif_export_dir = os.path.join(tempfile.gettempdir(), "arcade_gif_exports")
+                    os.makedirs(gif_export_dir, exist_ok=True)
+                    
+                    output_path = os.path.join(gif_export_dir, output_filename)
+                    
+                    # Generate unique job ID
+                    import uuid
+                    job_id = str(uuid.uuid4())[:8]
+                    
+                    # Start async conversion
+                    import threading
+                    
+                    def convert_to_gif():
+                        try:
+                            print(f"🎞️ Starting GIF conversion: {output_filename}", flush=True)
+                            
+                            # Build FFmpeg input args with optional trim
+                            input_args = ["ffmpeg", "-y"]
+                            
+                            # Add trim parameters if specified
+                            if start_time is not None:
+                                input_args.extend(["-ss", str(start_time)])
+                            if end_time is not None:
+                                input_args.extend(["-to", str(end_time)])
+                            
+                            input_args.extend(["-i", video_path])
+                            
+                            # Step 1: Generate palette
+                            palette_path = os.path.join(gif_export_dir, f"palette_{job_id}.png")
+                            palette_cmd = input_args + [
+                                "-vf", f"fps={fps},scale={width}:{height}:flags=lanczos,palettegen=stats_mode=diff",
+                                palette_path
+                            ]
+                            
+                            print(f"🎨 Generating palette...", flush=True)
+                            result = subprocess.run(palette_cmd, capture_output=True, text=True)
+                            if result.returncode != 0:
+                                print(f"❌ Palette generation failed: {result.stderr}", flush=True)
+                                return
+                            
+                            # Step 2: Generate GIF with palette
+                            bayer_scale = int((quality / 100) * 5)  # 0-5 scale
+                            
+                            gif_input_args = ["ffmpeg", "-y"]
+                            if start_time is not None:
+                                gif_input_args.extend(["-ss", str(start_time)])
+                            if end_time is not None:
+                                gif_input_args.extend(["-to", str(end_time)])
+                            
+                            gif_cmd = gif_input_args + [
+                                "-i", video_path,
+                                "-i", palette_path,
+                                "-lavfi", f"fps={fps},scale={width}:{height}:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale={bayer_scale}",
+                                "-loop", "0",  # Loop forever
+                                output_path
+                            ]
+                            
+                            print(f"🎬 Creating GIF...", flush=True)
+                            result = subprocess.run(gif_cmd, capture_output=True, text=True)
+                            if result.returncode != 0:
+                                print(f"❌ GIF conversion failed: {result.stderr}", flush=True)
+                                return
+                            
+                            # Cleanup palette
+                            if os.path.exists(palette_path):
+                                os.remove(palette_path)
+                            
+                            actual_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                            print(f"✅ GIF created: {output_filename} ({actual_size_mb:.1f} MB)", flush=True)
+                            
+                        except Exception as e:
+                            print(f"❌ Error in GIF conversion: {e}", flush=True)
+                            import traceback
+                            traceback.print_exc()
+                    
+                    # Start conversion in background
+                    thread = threading.Thread(target=convert_to_gif, daemon=True)
+                    thread.start()
+                    
+                    # Return response immediately
+                    response = {
+                        "status": "processing",
+                        "job_id": job_id,
+                        "output_filename": output_filename,
+                        "output_path": output_path,
+                        "estimated_size_mb": round(estimated_size_mb, 2),
+                        "download_url": f"/download_gif?file={output_filename}"
+                    }
+                    
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response).encode("utf-8"))
+                    
+                except json.JSONDecodeError:
+                    self.send_error(400, "Invalid JSON")
+                except Exception as e:
+                    print(f"❌ Error in GIF export: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    self.send_error(500, str(e))
 
             else:
                 self.send_error(404)

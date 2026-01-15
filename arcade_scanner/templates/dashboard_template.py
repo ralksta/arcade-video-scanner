@@ -21,6 +21,7 @@ from arcade_scanner.templates.components import (
     SETUP_WIZARD_COMPONENT,
     LIST_VIEW_COMPONENT,
     OPTIMIZE_PANEL_COMPONENT,
+    GIF_EXPORT_PANEL_COMPONENT,
     SETTINGS_MODAL_COMPONENT,
     CINEMA_MODAL_COMPONENT,
     TREEMAP_LEGEND_COMPONENT,
@@ -80,11 +81,11 @@ def generate_html_report(results, report_file, server_port=8000):
     opt_btn_html = ""
     if config.optimizer_available and config.settings.enable_optimizer:
         opt_btn_html = """
-        <button class="flex flex-col items-center gap-1 text-arcade-cyan hover:text-cyan-300 transition-colors group" onclick="cinemaOptimize()" title="Optimize">
-            <div class="w-10 h-10 rounded-full bg-arcade-cyan/20 flex items-center justify-center border border-arcade-cyan/50 group-hover:bg-arcade-cyan/40 transition-all shadow-[0_0_15px_rgba(0,255,208,0.2)]">
-                <span class="material-icons text-lg">bolt</span>
+        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaOptimize()" title="Optimize Video">
+            <div class="w-12 h-12 rounded-xl bg-arcade-cyan/15 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/40 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/60 group-hover:scale-105 transition-all shadow-lg shadow-arcade-cyan/10">
+                <span class="material-icons text-xl text-arcade-cyan group-hover:text-cyan-300">bolt</span>
             </div>
-            <span class="text-[10px] tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity">Optimize</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-cyan/80 group-hover:text-arcade-cyan transition-colors">Optimize</span>
         </button>
         """
     cinema_modal_html = CINEMA_MODAL_COMPONENT.format(opt_btn=opt_btn_html)
@@ -134,6 +135,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <!-- Modals & Overlays -->
     {cinema_modal_html}
     {OPTIMIZE_PANEL_COMPONENT}
+    {GIF_EXPORT_PANEL_COMPONENT}
     {SETTINGS_MODAL_COMPONENT}
     {FILTER_PANEL_COMPONENT}
     {TAG_MANAGER_MODAL_COMPONENT}
@@ -167,6 +169,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/formatters.js?v={int(time.time())}"></script>
     <script src="/static/engine.js?v={int(time.time())}"></script>
     <script src="/static/cinema.js?v={int(time.time())}"></script>
+    <script src="/static/gif_export.js?v={int(time.time())}"></script>
     <script src="/static/collections.js?v={int(time.time())}"></script>
     """
     

@@ -3057,6 +3057,11 @@ function cinemaOptimize() {
     panel.classList.add('active');
     const actions = document.getElementById('cinemaActions');
     if (actions) actions.style.display = 'none';
+
+    // Adjust cinema container to make room for panel
+    if (typeof adjustCinemaForPanel === 'function') {
+        adjustCinemaForPanel(true);
+    }
 }
 
 /**
@@ -3066,6 +3071,11 @@ function closeOptimize() {
     document.getElementById('optimizePanel').classList.remove('active');
     const actions = document.getElementById('cinemaActions');
     if (actions) actions.style.display = 'flex';
+
+    // Restore cinema container to full height
+    if (typeof adjustCinemaForPanel === 'function') {
+        adjustCinemaForPanel(false);
+    }
 }
 
 /**
