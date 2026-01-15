@@ -1,0 +1,204 @@
+/* Timeline Scrubber Styles */
+
+.timeline-scrubber {
+    width: 100%;
+    margin: 12px 0;
+}
+
+.timeline-track {
+    position: relative;
+    width: 100%;
+    height: 60px;
+    background: linear-gradient(180deg, #1a1a24 0%, #0f0f14 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.timeline-track.dragging {
+    cursor: grabbing;
+}
+
+/* Thumbnails Canvas */
+.timeline-thumbnails {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Selected Range Overlay */
+.timeline-selection {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 193, 7, 0.3) 0%,
+        rgba(255, 193, 7, 0.2) 50%,
+        rgba(255, 193, 7, 0.3) 100%
+    );
+    border-left: 2px solid rgba(255, 193, 7, 0.8);
+    border-right: 2px solid rgba(255, 193, 7, 0.8);
+    pointer-events: none;
+    transition: left 0.1s ease, width 0.1s ease;
+}
+
+/* Draggable Handles */
+.timeline-handle {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 60px;
+    cursor: grab;
+    z-index: 10;
+    transition: transform 0.2s ease;
+}
+
+.timeline-handle:hover,
+.timeline-handle.active {
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.timeline-handle.active {
+    cursor: grabbing;
+}
+
+.timeline-handle-inner {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #ffc107 0%, #ff9800 100%);
+    border: 2px solid #fff;
+    border-radius: 4px;
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.4),
+        0 0 0 2px rgba(255, 193, 7, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    position: relative;
+}
+
+.timeline-handle-inner::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 1px;
+}
+
+/* Handle differentiation */
+.timeline-handle-start .timeline-handle-inner {
+    border-radius: 4px 2px 2px 4px;
+}
+
+.timeline-handle-end .timeline-handle-inner {
+    border-radius: 2px 4px 4px 2px;
+}
+
+/* Tooltips */
+.timeline-tooltip {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: #ffc107;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Monaco', 'Courier New', monospace;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.timeline-handle:hover .timeline-tooltip,
+.timeline-handle.active .timeline-tooltip {
+    opacity: 1;
+}
+
+/* Playhead */
+.timeline-playhead {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 100%;
+    background: rgba(0, 255, 208, 0.8);
+    pointer-events: none;
+    z-index: 5;
+    box-shadow: 0 0 8px rgba(0, 255, 208, 0.6);
+    transition: left 0.1s linear;
+}
+
+.timeline-playhead::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid rgba(0, 255, 208, 1);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Time Labels */
+.timeline-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    padding: 0 2px;
+}
+
+.timeline-label-start,
+.timeline-label-end {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Monaco', 'Courier New', monospace;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .timeline-track {
+        height: 50px;
+    }
+    
+    .timeline-handle {
+        width: 24px;
+        height: 50px;
+    }
+    
+    .timeline-handle-inner::before {
+        height: 16px;
+    }
+}
+
+/* Animation for smooth transitions */
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(255, 193, 7, 0);
+    }
+}
+
+.timeline-handle.active .timeline-handle-inner {
+    animation: pulse 1s ease-in-out infinite;
+}

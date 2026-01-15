@@ -409,6 +409,12 @@ OPTIMIZE_PANEL_COMPONENT = """
         </button>
     </div>
     
+    <!-- Timeline Scrubber -->
+    <div class="flex items-start gap-4 flex-wrap">
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px] mt-4">Timeline</div>
+        <div class="flex-1" id="optimizeTimeline"></div>
+    </div>
+    
     <!-- Quality Row -->
     <div class="flex items-center gap-4 flex-wrap">
         <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px]">Start Q</div>
@@ -484,6 +490,12 @@ GIF_EXPORT_PANEL_COMPONENT = """
         
         <div class="flex-1"></div>
         <span class="text-xs text-gray-500">Duration: <span id="gifDuration" class="text-arcade-cyan">0.0s</span></span>
+    </div>
+    
+    <!-- Timeline Scrubber -->
+    <div class="flex items-start gap-4 flex-wrap">
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px] mt-4">Timeline</div>
+        <div class="flex-1" id="gifTimeline"></div>
     </div>
     
     <!-- Quality Row -->

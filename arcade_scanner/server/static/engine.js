@@ -3062,6 +3062,61 @@ function cinemaOptimize() {
     if (typeof adjustCinemaForPanel === 'function') {
         adjustCinemaForPanel(true);
     }
+
+    // Initialize timeline scrubber
+    setTimeout(() => {
+        const videoElement = document.getElementById('cinemaVideo');
+        if (videoElement && window.TimelineScrubber) {
+            // Destroy existing timeline if any
+            if (window.optimizeTimeline && typeof window.optimizeTimeline.destroy === 'function') {
+                window.optimizeTimeline.destroy();
+            }
+
+            // Create new timeline
+            window.optimizeTimeline = new TimelineScrubber(videoElement, {
+                containerSelector: '#optimizeTimeline',
+                onChange: (times) => {
+                    // Update trim inputs when handles are dragged
+                    const startInput = document.getElementById('optTrimStart');
+                    const endInput = document.getElementById('optTrimEnd');
+
+                    if (startInput) {
+                        startInput.value = formatTimeForInput(times.startTime);
+                    }
+                    if (endInput) {
+                        endInput.value = formatTimeForInput(times.endTime);
+                    }
+                }
+            });
+
+            window.optimizeTimeline.init();
+
+            // Sync inputs -> timeline
+            const startInput = document.getElementById('optTrimStart');
+            const endInput = document.getElementById('optTrimEnd');
+
+            const updateTimelineFromInputs = () => {
+                if (!window.optimizeTimeline) return;
+
+                const parse = (val) => {
+                    if (!val) return 0;
+                    const parts = val.split(':');
+                    if (parts.length === 2) return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+                    return parseFloat(val);
+                };
+
+                const start = parse(startInput?.value);
+                const end = parse(endInput?.value);
+
+                if (!isNaN(start) && !isNaN(end)) {
+                    window.optimizeTimeline.setTimes(start, end);
+                }
+            };
+
+            if (startInput) startInput.onchange = updateTimelineFromInputs;
+            if (endInput) endInput.onchange = updateTimelineFromInputs;
+        }
+    }, 100);
 }
 
 /**

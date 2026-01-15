@@ -46,6 +46,66 @@ function cinemaExportGif() {
 
     // Initial estimate
     updateGifEstimate();
+
+    // Initialize timeline scrubber
+    setTimeout(() => {
+        const videoElement = document.getElementById('cinemaVideo');
+
+        if (videoElement && window.TimelineScrubber) {
+            // Destroy existing timeline if any
+            // Check for destroy method to avoid errors if instance is corrupted
+            if (window.gifTimeline && typeof window.gifTimeline.destroy === 'function') {
+                window.gifTimeline.destroy();
+            }
+
+            // Create new timeline
+            window.gifTimeline = new TimelineScrubber(videoElement, {
+                containerSelector: '#gifTimeline',
+                onChange: (times) => {
+                    // Update trim inputs when handles are dragged
+                    const startInput = document.getElementById('gifTrimStart');
+                    const endInput = document.getElementById('gifTrimEnd');
+
+                    if (startInput) {
+                        startInput.value = formatTimeForInput(times.startTime);
+                    }
+                    if (endInput) {
+                        endInput.value = formatTimeForInput(times.endTime);
+                    }
+
+                    // Update GIF size estimate
+                    updateGifEstimate();
+                }
+            });
+
+            window.gifTimeline.init();
+
+            // Sync inputs -> timeline
+            const startInput = document.getElementById('gifTrimStart');
+            const endInput = document.getElementById('gifTrimEnd');
+
+            const updateTimelineFromInputs = () => {
+                if (!window.gifTimeline) return;
+
+                const parse = (val) => {
+                    if (!val) return 0;
+                    const parts = val.split(':');
+                    if (parts.length === 2) return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+                    return parseFloat(val);
+                };
+
+                const start = parse(startInput?.value);
+                const end = parse(endInput?.value);
+
+                if (!isNaN(start) && !isNaN(end)) {
+                    window.gifTimeline.setTimes(start, end);
+                }
+            };
+
+            if (startInput) startInput.onchange = updateTimelineFromInputs;
+            if (endInput) endInput.onchange = updateTimelineFromInputs;
+        }
+    }, 100);
 }
 
 /**
@@ -324,18 +384,12 @@ function adjustCinemaForPanel(isPanelOpen) {
     if (!video || !cinemaModal) return;
 
     if (isPanelOpen) {
-        // Calculate available height: viewport - panel height - margins
-        const panelHeight = 300; // Approximate panel height
-        const margins = 100; // Top/bottom margins  
-        const availableHeight = window.innerHeight - panelHeight - margins;
-        const maxHeightVh = (availableHeight / window.innerHeight) * 100;
-
-        // Shrink video
-        video.style.maxHeight = `${maxHeightVh}vh`;
+        // Make video much smaller to ensure controls are always visible
+        video.style.maxHeight = '50vh'; // Fixed smaller size
         video.style.transition = 'max-height 0.3s ease';
 
         if (image) {
-            image.style.maxHeight = `${maxHeightVh}vh`;
+            image.style.maxHeight = '50vh';
             image.style.transition = 'max-height 0.3s ease';
         }
 

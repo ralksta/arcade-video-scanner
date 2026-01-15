@@ -165,10 +165,12 @@ def generate_html_report(results, report_file, server_port=8000):
     """
     
     external_scripts = f"""
+    <link rel="stylesheet" href="/static/timeline_scrubber.css?v={int(time.time())}">
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
     <script src="/static/formatters.js?v={int(time.time())}"></script>
     <script src="/static/engine.js?v={int(time.time())}"></script>
     <script src="/static/cinema.js?v={int(time.time())}"></script>
+    <script src="/static/timeline_scrubber.js?v={int(time.time())}"></script>
     <script src="/static/gif_export.js?v={int(time.time())}"></script>
     <script src="/static/collections.js?v={int(time.time())}"></script>
     """
