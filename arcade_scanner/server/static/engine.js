@@ -550,6 +550,11 @@ function loadFromURL() {
  */
 function filterAndSort(scrollToTop = false) {
     try {
+        // Duplicates mode has its own rendering logic
+        if (workspaceMode === 'duplicates') {
+            return;
+        }
+
         let vCount = 0; let tSize = 0;
 
         // Standard Filtering
