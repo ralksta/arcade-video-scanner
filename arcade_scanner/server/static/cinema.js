@@ -117,6 +117,10 @@ function closeCinema() {
 
     currentCinemaPath = null;
     currentCinemaVideo = null;
+
+    // Close any open panels
+    if (typeof closeOptimize === 'function') closeOptimize();
+    if (typeof closeGifExport === 'function') closeGifExport();
 }
 
 /**
