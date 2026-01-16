@@ -24,6 +24,7 @@ from arcade_scanner.templates.components import (
     GIF_EXPORT_PANEL_COMPONENT,
     SETTINGS_MODAL_COMPONENT,
     CINEMA_MODAL_COMPONENT,
+    DUPLICATE_CHECKER_MODAL_COMPONENT,
     TREEMAP_LEGEND_COMPONENT,
     BATCH_BAR_COMPONENT,
     FOLDER_SIDEBAR_COMPONENT,
@@ -134,6 +135,7 @@ def generate_html_report(results, report_file, server_port=8000):
     
     <!-- Modals & Overlays -->
     {cinema_modal_html}
+    {DUPLICATE_CHECKER_MODAL_COMPONENT}
     {OPTIMIZE_PANEL_COMPONENT}
     {GIF_EXPORT_PANEL_COMPONENT}
     {SETTINGS_MODAL_COMPONENT}
@@ -168,6 +170,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <link rel="stylesheet" href="/static/styles.css?v={int(time.time())}">
     <link rel="stylesheet" href="/static/timeline_scrubber.css?v={int(time.time())}">
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
+    <script src="/static/treemap.js?v={int(time.time())}"></script>
     <script src="/static/formatters.js?v={int(time.time())}"></script>
     <script src="/static/engine.js?v={int(time.time())}"></script>
     <script src="/static/cinema.js?v={int(time.time())}"></script>

@@ -25,7 +25,7 @@ def run_scanner(args_list=None):
         from arcade_scanner.onboarding import run_onboarding
         run_onboarding()
 
-    print("--- Arcade Media Scanner 6.3 ---")
+    print("--- Arcade Media Scanner 6.7 ---")
     
     # 0. Maintenance
     if args.rebuild:

@@ -625,6 +625,187 @@ CINEMA_MODAL_COMPONENT = """
 </div>
 """
 
+DUPLICATE_CHECKER_MODAL_COMPONENT = """
+<!-- Duplicate Checker Fullscreen Modal -->
+<div id="duplicateCheckerModal" class="fixed inset-0 z-[10001] bg-black opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col">
+    <!-- Active class 'opacity-100 pointer-events-auto' toggled by JS -->
+    
+    <!-- Close Button -->
+    <button class="absolute top-6 right-6 text-white/50 hover:text-white z-50 p-2 transition-colors" onclick="closeDuplicateChecker()">
+        <span class="material-icons text-4xl">close</span>
+    </button>
+    
+    <!-- Header: Group Counter -->
+    <div class="absolute top-6 left-0 right-0 text-center z-40">
+        <div class="text-white/60 text-sm font-mono mb-1">DUPLICATE GROUP</div>
+        <div class="text-white text-2xl font-bold tracking-wider">
+            <span id="dupCheckerCurrentGroup">1</span> / <span id="dupCheckerTotalGroups">0</span>
+        </div>
+        <div class="text-purple-400 text-xs mt-1" id="dupCheckerGroupInfo">
+            2 duplicate candidates • Qualify diff: 0.0 pts
+        </div>
+    </div>
+    
+    <!-- Main Comparison Area -->
+    <div class="flex-1 flex items-center justify-center px-8 py-24">
+        <div class="grid grid-cols-2 gap-8 w-full max-w-7xl">
+            
+            <!-- File A (Left) -->
+            <div id="dupFileA" class="duplicate-file-panel flex flex-col gap-4 p-6 rounded-2xl border-2 border-white/10 bg-white/[0.02] transition-all hover:border-purple-400/50 hover:scale-[1.02]">
+                <!-- Label -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 rounded-full bg-purple-500/20 border-2 border-purple-500/50 flex items-center justify-center">
+                            <span class="text-purple-400 font-bold text-lg">A</span>
+                        </div>
+                        <span class="text-white/60 text-sm font-semibold uppercase tracking-wide">Candidate A</span>
+                    </div>
+                    <div id="dupFileABadge" class="hidden px-3 py-1 rounded-full bg-green-500/20 border border-green-500/50 text-green-400 text-xs font-bold uppercase">
+                        ✓ Higher Quality
+                    </div>
+                </div>
+                
+                <!-- Thumbnail -->
+                <div class="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="previewDuplicateFile('A')">
+                    <img id="dupFileAThumb" src="" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-icons text-white text-4xl drop-shadow-lg">play_circle</span>
+                    </div>
+                </div>
+                
+                <!-- Filename -->
+                <div class="text-white font-medium text-sm truncate" id="dupFileAName" title="">filename_a.mp4</div>
+                
+                <!-- Metadata Grid -->
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">Quality Score</div>
+                        <div id="dupFileAQuality" class="text-purple-400 font-bold text-lg">213.8</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">File Size</div>
+                        <div id="dupFileASize" class="text-white font-mono">0.79 MB</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">Resolution</div>
+                        <div id="dupFileARes" class="text-white font-mono">1436×1436</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">Bitrate</div>
+                        <div id="dupFileABitrate" class="text-white font-mono">--</div>
+                    </div>
+                </div>
+                
+                <!-- Action Button -->
+                <button onclick="keepDuplicateFile('A')" class="w-full py-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border-2 border-purple-500/50 hover:border-purple-500 text-purple-400 hover:text-white font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group">
+                    <span class="material-icons">check_circle</span>
+                    <span>Keep A</span>
+                    <span class="text-xs opacity-60 group-hover:opacity-100">(Press 1 or ←)</span>
+                </button>
+            </div>
+            
+            <!-- File B (Right) -->
+            <div id="dupFileB" class="duplicate-file-panel flex flex-col gap-4 p-6 rounded-2xl border-2 border-white/10 bg-white/[0.02] transition-all hover:border-purple-400/50 hover:scale-[1.02]">
+                <!-- Label -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 rounded-full bg-purple-500/20 border-2 border-purple-500/50 flex items-center justify-center">
+                            <span class="text-purple-400 font-bold text-lg">B</span>
+                        </div>
+                        <span class="text-white/60 text-sm font-semibold uppercase tracking-wide">Candidate B</span>
+                    </div>
+                    <div id="dupFileBBadge" class="hidden px-3 py-1 rounded-full bg-green-500/20 border border-green-500/50 text-green-400 text-xs font-bold uppercase">
+                        ✓ Higher Quality
+                    </div>
+                </div>
+                
+                <!-- Thumbnail -->
+                <div class="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="previewDuplicateFile('B')">
+                    <img id="dupFileBThumb" src="" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-icons text-white text-4xl drop-shadow-lg">play_circle</span>
+                    </div>
+                </div>
+                
+                <!-- Filename -->
+                <div class="text-white font-medium text-sm truncate" id="dupFileBName" title="">filename_b.mp4</div>
+                
+                <!-- Metadata Grid -->
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">Quality Score</div>
+                        <div id="dupFileBQuality" class="text-purple-400 font-bold text-lg">213.8</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">File Size</div>
+                        <div id="dupFileBSize" class="text-white font-mono">0.79 MB</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">Resolution</div>
+                        <div id="dupFileBRes" class="text-white font-mono">1436×1436</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-2">
+                        <div class="text-gray-500 mb-1">Bitrate</div>
+                        <div id="dupFileBBitrate" class="text-white font-mono">--</div>
+                    </div>
+                </div>
+                
+                <!-- Action Button -->
+                <button onclick="keepDuplicateFile('B')" class="w-full py-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border-2 border-purple-500/50 hover:border-purple-500 text-purple-400 hover:text-white font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group">
+                    <span class="material-icons">check_circle</span>
+                    <span>Keep B</span>
+                    <span class="text-xs opacity-60 group-hover:opacity-100">(Press 2 or →)</span>
+                </button>
+            </div>
+            
+        </div>
+    </div>
+    
+    <!-- Bottom Action Bar -->
+    <div class="absolute bottom-8 left-0 right-0 flex items-center justify-center gap-4 z-40">
+        <!-- Skip Button -->
+        <button onclick="skipDuplicateGroup()" class="px-6 py-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/20 hover:border-white/40 text-white/60 hover:text-white font-semibold text-sm transition-all flex items-center gap-2">
+            <span class="material-icons text-lg">skip_next</span>
+            <span>Skip</span>
+            <span class="text-xs opacity-60">(S or Space)</span>
+        </button>
+        
+        <!-- Any is Fine Button -->
+        <button onclick="markAnyIsFine()" class="px-6 py-3 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 hover:border-green-500 text-green-400 hover:text-white font-semibold text-sm transition-all flex items-center gap-2">
+            <span class="material-icons text-lg">done_all</span>
+            <span>Any is Fine</span>
+            <span class="text-xs opacity-60">(A)</span>
+        </button>
+    </div>
+    
+    <!-- Keyboard Shortcuts Legend -->
+    <div class="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl px-6 py-3 z-30">
+        <div class="flex items-center gap-6 text-xs text-white/60">
+            <div class="flex items-center gap-2">
+                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">1</kbd>
+                <span>Keep A</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">2</kbd>
+                <span>Keep B</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">S</kbd>
+                <span>Skip</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">A</kbd>
+                <span>Auto</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">ESC</kbd>
+                <span>Exit</span>
+            </div>
+        </div>
+    </div>
+</div>
+"""
+
 TREEMAP_LEGEND_COMPONENT = """
 <!-- Treemap Legend -->
 <div id="treemapLegend" class="hidden w-full bg-arcade-bg/95 border-b border-white/5 py-2">

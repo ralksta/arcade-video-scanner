@@ -33,6 +33,12 @@ const collectionState = {
     activeCriteria: null    // Stores current smart collection filter rules
 };
 
+// --- DUPLICATE CHECKER STATE ---
+const duplicateCheckerState = {
+    currentGroupIndex: 0,   // Current duplicate group being viewed
+    isActive: false         // Whether duplicate checker is currently open
+};
+
 // --- UI STATE ---
 const uiState = {
     safeMode: localStorage.getItem('safe_mode') === 'true',
@@ -413,7 +419,9 @@ function setLayout(layout, skipURLUpdate = false) {
         grid.classList.add('animating');
 
         // Reset treemap drill-down state
-        treemapCurrentFolder = null;
+        if (typeof setTreemapCurrentFolder === 'function') {
+            setTreemapCurrentFolder(null);
+        }
 
         // Restore batch bar display (will show if items are selected)
         if (batchBar) {
@@ -455,8 +463,9 @@ function updateURL() {
     if (currentLayout === 'treemap') {
         path = '/treeview';
         const params = new URLSearchParams();
-        if (treemapCurrentFolder) {
-            params.set('folder', encodeURIComponent(treemapCurrentFolder));
+        const treemapFolder = typeof getTreemapCurrentFolder === 'function' ? getTreemapCurrentFolder() : null;
+        if (treemapFolder) {
+            params.set('folder', encodeURIComponent(treemapFolder));
         }
         const qs = params.toString();
         if (qs) path += `?${qs}`;
@@ -478,7 +487,8 @@ function updateURL() {
     // Only push if changed (ignoring duplicate slashes etc)
     const currentPath = window.location.pathname + window.location.search;
     if (currentPath !== path) {
-        window.history.pushState({ layout: currentLayout, folder: treemapCurrentFolder, mode: workspaceMode }, '', path);
+        const treemapFolder = typeof getTreemapCurrentFolder === 'function' ? getTreemapCurrentFolder() : null;
+        window.history.pushState({ layout: currentLayout, folder: treemapFolder, mode: workspaceMode }, '', path);
     }
 }
 
@@ -522,7 +532,9 @@ function loadFromURL() {
 
     // Overrides from params
     if (params.get('view') === 'treemap') layout = 'treemap';
-    if (params.get('folder')) treemapCurrentFolder = decodeURIComponent(params.get('folder'));
+    if (params.get('folder') && typeof setTreemapCurrentFolder === 'function') {
+        setTreemapCurrentFolder(decodeURIComponent(params.get('folder')));
+    }
 
     // Check deep links
     if (path.startsWith('/collections/')) {
@@ -749,6 +761,11 @@ function renderUI(reset, scrollToTop = false) {
     // If in treemap mode, re-render treemap instead
     if (currentLayout === 'treemap') {
         renderTreemap();
+        return;
+    }
+
+    // If in duplicates mode, don't render the standard grid
+    if (workspaceMode === 'duplicates') {
         return;
     }
 
@@ -1877,440 +1894,23 @@ function resetDashboard() {
 }
 
 // --- TREEMAP VISUALIZATION ---
-// State for drill-down navigation
-let treemapCurrentFolder = null; // null = show all folders, string = show files in that folder
-let treemapUseLog = false; // Log scale toggle
+// UI code moved to treemap.js
+// Export state variables for treemap.js to access
+// Expose state for treemap.js
+Object.defineProperty(window, 'filteredVideos', {
+    get: () => filteredVideos,
+    set: (v) => { filteredVideos = v; }
+});
+Object.defineProperty(window, 'searchTerm', {
+    get: () => searchTerm,
+    set: (v) => { searchTerm = v; }
+});
+Object.defineProperty(window, 'currentLayout', {
+    get: () => currentLayout,
+    set: (v) => { currentLayout = v; }
+});
 
-/**
- * Toggle between linear and logarithmic scale for treemap sizing
- */
-function toggleTreemapScale() {
-    treemapUseLog = document.getElementById('treemapLogToggle').checked;
-    renderTreemap();
-}
-
-/**
- * Render the treemap visualization
- * Shows either folder view (all folders) or file view (files in selected folder)
- * Uses canvas for efficient rendering of potentially thousands of items
- */
-function renderTreemap() {
-    const container = document.getElementById('treemapContainer');
-    if (!container) return;
-
-    // Create or get canvas
-    let canvas = document.getElementById('treemapCanvas');
-    if (!canvas) {
-        canvas = document.createElement('canvas');
-        canvas.id = 'treemapCanvas';
-        container.appendChild(canvas);
-    }
-
-    const ctx = canvas.getContext('2d');
-    const rect = container.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (filteredVideos.length === 0) {
-        ctx.fillStyle = '#666';
-        ctx.font = '20px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Keine Videos gefunden', canvas.width / 2, canvas.height / 2);
-        return;
-    }
-
-    // Update legend to show current path
-    updateTreemapLegend();
-
-    if (treemapCurrentFolder === null) {
-        // FOLDER-ONLY VIEW: Show only folder blocks
-        renderFolderView(ctx, canvas);
-    } else {
-        // DRILLED-DOWN VIEW: Show files in selected folder
-        renderFileView(ctx, canvas, treemapCurrentFolder);
-    }
-}
-
-function renderFolderView(ctx, canvas) {
-    // Group videos by folder
-    const folderMap = new Map();
-    filteredVideos.forEach(v => {
-        const path = v.FilePath;
-        const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-        const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
-
-        if (!folderMap.has(folder)) {
-            folderMap.set(folder, { items: [], totalSize: 0, highCount: 0, okCount: 0 });
-        }
-        const f = folderMap.get(folder);
-        f.items.push(v);
-        f.totalSize += v.Size_MB;
-        if (v.Status === 'HIGH') f.highCount++;
-        else f.okCount++;
-    });
-
-    // Create folder data for squarify
-    const folderData = [];
-    folderMap.forEach((value, key) => {
-        const parts = key.split(/[\\/]/);
-        const shortName = parts[parts.length - 1] || 'Root';
-        folderData.push({
-            folder: key,
-            shortName: shortName,
-            size: value.totalSize,
-            count: value.items.length,
-            highCount: value.highCount,
-            okCount: value.okCount
-        });
-    });
-
-    // Sort and layout
-    // Sort and layout
-    const blocks = squarify(folderData, 0, 0, canvas.width, canvas.height, treemapUseLog);
-
-    // Folder color gradients - darker tones to complement video gradients
-    const folderGradients = [
-        ['#4c1d95', '#6b21a8'], // Deep purple
-        ['#1e3a8a', '#3b82f6'], // Deep to bright blue
-        ['#7c2d12', '#dc2626'], // Brown to red
-        ['#14532d', '#16a34a'], // Dark to bright green
-        ['#78350f', '#d97706'], // Brown to amber
-        ['#1f2937', '#4b5563']  // Dark gray to gray
-    ];
-
-    // Render folder blocks
-    blocks.forEach((block, idx) => {
-        // Base folder gradient
-        const colors = folderGradients[idx % folderGradients.length];
-        const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y + block.height);
-        gradient.addColorStop(0, colors[0]);
-        gradient.addColorStop(1, colors[1]);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(block.x, block.y, block.width, block.height);
-
-        // Status indicator bar at bottom (proportional HIGH vs OK)
-        const barHeight = Math.min(8, block.height * 0.1);
-        if (block.height > 30) {
-            const highRatio = block.highCount / block.count;
-            const highWidth = block.width * highRatio;
-
-            // Gold gradient for HIGH
-            const highGradient = ctx.createLinearGradient(block.x, block.y + block.height - barHeight, block.x + highWidth, block.y + block.height);
-            highGradient.addColorStop(0, '#E3A857');
-            highGradient.addColorStop(1, '#E0D5A3');
-            ctx.fillStyle = highGradient;
-            ctx.fillRect(block.x, block.y + block.height - barHeight, highWidth, barHeight);
-
-            // Olive-khaki gradient for OK
-            const okGradient = ctx.createLinearGradient(block.x + highWidth, block.y + block.height - barHeight, block.x + block.width, block.y + block.height);
-            okGradient.addColorStop(0, '#568203');
-            okGradient.addColorStop(1, '#F0E68C');
-            ctx.fillStyle = okGradient;
-            ctx.fillRect(block.x + highWidth, block.y + block.height - barHeight, block.width - highWidth, barHeight);
-        }
-
-        // Border
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(block.x, block.y, block.width, block.height);
-
-        // Search highlight - glow effect for folders containing matching files
-        if (searchTerm) {
-            const hasMatch = filteredVideos.some(v => {
-                const vPath = v.FilePath;
-                const vLastIdx = Math.max(vPath.lastIndexOf('/'), vPath.lastIndexOf('\\'));
-                const vFolder = vLastIdx >= 0 ? vPath.substring(0, vLastIdx) : 'Root';
-                return vFolder === block.folder && v.FilePath.toLowerCase().includes(searchTerm.toLowerCase());
-            });
-            if (hasMatch) {
-                ctx.save();
-                ctx.strokeStyle = '#00ffff';
-                ctx.lineWidth = 4;
-                ctx.shadowColor = '#00ffff';
-                ctx.shadowBlur = 20;
-                ctx.strokeRect(block.x + 2, block.y + 2, block.width - 4, block.height - 4);
-                ctx.restore();
-            }
-        }
-
-        // Labels
-        if (block.width > 60 && block.height > 40) {
-            ctx.fillStyle = '#fff';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            const centerX = block.x + block.width / 2;
-            const centerY = block.y + block.height / 2 - 8;
-
-            // Folder name
-            ctx.font = 'bold 13px Inter, sans-serif';
-
-            const maxChars = Math.floor(block.width / 8);
-            let displayName = block.shortName;
-            if (displayName.length > maxChars && maxChars > 3) {
-                displayName = displayName.substring(0, maxChars - 3) + '...';
-            }
-            ctx.fillText(displayName, centerX, centerY);
-
-            // Count and size
-            ctx.font = '11px Inter, sans-serif';
-            ctx.fillStyle = '#ccc';
-            const sizeText = block.size > 1024
-                ? `${(block.size / 1024).toFixed(1)} GB`
-                : `${block.size.toFixed(0)} MB`;
-            ctx.fillText(`${block.count} Videos • ${sizeText}`, centerX, centerY + 18);
-        }
-    });
-
-    // Store for interaction
-    canvas.treemapBlocks = blocks;
-    canvas.treemapMode = 'folders';
-}
-
-function renderFileView(ctx, canvas, folderPath) {
-    // Get videos in this folder
-    const videosInFolder = filteredVideos.filter(v => {
-        const path = v.FilePath;
-        const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-        const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
-        return folder === folderPath;
-    });
-
-    if (videosInFolder.length === 0) {
-        treemapCurrentFolder = null;
-        renderTreemap();
-        return;
-    }
-
-    // Prepare data
-    const treemapData = videosInFolder.map(v => ({
-        video: v,
-        size: v.Size_MB,
-        name: v.FilePath.split(/[\\/]/).pop()
-    }));
-
-    // Layout
-    const blocks = squarify(treemapData, 0, 0, canvas.width, canvas.height, treemapUseLog);
-
-    // Render video tiles with FLAT colors (no gradients)
-    blocks.forEach(block => {
-        const video = block.video;
-
-        // Color by status - gradient for HIGH, flat for OK
-        if (video.Status === 'HIGH') {
-            const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y + block.height);
-            gradient.addColorStop(0, '#E3A857');
-            gradient.addColorStop(1, '#E0D5A3');
-            ctx.fillStyle = gradient;
-        } else {
-            const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y);
-            gradient.addColorStop(0, '#568203');
-            gradient.addColorStop(1, '#F0E68C');
-            ctx.fillStyle = gradient;
-        }
-        ctx.fillRect(block.x, block.y, block.width, block.height);
-
-        // Border
-        ctx.strokeStyle = '#1f2937';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(block.x, block.y, block.width, block.height);
-
-        // Search highlight - glow effect for matching files
-        if (searchTerm && block.name.toLowerCase().includes(searchTerm.toLowerCase())) {
-            ctx.save();
-            ctx.strokeStyle = '#00ffff';
-            ctx.lineWidth = 3;
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 15;
-            ctx.strokeRect(block.x + 2, block.y + 2, block.width - 4, block.height - 4);
-            ctx.restore();
-        }
-
-        // Labels
-        if (block.width > 80 && block.height > 50) {
-            // Use dark text on bright backgrounds (HIGH/yellow), white on dark (OK/green)
-            ctx.fillStyle = video.Status === 'HIGH' ? '#000' : '#fff';
-
-            // Dynamic font size based on tile dimensions - larger tiles get bigger text
-            const minDim = Math.min(block.width, block.height);
-            const titleFontSize = Math.max(14, Math.min(32, minDim / 4));
-            const subFontSize = Math.max(11, Math.min(22, minDim / 6));
-
-            ctx.font = `600 ${titleFontSize}px Inter, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            const centerX = block.x + block.width / 2;
-            const centerY = block.y + block.height / 2;
-
-            // Calculate max chars based on tile width and font size
-            const charWidth = titleFontSize * 0.55;
-            const maxChars = Math.floor((block.width - 20) / charWidth);
-            const displayName = block.name.length > maxChars
-                ? block.name.substring(0, maxChars - 3) + '...'
-                : block.name;
-
-            ctx.fillText(displayName, centerX, centerY - titleFontSize * 0.6);
-            ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
-            ctx.fillStyle = video.Status === 'HIGH' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)';
-            ctx.fillText(`${video.Size_MB.toFixed(0)} MB`, centerX, centerY + subFontSize * 0.8);
-        }
-    });
-
-    // Store for interaction
-    canvas.treemapBlocks = blocks;
-    canvas.treemapMode = 'files';
-}
-
-function updateTreemapLegend() {
-    const legend = document.getElementById('treemapLegend');
-    if (!legend) return;
-
-    const titleEl = legend.querySelector('.legend-title');
-    const hintEl = legend.querySelector('.legend-hint');
-    const backBtn = document.getElementById('treemapBackBtn');
-
-    if (treemapCurrentFolder === null) {
-        titleEl.textContent = 'SPEICHER TREEMAP';
-        hintEl.textContent = 'Klicken zum Reinzoomen';
-        if (backBtn) backBtn.style.display = 'none';
-    } else {
-        const parts = treemapCurrentFolder.split(/[\\/]/);
-        const shortName = parts[parts.length - 1] || 'Root';
-        // Count videos in this folder
-        const count = filteredVideos.filter(v => {
-            const path = v.FilePath;
-            const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-            const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
-            return folder === treemapCurrentFolder;
-        }).length;
-        titleEl.innerHTML = `📁 ${shortName} <span style="opacity:0.6; font-size:0.85em;">(${count} Videos)</span>`;
-        hintEl.textContent = 'Klicken zum Abspielen';
-        if (backBtn) backBtn.style.display = 'inline-flex';
-    }
-}
-
-function treemapZoomOut() {
-    treemapCurrentFolder = null;
-    renderTreemap();
-    updateURL();
-}
-
-function setupTreemapInteraction() {
-    const canvas = document.getElementById('treemapCanvas');
-    if (!canvas || canvas.hasTreemapListeners) return;
-
-    // Create tooltip if it doesn't exist
-    let tooltip = document.getElementById('treemapTooltip');
-    if (!tooltip) {
-        tooltip = document.createElement('div');
-        tooltip.id = 'treemapTooltip';
-        document.body.appendChild(tooltip);
-    }
-
-    canvas.addEventListener('mousemove', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const block = canvas.treemapBlocks?.find(b =>
-            x >= b.x && x <= b.x + b.width &&
-            y >= b.y && y <= b.y + b.height
-        );
-
-        if (block) {
-            canvas.style.cursor = 'pointer';
-            tooltip.style.opacity = '1';
-            tooltip.style.left = e.clientX + 15 + 'px';
-            tooltip.style.top = e.clientY + 15 + 'px';
-
-            if (canvas.treemapMode === 'folders') {
-                // Folder tooltip
-                const sizeText = block.size > 1024
-                    ? `${(block.size / 1024).toFixed(1)} GB`
-                    : `${block.size.toFixed(0)} MB`;
-                tooltip.innerHTML = `
-                    <strong>📁 ${block.shortName}</strong>
-                    Videos: ${block.count}<br>
-                    Größe: ${sizeText}<br>
-                    HIGH: ${block.highCount} • OK: ${block.okCount}
-                `;
-            } else {
-                // File tooltip with thumbnail
-                const video = block.video;
-                const thumbUrl = `thumbnails/${video.thumb}`;
-                const isHevc = (video.codec || '').includes('hevc') || (video.codec || '').includes('h265');
-                tooltip.innerHTML = `
-                    <div style="display: flex; gap: 12px; align-items: flex-start;">
-                        <img src="${thumbUrl}" style="width: 120px; height: 68px; object-fit: cover; border-radius: 4px; background: #333;" onerror="this.style.display='none'">
-                        <div>
-                            <strong style="display: block; margin-bottom: 6px;">${block.name}</strong>
-                            Größe: ${video.Size_MB.toFixed(1)} MB<br>
-                            Bitrate: ${video.Bitrate_Mbps.toFixed(1)} Mbps<br>
-                            Codec: ${isHevc ? 'HEVC' : (video.codec || 'Unknown').toUpperCase()}<br>
-                            Status: <span style="color: ${video.Status === 'HIGH' ? '#f59e0b' : '#10b981'}">${video.Status}</span>
-                        </div>
-                    </div>
-                `;
-            }
-        } else {
-            canvas.style.cursor = 'default';
-            tooltip.style.opacity = '0';
-        }
-    });
-
-    canvas.addEventListener('click', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const block = canvas.treemapBlocks?.find(b =>
-            x >= b.x && x <= b.x + b.width &&
-            y >= b.y && y <= b.y + b.height
-        );
-
-        if (block) {
-            if (canvas.treemapMode === 'folders') {
-                // Drill down into folder
-                treemapCurrentFolder = block.folder;
-                renderTreemap();
-                updateURL();
-            } else {
-                // Open cinema for file
-                // Open cinema for file
-                const mockContainer = {
-                    getAttribute: (attr) => attr === 'data-path' ? block.video.FilePath : null,
-                    closest: () => null
-                };
-                openCinema(mockContainer);
-            }
-        }
-    });
-
-    canvas.addEventListener('mouseleave', () => {
-        tooltip.style.opacity = '0';
-    });
-
-    canvas.hasTreemapListeners = true;
-
-    // Add legend click handler for zoom out
-    const legend = document.getElementById('treemapLegend');
-    if (legend && !legend.hasClickListener) {
-        legend.style.cursor = 'pointer';
-        legend.addEventListener('click', () => {
-            if (treemapCurrentFolder !== null) {
-                treemapZoomOut();
-            }
-        });
-        legend.hasClickListener = true;
-    }
-}
-
-// ESC key handler for treemap zoom out
-// ESC key handler for treemap zoom out
+// ESC key handler - delegates to treemap.js for treemap-specific handling
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const cinemaModal = document.getElementById('cinemaModal');
@@ -2329,20 +1929,20 @@ document.addEventListener('keydown', (e) => {
             return;
         }
 
-        if (currentLayout === 'treemap' && treemapCurrentFolder !== null) {
+        // Delegate treemap ESC handling to treemap.js
+        if (typeof handleTreemapEscape === 'function' && handleTreemapEscape()) {
             e.preventDefault();
-            treemapZoomOut();
         }
     }
 });
 
-// Debounced resize handler for treemap
+// Debounced resize handler - delegates to treemap.js
 let resizeTimeout;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
-        if (currentLayout === 'treemap') {
-            renderTreemap();
+        if (typeof handleTreemapResize === 'function') {
+            handleTreemapResize();
         }
     }, 250);
 });
@@ -2351,7 +1951,9 @@ window.addEventListener('resize', () => {
 window.addEventListener('popstate', (event) => {
     if (event.state) {
         currentLayout = event.state.layout || 'grid';
-        treemapCurrentFolder = event.state.folder || null;
+        if (typeof setTreemapCurrentFolder === 'function') {
+            setTreemapCurrentFolder(event.state.folder || null);
+        }
         setLayout(currentLayout, true);
     } else {
         loadFromURL();
@@ -4284,7 +3886,11 @@ function renderDuplicatesView() {
             <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
                 <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
                 <h3 class="text-xl font-bold text-gray-400 mb-2">No Duplicates Found</h3>
-                <p class="text-sm text-gray-500">Your library is clean! No duplicate media detected.</p>
+                <p class="text-sm text-gray-500 mb-6">Your library is clean! No duplicate media detected.</p>
+                <button onclick="rescanDuplicates()" class="px-5 py-2.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-white text-sm font-medium transition-colors flex items-center gap-2">
+                    <span class="material-icons text-[18px]">refresh</span>
+                    Rescan for Duplicates
+                </button>
             </div>
         `;
         return;
@@ -4296,27 +3902,31 @@ function renderDuplicatesView() {
 
     // Render summary header
     let html = `
-            <div class="col-span-full bg-gradient-to-r from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-6 mb-4">
+            <div class="col-span-full bg-gradient-to-r from-purple-200 to-pink-200 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-300 dark:border-purple-500/30 rounded-xl p-6 mb-4">
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div class="flex items-center gap-4">
-                        <div class="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/40">
-                            <span class="material-icons text-3xl text-purple-400">content_copy</span>
+                        <div class="w-14 h-14 rounded-xl bg-purple-300 dark:bg-purple-500/20 flex items-center justify-center border border-purple-400 dark:border-purple-500/40">
+                            <span class="material-icons text-3xl text-purple-700 dark:text-purple-400">content_copy</span>
                         </div>
                         <div>
-                            <h2 class="text-xl font-bold text-white">Duplicate Media</h2>
-                            <p class="text-sm text-gray-400">
-                                Found <span class="text-purple-400 font-bold">${duplicateData.summary.total_groups}</span> groups
-                                (<span class="text-cyan-400">${duplicateData.summary.video_groups}</span> videos,
-                                <span class="text-pink-400">${duplicateData.summary.image_groups}</span> images)
+                            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Duplicate Media</h2>
+                            <p class="text-sm text-gray-700 dark:text-gray-400">
+                                Found <span class="text-purple-700 dark:text-purple-400 font-bold">${duplicateData.summary.total_groups}</span> groups
+                                (<span class="text-cyan-700 dark:text-cyan-400">${duplicateData.summary.video_groups}</span> videos,
+                                <span class="text-pink-700 dark:text-pink-400">${duplicateData.summary.image_groups}</span> images)
                             </p>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
                         <div class="text-right">
-                            <div class="text-2xl font-bold text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
-                            <div class="text-xs text-gray-500 uppercase tracking-wider">Potential Savings</div>
+                            <div class="text-2xl font-bold text-green-700 dark:text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-500 uppercase tracking-wider">Potential Savings</div>
                         </div>
-                        <button onclick="rescanDuplicates()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-white text-sm font-medium transition-colors flex items-center gap-2">
+                        <button onclick="openDuplicateChecker()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
+                            <span class="material-icons text-[18px]">fullscreen</span>
+                            Fullscreen Mode
+                        </button>
+                        <button onclick="rescanDuplicates()" class="px-4 py-2 rounded-lg bg-purple-300 dark:bg-purple-500/20 hover:bg-purple-400 dark:hover:bg-purple-500/30 border border-purple-400 dark:border-purple-500/40 text-purple-900 dark:text-white text-sm font-medium transition-colors flex items-center gap-2">
                             <span class="material-icons text-[18px]">refresh</span>
                             Rescan
                         </button>
@@ -4439,20 +4049,38 @@ async function deleteDuplicate(encodedPath) {
             const result = await res.json();
             console.log(`✅ Deleted: ${result.deleted.length} files, freed ${result.freed_mb} MB`);
 
-            // Find and remove the group containing this file
+            // Find and update the group containing this file
             if (duplicateData && duplicateData.groups) {
                 const groupIndex = duplicateData.groups.findIndex(group =>
                     group.files.some(file => file.path === path)
                 );
 
                 if (groupIndex !== -1) {
-                    // Remove the entire group since the duplicate case is resolved
-                    duplicateData.groups.splice(groupIndex, 1);
+                    const group = duplicateData.groups[groupIndex];
+
+                    // Remove only the deleted file from the group
+                    group.files = group.files.filter(file => file.path !== path);
+
+                    // If the group still has 2+ files, keep it and recalculate savings
+                    if (group.files.length >= 2) {
+                        // Find the largest file (the one to keep)
+                        const largestFile = group.files.reduce((max, file) =>
+                            file.size_mb > max.size_mb ? file : max
+                        );
+
+                        // Recalculate potential savings (sum of all files except the largest)
+                        group.potential_savings_mb = group.files
+                            .filter(file => file.path !== largestFile.path)
+                            .reduce((sum, file) => sum + file.size_mb, 0);
+                    } else {
+                        // If fewer than 2 files remain, remove the group entirely
+                        duplicateData.groups.splice(groupIndex, 1);
+                    }
 
                     // Update summary counts
                     duplicateData.summary.total_groups = duplicateData.groups.length;
 
-                    // Recalculate savings
+                    // Recalculate total savings
                     duplicateData.summary.potential_savings_mb = duplicateData.groups.reduce(
                         (sum, group) => sum + group.potential_savings_mb, 0
                     );
@@ -4614,6 +4242,321 @@ function skipSetup() {
     })
         .then(() => location.reload());
 }
+
+// ============================================================================
+// DUPLICATE CHECKER FULLSCREEN MODE
+// ============================================================================
+
+/**
+ * Open the fullscreen duplicate checker mode
+ * Shows the first duplicate group in a side-by-side comparison view
+ */
+function openDuplicateChecker() {
+    if (!duplicateData || !duplicateData.groups || duplicateData.groups.length === 0) {
+        alert('No duplicate groups to review');
+        return;
+    }
+
+    duplicateCheckerState.currentGroupIndex = 0;
+    duplicateCheckerState.isActive = true;
+
+    const modal = document.getElementById('duplicateCheckerModal');
+    if (!modal) {
+        console.error('Duplicate checker modal not found');
+        return;
+    }
+
+    // Show modal
+    modal.classList.add('opacity-100', 'pointer-events-auto');
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+
+    // Attach keyboard handler
+    window.addEventListener('keydown', duplicateCheckerKeyHandler, true);
+
+    // Render first group
+    renderDuplicateCheckerGroup(0);
+}
+
+/**
+ * Close the fullscreen duplicate checker mode
+ */
+function closeDuplicateChecker() {
+    duplicateCheckerState.isActive = false;
+
+    const modal = document.getElementById('duplicateCheckerModal');
+    if (modal) {
+        modal.classList.remove('opacity-100', 'pointer-events-auto');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    // Remove keyboard handler
+    window.removeEventListener('keydown', duplicateCheckerKeyHandler, true);
+
+    // Refresh duplicate view to show updated list
+    if (workspaceMode === 'duplicates') {
+        renderDuplicatesView();
+    }
+}
+
+/**
+ * Render a specific duplicate group in the fullscreen checker
+ * @param {number} groupIndex - Index of the group to render
+ */
+function renderDuplicateCheckerGroup(groupIndex) {
+    if (!duplicateData || !duplicateData.groups) return;
+
+    const groups = duplicateData.groups;
+    if (groupIndex < 0 || groupIndex >= groups.length) {
+        // No more groups - close the checker
+        closeDuplicateChecker();
+        alert('All duplicate groups reviewed!');
+        return;
+    }
+
+    const group = groups[groupIndex];
+    duplicateCheckerState.currentGroupIndex = groupIndex;
+
+    // Update header
+    document.getElementById('dupCheckerCurrentGroup').textContent = groupIndex + 1;
+    document.getElementById('dupCheckerTotalGroups').textContent = groups.length;
+
+    const qualityDiff = group.files.length >= 2
+        ? Math.abs(group.files[0].quality_score - group.files[1].quality_score).toFixed(1)
+        : 0;
+    document.getElementById('dupCheckerGroupInfo').textContent =
+        `${group.files.length} duplicate candidates • Quality diff: ${qualityDiff} pts`;
+
+    // Get the two files to compare (use first two files in group)
+    const fileA = group.files[0];
+    const fileB = group.files.length > 1 ? group.files[1] : fileA;
+
+    // Determine which is recommended (higher quality score)
+    const recommendedPath = group.recommended_keep || fileA.path;
+
+    // Render File A
+    renderDuplicateFile('A', fileA, fileA.path === recommendedPath);
+
+    // Render File B
+    renderDuplicateFile('B', fileB, fileB.path === recommendedPath);
+}
+
+/**
+ * Render a single file panel in the duplicate checker
+ * @param {string} side - 'A' or 'B'
+ * @param {Object} file - File data object
+ * @param {boolean} isRecommended - Whether this is the recommended file to keep
+ */
+function renderDuplicateFile(side, file, isRecommended) {
+    const thumbSrc = file.thumb ? `/thumbnails/${file.thumb}` : '/static/placeholder.png';
+    const fileName = file.path.split(/[\\/]/).pop();
+
+    // Update thumbnail
+    document.getElementById(`dupFile${side}Thumb`).src = thumbSrc;
+
+    // Update filename
+    const nameEl = document.getElementById(`dupFile${side}Name`);
+    nameEl.textContent = fileName;
+    nameEl.title = file.path;
+
+    // Update quality score
+    document.getElementById(`dupFile${side}Quality`).textContent = file.quality_score.toFixed(1);
+
+    // Update file size
+    document.getElementById(`dupFile${side}Size`).textContent = file.size_mb.toFixed(2) + ' MB';
+
+    // Update resolution
+    const resolution = file.width && file.height ? `${file.width}×${file.height}` : '--';
+    document.getElementById(`dupFile${side}Res`).textContent = resolution;
+
+    // Update bitrate
+    const bitrate = file.bitrate_mbps ? file.bitrate_mbps.toFixed(1) + ' Mbps' : '--';
+    document.getElementById(`dupFile${side}Bitrate`).textContent = bitrate;
+
+    // Show/hide recommended badge
+    const badge = document.getElementById(`dupFile${side}Badge`);
+    if (isRecommended) {
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+
+    // Highlight recommended panel
+    const panel = document.getElementById(`dupFile${side}`);
+    if (isRecommended) {
+        panel.classList.add('border-green-500/50', 'bg-green-500/5');
+        panel.classList.remove('border-white/10', 'bg-white/[0.02]');
+    } else {
+        panel.classList.remove('border-green-500/50', 'bg-green-500/5');
+        panel.classList.add('border-white/10', 'bg-white/[0.02]');
+    }
+}
+
+/**
+ * Navigate to next or previous duplicate group
+ * @param {number} direction - 1 for next, -1 for previous
+ */
+function navigateDuplicateGroup(direction) {
+    const newIndex = duplicateCheckerState.currentGroupIndex + direction;
+    renderDuplicateCheckerGroup(newIndex);
+}
+
+/**
+ * Keep a specific file (A or B) and delete the other(s)
+ * @param {string} side - 'A' or 'B'
+ */
+async function keepDuplicateFile(side) {
+    if (!duplicateData || !duplicateData.groups) return;
+
+    const group = duplicateData.groups[duplicateCheckerState.currentGroupIndex];
+    if (!group) return;
+
+    const fileToKeep = side === 'A' ? group.files[0] : group.files[1];
+    const filesToDelete = group.files.filter(f => f.path !== fileToKeep.path);
+
+    if (filesToDelete.length === 0) {
+        alert('No files to delete');
+        return;
+    }
+
+    const fileNames = filesToDelete.map(f => f.path.split(/[\\/]/).pop()).join(', ');
+    if (!confirm(`Delete ${filesToDelete.length} file(s)?\n\n${fileNames}\n\nThis cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/duplicates/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: filesToDelete.map(f => f.path) })
+        });
+
+        if (res.ok) {
+            // Remove this group from the list
+            duplicateData.groups.splice(duplicateCheckerState.currentGroupIndex, 1);
+            duplicateData.summary.total_groups--;
+
+            // Show next group (same index since we removed current)
+            renderDuplicateCheckerGroup(duplicateCheckerState.currentGroupIndex);
+        } else {
+            alert('Failed to delete files');
+        }
+    } catch (err) {
+        console.error('Delete error:', err);
+        alert('Error deleting files');
+    }
+}
+
+/**
+ * Skip current duplicate group without taking action
+ */
+function skipDuplicateGroup() {
+    navigateDuplicateGroup(1);
+}
+
+/**
+ * Mark "any is fine" - keep the recommended file and delete others
+ */
+async function markAnyIsFine() {
+    if (!duplicateData || !duplicateData.groups) return;
+
+    const group = duplicateData.groups[duplicateCheckerState.currentGroupIndex];
+    if (!group) return;
+
+    const recommendedPath = group.recommended_keep;
+    const fileToKeep = group.files.find(f => f.path === recommendedPath) || group.files[0];
+    const filesToDelete = group.files.filter(f => f.path !== fileToKeep.path);
+
+    if (filesToDelete.length === 0) {
+        // Only one file, just skip
+        skipDuplicateGroup();
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/duplicates/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: filesToDelete.map(f => f.path) })
+        });
+
+        if (res.ok) {
+            // Remove this group from the list
+            duplicateData.groups.splice(duplicateCheckerState.currentGroupIndex, 1);
+            duplicateData.summary.total_groups--;
+
+            // Show next group
+            renderDuplicateCheckerGroup(duplicateCheckerState.currentGroupIndex);
+        } else {
+            alert('Failed to delete files');
+        }
+    } catch (err) {
+        console.error('Delete error:', err);
+        alert('Error deleting files');
+    }
+}
+
+/**
+ * Preview a duplicate file in cinema mode (optional feature)
+ * @param {string} side - 'A' or 'B'
+ */
+function previewDuplicateFile(side) {
+    if (!duplicateData || !duplicateData.groups) return;
+
+    const group = duplicateData.groups[duplicateCheckerState.currentGroupIndex];
+    if (!group) return;
+
+    const file = side === 'A' ? group.files[0] : group.files[1];
+
+    // Create dummy container with path and open cinema
+    const dummyContainer = document.createElement('div');
+    dummyContainer.setAttribute('data-path', file.path);
+    openCinema(dummyContainer);
+}
+
+/**
+ * Handle keyboard shortcuts in duplicate checker mode
+ * @param {KeyboardEvent} e - Keyboard event
+ */
+function duplicateCheckerKeyHandler(e) {
+    // Only handle if duplicate checker is active
+    if (!duplicateCheckerState.isActive) return;
+
+    // Skip if typing in an input field
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    const key = e.key.toLowerCase();
+
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeDuplicateChecker();
+    } else if (key === '1' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        keepDuplicateFile('A');
+    } else if (key === '2' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        keepDuplicateFile('B');
+    } else if (key === 's' || key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        skipDuplicateGroup();
+    } else if (key === 'a') {
+        e.preventDefault();
+        e.stopPropagation();
+        markAnyIsFine();
+    }
+}
+
+// Expose duplicate checker functions to global scope
+window.openDuplicateChecker = openDuplicateChecker;
+window.closeDuplicateChecker = closeDuplicateChecker;
+window.keepDuplicateFile = keepDuplicateFile;
+window.skipDuplicateGroup = skipDuplicateGroup;
+window.markAnyIsFine = markAnyIsFine;
+window.previewDuplicateFile = previewDuplicateFile;
+
 
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(checkSetupRequired, 500);

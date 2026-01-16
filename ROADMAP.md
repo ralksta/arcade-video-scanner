@@ -10,7 +10,7 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ---
 
-## Version 6.2.0 (Planned)
+## Version XXX (Planned)
 
 ### 🟢 Performance & Optimization
 - [x] Database migration from JSON to SQLite for better performance with large libraries
@@ -22,6 +22,13 @@ This document outlines planned features and improvements for the Arcade Media Sc
 ---
 
 ## Completed Features
+
+### ✅ Version 6.7.1 (2026-01-16)
+- **Fullscreen Duplicate Checker**: Dedicated fullscreen mode for reviewing duplicates with side-by-side comparison.
+- **Keyboard Shortcuts**: Efficient workflow with `1`/`←` (Keep A), `2`/`→` (Keep B), `S`/`Space` (Skip), `A` (Auto), `ESC` (Exit).
+- **Quality Comparison**: Visual highlighting of recommended file with quality score differences.
+- **Progress Tracking**: Clear group counter showing current position (e.g., "47 / 13,771").
+- **Preview Integration**: Click thumbnails to preview files in cinema mode before deciding.
 
 ### ✅ Version 6.7.0 (2026-01-15)
 - **Batch Selection Mode**: Click one checkbox to enter selection mode, then click anywhere on other cards to toggle selection.

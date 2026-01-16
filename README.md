@@ -1,4 +1,4 @@
-# Arcade Media Scanner 6.7.0
+# Arcade Media Scanner 6.7.1
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -10,7 +10,21 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.7.0 Highlights (New!)
+## 🚀 Version 6.7.1 Highlights (New!)
+
+This release adds a **Fullscreen Duplicate Checker Mode** for efficient duplicate resolution.
+
+### ✅ Fullscreen Duplicate Checker
+- **Immersive Interface**: Dedicated fullscreen mode with side-by-side comparison of duplicate files.
+- **Keyboard Shortcuts**: Lightning-fast workflow with `1`/`←` to keep File A, `2`/`→` to keep File B, `S`/`Space` to skip, `A` for auto-keep recommended file, and `ESC` to exit.
+- **Smart Recommendations**: Visual highlighting of recommended file (green border + badge) based on quality score.
+- **Quality Metrics**: See quality score difference, resolution, file size, and bitrate for informed decisions.
+- **Progress Tracking**: Clear counter showing your position (e.g., "47 / 13,771 groups").
+- **Preview Integration**: Click any thumbnail to preview the file in cinema mode before making a decision.
+
+---
+
+## 🚀 Version 6.7.0 Highlights
 
 This release focuses on **Batch Selection UX**, **List View Fixes**, and **CSS Architecture Cleanup**.
 
@@ -283,6 +297,44 @@ docker-compose up -d
 - Environment variables
 - Troubleshooting
 - Backup/restore
+
+---
+
+## 👥 User Management
+
+Arcade Media Scanner supports multi-user accounts with data isolation. Each user has their own scan targets, favorites, vault, and tags.
+
+### Managing Users
+
+Use the `scripts/manage_users.py` CLI tool to manage user accounts:
+
+```bash
+# List all users
+.venv/bin/python3 scripts/manage_users.py list
+
+# Add a new user (will prompt for password)
+.venv/bin/python3 scripts/manage_users.py add john
+
+# Add an admin user
+.venv/bin/python3 scripts/manage_users.py add jane --admin
+
+# Change a user's password
+.venv/bin/python3 scripts/manage_users.py passwd john
+```
+
+**Note**: Use `.venv/bin/python3` to ensure the script runs with the correct dependencies. Alternatively, activate the virtual environment first:
+```bash
+source .venv/bin/activate
+python3 scripts/manage_users.py list
+```
+
+### Default Admin Account
+
+On first run, an admin account is automatically created:
+- **Username**: `admin`
+- **Password**: `admin`
+
+**⚠️ Security**: Change the default password immediately after first login!
 
 ---
 

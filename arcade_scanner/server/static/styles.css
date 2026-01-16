@@ -465,8 +465,7 @@ html {
 }
 
 #statusSelect,
-#codecSelect,
-#sortSelect {
+#codecSelect {
     background: var(--glass);
     border: 1px solid var(--glass-border);
     color: rgba(255, 255, 255, 0.8);
@@ -485,23 +484,20 @@ html {
 }
 
 #statusSelect:hover,
-#codecSelect:hover,
-#sortSelect:hover {
+#codecSelect:hover {
     background: var(--glass-hover);
     color: white;
     border-color: var(--highlight);
 }
 
 #statusSelect:focus,
-#codecSelect:focus,
-#sortSelect:focus {
+#codecSelect:focus {
     border-color: var(--action);
     box-shadow: 0 0 0 3px var(--action-glow);
 }
 
 #statusSelect option,
-#codecSelect option,
-#sortSelect option {
+#codecSelect option {
     background: var(--deep-purple);
     color: white;
 }
@@ -615,11 +611,12 @@ html {
 
 .cinema-actions {
     position: absolute;
-    bottom: 8%;
-    left: 50%;
-    transform: translateX(-50%);
+    right: 3%;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
-    gap: 15px;
+    flex-direction: column;
+    gap: 12px;
     z-index: 10001;
 }
 
@@ -627,17 +624,15 @@ html {
     background: rgba(20, 1, 35, 0.95);
     border: 2px solid var(--glass-border);
     border-radius: 12px;
-    padding: 12px 20px;
+    width: 48px;
+    height: 48px;
+    padding: 0;
     color: white;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: center;
     font-family: inherit;
-    font-weight: 700;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
     transition: all 0.3s;
     backdrop-filter: blur(10px);
 }
@@ -645,12 +640,17 @@ html {
 .cinema-action-btn:hover {
     background: var(--pink);
     border-color: var(--pink);
-    transform: translateY(-2px);
+    transform: scale(1.1);
     box-shadow: 0 5px 20px rgba(222, 26, 88, 0.4);
 }
 
 .cinema-action-btn .material-icons {
-    font-size: 20px;
+    font-size: 24px;
+}
+
+/* Hide button labels, show only icons */
+.cinema-action-btn span:not(.material-icons) {
+    display: none;
 }
 
 .cinema-info-btn {
@@ -1943,18 +1943,16 @@ html {
         z-index: 20000;
     }
 
-    /* Ensure buttons are reachable */
+    /* Ensure buttons are reachable on mobile */
     .cinema-actions {
-        bottom: 120px;
-        /* Push up to avoid potential bottom nav bars */
-        gap: 20px;
+        right: 2%;
+        gap: 10px;
     }
 
     .cinema-action-btn {
-        width: 50px;
-        height: 50px;
-        background: rgba(0, 0, 0, 0.8);
-        /* More contrast */
+        width: 44px;
+        height: 44px;
+        background: rgba(0, 0, 0, 0.9);
     }
 
     /* Ensure close button is easy to hit */
@@ -2060,7 +2058,7 @@ html {
 
 /* Hide action buttons (favorite, vault, optimize, play overlay) in selection mode */
 #videoGrid.selection-mode .video-card-container .favorite-btn,
-#videoGrid.selection-mode .video-card-container .card-media > .hidden.md\:flex {
+#videoGrid.selection-mode .video-card-container .card-media>.hidden.md\:flex {
     display: none !important;
 }
 
