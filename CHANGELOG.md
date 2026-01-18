@@ -2,6 +2,102 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.8.0] - 2026-01-18
+
+### Added
+- **Visual Timeline & Scrubber**: Professional visual timeline with frame-accurate seeking and real-time thumbnail previews.
+- **Trim Handles**: Visual markers for setting export start/end points.
+- **GIF Export Panel**: Replaced modal with a bottom panel UI matching the optimizer workflow.
+- **Production Presets**: Resolution (360p-1080p) and FPS (10-30) presets for GIF export.
+- **Size Estimation**: Dynamic file size calculation for GIF exports.
+- **Current Time Capture**: Buttons to set trim handles to current video time.
+
+### Changed
+- **Cinema Mode UX Overhaul**: Redesigned all action buttons with labels, larger touch targets, and backdrop blur.
+- **Docker-Aware UI**: Automatically hide "Reveal in Finder" buttons when running in Docker.
+
+## [6.7.1] - 2026-01-16
+
+### Added
+- **Fullscreen Duplicate Checker**: Dedicated interface for side-by-side duplicate resolution.
+- **Duplicate Shortcuts**: `1`/`←` (Keep A), `2`/`→` (Keep B), `S`/`Space` (Skip), `A` (Auto), `ESC` (Exit).
+- **Smart Recommendations**: Green border highlighting for recommended files based on quality score.
+- **Progress Tracking**: Group counter (e.g., "47 / 13,771") in duplicate view.
+
+## [6.7.0] - 2026-01-15
+
+### Added
+- **Batch Selection Mode**: Click one checkbox to enter selection mode, then click anywhere on cards to toggle.
+- **Visual Feedback**: Checkmark overlay on hover and cyan highlights during selection.
+
+### Fixed
+- **List View Thumbnails**: Properly constrained thumbnail sizes (fixed full-size image bug).
+- **CSS Media Queries**: Fixed desktop grid layout breakage caused by malformed queries.
+- **Asset Loading**: Added missing `styles.css` link to dashboard.
+
+## [6.6.0] - 2026-01-14
+
+### Added
+- **Binary Search Quality**: O(log n) optimization passes for faster quality targeting.
+- **Early Size Abort**: Stop encoding if output exceeds 95% of original size.
+- **Fallback Mode**: Use best acceptable result (SSIM >= 0.945) when strict targets fail.
+
+### Changed
+- **JS Refactoring**: Extracted `cinema.js`, `collections.js`, and `formatters.js` from `engine.js`.
+- **Documentation**: Added JSDoc to major JavaScript functions.
+
+### Fixed
+- **Keep/Discard**: Fixed "Keep" button not replacing original file (import shadowing fix).
+
+## [6.5.0] - 2026-01-14
+
+### Added
+- **Cinema Tag Display**: View and remove assigned tags directly in the cinema overlay.
+- **Docker Live Reload**: Volume mount support for instant code updates in production.
+
+### Fixed
+- **Tag System**: Resolved cache-busting and validation issues during tag creation/deletion.
+
+## [6.4.1] - 2026-01-14
+
+### Added
+- **RAW Image Support**: Support for 12 RAW formats (CR2, NEF, ARW, DNG, etc.).
+- **Smart Image Collections**: Pre-defined filters for Photos, Recent Imports, and Large Files.
+- **Persistent Duplicate Cache**: Scan results saved to disk to prevent redundant scans.
+- **Rescan Button**: Manual duplicate analysis trigger.
+
+### Fixed
+- **Connection Leaks**: Fixed "Too many open files" error with proper SQLite connection management.
+
+## [6.4.0] - 2026-01-14
+
+### Added
+- **Duplicate Detection**: Smart metadata + content sampling (512KB start/end) verification.
+- **Setup Wizard**: ASCII-based terminal walkthrough for first-run configuration.
+- **Database Maintenance**: Tools to purge orphan entries and thumbnails.
+
+## [6.3.0] - 2026-01-12
+
+### Added
+- **Unified Media Library**: Full support for scanning and viewing images alongside videos.
+- **Cinema Modal Navigation**: Use Arrow keys to navigate through library items.
+- **Visual Badges**: Purple "IMG" badge for image cards.
+
+## [6.2.0] - 2026-01-12
+
+### Added
+- **Multi-User Accounts**: Secure login with isolated targets, favorites, and tags.
+- **SQLite Backend**: Replaced JSON storage for massive library performance.
+- **Negative Tag Filters**: Exclude specific tags from search results.
+- **Smart Collections**: Save any complex query as a sidebar shortcut.
+
+## [6.1.0] - 2026-01-05
+
+### Added
+- **Theme Engine**: Support for multiple themes (Arcade, Professional, Candy).
+- **Custom Tagging**: Batch apply custom tags to any media.
+- **Search Polish**: Redesigned unified search and filter sidebar.
+
 ## [6.0.0] - 2026-01-01
 
 ### Added

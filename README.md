@@ -1,4 +1,4 @@
-# Arcade Media Scanner 6.7.1
+# Arcade Media Scanner 6.8.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -10,7 +10,29 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.7.1 Highlights (New!)
+## 🚀 Version 6.8.0 Highlights (New!)
+
+This release adds a **Visual Timeline Scrubber**, **GIF Export Panel**, and **Cinema UX Redesign**.
+
+### ✅ Visual Timeline & Scrubber
+- **Frame-Accurate Seeking**: Implemented a professional visual timeline scrubber with real-time thumbnail previews.
+- **Trim Handles**: Visual markers for setting export start/end points with frame-perfect precision.
+- **Playback Sync**: Scrubber position automatically stays in sync with video playback state.
+
+### ✅ GIF Export Panel
+- **UX Redesign**: Replaced the intrusive GIF modal with a sleek bottom panel matching the optimizer workflow.
+- **Production Presets**: Quick buttons for resolution (360p to 1080p) and frame rates (10fps to 30fps).
+- **Size Estimation**: Real-time file size calculation based on your selected resolution, FPS, and trim duration.
+- **Current Time Capture**: One-click buttons to set trim handles to the current video playback position.
+
+### ✅ Cinema Mode UX Overhaul
+- **Improved Readability**: Redesigned all action buttons with always-visible labels and improved grouping.
+- **Premium Interaction**: Larger touch targets, backdrop blur effects, and scale-on-hover animations (1.05x).
+- **Docker-Aware UI**: Automatically hides "Reveal in Finder" buttons when running in Docker environments.
+
+---
+
+## 🚀 Version 6.7.1 Highlights
 
 This release adds a **Fullscreen Duplicate Checker Mode** for efficient duplicate resolution.
 
