@@ -105,47 +105,63 @@ def sanitize_path(path: str, allowed_dirs: Optional[List[str]] = None) -> str:
 
 def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool:
     """
-    Check if a path is allowed without raising exceptions.
+    Check if a path is allowed based on scan targets and security rules.
     
     Args:
-        path: Path to check
-        allowed_dirs: Optional list of allowed directories
+        path: Path to check (file or directory)
+        allowed_dirs: Optional list of allowed directories. Defaults to config scan targets.
         
     Returns:
         True if path is allowed, False otherwise
     """
-    from ..config import config
+    from ..config import config, IS_WIN
+    import sys
     
+    if not path:
+        return False
+
     if allowed_dirs is None:
         allowed_dirs = config.active_scan_targets
     
     try:
-        abs_path = os.path.abspath(path)
+        # 1. Resolve to absolute real path (following symlinks is critical for macOS volumes)
+        abs_path = os.path.realpath(os.path.abspath(path))
+        allowed_abs = [os.path.realpath(os.path.abspath(d)) for d in allowed_dirs if d]
         
-        # Check whitelist
-        allowed_abs = [os.path.abspath(d) for d in allowed_dirs if d]
+        # 2. Case-insensitive check on Windows/macOS
+        platform_norm = lambda p: p.lower() if (IS_WIN or sys.platform == "darwin") else p
         
-        # Debug logging
-        is_whitelisted = any(abs_path.startswith(allowed) for allowed in allowed_abs)
+        path_norm = platform_norm(abs_path)
+        is_whitelisted = any(path_norm.startswith(platform_norm(allowed)) for allowed in allowed_abs)
+        
         if not is_whitelisted:
             print(f"⚠️ Path not in whitelist: {abs_path}")
             print(f"   Allowed directories: {allowed_abs}")
             return False
         
-        # Check for hidden files (starting with .)
-        if any(part.startswith('.') for part in Path(abs_path).parts):
-            print(f"⚠️ Hidden file rejected: {abs_path}")
-            return False
+        # 3. Check for hidden files (starting with .)
+        # We check all parts of the path for an exact hidden folder/file
+        # Avoid blocking the root '/' or drive letters
+        parts = Path(abs_path).parts
+        for part in parts:
+            if part.startswith('.') and not (IS_WIN and len(part) <= 3 and ':' in part):
+                print(f"⚠️ Hidden path rejected: {abs_path}")
+                return False
         
-        # Must be a file
-        if not os.path.isfile(abs_path):
-            print(f"⚠️ Not a file: {abs_path}")
+        # 4. State Verification (Exist & File)
+        # We don't block based on 'isfile' here because it might be a directory we are revealing,
+        # or a file that is temporarily busy. We let the actual consumer (streamer/opener) handle it.
+        # However, for security, we check if it exists at all.
+        if not os.path.exists(abs_path):
+            print(f"⚠️ Path does not exist: {abs_path}")
+            # We still return True if it's whitelisted but missing? 
+            # No, if it doesn't exist, we can't 'allow' access to it.
             return False
-        
+            
         return True
         
     except (ValueError, OSError) as e:
-        print(f"⚠️ Path validation error for {path}: {e}")
+        print(f"⚠️ Path validation exception for {path}: {e}")
         return False
 
 
