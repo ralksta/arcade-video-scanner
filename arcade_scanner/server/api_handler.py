@@ -67,8 +67,13 @@ def clear_duplicate_cache():
     except Exception as e:
         print(f"⚠️ Could not remove duplicate cache file: {e}")
 
-def background_duplicate_scan():
-    """Background worker for duplicate detection."""
+def background_duplicate_scan(user_scan_targets=None):
+    """Background worker for duplicate detection.
+
+    Args:
+        user_scan_targets: Optional list of absolute paths to filter files by user's scan targets.
+                          If None, scans all files in database.
+    """
     global DUPLICATE_RESULTS_CACHE
     from arcade_scanner.core.duplicate_detector import DuplicateDetector
     import threading
@@ -85,8 +90,21 @@ def background_duplicate_scan():
         detector = DuplicateDetector()
         # Get all videos (thread-safe enough for read)
         all_videos = db.get_all()
+        print(f"🔍 Duplicate scan: {len(all_videos)} total files in database")
+
+        # Filter by user's scan targets if provided
+        if user_scan_targets:
+            all_videos = [v for v in all_videos
+                         if any(os.path.abspath(v.file_path).startswith(t) for t in user_scan_targets)]
+            print(f"🔍 After user filter: {len(all_videos)} files match scan targets")
+
+        # Count by media type
+        videos = [v for v in all_videos if getattr(v, 'media_type', 'video') == 'video']
+        images = [v for v in all_videos if getattr(v, 'media_type', 'video') == 'image']
+        print(f"🔍 Scanning {len(videos)} videos + {len(images)} images = {len(all_videos)} total")
 
         results = detector.find_all_duplicates(all_videos, progress_cb)
+        print(f"🔍 Found {len(results)} duplicate groups")
 
         # Serialize results slightly earlier to avoid main thread blocking later
         DUPLICATE_RESULTS_CACHE = [g.to_dict() for g in results]
@@ -105,6 +123,15 @@ def background_duplicate_scan():
 
 
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
+    # Suppress logging for noisy polling endpoints
+    QUIET_PATHS = {"/api/duplicates/status"}
+
+    def log_message(self, format, *args):
+        """Override to suppress noisy polling requests."""
+        if self.path in self.QUIET_PATHS:
+            return  # Suppress logging
+        super().log_message(format, *args)
+
     def get_current_user(self):
         """Returns the username from the session cookie, or None."""
         if "Cookie" in self.headers:
@@ -287,9 +314,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                      self.send_error(404, "User not found")
                 return
             
-            elif self.path.startswith("/reveal?path="):
+            elif self.path.startswith("/reveal?"):
                 try:
-                    file_path = unquote(self.path.split("path=")[1])
+                    params = parse_qs(urlparse(self.path).query)
+                    file_path = params.get("path", [None])[0]
+                    if not file_path:
+                         self.send_error(400, "Missing path parameter")
+                         return
+                         
                     print(f"🔍 Reveal requested for: {file_path}")
 
                     # Check if file is in a hidden folder (starts with .)
@@ -821,14 +853,24 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"Batch updated favorite state for {user_name} ({updated_count} files) -> favorite={state}")
                 self.send_response(204)
                 self.end_headers()
-            elif self.path.startswith("/stream?path="):
+            elif self.path.startswith("/stream?"):
                 try:
-                    file_path = unquote(self.path.split("path=")[1])
+                    params = parse_qs(urlparse(self.path).query)
+                    file_path = params.get("path", [None])[0]
                     
+                    if not file_path:
+                        self.send_error(400, "Missing path parameter")
+                        return
+
                     # Security Fix C-2: Prevent arbitrary file read
                     if not is_path_allowed(file_path):
-                        print(f"🚨 Unauthorized stream access blocked: {file_path}")
-                        self.send_error(403, "Forbidden - Path not in scan directories")
+                        # Detailed error message for owner (masked with 403 status for consistency)
+                        error_msg = "Forbidden - Path outside allowed scan directories"
+                        if not os.path.exists(os.path.realpath(os.path.abspath(file_path))):
+                            error_msg = "Forbidden - File not found on disk"
+                            
+                        print(f"🚨 Unauthorized stream access blocked ({error_msg}): {file_path}")
+                        self.send_error(403, error_msg)
                         return
                     
                     serve_file_range(self, file_path, method="GET")
@@ -1196,15 +1238,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error returning duplicates: {e}")
                     self.send_error(500, str(e))
             
-            elif self.path.startswith("/download_gif?file="):
-                # Download generated GIF file
+            elif self.path.startswith("/download_gif?"):
                 user_name = self.get_current_user()
                 if not user_name:
                     self.send_error(401, "Unauthorized")
                     return
                 
                 try:
-                    filename = unquote(self.path.split("file=")[1])
+                    params = parse_qs(urlparse(self.path).query)
+                    filename = params.get("file", [None])[0]
+                    if not filename:
+                        self.send_error(400, "Missing file parameter")
+                        return
                     
                     # Security: Validate filename (no path traversal)
                     if "/" in filename or "\\" in filename or ".." in filename:
@@ -1638,14 +1683,20 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 if not user_name:
                     self.send_error(401, "Unauthorized")
                     return
-                
+
                 if DUPLICATE_SCAN_STATE["is_running"]:
                     self.send_error(409, "Scan already in progress")
                     return
-                
-                # Start background thread
+
+                # Get user's scan targets for filtering
+                u = user_db.get_user(user_name)
+                user_targets = None
+                if u and u.data.scan_targets:
+                    user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
+
+                # Start background thread with user's scan targets
                 import threading
-                t = threading.Thread(target=background_duplicate_scan)
+                t = threading.Thread(target=background_duplicate_scan, args=(user_targets,))
                 t.daemon = True
                 t.start()
                 
