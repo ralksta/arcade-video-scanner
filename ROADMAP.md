@@ -23,6 +23,12 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Version 6.8.0 (2026-01-18)
+- **Visual Timeline Scrubber**: Professional timeline with frame-accurate seeking and thumbnail previews.
+- **GIF Export Panel**: Redesigned bottom panel UI with presets and size estimation.
+- **Cinema UX Refactor**: Redesigned action buttons with labels and improved layout.
+- **Docker-Aware UI**: Dynamic visibility for "Reveal in Finder" buttons based on environment.
+
 ### ✅ Version 6.7.1 (2026-01-16)
 - **Fullscreen Duplicate Checker**: Dedicated fullscreen mode for reviewing duplicates with side-by-side comparison.
 - **Keyboard Shortcuts**: Efficient workflow with `1`/`←` (Keep A), `2`/`→` (Keep B), `S`/`Space` (Skip), `A` (Auto), `ESC` (Exit).
