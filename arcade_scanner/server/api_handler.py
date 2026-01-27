@@ -1098,23 +1098,23 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     return
                 
                 # Filter videos
-                all_videos = [e.model_dump(by_alias=True) for e in db.get_all()]
                 user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
-                
+                filtered_videos = []
+
                 # If user has no targets, they see nothing (or maybe we allow strict isolation?)
                 # If user is admin? Admin typically sees all? 
                 # Request was "include and excludes already different for every user?".
                 # Implies users only see what they define.
                 
-                filtered_videos = []
                 # ADMIN OVERRIDE: If no targets defined, Admin sees all.
                 if not user_targets and u.is_admin:
-                    filtered_videos = all_videos
+                    filtered_videos = [e.model_dump(by_alias=True) for e in db.get_all()]
                 elif user_targets:
-                    for v in all_videos:
-                        v_path = os.path.abspath(v["FilePath"])
+                    # Optimized: Check path BEFORE serialization
+                    for entry in db.get_all():
+                        v_path = os.path.abspath(entry.file_path)
                         if any(v_path.startswith(t) for t in user_targets):
-                             filtered_videos.append(v)
+                             filtered_videos.append(entry.model_dump(by_alias=True))
                 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
