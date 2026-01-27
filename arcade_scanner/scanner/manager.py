@@ -99,7 +99,7 @@ class ScannerManager:
                 else:
                     try:
                         # Basic existence check and stat
-                        file_stat = os.stat(path)
+                        file_stat = await asyncio.to_thread(os.stat, path)
                         # Check if file size changed significantly (more than 10MB difference)
                         # This catches files that were optimized/replaced
                         current_size_mb = file_stat.st_size / (1024 * 1024)
@@ -142,7 +142,7 @@ class ScannerManager:
                             # We need to re-stat if we didn't get it above (e.g. if needs_update was True from start)
                             # But optimization: we can just stat here.
                             if not 'file_stat' in locals():
-                                file_stat = os.stat(path)
+                                file_stat = await asyncio.to_thread(os.stat, path)
                             
                             entry.mtime = int(file_stat.st_mtime)
                             
