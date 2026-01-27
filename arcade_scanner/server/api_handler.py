@@ -5,6 +5,7 @@ import mimetypes
 import sys
 import time
 import json
+import threading
 from pathlib import Path
 import socket
 import ssl
@@ -27,6 +28,31 @@ DUPLICATE_SCAN_STATE = {
     "message": "",
 }
 DUPLICATE_RESULTS_CACHE = None
+
+class ReportDebouncer:
+    def __init__(self, delay=1.0):
+        self.delay = delay
+        self._timer = None
+        self._lock = threading.Lock()
+
+    def schedule(self, port):
+        with self._lock:
+            if self._timer:
+                self._timer.cancel()
+            self._timer = threading.Timer(self.delay, self._generate, args=[port])
+            self._timer.daemon = True
+            self._timer.start()
+
+    def _generate(self, port):
+        try:
+            # Re-fetch results to ensure freshness
+            results = [e.model_dump(by_alias=True) for e in db.get_all()]
+            generate_html_report(results, config.report_file, server_port=port)
+            # print(f"✅ HTML Report regenerated (debounced)")
+        except Exception as e:
+            print(f"⚠️ Report generation failed: {e}")
+
+report_debouncer = ReportDebouncer(delay=1.0)
 
 def load_duplicate_cache():
     """Load cached duplicate results from disk."""
@@ -374,11 +400,10 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     # Regenerate HTML report so refresh works
                     try:
                         current_port = self.server.server_address[1]
-                        results = [e.model_dump(by_alias=True) for e in db.get_all()]
-                        generate_html_report(results, config.report_file, server_port=current_port)
-                        print(f"✅ Marked as optimized and report updated: {os.path.basename(abs_path)}")
+                        report_debouncer.schedule(current_port)
+                        print(f"✅ Marked as optimized and report update scheduled: {os.path.basename(abs_path)}")
                     except Exception as e:
-                        print(f"⚠️ Cache updated but report gen failed: {e}")
+                        print(f"⚠️ Cache updated but report scheduling failed: {e}")
 
                 self.send_response(204)
                 self.end_headers()
@@ -574,10 +599,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             # Regenerate Report
                             try:
                                 current_port = self.server.server_address[1]
-                                results = [e.model_dump(by_alias=True) for e in db.get_all()]
-                                generate_html_report(results, config.report_file, server_port=current_port)
+                                report_debouncer.schedule(current_port)
                             except Exception as e:
-                                print(f"⚠️ Report gen failed: {e}")
+                                print(f"⚠️ Report gen scheduling failed: {e}")
                                 
                             print(f"🗑️ Discarded optimized: {os.path.basename(abs_path)}")
                             
@@ -1393,17 +1417,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                         # Regenerate HTML report to bake in new settings (Theme, etc.)
                         try:
-                            # We need to import db to get results
-                            # results = [e.model_dump(by_alias=True) for e in db.get_all()]
-                            # But simple way is to rely on scanner manager or just trigger a re-render if possible.
-                            # Actually, we can just fetch db here since it's imported.
-                            results = [e.model_dump(by_alias=True) for e in db.get_all()]
                             current_port = config.PORT if hasattr(config, 'PORT') else 8000
-                            # generate_html_report is imported
-                            generate_html_report(results, config.report_file, server_port=current_port)
-                            print("✅ HTML Report regenerated with new settings")
+                            report_debouncer.schedule(current_port)
+                            print("✅ HTML Report scheduled for regeneration with new settings")
                         except Exception as e:
-                            print(f"⚠️ Settings saved but report gen failed: {e}")
+                            print(f"⚠️ Settings saved but report gen scheduling failed: {e}")
 
                         self.send_response(200)
                         self.send_header("Content-Type", "application/json")
