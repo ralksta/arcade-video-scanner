@@ -67,8 +67,7 @@ class ScannerManager:
         found_paths: Set[str] = set()
         
         processed_count = 0
-        
-        processed_count = 0
+        last_save_time = time.time()
         
         # Concurrency: Using self.sem_video and self.sem_image defined in __init__
         pending_tasks = set()
@@ -166,11 +165,17 @@ class ScannerManager:
                         db.upsert(entry)
                         
                         nonlocal processed_count
+                        nonlocal last_save_time
                         processed_count += 1
                         
                         # Quick Save periodically (every 500 for speed)
+                        # Optimized to avoid quadratic write overhead:
+                        # Only save if 500 items processed AND > 60s passed
                         if processed_count % 500 == 0:
-                            db.save()
+                            current_time = time.time()
+                            if current_time - last_save_time > 60:
+                                db.save()
+                                last_save_time = current_time
 
         try:
             # 2. Discovery Loop
