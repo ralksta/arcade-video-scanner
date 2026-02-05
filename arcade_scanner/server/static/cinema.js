@@ -12,6 +12,15 @@
 // --- CINEMA STATE ---
 let currentCinemaPath = null;
 let currentCinemaVideo = null;
+let cinemaPlaylist = null; // Overrides filteredVideos if set (e.g. for folder view)
+
+/**
+ * Set the playlist for cinema navigation
+ * @param {Array|null} playlist - Array of video objects or null to use default filteredVideos
+ */
+function setCinemaPlaylist(playlist) {
+    cinemaPlaylist = playlist;
+}
 
 // --- MAIN FUNCTIONS ---
 
@@ -121,6 +130,10 @@ function closeCinema() {
     // Close any open panels
     if (typeof closeOptimize === 'function') closeOptimize();
     if (typeof closeGifExport === 'function') closeGifExport();
+
+    // Note: We do NOT clear cinemaPlaylist here because we might want to 
+    // keep browsing the same context if we reopen a file in the same view.
+    // The playlist should be managed by the view (engine.js/treemap.js).
 }
 
 /**
@@ -130,16 +143,19 @@ function closeCinema() {
 function navigateCinema(direction) {
     if (!currentCinemaPath) return;
 
-    // Find current index in filteredVideos (from engine.js)
-    const currentIndex = filteredVideos.findIndex(v => v.FilePath === currentCinemaPath);
+    // Use custom playlist if available, otherwise default to global filtered list
+    const sourceList = cinemaPlaylist || filteredVideos;
+
+    // Find current index in sourceList
+    const currentIndex = sourceList.findIndex(v => v.FilePath === currentCinemaPath);
     if (currentIndex === -1) return;
 
     // Calculate new index with wrap-around
     let newIndex = currentIndex + direction;
-    if (newIndex < 0) newIndex = filteredVideos.length - 1;
-    if (newIndex >= filteredVideos.length) newIndex = 0;
+    if (newIndex < 0) newIndex = sourceList.length - 1;
+    if (newIndex >= sourceList.length) newIndex = 0;
 
-    const newVideo = filteredVideos[newIndex];
+    const newVideo = sourceList[newIndex];
     if (newVideo) {
         // Clean up current streams to avoid file handle leak
         const video = document.getElementById('cinemaVideo');
@@ -772,7 +788,9 @@ window.cinemaExportGif = cinemaExportGif;
 window.closeGifExportModal = closeGifExportModal;
 window.startGifExport = startGifExport;
 window.updateGifEstimate = updateGifEstimate;
+window.updateGifEstimate = updateGifEstimate;
 window.setGifTrimFromVideo = setGifTrimFromVideo;
+window.setCinemaPlaylist = setCinemaPlaylist;
 
 // Expose state for other modules that need it (e.g., optimizer panel)
 // Using defineProperty to create live bindings
