@@ -26,6 +26,7 @@ from arcade_scanner.templates.components import (
     CINEMA_MODAL_COMPONENT,
     DUPLICATE_CHECKER_MODAL_COMPONENT,
     TREEMAP_LEGEND_COMPONENT,
+    FOLDER_BROWSER_LEGEND_COMPONENT,
     BATCH_BAR_COMPONENT,
     FOLDER_SIDEBAR_COMPONENT,
     SAVED_VIEWS_COMPONENT
@@ -109,7 +110,9 @@ def generate_html_report(results, report_file, server_port=8000):
         {SAVED_VIEWS_COMPONENT}
         
         {TREEMAP_LEGEND_COMPONENT}
-        
+
+        {FOLDER_BROWSER_LEGEND_COMPONENT}
+
         <!-- Main Content Container with safe area padding -->
         <main class="flex-1 p-2 md:p-6 pb-[80px] md:pb-6 relative w-full overflow-x-hidden" id="mainContentArea">
             
@@ -172,6 +175,8 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
     <script src="/static/treemap.js?v={int(time.time())}"></script>
     <script src="/static/formatters.js?v={int(time.time())}"></script>
+    <script src="/static/settings.js?v={int(time.time())}"></script>
+    <script src="/static/duplicates.js?v={int(time.time())}"></script>
     <script src="/static/engine.js?v={int(time.time())}"></script>
     <script src="/static/cinema.js?v={int(time.time())}"></script>
     <script src="/static/timeline_scrubber.js?v={int(time.time())}"></script>

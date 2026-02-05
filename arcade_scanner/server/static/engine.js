@@ -39,6 +39,15 @@ const duplicateCheckerState = {
     isActive: false         // Whether duplicate checker is currently open
 };
 
+// --- FOLDER BROWSER STATE ---
+const folderBrowserState = {
+    currentPath: null,      // null = root (show all root folders), string = current folder path
+    showVideosHere: false   // When true, show videos at current path instead of subfolders
+};
+
+// Legacy alias for folder browser
+let folderBrowserPath = folderBrowserState.currentPath;
+
 // --- UI STATE ---
 const uiState = {
     safeMode: localStorage.getItem('safe_mode') === 'true',
@@ -253,6 +262,11 @@ function setWorkspaceMode(mode, preserveCollection = false) {
         // Debug: console.log("Setting workspace mode:", mode);
         workspaceMode = mode;
 
+        // Reset cinema playlist when changing workspace
+        if (typeof setCinemaPlaylist === 'function') {
+            setCinemaPlaylist(null);
+        }
+
         // Clear active smart collection when changing workspace unless executing a collection load
         if (!preserveCollection) {
             activeSmartCollectionCriteria = null;
@@ -322,8 +336,20 @@ function setWorkspaceMode(mode, preserveCollection = false) {
 
         // Special handling for duplicates mode
         if (mode === 'duplicates') {
+            // Ensure grid is visible (might be hidden from treemap mode)
+            const videoGrid = document.getElementById('videoGrid');
+            const treemapContainer = document.getElementById('treemapContainer');
+            const loadingSentinel = document.getElementById('loadingSentinel');
+            if (videoGrid) videoGrid.style.display = '';
+            if (treemapContainer) treemapContainer.style.display = 'none';
+            if (loadingSentinel) loadingSentinel.style.display = 'none';
+
             renderDuplicatesView();
         } else {
+            // Restore sentinel for infinite scroll (may have been hidden by duplicates mode)
+            const loadingSentinel = document.getElementById('loadingSentinel');
+            if (loadingSentinel) loadingSentinel.style.display = '';
+
             filterAndSort(true); // Scroll to top on workspace change
         }
         updateURL();
@@ -338,11 +364,12 @@ function setWorkspaceMode(mode, preserveCollection = false) {
  * Updates the toggle button icon to indicate the next mode
  */
 function toggleLayout() {
-    const modes = ['grid', 'list', 'treemap'];
+    const modes = ['grid', 'list', 'treemap', 'folderbrowser'];
     const icons = {
-        grid: 'view_list',      // Shows what's NEXT
-        list: 'dashboard',      // Shows what's NEXT
-        treemap: 'view_module'  // Shows what's NEXT
+        grid: 'view_list',         // Shows what's NEXT (list)
+        list: 'dashboard',         // Shows what's NEXT (treemap)
+        treemap: 'folder',         // Shows what's NEXT (folderbrowser)
+        folderbrowser: 'view_module'  // Shows what's NEXT (grid)
     };
 
     const currentIndex = modes.indexOf(currentLayout);
@@ -358,10 +385,10 @@ function toggleLayout() {
 
 /**
  * Set the display layout mode
- * Handles switching between grid, list, and treemap views with proper
+ * Handles switching between grid, list, treemap, and folderbrowser views with proper
  * show/hide of relevant UI elements and animations
  *
- * @param {string} layout - Layout mode ('grid', 'list', 'treemap')
+ * @param {string} layout - Layout mode ('grid', 'list', 'treemap', 'folderbrowser')
  * @param {boolean} [skipURLUpdate=false] - If true, don't update browser URL
  */
 function setLayout(layout, skipURLUpdate = false) {
@@ -373,6 +400,11 @@ function setLayout(layout, skipURLUpdate = false) {
     const batchBar = document.getElementById('batchBar');
     const workspaceBar = document.querySelector('.workspace-bar');
     const treemapLegend = document.getElementById('treemapLegend');
+    const folderBrowserLegend = document.getElementById('folderBrowserLegend');
+
+    // Hide all legends first
+    if (treemapLegend) treemapLegend.style.display = 'none';
+    if (folderBrowserLegend) folderBrowserLegend.style.display = 'none';
 
     if (layout === 'treemap') {
         grid.style.display = 'none';
@@ -399,7 +431,39 @@ function setLayout(layout, skipURLUpdate = false) {
 
         renderTreemap();
         setupTreemapInteraction();
+    } else if (layout === 'folderbrowser') {
+        // Folder browser mode
+        grid.style.display = '';
+        grid.classList.remove('list-view');
+        sentinel.style.display = 'none'; // No infinite scroll in folder browser
+        treemap.style.display = 'none';
+
+        // Trigger animation
+        grid.classList.remove('animating');
+        void grid.offsetWidth; // Trigger reflow
+        grid.classList.add('animating');
+
+        // Hide batch bar in folder browser (no checkboxes on folder cards)
+        if (batchBar) {
+            batchBar.style.display = 'none';
+        }
+
+        // Hide sort dropdown in folder browser view
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) sortSelect.style.display = 'none';
+
+        // Hide workspace bar, show folder browser legend
+        if (workspaceBar) workspaceBar.style.display = 'none';
+        if (folderBrowserLegend) folderBrowserLegend.style.display = 'block';
+
+        // Reset treemap drill-down state
+        if (typeof setTreemapCurrentFolder === 'function') {
+            setTreemapCurrentFolder(null);
+        }
+
+        renderFolderBrowser();
     } else {
+        // Grid or list mode
         // Toggle list-view class for CSS styling
         if (layout === 'list') {
             grid.classList.add('list-view');
@@ -423,14 +487,18 @@ function setLayout(layout, skipURLUpdate = false) {
             setTreemapCurrentFolder(null);
         }
 
+        // Reset folder browser state
+        folderBrowserState.currentPath = null;
+        folderBrowserState.showVideosHere = false;
+        folderBrowserPath = null;
+
         // Restore batch bar display (will show if items are selected)
         if (batchBar) {
             batchBar.style.display = '';
         }
 
-        // Show workspace bar, hide treemap legend
+        // Show workspace bar
         if (workspaceBar) workspaceBar.style.display = '';
-        if (treemapLegend) treemapLegend.style.display = 'none';
 
         // Show sort dropdown in grid/list view
         const sortSelect = document.getElementById('sortSelect');
@@ -478,17 +546,31 @@ function updateURL() {
         else if (path.startsWith('/collections/')) { } // Keep existing path for collections
         else path = '/lobby';
 
-        // Add view param if not grid
+        // Add view params
+        const params = new URLSearchParams();
         if (currentLayout !== 'grid') {
-            path += `?view=${currentLayout}`;
+            params.set('view', currentLayout);
         }
+
+        // Add folder browser path if in folderbrowser mode
+        if (currentLayout === 'folderbrowser' && folderBrowserState.currentPath) {
+            params.set('folderPath', encodeURIComponent(folderBrowserState.currentPath));
+        }
+
+        const qs = params.toString();
+        if (qs) path += `?${qs}`;
     }
 
     // Only push if changed (ignoring duplicate slashes etc)
     const currentPath = window.location.pathname + window.location.search;
     if (currentPath !== path) {
         const treemapFolder = typeof getTreemapCurrentFolder === 'function' ? getTreemapCurrentFolder() : null;
-        window.history.pushState({ layout: currentLayout, folder: treemapFolder, mode: workspaceMode }, '', path);
+        window.history.pushState({
+            layout: currentLayout,
+            folder: treemapFolder,
+            folderBrowserPath: folderBrowserState.currentPath,
+            mode: workspaceMode
+        }, '', path);
     }
 }
 
@@ -532,8 +614,15 @@ function loadFromURL() {
 
     // Overrides from params
     if (params.get('view') === 'treemap') layout = 'treemap';
+    if (params.get('view') === 'folderbrowser') layout = 'folderbrowser';
     if (params.get('folder') && typeof setTreemapCurrentFolder === 'function') {
         setTreemapCurrentFolder(decodeURIComponent(params.get('folder')));
+    }
+
+    // Restore folder browser path from URL
+    if (params.get('folderPath')) {
+        folderBrowserState.currentPath = decodeURIComponent(params.get('folderPath'));
+        folderBrowserPath = folderBrowserState.currentPath;
     }
 
     // Check deep links
@@ -544,11 +633,13 @@ function loadFromURL() {
         setWorkspaceMode(mode);
     }
 
-    // Force layout if treeview
+    // Force layout if special view
     if (layout === 'treemap') {
         setLayout('treemap');
     } else if (layout === 'list') {
         setLayout('list');
+    } else if (layout === 'folderbrowser') {
+        setLayout('folderbrowser');
     }
 
     // Check for deep links (navigating back/forward)
@@ -770,9 +861,18 @@ function renderUI(reset, scrollToTop = false) {
     }
 
     const grid = document.getElementById('videoGrid');
+
+    // Reset cinema playlist to use global filter
+    // We do this here (even if not resetting) to ensure that if we are in the main grid,
+    // we strictly use the filteredVideos list, not a stale folder list.
+    if (typeof setCinemaPlaylist === 'function') {
+        setCinemaPlaylist(null);
+    }
+
     if (reset) {
         grid.innerHTML = '';
         renderedCount = 0;
+
         // Only scroll to top when explicitly requested (e.g., workspace change)
         // This prevents scroll-jumping when filtering/sorting
         if (scrollToTop) {
@@ -998,13 +1098,19 @@ function createVideoCard(v) {
                 <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-black/50 text-arcade-cyan focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
              </div>
 
-             <!-- Favorite Star -->
              <button class="favorite-btn absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 flex items-center justify-center transition-all ${v.favorite ? 'text-arcade-gold active scale-110' : 'text-gray-400 opacity-0 group-hover:opacity-100'}"
                 onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))">
                 <span class="material-icons text-lg">${v.favorite ? 'star' : 'star_border'}</span>
              </button>
 
-             <img src="/thumbnails/${v.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
+             <!-- Thumbnail with Skeleton Loader -->
+             <div class="skeleton skeleton-thumbnail absolute inset-0">
+                 <img src="/thumbnails/${v.thumb}" 
+                      class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+                      loading="lazy"
+                      onload="this.parentElement.classList.add('loaded'); this.parentElement.classList.remove('skeleton')"
+                      onerror="this.parentElement.classList.add('loaded'); this.parentElement.classList.remove('skeleton')">
+             </div>
 
              
              <!-- Quick Actions Overlay -->
@@ -1893,6 +1999,489 @@ function resetDashboard() {
     renderFolderSidebar(); // This will refresh the folder list UI
 }
 
+// --- FOLDER BROWSER ---
+
+/**
+ * Get subfolders at a given path based on filteredVideos (respects current filters)
+ * @param {string|null} path - Parent path (null for root level)
+ * @returns {Array} Array of folder objects: {path, name, count, size_mb, hasSubfolders, thumbnails}
+ */
+function getSubfoldersAt(path) {
+    const normalizePath = (p) => p.replace(/\\/g, '/');
+    const normalizedPath = path ? normalizePath(path) : null;
+
+    // Build folder stats from filteredVideos (respects current workspace/filters)
+    const folderStats = new Map();
+
+    filteredVideos.forEach(video => {
+        const lastIdx = Math.max(video.FilePath.lastIndexOf('/'), video.FilePath.lastIndexOf('\\'));
+        if (lastIdx < 0) return;
+
+        const videoDir = video.FilePath.substring(0, lastIdx);
+        const normalizedVideoDir = normalizePath(videoDir);
+
+        if (!folderStats.has(normalizedVideoDir)) {
+            folderStats.set(normalizedVideoDir, {
+                originalPath: videoDir,
+                count: 0,
+                size_mb: 0
+            });
+        }
+        const stats = folderStats.get(normalizedVideoDir);
+        stats.count++;
+        stats.size_mb += video.Size_MB || 0;
+    });
+
+    const allPaths = Array.from(folderStats.keys());
+    const subfolders = new Map();
+
+    if (normalizedPath === null) {
+        // Root level: find top-level folders
+        allPaths.forEach(folderPath => {
+            // Check if this path is a subfolder of any other path
+            let isSubfolder = false;
+            allPaths.forEach(otherPath => {
+                if (otherPath !== folderPath && folderPath.startsWith(otherPath + '/')) {
+                    isSubfolder = true;
+                }
+            });
+
+            if (!isSubfolder) {
+                // This is a root-level folder - aggregate all subfolders into it
+                const stats = folderStats.get(folderPath);
+                if (!subfolders.has(folderPath)) {
+                    subfolders.set(folderPath, {
+                        path: stats.originalPath,
+                        count: 0,
+                        size_mb: 0,
+                        hasSubfolders: false
+                    });
+                }
+                const folder = subfolders.get(folderPath);
+                folder.count += stats.count;
+                folder.size_mb += stats.size_mb;
+
+                // Also add stats from all subfolders
+                allPaths.forEach(subPath => {
+                    if (subPath !== folderPath && subPath.startsWith(folderPath + '/')) {
+                        const subStats = folderStats.get(subPath);
+                        folder.count += subStats.count;
+                        folder.size_mb += subStats.size_mb;
+                        folder.hasSubfolders = true;
+                    }
+                });
+            }
+        });
+    } else {
+        // Find direct children of the given path
+        allPaths.forEach(folderPath => {
+            if (folderPath.startsWith(normalizedPath + '/')) {
+                const remainder = folderPath.substring(normalizedPath.length + 1);
+                const nextSegment = remainder.split('/')[0];
+                const childPath = normalizedPath + '/' + nextSegment;
+
+                if (!subfolders.has(childPath)) {
+                    // Reconstruct original path format
+                    const originalPath = path + (path.includes('\\') ? '\\' : '/') + nextSegment;
+                    subfolders.set(childPath, {
+                        path: originalPath,
+                        count: 0,
+                        size_mb: 0,
+                        hasSubfolders: false
+                    });
+                }
+
+                const folder = subfolders.get(childPath);
+                const stats = folderStats.get(folderPath);
+                folder.count += stats.count;
+                folder.size_mb += stats.size_mb;
+
+                // Check if there are deeper subfolders
+                if (remainder.includes('/')) {
+                    folder.hasSubfolders = true;
+                }
+            }
+        });
+    }
+
+    // Convert to array, add names, and sort by size
+    const result = Array.from(subfolders.values()).map(folder => ({
+        ...folder,
+        name: folder.path.split(/[\\/]/).pop() || folder.path
+    }));
+
+    // Get thumbnails for each folder (from filteredVideos)
+    result.forEach(folder => {
+        folder.thumbnails = getThumbnailsForFolder(folder.path, 4);
+    });
+
+    // Sort by size descending
+    result.sort((a, b) => b.size_mb - a.size_mb);
+
+    return result;
+}
+
+/**
+ * Get videos whose directory exactly matches the given path (not in subfolders)
+ * @param {string} path - Folder path
+ * @returns {Array} Array of video objects
+ */
+function getVideosDirectlyIn(path) {
+    if (!path) return [];
+
+    const normalizePath = (p) => p.replace(/\\/g, '/');
+    const normalizedPath = normalizePath(path);
+
+    return filteredVideos.filter(v => {
+        const videoDir = normalizePath(v.FilePath.substring(0, Math.max(
+            v.FilePath.lastIndexOf('/'),
+            v.FilePath.lastIndexOf('\\')
+        )));
+        return videoDir === normalizedPath;
+    });
+}
+
+/**
+ * Get videos that are within the given path (including subfolders)
+ * @param {string} path - Folder path
+ * @returns {Array} Array of video objects
+ */
+function getVideosUnderPath(path) {
+    if (!path) return filteredVideos;
+
+    const normalizePath = (p) => p.replace(/\\/g, '/');
+    const normalizedPath = normalizePath(path);
+
+    return filteredVideos.filter(v => {
+        const normalizedFilePath = normalizePath(v.FilePath);
+        return normalizedFilePath.startsWith(normalizedPath + '/') ||
+            normalizePath(v.FilePath.substring(0, Math.max(
+                v.FilePath.lastIndexOf('/'),
+                v.FilePath.lastIndexOf('\\')
+            ))) === normalizedPath;
+    });
+}
+
+/**
+ * Get first N thumbnail paths for videos in a folder (recursive)
+ * @param {string} path - Folder path
+ * @param {number} count - Number of thumbnails to get
+ * @returns {Array} Array of thumbnail paths
+ */
+function getThumbnailsForFolder(path, count = 4) {
+    const videos = getVideosUnderPath(path);
+    return videos
+        .filter(v => v.thumb)
+        .slice(0, count)
+        .map(v => v.thumb);
+}
+
+/**
+ * Get folder statistics (count, size) for all videos under a path
+ * @param {string} path - Folder path
+ * @returns {Object} {count, size_mb}
+ */
+function getFolderStats(path) {
+    const videos = getVideosUnderPath(path);
+    return {
+        count: videos.length,
+        size_mb: videos.reduce((sum, v) => sum + (v.Size_MB || 0), 0)
+    };
+}
+
+/**
+ * Set the folder browser path and re-render
+ * @param {string|null} path - Folder path or null for root
+ */
+function setFolderBrowserPath(path) {
+    folderBrowserState.currentPath = path;
+    folderBrowserState.showVideosHere = false;
+    folderBrowserPath = path;
+
+    if (currentLayout === 'folderbrowser') {
+        renderFolderBrowser();
+        updateURL();
+    }
+}
+
+/**
+ * Go up one level in the folder browser
+ */
+function folderBrowserBack() {
+    if (folderBrowserState.showVideosHere) {
+        // If showing videos, go back to folder view
+        folderBrowserState.showVideosHere = false;
+        renderFolderBrowser();
+        updateURL();
+        return;
+    }
+
+    if (!folderBrowserState.currentPath) return; // Already at root
+
+    const normalizePath = (p) => p.replace(/\\/g, '/');
+    const normalized = normalizePath(folderBrowserState.currentPath);
+    const lastSlash = normalized.lastIndexOf('/');
+
+    if (lastSlash > 0) {
+        // Go up one level
+        const parentPath = folderBrowserState.currentPath.substring(0,
+            Math.max(folderBrowserState.currentPath.lastIndexOf('/'),
+                folderBrowserState.currentPath.lastIndexOf('\\')));
+
+        // Check if parent is a root folder or has a parent itself
+        const subfolders = getSubfoldersAt(null);
+        const isRootFolder = subfolders.some(f =>
+            normalizePath(f.path) === normalizePath(parentPath)
+        );
+
+        setFolderBrowserPath(isRootFolder ? null : parentPath);
+    } else {
+        // Go to root
+        setFolderBrowserPath(null);
+    }
+}
+
+/**
+ * Toggle showing videos at current folder path
+ */
+function toggleFolderBrowserVideos() {
+    folderBrowserState.showVideosHere = !folderBrowserState.showVideosHere;
+    renderFolderBrowser();
+}
+
+/**
+ * Build breadcrumb segments from current path
+ * @returns {Array} Array of {name, path} objects
+ */
+function getFolderBreadcrumbs() {
+    const breadcrumbs = [{ name: 'All Folders', path: null }];
+
+    if (!folderBrowserState.currentPath) return breadcrumbs;
+
+    const normalizePath = (p) => p.replace(/\\/g, '/');
+    const normalized = normalizePath(folderBrowserState.currentPath);
+    const rootFolders = getSubfoldersAt(null);
+
+    // Find which root folder this path belongs to
+    let rootFolder = null;
+    for (const folder of rootFolders) {
+        const normalizedRoot = normalizePath(folder.path);
+        if (normalized === normalizedRoot || normalized.startsWith(normalizedRoot + '/')) {
+            rootFolder = folder;
+            break;
+        }
+    }
+
+    if (rootFolder) {
+        const normalizedRoot = normalizePath(rootFolder.path);
+        breadcrumbs.push({ name: rootFolder.name, path: rootFolder.path });
+
+        // Add intermediate segments
+        if (normalized !== normalizedRoot) {
+            const remainder = normalized.substring(normalizedRoot.length + 1);
+            const segments = remainder.split('/');
+            let currentPath = rootFolder.path;
+            const separator = rootFolder.path.includes('\\') ? '\\' : '/';
+
+            segments.forEach(segment => {
+                currentPath = currentPath + separator + segment;
+                breadcrumbs.push({ name: segment, path: currentPath });
+            });
+        }
+    }
+
+    return breadcrumbs;
+}
+
+/**
+ * Create a folder card element
+ * @param {Object} folder - Folder data {path, name, count, size_mb, hasSubfolders, thumbnails}
+ * @returns {HTMLElement} DOM element for the folder card
+ */
+function createFolderCard(folder) {
+    const container = document.createElement('div');
+    container.className = 'group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] folder-card cursor-pointer';
+    container.setAttribute('data-path', folder.path);
+
+    // Create 2x2 mosaic of thumbnails
+    const thumbs = folder.thumbnails || [];
+    let mosaicHtml = '';
+    for (let i = 0; i < 4; i++) {
+        if (thumbs[i]) {
+            mosaicHtml += `<div class="bg-black overflow-hidden"><img src="/thumbnails/${thumbs[i]}" class="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity" loading="lazy"></div>`;
+        } else {
+            mosaicHtml += `<div class="bg-gray-900/50 flex items-center justify-center"><span class="material-icons text-gray-700 text-2xl">folder</span></div>`;
+        }
+    }
+
+    container.innerHTML = `
+        <!-- Thumbnail Mosaic -->
+        <div class="folder-card-mosaic aspect-video grid grid-cols-2 grid-rows-2 gap-0.5 bg-black/50">
+            ${mosaicHtml}
+        </div>
+
+        <!-- Folder Info Overlay -->
+        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none"></div>
+
+        <!-- Folder Icon Badge -->
+        <div class="absolute top-3 left-3 w-10 h-10 rounded-lg bg-arcade-cyan/20 backdrop-blur flex items-center justify-center border border-arcade-cyan/30">
+            <span class="material-icons text-arcade-cyan">${folder.hasSubfolders ? 'folder' : 'folder_open'}</span>
+        </div>
+
+        <!-- Subfolder Indicator -->
+        ${folder.hasSubfolders ? `
+        <div class="absolute top-3 right-3 px-2 py-1 rounded-md bg-white/10 backdrop-blur text-[10px] font-bold text-gray-300 flex items-center gap-1">
+            <span class="material-icons text-xs">subdirectory_arrow_right</span>
+            HAS SUBFOLDERS
+        </div>
+        ` : ''}
+
+        <!-- Content -->
+        <div class="absolute bottom-0 left-0 right-0 p-4">
+            <h3 class="text-base font-bold text-white truncate group-hover:text-arcade-cyan transition-colors" title="${folder.path}">${folder.name}</h3>
+            <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                <span class="flex items-center gap-1">
+                    <span class="material-icons text-sm">video_library</span>
+                    ${folder.count} videos
+                </span>
+                <span class="flex items-center gap-1">
+                    <span class="material-icons text-sm">storage</span>
+                    ${formatSize(folder.size_mb)}
+                </span>
+            </div>
+        </div>
+
+        <!-- Hover Action Indicator -->
+        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+            <div class="w-14 h-14 rounded-full bg-arcade-cyan/20 border border-arcade-cyan/50 flex items-center justify-center backdrop-blur">
+                <span class="material-icons text-arcade-cyan text-3xl">${folder.hasSubfolders ? 'folder_open' : 'play_arrow'}</span>
+            </div>
+        </div>
+    `;
+
+    // Click handler
+    container.addEventListener('click', () => {
+        setFolderBrowserPath(folder.path);
+    });
+
+    return container;
+}
+
+/**
+ * Render the folder browser view
+ */
+function renderFolderBrowser() {
+    const grid = document.getElementById('videoGrid');
+    const legend = document.getElementById('folderBrowserLegend');
+    const backBtn = document.getElementById('folderBrowserBackBtn');
+    const breadcrumbEl = document.getElementById('folderBreadcrumb');
+    const videosHereLink = document.getElementById('folderVideosHereLink');
+    const videosHereCount = document.getElementById('folderVideosHereCount');
+
+    // Get subfolders at current path
+    const subfolders = getSubfoldersAt(folderBrowserState.currentPath);
+    const videosHere = folderBrowserState.currentPath ? getVideosDirectlyIn(folderBrowserState.currentPath) : [];
+
+    // Update legend visibility
+    if (legend) {
+        legend.style.display = 'block';
+        legend.classList.remove('hidden');
+    }
+
+    // Update back button visibility
+    if (backBtn) {
+        if (folderBrowserState.currentPath || folderBrowserState.showVideosHere) {
+            backBtn.style.display = 'inline-flex';
+            backBtn.classList.remove('hidden');
+        } else {
+            backBtn.style.display = 'none';
+        }
+    }
+
+    // Update breadcrumb
+    if (breadcrumbEl) {
+        const breadcrumbs = getFolderBreadcrumbs();
+        breadcrumbEl.innerHTML = breadcrumbs.map((crumb, idx) => {
+            const isLast = idx === breadcrumbs.length - 1;
+            const clickHandler = isLast ? '' : `onclick="setFolderBrowserPath(${crumb.path === null ? 'null' : `'${crumb.path.replace(/'/g, "\\'")}'`})"`;
+            return `
+                <span class="${isLast ? 'text-white font-bold' : 'text-arcade-cyan hover:text-white cursor-pointer transition-colors'}" ${clickHandler}>${crumb.name}</span>
+                ${!isLast ? '<span class="text-gray-600 mx-1">/</span>' : ''}
+            `;
+        }).join('');
+    }
+
+    // Update "videos here" link
+    if (videosHereLink && videosHereCount) {
+        if (videosHere.length > 0 && subfolders.length > 0 && !folderBrowserState.showVideosHere) {
+            videosHereLink.style.display = 'flex';
+            videosHereLink.classList.remove('hidden');
+            videosHereCount.textContent = `${videosHere.length} video${videosHere.length !== 1 ? 's' : ''} here`;
+        } else {
+            videosHereLink.style.display = 'none';
+        }
+    }
+
+    // Clear the grid
+    grid.innerHTML = '';
+    grid.classList.remove('list-view');
+
+    // Decide what to render
+    if (folderBrowserState.showVideosHere || (subfolders.length === 0 && folderBrowserState.currentPath)) {
+        // Show videos at current path
+        const videosToShow = folderBrowserState.showVideosHere ? videosHere : getVideosUnderPath(folderBrowserState.currentPath);
+
+        if (videosToShow.length === 0) {
+            // Empty folder
+            grid.innerHTML = `
+                <div class="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
+                    <span class="material-icons text-6xl mb-4">folder_off</span>
+                    <p class="text-lg font-medium">No videos in this folder</p>
+                    <button class="mt-4 px-4 py-2 rounded-lg bg-arcade-cyan/20 text-arcade-cyan hover:bg-arcade-cyan/30 transition-colors" onclick="folderBrowserBack()">
+                        Go Back
+                    </button>
+                </div>
+            `;
+        } else {
+            // Render video cards using existing function
+            const fragment = document.createDocumentFragment();
+            videosToShow.forEach(video => {
+                fragment.appendChild(createVideoCard(video));
+            });
+            grid.appendChild(fragment);
+
+            // Set playlist for cinema navigation
+            if (typeof setCinemaPlaylist === 'function') {
+                setCinemaPlaylist(videosToShow);
+            }
+        }
+    } else if (subfolders.length === 0 && !folderBrowserState.currentPath) {
+        // No folders at root level
+        grid.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
+                <span class="material-icons text-6xl mb-4">folder_off</span>
+                <p class="text-lg font-medium">No folders found</p>
+                <p class="text-sm mt-2">Videos are not organized in folders</p>
+            </div>
+        `;
+    } else {
+        // Render folder cards
+        const fragment = document.createDocumentFragment();
+        subfolders.forEach(folder => {
+            fragment.appendChild(createFolderCard(folder));
+        });
+        grid.appendChild(fragment);
+    }
+}
+
+/**
+ * Update the folder browser legend state
+ */
+function updateFolderBrowserLegend() {
+    // This is called by renderFolderBrowser, but exposed for external use if needed
+    renderFolderBrowser();
+}
+
 // --- TREEMAP VISUALIZATION ---
 // UI code moved to treemap.js
 // Export state variables for treemap.js to access
@@ -1909,6 +2498,13 @@ Object.defineProperty(window, 'currentLayout', {
     get: () => currentLayout,
     set: (v) => { currentLayout = v; }
 });
+Object.defineProperty(window, 'workspaceMode', {
+    get: () => workspaceMode,
+    set: (v) => { workspaceMode = v; }
+});
+
+// Expose duplicate checker state for duplicates.js
+window.duplicateCheckerState = duplicateCheckerState;
 
 // ESC key handler - delegates to treemap.js for treemap-specific handling
 document.addEventListener('keydown', (e) => {
@@ -1932,6 +2528,14 @@ document.addEventListener('keydown', (e) => {
         // Delegate treemap ESC handling to treemap.js
         if (typeof handleTreemapEscape === 'function' && handleTreemapEscape()) {
             e.preventDefault();
+            return;
+        }
+
+        // Handle folder browser ESC - go up one level
+        if (currentLayout === 'folderbrowser' && (folderBrowserState.currentPath || folderBrowserState.showVideosHere)) {
+            folderBrowserBack();
+            e.preventDefault();
+            return;
         }
     }
 });
@@ -1954,6 +2558,11 @@ window.addEventListener('popstate', (event) => {
         if (typeof setTreemapCurrentFolder === 'function') {
             setTreemapCurrentFolder(event.state.folder || null);
         }
+        // Restore folder browser path
+        if (event.state.folderBrowserPath !== undefined) {
+            folderBrowserState.currentPath = event.state.folderBrowserPath;
+            folderBrowserPath = event.state.folderBrowserPath;
+        }
         setLayout(currentLayout, true);
     } else {
         loadFromURL();
@@ -1962,691 +2571,14 @@ window.addEventListener('popstate', (event) => {
 
 // Init handled in DOMContentLoaded below
 
-// --- SETTINGS MODAL ---
-async function openSettings() {
-    const modal = document.getElementById('settingsModal');
-    modal.classList.add('active');
-
-    try {
-        const response = await fetch('/api/settings');
-        const data = await response.json();
-
-        // Populate form fields
-        document.getElementById('settingsTargets').value = data.scan_targets.join('\n');
-        document.getElementById('settingsExcludes').value = data.exclude_paths.join('\n');
-        document.getElementById('settingsMinSize').value = data.min_size_mb || 100;
-        document.getElementById('settingsBitrate').value = data.bitrate_threshold_kbps || 15000;
-
-        // Privacy
-        document.getElementById('settingsSafeMode').checked = safeMode;
-        document.getElementById('settingsSensitiveDirs').value = (data.sensitive_dirs || []).join('\n');
-        document.getElementById('settingsSensitiveTags').value = (data.sensitive_tags || []).join(', ');
-        document.getElementById('settingsSensitiveCollections').value = (data.sensitive_collections || []).join('\n');
-
-        // New Features
-        document.getElementById('settingsTheme').value = data.theme || 'arcade';
-        document.getElementById('settingsFunFacts').checked = data.enable_fun_facts ?? true;
-        const optimizerCheckbox = document.getElementById('settingsOptimizer');
-        if (optimizerCheckbox) optimizerCheckbox.checked = data.enable_optimizer !== false;
-
-        const imageScanCheckbox = document.getElementById('settingsScanImages');
-        if (imageScanCheckbox) imageScanCheckbox.checked = data.enable_image_scanning === true;
-
-        // Show default paths hint
-        document.getElementById('defaultTargetsHint').textContent =
-            `Standard: ${data.default_scan_targets.slice(0, 2).join(', ')}${data.default_scan_targets.length > 2 ? '...' : ''}`;
-
-        // Populate default exclusions with checkboxes
-        const container = document.getElementById('defaultExclusionsContainer');
-        container.innerHTML = '';
-
-        const disabledDefaults = data.disabled_defaults || [];
-
-        data.default_exclusions.forEach(exc => {
-            const isEnabled = !disabledDefaults.includes(exc.path);
-            const item = document.createElement('label');
-            item.className = 'checkbox-item';
-            item.innerHTML = `
-                <input type="checkbox" data-path="${exc.path}" ${isEnabled ? 'checked' : ''}>
-                <div class="checkbox-item-content">
-                    <div class="checkbox-item-title">${exc.path}</div>
-                    <div class="checkbox-item-description">${exc.desc}</div>
-                </div>
-            `;
-            container.appendChild(item);
-        });
-
-        // Fetch cache statistics
-        const statsResponse = await fetch('/api/cache-stats');
-        const stats = await statsResponse.json();
-
-        document.getElementById('statThumbnails').textContent = `${stats.thumbnails_mb} MB`;
-
-        document.getElementById('statTotal').textContent = `${stats.total_mb} MB`;
-    } catch (e) {
-        console.error('Failed to load settings:', e);
-    }
-}
-
-function closeSettings() {
-    document.getElementById('settingsModal').classList.remove('active');
-}
-
-async function saveSettings() {
-    const saveBtn = document.getElementById('saveSettingsBtn');
-    const saveIcon = saveBtn?.querySelector('.save-icon');
-    const saveSpinner = saveBtn?.querySelector('.save-spinner');
-    const saveText = saveBtn?.querySelector('.save-text');
-
-    // Show loading state
-    if (saveBtn) saveBtn.disabled = true;
-    if (saveIcon) saveIcon.classList.add('hidden');
-    if (saveSpinner) saveSpinner.classList.remove('hidden');
-    if (saveText) saveText.textContent = 'Saving...';
-
-    const targetsText = document.getElementById('settingsTargets').value;
-    const excludesText = document.getElementById('settingsExcludes').value;
-
-    // Collect disabled defaults (unchecked checkboxes)
-    const disabledDefaults = [];
-    document.querySelectorAll('#defaultExclusionsContainer input[type="checkbox"]').forEach(cb => {
-        if (!cb.checked) {
-            disabledDefaults.push(cb.dataset.path);
-        }
-    });
-
-    const settings = {
-        scan_targets: targetsText.split('\n').map(s => s.trim()).filter(s => s),
-        exclude_paths: excludesText.split('\n').map(s => s.trim()).filter(s => s),
-        disabled_defaults: disabledDefaults,
-        saved_views: window.userSettings?.saved_views || [],
-        sensitive_dirs: document.getElementById('settingsSensitiveDirs').value.split('\n').map(s => s.trim()).filter(s => s),
-        sensitive_tags: document.getElementById('settingsSensitiveTags').value.split(',').map(s => s.trim()).filter(s => s),
-        sensitive_collections: document.getElementById('settingsSensitiveCollections').value.split(/[\n,]/).map(s => s.trim()).filter(s => s),
-        min_size_mb: parseInt(document.getElementById('settingsMinSize').value) || 100,
-        min_image_size_kb: parseInt(document.getElementById('settingsMinImageSize').value) || 100,
-        bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000,
-
-        enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
-        enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
-        enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
-        enable_deovr: document.getElementById('settingsDeoVR')?.checked || false,
-        theme: document.getElementById('settingsTheme').value || 'arcade'
-    };
-
-    try {
-        const response = await fetch('/api/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
-        });
-
-        // Reset button state
-        if (saveBtn) saveBtn.disabled = false;
-        if (saveIcon) saveIcon.classList.remove('hidden');
-        if (saveSpinner) saveSpinner.classList.add('hidden');
-        if (saveText) saveText.textContent = 'Save';
-
-        if (response.ok) {
-            // Hide unsaved indicator
-            const unsavedIndicator = document.getElementById('unsavedIndicator');
-            if (unsavedIndicator) unsavedIndicator.style.opacity = '0';
-
-            // Update Theme immediately
-            const newTheme = document.getElementById('settingsTheme').value;
-            if (newTheme) document.documentElement.setAttribute('data-theme', newTheme);
-
-
-            // Show success toast
-            showSettingsToast();
-
-            // Close after brief delay to show success state
-            setTimeout(() => {
-                closeSettings();
-            }, 1200);
-
-            // Update local state immediately
-            window.userSettings = {
-                ...window.userSettings,
-                ...settings
-            };
-
-            // Update Safe Mode State separately (localStorage)
-            const newSafeMode = document.getElementById('settingsSafeMode').checked;
-            if (newSafeMode !== safeMode) {
-                safeMode = newSafeMode;
-                localStorage.setItem('safe_mode', safeMode);
-            }
-
-            // Always refresh content to reflect potential changes in sensitive lists or other settings
-            filterAndSort();
-            renderCollections();
-        } else {
-            showSettingsToast('Error saving settings', true);
-        }
-    } catch (e) {
-        console.error('Failed to save settings:', e);
-        // Reset button state
-        if (saveBtn) saveBtn.disabled = false;
-        if (saveIcon) saveIcon.classList.remove('hidden');
-        if (saveSpinner) saveSpinner.classList.add('hidden');
-        if (saveText) saveText.textContent = 'Save';
-
-        showSettingsToast('Error saving settings', true);
-    }
-}
-
-function showSettingsToast(message = 'Settings saved', isError = false) {
-    const toast = document.getElementById('settingsToast');
-    if (!toast) return;
-
-    const toastContent = toast.querySelector('div');
-    if (toastContent) {
-        toastContent.className = isError
-            ? 'bg-red-500/95 backdrop-blur text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3'
-            : 'bg-green-500/95 backdrop-blur text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3';
-        const icon = toastContent.querySelector('.material-icons');
-        const text = toastContent.querySelector('span:last-child');
-        if (icon) icon.textContent = isError ? 'error' : 'check_circle';
-        if (text) text.textContent = message;
-    }
-
-    toast.classList.remove('translate-y-20', 'opacity-0');
-    toast.classList.add('translate-y-0', 'opacity-100');
-
-    setTimeout(() => {
-        toast.classList.add('translate-y-20', 'opacity-0');
-        toast.classList.remove('translate-y-0', 'opacity-100');
-    }, 3000);
-}
-
-async function loadSettings() {
-    try {
-        const response = await fetch('/api/settings');
-        if (response.ok) {
-            const data = await response.json();
-            // Merge with existing to keep any static generated data
-            window.userSettings = {
-                ...window.userSettings,
-                ...data
-            };
-
-            // Set Docker detection flag
-            window.IS_DOCKER = data.is_docker || false;
-
-            // Hide Locate button in Docker mode
-            if (window.IS_DOCKER) {
-                const locateBtn = document.getElementById('cinemaLocateBtn');
-                if (locateBtn) locateBtn.style.display = 'none';
-            }
-
-            // Settings loaded successfully
-
-            // Check for deep links (e.g., /collections/Name)
-            checkDeepLinks();
-        }
-    } catch (e) {
-        console.error("Failed to load settings:", e);
-    }
-}
-
-function checkDeepLinks() {
-    const path = window.location.pathname;
-    if (path.startsWith('/collections/')) {
-        const nameEncoded = path.substring('/collections/'.length);
-        const name = decodeURIComponent(nameEncoded);
-
-        const collections = window.userSettings.smart_collections || [];
-        const collection = collections.find(c => c.name === name);
-
-        if (collection) {
-            // Deep link to collection
-            applyCollection(collection.id);
-        } else {
-            console.warn("Deep link collection not found:", name);
-            // Default to lobby if not found
-            // setWorkspaceMode('lobby'); // Standard default
-            history.replaceState(null, '', '/');
-        }
-    }
-}
-
-// === NEW SETTINGS UI NAVIGATION ===
-
-function initSettingsNavigation() {
-    // Use more specific selector to only target settings modal nav items
-    const settingsModal = document.getElementById('settingsModal');
-    if (!settingsModal) return;
-
-    const navItems = settingsModal.querySelectorAll('.settings-nav-item[data-section]');
-    const contentSections = settingsModal.querySelectorAll('.content-section');
-
-    navItems.forEach(item => {
-        item.addEventListener('click', () => {
-            const sectionId = item.dataset.section;
-            if (!sectionId) return;
-
-            // Update active nav item and indicator
-            navItems.forEach(nav => {
-                nav.classList.remove('active', 'text-white', 'bg-white/5');
-                nav.classList.add('text-gray-400');
-                const indicator = nav.querySelector('.active-indicator');
-                if (indicator) indicator.classList.add('opacity-0');
-            });
-            item.classList.add('active', 'text-white', 'bg-white/5');
-            item.classList.remove('text-gray-400');
-            const activeIndicator = item.querySelector('.active-indicator');
-            if (activeIndicator) activeIndicator.classList.remove('opacity-0');
-
-            // Show corresponding content - toggle hidden class
-            contentSections.forEach(section => {
-                section.classList.add('hidden');
-                section.classList.remove('active');
-            });
-            const targetSection = document.getElementById(`content-${sectionId}`);
-            if (targetSection) {
-                targetSection.classList.remove('hidden');
-                targetSection.classList.add('active');
-            }
-
-            // Update header
-            updateSettingsHeader(sectionId);
-        });
-    });
-
-    // Set initial active state
-    const initialActive = settingsModal.querySelector('.settings-nav-item.active');
-    if (initialActive) {
-        const indicator = initialActive.querySelector('.active-indicator');
-        if (indicator) indicator.classList.remove('opacity-0');
-        initialActive.classList.add('text-white', 'bg-white/5');
-        initialActive.classList.remove('text-gray-400');
-    }
-}
-
-function updateSettingsHeader(sectionId) {
-    const headers = {
-        'scanning': {
-            title: 'Scanning',
-            subtitle: 'Configure video library scanning behavior'
-        },
-        'performance': {
-            title: 'Performance',
-            subtitle: 'Optimize scan performance and file filtering'
-        },
-        'interface': {
-            title: 'Interface',
-            subtitle: 'Customize dashboard appearance and features'
-        },
-        'storage': {
-            title: 'Storage',
-            subtitle: 'Manage cache and disk space usage'
-        },
-        'privacy': {
-            title: 'Privacy & Safety',
-            subtitle: 'Configure Safe Mode and hidden content'
-        }
-    };
-
-    const header = headers[sectionId] || { title: sectionId, subtitle: '' };
-    const titleEl = document.getElementById('section-title');
-    const subtitleEl = document.getElementById('section-subtitle');
-
-    if (titleEl) titleEl.textContent = header.title;
-    if (subtitleEl) subtitleEl.textContent = header.subtitle;
-}
-
-// Number Input Adjustment for new UI
-function adjustSettingsNumber(inputId, delta) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-
-    const current = parseInt(input.value) || 0;
-    const min = parseInt(input.min) || 0;
-    const max = parseInt(input.max) || Infinity;
-    const newValue = Math.max(min, Math.min(max, current + delta));
-    input.value = newValue;
-    markSettingsUnsaved();
-}
-
-// Save State Indicator
-function markSettingsUnsaved() {
-    const indicator = document.getElementById('unsavedIndicator');
-    if (indicator) {
-        indicator.style.opacity = '1';
-    }
-}
-
-function markSettingsSaving() {
-    const indicator = document.querySelector('.save-indicator');
-    if (indicator) {
-        indicator.className = 'save-indicator saving';
-        indicator.innerHTML = '<div class="loading-spinner"></div><span>Saving...</span>';
-    }
-}
-
-function markSettingsSaved() {
-    const indicator = document.querySelector('.save-indicator');
-    if (indicator) {
-        indicator.className = 'save-indicator saved';
-        indicator.innerHTML = '<span class="material-icons">check_circle</span><span>All changes saved</span>';
-    }
-}
-
-// Initialize navigation when settings modal opens
-const originalOpenSettings = window.openSettings;
-window.openSettings = async function () {
-    if (originalOpenSettings) {
-        await originalOpenSettings();
-    }
-    // Initialize navigation after modal is populated
-    setTimeout(() => {
-        initSettingsNavigation();
-    }, 100);
-};
-
-// Add change listeners to mark unsaved
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const settingsInputs = document.querySelectorAll('#settingsModal input, #settingsModal textarea');
-        settingsInputs.forEach(el => {
-            el.addEventListener('input', markSettingsUnsaved);
-        });
-    }, 500);
-});
-
-// Keyboard Shortcuts for Settings Modal and Collection Modal
-document.addEventListener('keydown', (e) => {
-    const settingsModal = document.getElementById('settingsModal');
-    const isSettingsOpen = settingsModal && settingsModal.classList.contains('active');
-
-    const collectionModal = document.getElementById('collectionModal');
-    const isCollectionOpen = collectionModal && collectionModal.classList.contains('active');
-
-    // ESC to close modals (collection modal takes priority if both somehow open)
-    if (e.key === 'Escape') {
-        if (isCollectionOpen) {
-            e.preventDefault();
-            closeCollectionModal();
-            return;
-        }
-        if (isSettingsOpen) {
-            e.preventDefault();
-            closeSettings();
-            showToast('Settings closed', 'info');
-            return;
-        }
-    }
-
-    if (isSettingsOpen) {
-        // Cmd+S (Mac) or Ctrl+S (Windows/Linux) to save
-        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-            e.preventDefault();
-            saveSettings();
-            showToast('Saving settings...', 'success');
-        }
-    }
-});
-
-/**
- * Show a toast notification message
- * @param {string} message - Message to display
- * @param {string} [type='info'] - Toast type ('info', 'success', 'error')
- */
-function showToast(message, type = 'info') {
-    // Remove existing toast if any
-    const existingToast = document.querySelector('.settings-toast');
-    if (existingToast) {
-        existingToast.remove();
-    }
-
-    // Create toast
-    const toast = document.createElement('div');
-    toast.className = `settings-toast toast-${type}`;
-    toast.innerHTML = `
-        <span class="material-icons">${type === 'success' ? 'check_circle' : 'info'}</span>
-        <span>${message}</span>
-    `;
-
-    document.body.appendChild(toast);
-
-    // Trigger animation
-    setTimeout(() => toast.classList.add('show'), 10);
-
-    // Remove after 2 seconds
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
-}
-
-// --- HIDDEN PATH MODAL ---
-let currentHiddenPath = '';
-
-/**
- * Show modal with path info when file is in a hidden folder
- * Provides copy-to-clipboard functionality as an alternative to reveal
- * @param {string} path - Full path to the file
- */
-function showHiddenPathModal(path) {
-    currentHiddenPath = path;
-    const modal = document.getElementById('hiddenPathModal');
-    const pathDisplay = document.getElementById('hiddenPathDisplay');
-
-    if (modal && pathDisplay) {
-        pathDisplay.textContent = path;
-        // Reset copy button state
-        const copyIcon = document.getElementById('copyPathIcon');
-        const copyText = document.getElementById('copyPathText');
-        if (copyIcon) copyIcon.textContent = 'content_copy';
-        if (copyText) copyText.textContent = 'Copy Path to Clipboard';
-
-        modal.classList.add('active');
-    }
-}
-
-/**
- * Close the hidden path modal
- */
-function closeHiddenPathModal() {
-    const modal = document.getElementById('hiddenPathModal');
-    if (modal) modal.classList.remove('active');
-    currentHiddenPath = '';
-}
-
-/**
- * Copy the current hidden path to clipboard
- */
-async function copyHiddenPath() {
-    if (!currentHiddenPath) return;
-
-    try {
-        await navigator.clipboard.writeText(currentHiddenPath);
-        // Update button to show success
-        const copyIcon = document.getElementById('copyPathIcon');
-        const copyText = document.getElementById('copyPathText');
-        if (copyIcon) copyIcon.textContent = 'check';
-        if (copyText) copyText.textContent = 'Copied!';
-
-        // Reset after 2 seconds
-        setTimeout(() => {
-            if (copyIcon) copyIcon.textContent = 'content_copy';
-            if (copyText) copyText.textContent = 'Copy Path to Clipboard';
-        }, 2000);
-    } catch (err) {
-        console.error('Failed to copy path:', err);
-        showToast('Failed to copy path', 'error');
-    }
-}
-
-/**
- * Reveal a file in the system file browser (Finder/Explorer)
- * Handles hidden folders by showing a modal with the path instead
- * @param {string} path - Full path to reveal
- */
-async function revealInFinder(path) {
-    try {
-        const response = await fetch(`/reveal?path=${encodeURIComponent(path)}`);
-
-        if (response.status === 204) {
-            // Success - file was revealed
-            return;
-        }
-
-        if (response.ok) {
-            const data = await response.json();
-            if (data.status === 'hidden_folder') {
-                // Show helpful modal for hidden folder
-                showHiddenPathModal(data.path);
-                return;
-            }
-        }
-
-        // Other errors
-        console.error('Reveal failed:', response.status);
-        showToast('Could not reveal file', 'error');
-    } catch (err) {
-        console.error('Reveal error:', err);
-        showToast('Could not reveal file', 'error');
-    }
-}
-
-// --- RESCAN ---
-
-/**
- * Trigger a full library rescan
- * Shows loading state and reloads page when complete
- */
-function rescanLibrary() {
-    const btn = document.getElementById('refreshBtn');
-    const originalContent = btn.innerHTML;
-
-    btn.innerHTML = '<span class="material-icons spin">sync</span> SCANNEN...';
-    btn.style.pointerEvents = 'none';
-    document.body.style.opacity = '0.5';
-
-    fetch('/api/rescan')
-        .then(response => {
-            if (response.ok) return response.json();
-            throw new Error('Scan failed');
-        })
-        .then(() => {
-            location.reload();
-        })
-        .catch(e => {
-            console.error(e);
-            alert('Scan error: ' + e.message);
-            btn.innerHTML = originalContent;
-            btn.style.pointerEvents = 'auto';
-            document.body.style.opacity = '1';
-        });
-}
-
-// --- SAVED VIEWS & CUSTOM FILTERS ---
-
-function renderSavedViews() {
-    const container = document.getElementById('savedViewsContainer');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    const views = userSettings.saved_views || [];
-
-    views.forEach(view => {
-        const chip = document.createElement('button');
-        chip.className = 'view-chip';
-        // highlight if currently active? (complex to strict match, skip for now)
-
-        chip.innerHTML = `
-            <span onclick="loadView('${view.id}')">${view.name}</span>
-            <span class="material-icons chip-delete" onclick="deleteView('${view.id}', event)">close</span>
-        `;
-        container.appendChild(chip);
-    });
-}
-
-function saveCurrentView() {
-    const name = prompt("Name for this view:", "");
-    if (!name) return;
-
-    if (!userSettings.saved_views) userSettings.saved_views = [];
-
-    const newView = {
-        id: 'view_' + Date.now(),
-        name: name,
-        search: searchTerm,
-        filter: currentFilter,
-        codec: currentCodec,
-        sort: currentSort,
-        mode: workspaceMode,
-        folder: currentFolder
-    };
-
-    userSettings.saved_views.push(newView);
-    saveSettingsWithoutReload(); // We need a version that doesn't just print console
-    renderSavedViews();
-}
-
-function loadView(id) {
-    const view = (userSettings.saved_views || []).find(v => v.id === id);
-    if (!view) return;
-
-    // Apply settings
-    searchTerm = view.search || "";
-    document.getElementById('mobileSearchInput').value = searchTerm;
-
-    currentFilter = view.filter || "all";
-    document.getElementById('statusSelect').value = currentFilter;
-
-    currentCodec = view.codec || "all";
-    if (document.getElementById('codecSelect'))
-        document.getElementById('codecSelect').value = currentCodec;
-
-    currentSort = view.sort || "bitrate";
-    document.getElementById('sortSelect').value = currentSort;
-
-    if (view.mode) {
-        setWorkspaceMode(view.mode); // Handles filterAndSort internally if changed
-    }
-
-    // If we rely on stored vars, we must call update
-    filterAndSort();
-
-    // Update visuals
-    updateURL();
-}
-
-/**
- * Delete a saved view
- * @param {string} id - View ID to delete
- * @param {Event} [event] - Click event to stop propagation
- */
-function deleteView(id, event) {
-    if (event) event.stopPropagation();
-    if (!confirm("Delete this view?")) return;
-
-    if (userSettings.saved_views) {
-        userSettings.saved_views = userSettings.saved_views.filter(v => v.id !== id);
-        saveSettingsWithoutReload();
-        renderSavedViews();
-    }
-}
-
-/**
- * Save current settings to server without closing UI or reloading
- * Used for background saves (views, collections, etc.)
- */
-function saveSettingsWithoutReload() {
-    fetch(`/api/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userSettings)
-    }).then(r => r.json()).then(data => {
-        if (data.success) {
-            // Views saved
-        }
-    });
-}
+// --- SETTINGS MODULE ---
+// Settings functionality has been extracted to settings.js
+// Functions available: openSettings, closeSettings, saveSettings, loadSettings,
+// showSettingsToast, initSettingsNavigation, adjustSettingsNumber,
+// markSettingsUnsaved, markSettingsSaving, markSettingsSaved, showToast,
+// showHiddenPathModal, closeHiddenPathModal, copyHiddenPath, revealInFinder,
+// rescanLibrary, renderSavedViews, saveCurrentView, loadView, deleteView,
+// saveSettingsWithoutReload, exportSettings, importSettings
 
 // --- SMART COLLECTIONS MODULE ---
 // Smart Collections functionality has been extracted to collections.js
@@ -3761,378 +3693,13 @@ async function logout() {
 }
 
 // ============================================================================
-// DUPLICATE DETECTION
+// DUPLICATE DETECTION MODULE
 // ============================================================================
-let duplicateData = null;
-let duplicatePollInterval = null;
-
-async function loadDuplicates() {
-    try {
-        // 1. Check if we already have results cached
-        const res = await fetch('/api/duplicates');
-        if (res.ok) {
-            const data = await res.json();
-            if (data.summary && data.summary.scan_run) {
-                duplicateData = data;
-                console.log(`🔍 Found cached results: ${duplicateData.summary.total_groups} groups`);
-                return duplicateData;
-            }
-        }
-
-        // 2. If no cache, trigger a new scan
-        console.log("No cached results, triggering scan...");
-        const scanRes = await fetch('/api/duplicates/scan', { method: 'POST' });
-        if (scanRes.status === 202 || scanRes.status === 409) {
-            // Scan started or already running
-            return "scanning";
-        }
-
-    } catch (e) {
-        console.error("Error loading duplicates:", e);
-    }
-    return null;
-}
-
-function pollDuplicateStatus(grid) {
-    // Clear any existing poll first
-    if (duplicatePollInterval) clearInterval(duplicatePollInterval);
-
-    const statusText = document.getElementById('scan-status-text');
-    const progressBar = document.getElementById('scan-progress-bar');
-    const progressText = document.getElementById('scan-progress-text');
-
-    duplicatePollInterval = setInterval(async () => {
-        // Stop polling if we navigated away
-        if (workspaceMode !== 'duplicates') {
-            clearInterval(duplicatePollInterval);
-            duplicatePollInterval = null;
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/duplicates/status');
-            if (!res.ok) return;
-
-            const status = await res.json();
-
-            if (status.is_running) {
-                // Update UI
-                if (statusText) statusText.textContent = status.message || "Scanning...";
-                if (progressBar) progressBar.style.width = `${status.progress}%`;
-                if (progressText) progressText.textContent = `${status.progress}%`;
-            } else {
-                // Scan finished
-                clearInterval(duplicatePollInterval);
-                duplicatePollInterval = null;
-
-                // Fetch final results
-                const finalRes = await fetch('/api/duplicates');
-                if (finalRes.ok) {
-                    duplicateData = await finalRes.json();
-                    renderDuplicatesView(); // Re-render with data
-                }
-            }
-        } catch (e) {
-            console.error("Polling error:", e);
-            clearInterval(duplicatePollInterval);
-        }
-    }, 500);
-}
-
-function renderDuplicatesView() {
-    // Safety check: Don't render if we switched away
-    if (workspaceMode !== 'duplicates') return;
-
-    const grid = document.getElementById('videoGrid');
-    if (!grid) return;
-
-    // Initial state or Loading state
-    if (!duplicateData) {
-        grid.innerHTML = `
-            <div class="col-span-full flex flex-col items-center justify-center py-24 gap-6">
-                <!-- Spinner -->
-                <div class="relative w-20 h-20">
-                    <div class="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
-                    <div class="absolute inset-0 rounded-full border-4 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
-                </div>
-                
-                <!-- Status Text -->
-                <div class="text-center">
-                    <h3 class="text-xl font-bold text-white mb-2" id="scan-status-text">Starting visual analysis...</h3>
-                    <p class="text-sm text-gray-400">This may take a minute for large libraries.</p>
-                </div>
-                
-                <!-- Progress Bar -->
-                <div class="w-full max-w-md bg-white/5 rounded-full h-4 overflow-hidden relative border border-white/5">
-                    <div id="scan-progress-bar" class="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300" style="width: 0%"></div>
-                </div>
-                <div class="text-xs text-gray-500 font-mono" id="scan-progress-text">0%</div>
-            </div>
-        `;
-
-        loadDuplicates().then(result => {
-            if (result === "scanning") {
-                pollDuplicateStatus(grid);
-            } else if (result && result.groups) {
-                renderDuplicatesView(); // Recursively call to render data
-            }
-        });
-        return;
-    }
-
-    // Empty State Check
-    if (duplicateData.groups.length === 0) {
-        grid.innerHTML = `
-            <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
-                <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
-                <h3 class="text-xl font-bold text-gray-400 mb-2">No Duplicates Found</h3>
-                <p class="text-sm text-gray-500 mb-6">Your library is clean! No duplicate media detected.</p>
-                <button onclick="rescanDuplicates()" class="px-5 py-2.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-white text-sm font-medium transition-colors flex items-center gap-2">
-                    <span class="material-icons text-[18px]">refresh</span>
-                    Rescan for Duplicates
-                </button>
-            </div>
-        `;
-        return;
-    }
-
-    // Update sidebar count
-    const countEl = document.getElementById('count-duplicates');
-    if (countEl) countEl.textContent = duplicateData.summary.total_groups;
-
-    // Render summary header
-    let html = `
-            <div class="col-span-full bg-gradient-to-r from-purple-200 to-pink-200 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-300 dark:border-purple-500/30 rounded-xl p-6 mb-4">
-                <div class="flex items-center justify-between flex-wrap gap-4">
-                    <div class="flex items-center gap-4">
-                        <div class="w-14 h-14 rounded-xl bg-purple-300 dark:bg-purple-500/20 flex items-center justify-center border border-purple-400 dark:border-purple-500/40">
-                            <span class="material-icons text-3xl text-purple-700 dark:text-purple-400">content_copy</span>
-                        </div>
-                        <div>
-                            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Duplicate Media</h2>
-                            <p class="text-sm text-gray-700 dark:text-gray-400">
-                                Found <span class="text-purple-700 dark:text-purple-400 font-bold">${duplicateData.summary.total_groups}</span> groups
-                                (<span class="text-cyan-700 dark:text-cyan-400">${duplicateData.summary.video_groups}</span> videos,
-                                <span class="text-pink-700 dark:text-pink-400">${duplicateData.summary.image_groups}</span> images)
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <div class="text-right">
-                            <div class="text-2xl font-bold text-green-700 dark:text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
-                            <div class="text-xs text-gray-600 dark:text-gray-500 uppercase tracking-wider">Potential Savings</div>
-                        </div>
-                        <button onclick="openDuplicateChecker()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
-                            <span class="material-icons text-[18px]">fullscreen</span>
-                            Fullscreen Mode
-                        </button>
-                        <button onclick="rescanDuplicates()" class="px-4 py-2 rounded-lg bg-purple-300 dark:bg-purple-500/20 hover:bg-purple-400 dark:hover:bg-purple-500/30 border border-purple-400 dark:border-purple-500/40 text-purple-900 dark:text-white text-sm font-medium transition-colors flex items-center gap-2">
-                            <span class="material-icons text-[18px]">refresh</span>
-                            Rescan
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-    // Render each duplicate group
-    duplicateData.groups.forEach((group, idx) => {
-        const isVideo = group.media_type === 'video';
-        const icon = isVideo ? 'movie' : 'image';
-        const color = isVideo ? 'cyan' : 'pink';
-
-        html += `
-                <div class="col-span-full bg-[#14141c] rounded-xl border border-white/5 hover:border-${color}-500/30 overflow-hidden mb-4 transition-all">
-                    <!-- Group Header -->
-                    <div class="p-4 border-b border-white/5 flex items-center justify-between flex-wrap gap-2 bg-white/[0.02]">
-                        <div class="flex items-center gap-3">
-                            <span class="material-icons text-${color}-400">${icon}</span>
-                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">
-                                Group ${idx + 1} • ${group.match_type} match • ${group.files.length} files
-                            </span>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="text-sm font-mono text-green-400">
-                                +${group.potential_savings_mb.toFixed(0)} MB
-                            </span>
-                            <span class="text-xs text-gray-500 px-2 py-1 rounded bg-white/5">
-                                ${Math.round(group.confidence * 100)}% match
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Files Grid -->
-                    <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${Math.min(group.files.length, 4)} gap-4">
-                        ${group.files.map((file, fIdx) => {
-            const isKeep = file.path === group.recommended_keep;
-            const thumbSrc = file.thumb ? `/thumbnails/${file.thumb}` : '/static/placeholder.png';
-            return `
-                                <div class="relative rounded-lg border ${isKeep ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 bg-white/[0.02]'} overflow-hidden flex flex-col">
-                                    ${isKeep ? `
-                                        <div class="absolute top-2 right-2 z-10 px-2 py-0.5 rounded text-[10px] font-bold bg-green-500 text-black uppercase tracking-wider">
-                                            Keep
-                                        </div>
-                                    ` : ''}
-                                    
-                                    <!-- Thumbnail -->
-                                    <div class="relative aspect-video bg-black cursor-pointer group" onclick="openCinema(this)" data-path="${file.path}">
-                                        <img src="${thumbSrc}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
-                                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="p-3 flex flex-col gap-2">
-                                        <div class="text-sm font-medium text-gray-200 truncate" title="${file.path}">
-                                            ${file.path.split(/[\\/]/).pop()}
-                                        </div>
-                                        
-                                        <div class="text-xs text-gray-500 truncate" title="${file.path}">
-                                            ${file.path.split(/[\\/]/).slice(-3, -1).join('/')}
-                                        </div>
-                                        
-                                        <div class="flex items-center gap-2 text-[10px] text-gray-400 font-mono flex-wrap">
-                                            <span class="bg-white/5 px-1.5 py-0.5 rounded">${file.size_mb.toFixed(0)} MB</span>
-                                            ${file.width && file.height ? `<span class="bg-white/5 px-1.5 py-0.5 rounded">${file.width}×${file.height}</span>` : ''}
-                                            ${file.bitrate_mbps ? `<span class="bg-white/5 px-1.5 py-0.5 rounded">${file.bitrate_mbps.toFixed(1)} Mbps</span>` : ''}
-                                            <span class="ml-auto bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Q: ${file.quality_score.toFixed(0)}</span>
-                                        </div>
-                                        
-                                        ${!window.IS_DOCKER ? `
-                                        <!-- Reveal in Finder Button -->
-                                        <button onclick="revealInFinder('${file.path.replace(/'/g, "\\'")}')"
-                                                class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
-                                            <span class="material-icons text-sm">folder_open</span>
-                                            Reveal in Finder
-                                        </button>
-                                        ` : ''}
-                                    </div>    
-                                        ${!isKeep ? `
-                                            <button onclick="deleteDuplicate('${encodeURIComponent(file.path)}')" 
-                                                    class="w-full py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1">
-                                                <span class="material-icons text-sm">delete</span>
-                                                Delete
-                                            </button>
-                                        ` : `
-                                            <div class="w-full py-2 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 text-xs font-bold text-center flex items-center justify-center gap-1">
-                                                <span class="material-icons text-sm">verified</span>
-                                                Best Quality
-                                            </div>
-                                        `}
-                                    </div>
-                            `;
-        }).join('')}
-                    </div>
-                </div>
-            `;
-    });
-
-    grid.innerHTML = html;
-}
-
-async function deleteDuplicate(encodedPath) {
-    const path = decodeURIComponent(encodedPath);
-    const filename = path.split(/[\\/]/).pop();
-
-    if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) {
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/duplicates/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paths: [path] })
-        });
-
-        if (res.ok) {
-            const result = await res.json();
-            console.log(`✅ Deleted: ${result.deleted.length} files, freed ${result.freed_mb} MB`);
-
-            // Find and update the group containing this file
-            if (duplicateData && duplicateData.groups) {
-                const groupIndex = duplicateData.groups.findIndex(group =>
-                    group.files.some(file => file.path === path)
-                );
-
-                if (groupIndex !== -1) {
-                    const group = duplicateData.groups[groupIndex];
-
-                    // Remove only the deleted file from the group
-                    group.files = group.files.filter(file => file.path !== path);
-
-                    // If the group still has 2+ files, keep it and recalculate savings
-                    if (group.files.length >= 2) {
-                        // Find the largest file (the one to keep)
-                        const largestFile = group.files.reduce((max, file) =>
-                            file.size_mb > max.size_mb ? file : max
-                        );
-
-                        // Recalculate potential savings (sum of all files except the largest)
-                        group.potential_savings_mb = group.files
-                            .filter(file => file.path !== largestFile.path)
-                            .reduce((sum, file) => sum + file.size_mb, 0);
-                    } else {
-                        // If fewer than 2 files remain, remove the group entirely
-                        duplicateData.groups.splice(groupIndex, 1);
-                    }
-
-                    // Update summary counts
-                    duplicateData.summary.total_groups = duplicateData.groups.length;
-
-                    // Recalculate total savings
-                    duplicateData.summary.potential_savings_mb = duplicateData.groups.reduce(
-                        (sum, group) => sum + group.potential_savings_mb, 0
-                    );
-
-                    // Recalculate video/image group counts
-                    duplicateData.summary.video_groups = duplicateData.groups.filter(
-                        g => g.media_type === 'video'
-                    ).length;
-                    duplicateData.summary.image_groups = duplicateData.groups.filter(
-                        g => g.media_type === 'image'
-                    ).length;
-                }
-            }
-
-            // Refresh view with updated data
-            renderDuplicatesView();
-        } else {
-            alert('Failed to delete file');
-        }
-    } catch (e) {
-        console.error('Delete error:', e);
-        alert('Error deleting file');
-    }
-}
-
-async function rescanDuplicates() {
-    if (!confirm('This will clear the cached duplicate results and perform a fresh scan. Continue?')) {
-        return;
-    }
-
-    try {
-        // Clear the cache
-        const clearRes = await fetch('/api/duplicates/clear', {
-            method: 'POST'
-        });
-
-        if (!clearRes.ok) {
-            alert('Failed to clear cache');
-            return;
-        }
-
-        // Clear client-side data
-        duplicateData = null;
-
-        // Trigger a new scan by re-rendering (which will auto-start scan if no data)
-        renderDuplicatesView();
-
-    } catch (e) {
-        console.error('Rescan error:', e);
-        alert('Error triggering rescan');
-    }
-}
+// Duplicate detection functionality has been extracted to duplicates.js
+// Functions available: loadDuplicates, renderDuplicatesView, deleteDuplicate,
+// rescanDuplicates, openDuplicateChecker, closeDuplicateChecker,
+// keepDuplicateFile, skipDuplicateGroup, markAnyIsFine, previewDuplicateFile,
+// navigateDuplicateGroup
 
 // =============================================================================
 // FIRST-RUN SETUP WIZARD
@@ -4243,319 +3810,11 @@ function skipSetup() {
         .then(() => location.reload());
 }
 
-// ============================================================================
-// DUPLICATE CHECKER FULLSCREEN MODE
-// ============================================================================
-
-/**
- * Open the fullscreen duplicate checker mode
- * Shows the first duplicate group in a side-by-side comparison view
- */
-function openDuplicateChecker() {
-    if (!duplicateData || !duplicateData.groups || duplicateData.groups.length === 0) {
-        alert('No duplicate groups to review');
-        return;
-    }
-
-    duplicateCheckerState.currentGroupIndex = 0;
-    duplicateCheckerState.isActive = true;
-
-    const modal = document.getElementById('duplicateCheckerModal');
-    if (!modal) {
-        console.error('Duplicate checker modal not found');
-        return;
-    }
-
-    // Show modal
-    modal.classList.add('opacity-100', 'pointer-events-auto');
-    modal.classList.remove('opacity-0', 'pointer-events-none');
-
-    // Attach keyboard handler
-    window.addEventListener('keydown', duplicateCheckerKeyHandler, true);
-
-    // Render first group
-    renderDuplicateCheckerGroup(0);
-}
-
-/**
- * Close the fullscreen duplicate checker mode
- */
-function closeDuplicateChecker() {
-    duplicateCheckerState.isActive = false;
-
-    const modal = document.getElementById('duplicateCheckerModal');
-    if (modal) {
-        modal.classList.remove('opacity-100', 'pointer-events-auto');
-        modal.classList.add('opacity-0', 'pointer-events-none');
-    }
-
-    // Remove keyboard handler
-    window.removeEventListener('keydown', duplicateCheckerKeyHandler, true);
-
-    // Refresh duplicate view to show updated list
-    if (workspaceMode === 'duplicates') {
-        renderDuplicatesView();
-    }
-}
-
-/**
- * Render a specific duplicate group in the fullscreen checker
- * @param {number} groupIndex - Index of the group to render
- */
-function renderDuplicateCheckerGroup(groupIndex) {
-    if (!duplicateData || !duplicateData.groups) return;
-
-    const groups = duplicateData.groups;
-    if (groupIndex < 0 || groupIndex >= groups.length) {
-        // No more groups - close the checker
-        closeDuplicateChecker();
-        alert('All duplicate groups reviewed!');
-        return;
-    }
-
-    const group = groups[groupIndex];
-    duplicateCheckerState.currentGroupIndex = groupIndex;
-
-    // Update header
-    document.getElementById('dupCheckerCurrentGroup').textContent = groupIndex + 1;
-    document.getElementById('dupCheckerTotalGroups').textContent = groups.length;
-
-    const qualityDiff = group.files.length >= 2
-        ? Math.abs(group.files[0].quality_score - group.files[1].quality_score).toFixed(1)
-        : 0;
-    document.getElementById('dupCheckerGroupInfo').textContent =
-        `${group.files.length} duplicate candidates • Quality diff: ${qualityDiff} pts`;
-
-    // Get the two files to compare (use first two files in group)
-    const fileA = group.files[0];
-    const fileB = group.files.length > 1 ? group.files[1] : fileA;
-
-    // Determine which is recommended (higher quality score)
-    const recommendedPath = group.recommended_keep || fileA.path;
-
-    // Render File A
-    renderDuplicateFile('A', fileA, fileA.path === recommendedPath);
-
-    // Render File B
-    renderDuplicateFile('B', fileB, fileB.path === recommendedPath);
-}
-
-/**
- * Render a single file panel in the duplicate checker
- * @param {string} side - 'A' or 'B'
- * @param {Object} file - File data object
- * @param {boolean} isRecommended - Whether this is the recommended file to keep
- */
-function renderDuplicateFile(side, file, isRecommended) {
-    const thumbSrc = file.thumb ? `/thumbnails/${file.thumb}` : '/static/placeholder.png';
-    const fileName = file.path.split(/[\\/]/).pop();
-
-    // Update thumbnail
-    document.getElementById(`dupFile${side}Thumb`).src = thumbSrc;
-
-    // Update filename
-    const nameEl = document.getElementById(`dupFile${side}Name`);
-    nameEl.textContent = fileName;
-    nameEl.title = file.path;
-
-    // Update quality score
-    document.getElementById(`dupFile${side}Quality`).textContent = file.quality_score.toFixed(1);
-
-    // Update file size
-    document.getElementById(`dupFile${side}Size`).textContent = file.size_mb.toFixed(2) + ' MB';
-
-    // Update resolution
-    const resolution = file.width && file.height ? `${file.width}×${file.height}` : '--';
-    document.getElementById(`dupFile${side}Res`).textContent = resolution;
-
-    // Update bitrate
-    const bitrate = file.bitrate_mbps ? file.bitrate_mbps.toFixed(1) + ' Mbps' : '--';
-    document.getElementById(`dupFile${side}Bitrate`).textContent = bitrate;
-
-    // Show/hide recommended badge
-    const badge = document.getElementById(`dupFile${side}Badge`);
-    if (isRecommended) {
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
-    }
-
-    // Highlight recommended panel
-    const panel = document.getElementById(`dupFile${side}`);
-    if (isRecommended) {
-        panel.classList.add('border-green-500/50', 'bg-green-500/5');
-        panel.classList.remove('border-white/10', 'bg-white/[0.02]');
-    } else {
-        panel.classList.remove('border-green-500/50', 'bg-green-500/5');
-        panel.classList.add('border-white/10', 'bg-white/[0.02]');
-    }
-}
-
-/**
- * Navigate to next or previous duplicate group
- * @param {number} direction - 1 for next, -1 for previous
- */
-function navigateDuplicateGroup(direction) {
-    const newIndex = duplicateCheckerState.currentGroupIndex + direction;
-    renderDuplicateCheckerGroup(newIndex);
-}
-
-/**
- * Keep a specific file (A or B) and delete the other(s)
- * @param {string} side - 'A' or 'B'
- */
-async function keepDuplicateFile(side) {
-    if (!duplicateData || !duplicateData.groups) return;
-
-    const group = duplicateData.groups[duplicateCheckerState.currentGroupIndex];
-    if (!group) return;
-
-    const fileToKeep = side === 'A' ? group.files[0] : group.files[1];
-    const filesToDelete = group.files.filter(f => f.path !== fileToKeep.path);
-
-    if (filesToDelete.length === 0) {
-        alert('No files to delete');
-        return;
-    }
-
-    const fileNames = filesToDelete.map(f => f.path.split(/[\\/]/).pop()).join(', ');
-    if (!confirm(`Delete ${filesToDelete.length} file(s)?\n\n${fileNames}\n\nThis cannot be undone.`)) {
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/duplicates/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paths: filesToDelete.map(f => f.path) })
-        });
-
-        if (res.ok) {
-            // Remove this group from the list
-            duplicateData.groups.splice(duplicateCheckerState.currentGroupIndex, 1);
-            duplicateData.summary.total_groups--;
-
-            // Show next group (same index since we removed current)
-            renderDuplicateCheckerGroup(duplicateCheckerState.currentGroupIndex);
-        } else {
-            alert('Failed to delete files');
-        }
-    } catch (err) {
-        console.error('Delete error:', err);
-        alert('Error deleting files');
-    }
-}
-
-/**
- * Skip current duplicate group without taking action
- */
-function skipDuplicateGroup() {
-    navigateDuplicateGroup(1);
-}
-
-/**
- * Mark "any is fine" - keep the recommended file and delete others
- */
-async function markAnyIsFine() {
-    if (!duplicateData || !duplicateData.groups) return;
-
-    const group = duplicateData.groups[duplicateCheckerState.currentGroupIndex];
-    if (!group) return;
-
-    const recommendedPath = group.recommended_keep;
-    const fileToKeep = group.files.find(f => f.path === recommendedPath) || group.files[0];
-    const filesToDelete = group.files.filter(f => f.path !== fileToKeep.path);
-
-    if (filesToDelete.length === 0) {
-        // Only one file, just skip
-        skipDuplicateGroup();
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/duplicates/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paths: filesToDelete.map(f => f.path) })
-        });
-
-        if (res.ok) {
-            // Remove this group from the list
-            duplicateData.groups.splice(duplicateCheckerState.currentGroupIndex, 1);
-            duplicateData.summary.total_groups--;
-
-            // Show next group
-            renderDuplicateCheckerGroup(duplicateCheckerState.currentGroupIndex);
-        } else {
-            alert('Failed to delete files');
-        }
-    } catch (err) {
-        console.error('Delete error:', err);
-        alert('Error deleting files');
-    }
-}
-
-/**
- * Preview a duplicate file in cinema mode (optional feature)
- * @param {string} side - 'A' or 'B'
- */
-function previewDuplicateFile(side) {
-    if (!duplicateData || !duplicateData.groups) return;
-
-    const group = duplicateData.groups[duplicateCheckerState.currentGroupIndex];
-    if (!group) return;
-
-    const file = side === 'A' ? group.files[0] : group.files[1];
-
-    // Create dummy container with path and open cinema
-    const dummyContainer = document.createElement('div');
-    dummyContainer.setAttribute('data-path', file.path);
-    openCinema(dummyContainer);
-}
-
-/**
- * Handle keyboard shortcuts in duplicate checker mode
- * @param {KeyboardEvent} e - Keyboard event
- */
-function duplicateCheckerKeyHandler(e) {
-    // Only handle if duplicate checker is active
-    if (!duplicateCheckerState.isActive) return;
-
-    // Skip if typing in an input field
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-    const key = e.key.toLowerCase();
-
-    if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        closeDuplicateChecker();
-    } else if (key === '1' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        e.stopPropagation();
-        keepDuplicateFile('A');
-    } else if (key === '2' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        e.stopPropagation();
-        keepDuplicateFile('B');
-    } else if (key === 's' || key === ' ') {
-        e.preventDefault();
-        e.stopPropagation();
-        skipDuplicateGroup();
-    } else if (key === 'a') {
-        e.preventDefault();
-        e.stopPropagation();
-        markAnyIsFine();
-    }
-}
-
-// Expose duplicate checker functions to global scope
-window.openDuplicateChecker = openDuplicateChecker;
-window.closeDuplicateChecker = closeDuplicateChecker;
-window.keepDuplicateFile = keepDuplicateFile;
-window.skipDuplicateGroup = skipDuplicateGroup;
-window.markAnyIsFine = markAnyIsFine;
-window.previewDuplicateFile = previewDuplicateFile;
+// Duplicate Checker Fullscreen Mode has been moved to duplicates.js
+// See duplicates.js for: openDuplicateChecker, closeDuplicateChecker,
+// renderDuplicateCheckerGroup, renderDuplicateFile, navigateDuplicateGroup,
+// keepDuplicateFile, skipDuplicateGroup, markAnyIsFine, previewDuplicateFile,
+// duplicateCheckerKeyHandler
 
 
 document.addEventListener('DOMContentLoaded', () => {

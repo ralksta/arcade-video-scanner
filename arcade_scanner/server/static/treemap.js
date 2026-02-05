@@ -251,6 +251,11 @@ function renderFileView(ctx, canvas, folderPath, videos) {
         return;
     }
 
+    // Set playlist for cinema navigation
+    if (typeof setCinemaPlaylist === 'function') {
+        setCinemaPlaylist(videosInFolder);
+    }
+
     // Prepare data
     const treemapData = videosInFolder.map(v => ({
         video: v,
@@ -372,6 +377,12 @@ function updateTreemapLegend() {
  */
 function treemapZoomOut() {
     treemapCurrentFolder = null;
+
+    // Reset playlist
+    if (typeof setCinemaPlaylist === 'function') {
+        setCinemaPlaylist(null);
+    }
+
     renderTreemap();
     // Call updateURL from engine.js if available
     if (typeof updateURL === 'function') {

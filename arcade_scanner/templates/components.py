@@ -813,7 +813,7 @@ TREEMAP_LEGEND_COMPONENT = """
         <button id="treemapBackBtn" class="hidden items-center gap-2 text-sm text-gray-400 hover:text-white" onclick="treemapZoomOut()">
             <span class="material-icons text-base">arrow_back</span> BACK
         </button>
-        
+
         <div class="flex items-center gap-4 text-xs font-mono text-gray-500">
             <span class="legend-title text-white font-bold tracking-wider">STORAGE MAP</span>
             <span class="legend-hint text-arcade-cyan/70"></span>
@@ -822,7 +822,7 @@ TREEMAP_LEGEND_COMPONENT = """
                 <span class="w-2 h-2 rounded-full bg-arcade-cyan"></span> OPTIMIZED
             </div>
         </div>
-        
+
         <!-- Log Scale Toggle -->
         <label class="flex items-center gap-2 cursor-pointer group">
             <div class="relative w-8 h-4 bg-gray-700 rounded-full transition-colors group-hover:bg-gray-600">
@@ -831,6 +831,33 @@ TREEMAP_LEGEND_COMPONENT = """
             </div>
             <span class="text-[10px] text-gray-500 font-bold">LOG SCALE</span>
         </label>
+    </div>
+</div>
+"""
+
+
+FOLDER_BROWSER_LEGEND_COMPONENT = """
+<!-- Folder Browser Legend -->
+<div id="folderBrowserLegend" class="hidden w-full bg-arcade-bg/95 border-b border-white/5 py-2">
+    <div class="w-full px-4 flex items-center justify-between">
+        <!-- Back Button -->
+        <button id="folderBrowserBackBtn" class="hidden items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors" onclick="folderBrowserBack()">
+            <span class="material-icons text-base">arrow_back</span> BACK
+        </button>
+
+        <!-- Breadcrumb Navigation -->
+        <div class="flex items-center gap-2 text-sm flex-1 ml-4 overflow-x-auto">
+            <span class="material-icons text-arcade-cyan text-base">folder</span>
+            <div id="folderBreadcrumb" class="flex items-center gap-1 font-mono">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Videos Here Link -->
+        <div id="folderVideosHereLink" class="hidden items-center gap-2 text-sm text-arcade-cyan hover:text-white cursor-pointer transition-colors" onclick="toggleFolderBrowserVideos()">
+            <span class="material-icons text-base">play_circle</span>
+            <span id="folderVideosHereCount">0 videos here</span>
+        </div>
     </div>
 </div>
 """
@@ -2258,6 +2285,9 @@ FILTER_BAR_COMPONENT = """
             </button>
             <button onclick="setLayout('treemap')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Tree View">
                 <span class="material-icons text-[18px]">account_tree</span>
+            </button>
+            <button onclick="setLayout('folderbrowser')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Folder Browser">
+                <span class="material-icons text-[18px]">folder</span>
             </button>
         </div>
         
