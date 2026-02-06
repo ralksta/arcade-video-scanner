@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-Video Optimizer V2.3 - Multi-Platform Hardware Encoder with Logging
+Video Optimizer V2.4 - Multi-Platform Hardware Encoder with Bitrate Analysis
 Supports: NVIDIA NVENC (RTX 4090), Apple VideoToolbox (M4 Max), Intel QuickSync (QSV)
+
+New in V2.4: Bitrate analyzer integration ensures output never exceeds source bitrate.
 """
 import os
 import sys
@@ -14,6 +16,21 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import threading
 import queue
+
+# Import bitrate analyzer for maxrate caps
+# Use sys.path to avoid circular dependencies through arcade_scanner's __init__.py
+try:
+    import sys as _sys
+    _analyzer_path = Path(__file__).parent.parent / "arcade_scanner" / "core"
+    if _analyzer_path.exists():
+        _sys.path.insert(0, str(_analyzer_path))
+        from bitrate_analyzer import analyze_bitrate, BitrateProfile
+        _sys.path.pop(0)
+        BITRATE_ANALYZER_AVAILABLE = True
+    else:
+        BITRATE_ANALYZER_AVAILABLE = False
+except ImportError:
+    BITRATE_ANALYZER_AVAILABLE = False
 
 # Logs directory
 LOG_DIR = Path.home() / ".arcade-scanner" / "logs"
@@ -334,8 +351,13 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     
     sys.stdout.flush()
 
-def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress'):
-    """Build the ffmpeg command based on encoder profile."""
+def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress', maxrate_kbps=None, bufsize_kbps=None):
+    """Build the ffmpeg command based on encoder profile.
+    
+    Args:
+        maxrate_kbps: Optional max bitrate cap (from bitrate analyzer) to prevent exceeding source
+        bufsize_kbps: Optional buffer size for VBR smoothing
+    """
     cmd = ['ffmpeg', '-y']
     
     # Trim input if needed (fast seek)
@@ -356,6 +378,16 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
         cmd.extend(profile['encoder_args'])
         cmd.extend([profile['quality_flag'], str(quality_value)])
         cmd.extend(['-vf', profile['video_filter']])
+        
+        # Add maxrate/bufsize caps if provided (from bitrate analyzer)
+        # This ensures output never exceeds source bitrate even with high quality settings
+        if maxrate_kbps and maxrate_kbps > 0:
+            cmd.extend(['-maxrate', f'{int(maxrate_kbps)}k'])
+            if bufsize_kbps and bufsize_kbps > 0:
+                cmd.extend(['-bufsize', f'{int(bufsize_kbps)}k'])
+            else:
+                # Default bufsize = 2x maxrate for VBR headroom
+                cmd.extend(['-bufsize', f'{int(maxrate_kbps * 2)}k'])
     
     # Audio settings
     if copy_audio:
@@ -430,6 +462,26 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     if not info or info['duration'] <= 0:
         batch_stats['failed'] += 1
         return (False, 0)
+    
+    # --- BITRATE ANALYSIS for maxrate caps ---
+    maxrate_kbps = None
+    bufsize_kbps = None
+    if BITRATE_ANALYZER_AVAILABLE and video_mode == 'compress':
+        try:
+            bitrate_profile = analyze_bitrate(str(input_path))
+            if bitrate_profile.max_bitrate_kbps > 0:
+                # Use source max bitrate as our ceiling (with 5% safety margin)
+                maxrate_kbps = bitrate_profile.max_bitrate_kbps * 0.95
+                # Bufsize for VBR smoothing - larger for variable content
+                if bitrate_profile.is_variable_bitrate:
+                    bufsize_kbps = maxrate_kbps * 2.0
+                else:
+                    bufsize_kbps = maxrate_kbps * 1.5
+                
+                print(f"{Y}Bitrate Analysis:{NC} Source avg={bitrate_profile.avg_bitrate_kbps:.0f}kbps, max={bitrate_profile.max_bitrate_kbps:.0f}kbps, VBR={bitrate_profile.is_variable_bitrate}")
+                print(f"{Y}Maxrate Cap:{NC} {maxrate_kbps:.0f}kbps (ensures output ≤ source)")
+        except Exception as e:
+            print(f"{Y}⚠️ Bitrate analysis skipped:{NC} {e}")
     
     # Calculate Trim Duration and Projected Size
     trim_start_sec = parse_time_to_seconds(ss)
@@ -585,9 +637,9 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
     # Helper function to run a single encode pass
     def run_encode_pass(quality_val):
         """Run a single encode pass and return (success, size_after, ssim, error_reason)."""
-        print(f"{G}Pass:{NC} Q={quality_val}")
+        print(f"{G}Pass:{NC} Q={quality_val}" + (f" (maxrate={maxrate_kbps:.0f}k)" if maxrate_kbps else ""))
 
-        cmd = build_ffmpeg_command(input_path, output_path, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress')
+        cmd = build_ffmpeg_command(input_path, output_path, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress', maxrate_kbps=maxrate_kbps, bufsize_kbps=bufsize_kbps)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}
