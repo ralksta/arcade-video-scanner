@@ -75,6 +75,57 @@ class DuplicateGroup:
         }
 
 
+class _BKNode:
+    __slots__ = ['idx', 'phash', 'children']
+
+    def __init__(self, idx, phash):
+        self.idx = idx
+        self.phash = phash
+        self.children = {}
+
+
+class _BKTree:
+    def __init__(self):
+        self.root = None
+
+    def add(self, idx, phash):
+        if self.root is None:
+            self.root = _BKNode(idx, phash)
+            return
+
+        node = self.root
+        while True:
+            dist = node.phash - phash
+            if dist in node.children:
+                node = node.children[dist]
+            else:
+                node.children[dist] = _BKNode(idx, phash)
+                break
+
+    def search(self, query_phash, threshold):
+        if self.root is None:
+            return []
+
+        results = []
+        stack = [self.root]
+
+        while stack:
+            node = stack.pop()
+            dist = node.phash - query_phash
+
+            if dist <= threshold:
+                results.append(node.idx)
+
+            low = dist - threshold
+            high = dist + threshold
+
+            for d in range(low, high + 1):
+                if d in node.children:
+                    stack.append(node.children[d])
+
+        return results
+
+
 class DuplicateDetector:
     """
     Detects duplicate media files using various strategies.
@@ -302,6 +353,8 @@ class DuplicateDetector:
                 except:
                     pass
         
+
+
         # Group by similar hashes
         used = set()
         groups = []
@@ -454,6 +507,10 @@ class DuplicateDetector:
             except Exception:
                 continue
         
+        # Build BK-Tree
+        tree = _BKTree()
+        for i, (hash_str, phash, img) in enumerate(hash_data):
+            tree.add(i, phash)
         # Group by similar hashes
         used = set()
         groups = []
@@ -465,15 +522,13 @@ class DuplicateDetector:
             similar = [img]
             used.add(i)
             
-            for j, (other_hash_str, other_phash, other_img) in enumerate(hash_data):
-                if j in used:
-                    continue
-                
-                # Compare hashes
-                diff = phash - other_phash
-                if diff <= threshold:
-                    similar.append(other_img)
-                    used.add(j)
+            # Search in tree
+            found_indices = tree.search(phash, threshold)
+
+            for idx in found_indices:
+                if idx not in used:
+                    similar.append(hash_data[idx][2])
+                    used.add(idx)
             
             if len(similar) > 1:
                 group = self._create_image_group(similar, match_type="hash")
