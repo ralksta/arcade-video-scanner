@@ -28,11 +28,9 @@ class ScannerManager:
         self.video_inspector = VideoInspector(self.probe)
         self.image_inspector = ImageInspector()
         
-        # Concurrency Lanes
-        # Heavy Lane (FFprobe/FFmpeg) - CPU bound
-        self.sem_video = asyncio.Semaphore(os.cpu_count() or 4)
-        # Fast Lane (Pillow) - IO bound, increased for image speed
-        self.sem_image = asyncio.Semaphore(200) 
+        # Concurrency Lanes (created lazily in run_scan to bind to correct event loop)
+        self.sem_video = None
+        self.sem_image = None 
 
     async def run_scan(self, progress_callback: Optional[Callable[[str], None]] = None, force_rescan: bool = False) -> int:
         """
@@ -47,7 +45,11 @@ class ScannerManager:
         start_time = time.time()
         print(f"🚀 Starting Scan on: {config.active_scan_targets}")
         
-        # Configure Image Scanning (Phase 2 Check)
+        # Create semaphores bound to current event loop (fixes asyncio event loop mismatch)
+        # Heavy Lane (FFprobe/FFmpeg) - CPU bound
+        self.sem_video = asyncio.Semaphore(os.cpu_count() or 4)
+        # Fast Lane (Pillow) - IO bound, increased for image speed
+        self.sem_image = asyncio.Semaphore(200)
         try:
             from ..database.user_store import user_db
             scan_images = False
