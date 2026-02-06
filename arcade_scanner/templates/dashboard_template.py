@@ -175,6 +175,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
     <script src="/static/treemap.js?v={int(time.time())}"></script>
     <script src="/static/formatters.js?v={int(time.time())}"></script>
+    <script src="/static/state.js?v={int(time.time())}"></script>
     <script src="/static/settings.js?v={int(time.time())}"></script>
     <script src="/static/duplicates.js?v={int(time.time())}"></script>
     <script src="/static/engine.js?v={int(time.time())}"></script>
