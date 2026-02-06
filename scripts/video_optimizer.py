@@ -755,18 +755,19 @@ def process_file(input_path, profile, min_size_mb=50, copy_audio=False, port=Non
 
             if meets_targets:
                 best_result = (quality, size_after, ssim, saved_bytes, saved_pct)
-                # Try for more compression
-                if profile['quality_direction'] > 0:
-                    low = mid + 1   # Try higher Q values (more compression)
-                else:
-                    high = mid - 1  # Try lower Q values (more compression)
+                
+                # EARLY EXIT: If savings are already excellent, stop searching
+                # No point searching further when we've already saved 50%+ with good quality
+                if saved_pct >= 50.0 and ssim >= MIN_QUALITY:
+                    print(f" {BG}   -> Early exit: {saved_pct:.1f}% savings is excellent!{NC}")
+                    break
+                
+                # Otherwise try for more compression - move to higher indices
+                low = mid + 1
                 if output_path.exists(): output_path.unlink()
             else:
                 # SSIM OK but savings not enough, need more compression
-                if profile['quality_direction'] > 0:
-                    low = mid + 1
-                else:
-                    high = mid - 1
+                low = mid + 1
                 if output_path.exists(): output_path.unlink()
 
         # Use best result if found, or fall back to best acceptable
