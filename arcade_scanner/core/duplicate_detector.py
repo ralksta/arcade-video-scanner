@@ -13,8 +13,10 @@ try:
     import imagehash
     from PIL import Image
     IMAGEHASH_AVAILABLE = True
-except ImportError:
+    print("✅ imagehash + PIL available for visual duplicate detection")
+except ImportError as e:
     IMAGEHASH_AVAILABLE = False
+    print(f"⚠️ imagehash not available: {e}")
 
 
 @dataclass
