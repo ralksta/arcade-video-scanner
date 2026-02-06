@@ -290,8 +290,8 @@ function renderDuplicatesView() {
                                             <span class="ml-auto bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Q: ${file.quality_score.toFixed(0)}</span>
                                         </div>
                                         
-                                        ${!window.IS_DOCKER ? `
-                                        <!-- Reveal in Finder Button -->
+                                        ${window.IS_LOCAL_ACCESS ? `
+                                        <!-- Reveal in Finder Button (only on local access) -->
                                         <button onclick="revealInFinder('${file.path.replace(/'/g, "\\'")}')"
                                                 class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">folder_open</span>
@@ -299,18 +299,12 @@ function renderDuplicatesView() {
                                         </button>
                                         ` : ''}
                                     </div>    
-                                        ${!isKeep ? `
-                                            <button onclick="deleteDuplicate('${encodeURIComponent(file.path)}')" 
-                                                    class="w-full py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1">
-                                                <span class="material-icons text-sm">delete</span>
-                                                Delete
-                                            </button>
-                                        ` : `
-                                            <div class="w-full py-2 rounded-lg bg-green-500/10 text-green-400 border border-green-500/30 text-xs font-bold text-center flex items-center justify-center gap-1">
-                                                <span class="material-icons text-sm">verified</span>
-                                                Best Quality
-                                            </div>
-                                        `}
+                                        <!-- Delete button for all files -->
+                                        <button onclick="deleteDuplicate('${encodeURIComponent(file.path)}')" 
+                                                class="w-full py-2 rounded-lg ${isKeep ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 border border-orange-500/30' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30'} text-xs font-bold transition-all flex items-center justify-center gap-1">
+                                            <span class="material-icons text-sm">delete</span>
+                                            ${isKeep ? 'Delete (Recommended)' : 'Delete'}
+                                        </button>
                                     </div>
                             `;
         }).join('')}

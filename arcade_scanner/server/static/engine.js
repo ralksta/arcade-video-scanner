@@ -965,7 +965,7 @@ function createComparisonCard(pair) {
                 <span class="truncate font-medium text-gray-300" title="${orig.FilePath}">${orig.FilePath.split(/[\\\\/]/).pop()}</span>
                 <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
-            ${!window.IS_DOCKER ? `
+            ${window.IS_LOCAL_ACCESS ? `
             <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
@@ -1004,7 +1004,7 @@ function createComparisonCard(pair) {
                 <span class="truncate font-medium text-gray-300" title="${opt.FilePath}">${opt.FilePath.split(/[\\\\/]/).pop()}</span>
                 <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
-             ${!window.IS_DOCKER ? `
+             ${window.IS_LOCAL_ACCESS ? `
              <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
@@ -1115,7 +1115,7 @@ function createVideoCard(v) {
              
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
-                 ${!window.IS_DOCKER ? `
+                 ${window.IS_LOCAL_ACCESS ? `
                  <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
                     <span class="material-icons">folder_open</span>
                  </button>

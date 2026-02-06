@@ -244,8 +244,14 @@ async function loadSettings() {
             // Set Docker detection flag
             window.IS_DOCKER = data.is_docker || false;
 
-            // Hide Locate button in Docker mode
-            if (window.IS_DOCKER) {
+            // Detect if accessing locally (localhost or 127.0.0.1)
+            // Remote access means "Reveal in Finder" can't work
+            const hostname = window.location.hostname;
+            window.IS_LOCAL_ACCESS = !window.IS_DOCKER &&
+                (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1');
+
+            // Hide Locate button in Docker mode or remote access
+            if (window.IS_DOCKER || !window.IS_LOCAL_ACCESS) {
                 const locateBtn = document.getElementById('cinemaLocateBtn');
                 if (locateBtn) locateBtn.style.display = 'none';
             }
