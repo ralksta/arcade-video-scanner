@@ -403,15 +403,34 @@ async function deleteDuplicate(encodedPath) {
 }
 
 /**
- * Rescan for duplicates - clears cache and triggers fresh scan
+ * Rescan for duplicates - runs library scan first to pick up new files, then duplicate scan
  */
 async function rescanDuplicates() {
-    if (!confirm('This will clear the cached duplicate results and perform a fresh scan. Continue?')) {
+    if (!confirm('This will scan for new files in your library and then search for duplicates. Continue?')) {
         return;
     }
 
     try {
-        // Clear the cache
+        // Show scanning UI
+        showDuplicateScanningUI();
+
+        // Update status for library scan phase
+        const statusText = document.getElementById('scan-status-text');
+        if (statusText) statusText.textContent = 'Scanning library for new files...';
+
+        // 1. Run library scan first to pick up new files
+        const libraryScanRes = await fetch('/api/rescan');
+        if (!libraryScanRes.ok) {
+            console.warn('Library scan failed, continuing with duplicate scan...');
+        } else {
+            const scanResult = await libraryScanRes.json();
+            console.log(`📁 Library scan complete: ${scanResult.count} new/updated files`);
+        }
+
+        // Update status for duplicate scan phase
+        if (statusText) statusText.textContent = 'Clearing duplicate cache...';
+
+        // 2. Clear the duplicate cache
         const clearRes = await fetch('/api/duplicates/clear', {
             method: 'POST'
         });
@@ -421,7 +440,7 @@ async function rescanDuplicates() {
             return;
         }
 
-        // Clear client-side data and start a new scan
+        // 3. Clear client-side data and start a new duplicate scan
         duplicateData = null;
         startDuplicateScan();
 
