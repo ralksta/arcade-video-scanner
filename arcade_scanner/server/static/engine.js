@@ -1,82 +1,9 @@
 /**
- * Application State - Grouped globals for better organization
- * TODO: Future refactor should migrate these to a proper state management system
+ * Application State is now managed via global Store (state.js)
+ * Legacy variable names are preserved as proxies on the window object.
  */
 
-// --- FILTER STATE ---
-const filterState = {
-    status: 'all',          // Status filter (all, HIGH, OK, optimized_files)
-    codec: 'all',           // Codec filter (all, h264, hevc, etc.)
-    folder: 'all',          // Folder filter
-    search: '',             // Search term
-    date: 'all',            // Date filter (all, 1d, 7d, 30d)
-    size: {
-        min: null,          // Min size in MB
-        max: null           // Max size in MB
-    },
-    tags: {
-        active: [],         // Array of tag names currently selected
-        untaggedOnly: false // Show only untagged items
-    }
-};
-
-// --- VIEW STATE ---
-const viewState = {
-    layout: 'grid',         // Current layout (grid, list, treemap)
-    workspace: 'lobby',     // Current workspace (lobby, mixed, vault, favorites, duplicates)
-    sort: 'bitrate'         // Sort order (bitrate, size, name, date)
-};
-
-// --- COLLECTION STATE ---
-const collectionState = {
-    activeId: null,         // Currently active collection ID for UI highlighting
-    activeCriteria: null    // Stores current smart collection filter rules
-};
-
-// --- DUPLICATE CHECKER STATE ---
-const duplicateCheckerState = {
-    currentGroupIndex: 0,   // Current duplicate group being viewed
-    isActive: false         // Whether duplicate checker is currently open
-};
-
-// --- FOLDER BROWSER STATE ---
-const folderBrowserState = {
-    currentPath: null,      // null = root (show all root folders), string = current folder path
-    showVideosHere: false   // When true, show videos at current path instead of subfolders
-};
-
-// Legacy alias for folder browser
-let folderBrowserPath = folderBrowserState.currentPath;
-
-// --- UI STATE ---
-const uiState = {
-    safeMode: localStorage.getItem('safe_mode') === 'true',
-    renderedCount: 0
-};
-
-// --- DATA STATE ---
-let availableTags = [];     // Loaded from API
-let filteredVideos = [];    // Result of filter/sort
 const BATCH_SIZE = 40;
-
-// Legacy variable aliases for backward compatibility
-// These will be deprecated in future versions
-let currentFilter = filterState.status;
-let currentCodec = filterState.codec;
-let currentSort = viewState.sort;
-let currentLayout = viewState.layout;
-let workspaceMode = viewState.workspace;
-let currentFolder = filterState.folder;
-let minSizeMB = filterState.size.min;
-let maxSizeMB = filterState.size.max;
-let dateFilter = filterState.date;
-let activeTags = filterState.tags.active;
-let filterUntaggedOnly = filterState.tags.untaggedOnly;
-let searchTerm = filterState.search;
-let activeSmartCollectionCriteria = collectionState.activeCriteria;
-let activeCollectionId = collectionState.activeId;
-let safeMode = uiState.safeMode;
-let renderedCount = uiState.renderedCount;
 
 // --- GLOBAL AUTH INTERCEPTOR ---
 const originalFetch = window.fetch;
@@ -2484,27 +2411,7 @@ function updateFolderBrowserLegend() {
 
 // --- TREEMAP VISUALIZATION ---
 // UI code moved to treemap.js
-// Export state variables for treemap.js to access
-// Expose state for treemap.js
-Object.defineProperty(window, 'filteredVideos', {
-    get: () => filteredVideos,
-    set: (v) => { filteredVideos = v; }
-});
-Object.defineProperty(window, 'searchTerm', {
-    get: () => searchTerm,
-    set: (v) => { searchTerm = v; }
-});
-Object.defineProperty(window, 'currentLayout', {
-    get: () => currentLayout,
-    set: (v) => { currentLayout = v; }
-});
-Object.defineProperty(window, 'workspaceMode', {
-    get: () => workspaceMode,
-    set: (v) => { workspaceMode = v; }
-});
-
-// Expose duplicate checker state for duplicates.js
-window.duplicateCheckerState = duplicateCheckerState;
+// State variables are exposed via window proxies in state.js
 
 // ESC key handler - delegates to treemap.js for treemap-specific handling
 document.addEventListener('keydown', (e) => {
