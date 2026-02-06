@@ -1,5 +1,7 @@
 import json
 import os
+import threading
+import atexit
 from typing import Dict, List, Optional
 from ..config import config
 from ..models.video_entry import VideoEntry
@@ -12,7 +14,31 @@ class JSONStore:
     def __init__(self):
         self.cache_file = config.cache_file
         self._data: Dict[str, VideoEntry] = {}
+        self._save_timer = None
+        self._save_lock = threading.Lock()
+        self._io_lock = threading.Lock()
         self.load()
+        atexit.register(self.shutdown)
+
+    def shutdown(self):
+        """Force save on exit."""
+        with self._save_lock:
+            if self._save_timer:
+                self._save_timer.cancel()
+                self._save_timer = None
+        self.save()
+
+    def schedule_save(self, delay: float = 2.0) -> None:
+        """
+        Schedules a background save operation.
+        If called again within 'delay' seconds, the timer is reset.
+        """
+        with self._save_lock:
+            if self._save_timer:
+                self._save_timer.cancel()
+            self._save_timer = threading.Timer(delay, self.save)
+            self._save_timer.daemon = True
+            self._save_timer.start()
 
     def load(self) -> None:
         """Loads data from disk and converts to VideoEntry models."""
@@ -52,45 +78,50 @@ class JSONStore:
         import tempfile
         import shutil
         
-        try:
-            # Convert models back to JSON-compatible dicts (using aliases like Size_MB)
-            dump_data = {
-                path: entry.model_dump(by_alias=True) 
-                for path, entry in self._data.items()
-            }
-            
-            # Atomic write pattern: write to temp file, then rename
-            cache_dir = os.path.dirname(self.cache_file)
-            
-            # Create temp file in same directory (ensures same filesystem for atomic rename)
-            temp_fd, temp_path = tempfile.mkstemp(
-                dir=cache_dir,
-                prefix=".cache_tmp_",
-                suffix=".json"
-            )
-            
+        # Serialize I/O operations
+        with self._io_lock:
             try:
-                # Write to temp file
-                with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
-                    json.dump(dump_data, f, indent=4, ensure_ascii=False)
+                # Create a shallow copy for thread-safe iteration
+                snapshot = self._data.copy()
                 
-                # Atomic rename (overwrites old file)
-                # This is atomic on POSIX systems
-                shutil.move(temp_path, self.cache_file)
+                # Convert models back to JSON-compatible dicts (using aliases like Size_MB)
+                dump_data = {
+                    path: entry.model_dump(by_alias=True)
+                    for path, entry in snapshot.items()
+                }
                 
-                print(f"✅ Database saved ({len(self._data)} entries)")
+                # Atomic write pattern: write to temp file, then rename
+                cache_dir = os.path.dirname(self.cache_file)
                 
+                # Create temp file in same directory (ensures same filesystem for atomic rename)
+                temp_fd, temp_path = tempfile.mkstemp(
+                    dir=cache_dir,
+                    prefix=".cache_tmp_",
+                    suffix=".json"
+                )
+                
+                try:
+                    # Write to temp file
+                    with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+                        json.dump(dump_data, f, indent=4, ensure_ascii=False)
+
+                    # Atomic rename (overwrites old file)
+                    # This is atomic on POSIX systems
+                    shutil.move(temp_path, self.cache_file)
+
+                    print(f"✅ Database saved ({len(self._data)} entries)")
+
+                except Exception as e:
+                    # Cleanup temp file on error
+                    if os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except:
+                            pass
+                    raise e
+
             except Exception as e:
-                # Cleanup temp file on error
-                if os.path.exists(temp_path):
-                    try:
-                        os.remove(temp_path)
-                    except:
-                        pass
-                raise e
-                
-        except Exception as e:
-            print(f"❌ Error saving database: {e}")
+                print(f"❌ Error saving database: {e}")
 
     def get_all(self) -> List[VideoEntry]:
         return list(self._data.values())
