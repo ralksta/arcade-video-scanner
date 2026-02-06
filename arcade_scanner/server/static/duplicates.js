@@ -170,6 +170,10 @@ function renderDuplicatesView() {
 
     // Empty State Check
     if (duplicateData.groups.length === 0) {
+        // Update sidebar count to 0 (cache may be stale after deletions)
+        const emptyCountEl = document.getElementById('count-duplicates');
+        if (emptyCountEl) emptyCountEl.textContent = '0';
+
         grid.innerHTML = `
             <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
                 <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
