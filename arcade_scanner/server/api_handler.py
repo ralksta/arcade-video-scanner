@@ -427,7 +427,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             Status="OK"
                         )
                     db.upsert(entry)
-                    db.save()
+                    db.schedule_save()
                     
                     # Regenerate HTML report so refresh works
                     try:
@@ -600,7 +600,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             if orig_abs != str(new_path):
                                 db.remove(orig_abs)
                                 
-                            db.save()
+                            db.schedule_save()
                             
                         else:
                             print(f"❌ Optimized file not found: {opt_abs}")
@@ -626,7 +626,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         if os.path.exists(abs_path):
                             os.remove(abs_path)
                             db.remove(abs_path)
-                            db.save()
+                            db.schedule_save()
                                 
                             # Regenerate Report
                             try:
@@ -1778,7 +1778,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     
                     # Save database changes
                     if deleted:
-                        db.save()
+                        db.schedule_save()
                     
                     response = {
                         "success": True,
