@@ -210,6 +210,10 @@ function renderDuplicatesView() {
                             <div class="text-2xl font-bold text-green-700 dark:text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
                             <div class="text-xs text-gray-600 dark:text-gray-500 uppercase tracking-wider">Potential Savings</div>
                         </div>
+                        <button onclick="deleteAllDuplicates()" class="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
+                            <span class="material-icons text-[18px]">delete_sweep</span>
+                            Delete All Duplicates
+                        </button>
                         <button onclick="openDuplicateChecker()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
                             <span class="material-icons text-[18px]">fullscreen</span>
                             Fullscreen Mode
@@ -424,6 +428,87 @@ async function rescanDuplicates() {
     } catch (e) {
         console.error('Rescan error:', e);
         alert('Error triggering rescan');
+    }
+}
+
+/**
+ * Delete all duplicate files (keeps the recommended file in each group)
+ * This is a bulk operation that processes all groups at once
+ */
+async function deleteAllDuplicates() {
+    if (!duplicateData || !duplicateData.groups || duplicateData.groups.length === 0) {
+        alert('No duplicates to delete');
+        return;
+    }
+
+    // Collect all files to delete (all except recommended in each group)
+    const filesToDelete = [];
+    let totalSavingsMb = 0;
+
+    duplicateData.groups.forEach(group => {
+        const recommendedPath = group.recommended_keep;
+        group.files.forEach(file => {
+            if (file.path !== recommendedPath) {
+                filesToDelete.push(file.path);
+                totalSavingsMb += file.size_mb;
+            }
+        });
+    });
+
+    if (filesToDelete.length === 0) {
+        alert('No duplicate files to delete');
+        return;
+    }
+
+    // Confirmation dialog with details
+    const confirmation = confirm(
+        `⚠️ DELETE ALL DUPLICATES\n\n` +
+        `This will permanently delete ${filesToDelete.length} file(s) across ${duplicateData.groups.length} groups.\n\n` +
+        `Space to be freed: ${totalSavingsMb.toFixed(1)} MB\n\n` +
+        `The best quality file in each group will be kept.\n\n` +
+        `This action CANNOT be undone. Continue?`
+    );
+
+    if (!confirmation) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/duplicates/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: filesToDelete })
+        });
+
+        if (res.ok) {
+            const result = await res.json();
+            console.log(`✅ Bulk delete complete: ${result.deleted.length} files, freed ${result.freed_mb} MB`);
+
+            // Clear all groups since we deleted all duplicates
+            duplicateData.groups = [];
+            duplicateData.summary.total_groups = 0;
+            duplicateData.summary.video_groups = 0;
+            duplicateData.summary.image_groups = 0;
+            duplicateData.summary.potential_savings_mb = 0;
+
+            // Handle any failed deletions
+            if (result.failed && result.failed.length > 0) {
+                alert(
+                    `Deleted ${result.deleted.length} files (freed ${result.freed_mb.toFixed(1)} MB).\n\n` +
+                    `${result.failed.length} file(s) could not be deleted.`
+                );
+            } else {
+                alert(`Successfully deleted ${result.deleted.length} files and freed ${result.freed_mb.toFixed(1)} MB!`);
+            }
+
+            // Refresh the view
+            renderDuplicatesView();
+        } else {
+            alert('Failed to delete files');
+        }
+    } catch (e) {
+        console.error('Bulk delete error:', e);
+        alert('Error deleting files');
     }
 }
 
@@ -793,6 +878,7 @@ function duplicateCheckerKeyHandler(e) {
 window.loadDuplicates = loadDuplicates;
 window.renderDuplicatesView = renderDuplicatesView;
 window.deleteDuplicate = deleteDuplicate;
+window.deleteAllDuplicates = deleteAllDuplicates;
 window.rescanDuplicates = rescanDuplicates;
 window.startDuplicateScan = startDuplicateScan;
 
