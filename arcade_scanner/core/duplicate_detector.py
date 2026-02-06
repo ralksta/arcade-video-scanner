@@ -234,10 +234,17 @@ class DuplicateDetector:
             if len(group) == 1:
                 unmatched.append(group[0])
         
+        # Debug: Show what's happening
+        print(f"🔍 DEBUG verify: {len(files)} files -> {len(hash_map)} unique hashes, {len(result_groups)} exact matches, {len(unmatched)} unmatched")
+        
         # If we have unmatched files and imagehash is available, try visual matching
         if len(unmatched) >= 2 and IMAGEHASH_AVAILABLE:
+            print(f"🔍 DEBUG verify: Trying visual hash fallback for {len(unmatched)} files...")
             visual_groups = self._verify_by_visual_hash(unmatched)
+            print(f"🔍 DEBUG verify: Visual hash found {len(visual_groups)} groups")
             result_groups.extend(visual_groups)
+        elif len(unmatched) >= 2:
+            print(f"🔍 DEBUG verify: imagehash not available, cannot check visual similarity for {len(unmatched)} files")
         
         return result_groups
     
