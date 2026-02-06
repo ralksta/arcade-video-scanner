@@ -174,7 +174,8 @@ class ScannerManager:
                         if processed_count % 500 == 0:
                             current_time = time.time()
                             if current_time - last_save_time > 60:
-                                db.save()
+                                snapshot = db.get_data_snapshot()
+                                await asyncio.to_thread(db.save, snapshot)
                                 last_save_time = current_time
 
         try:
