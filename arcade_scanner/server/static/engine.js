@@ -448,9 +448,9 @@ function setLayout(layout, skipURLUpdate = false) {
             batchBar.style.display = 'none';
         }
 
-        // Hide sort dropdown in folder browser view
+        // Show sort dropdown in folder browser view (for sorting files)
         const sortSelect = document.getElementById('sortSelect');
-        if (sortSelect) sortSelect.style.display = 'none';
+        if (sortSelect) sortSelect.style.display = '';
 
         // Hide workspace bar, show folder browser legend
         if (workspaceBar) workspaceBar.style.display = 'none';
