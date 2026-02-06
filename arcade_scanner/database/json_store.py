@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 from typing import Dict, List, Optional
 from ..config import config
 from ..models.video_entry import VideoEntry
@@ -11,34 +12,36 @@ class JSONStore:
     """
     def __init__(self):
         self.cache_file = config.cache_file
+        self._lock = threading.Lock()
         self._data: Dict[str, VideoEntry] = {}
         self.load()
 
     def load(self) -> None:
         """Loads data from disk and converts to VideoEntry models."""
-        if os.path.exists(self.cache_file):
-            try:
-                with open(self.cache_file, "r", encoding="utf-8") as f:
-                    raw_data = json.load(f)
-                    if not isinstance(raw_data, dict):
-                        raw_data = {}
-                    
-                    self._data = {}
-                    for path, entry_dict in raw_data.items():
-                        try:
-                            # Ensure the key is preserved as file_path if missing in body
-                            if "FilePath" not in entry_dict:
-                                entry_dict["FilePath"] = path
+        with self._lock:
+            if os.path.exists(self.cache_file):
+                try:
+                    with open(self.cache_file, "r", encoding="utf-8") as f:
+                        raw_data = json.load(f)
+                        if not isinstance(raw_data, dict):
+                            raw_data = {}
+
+                        self._data = {}
+                        for path, entry_dict in raw_data.items():
+                            try:
+                                # Ensure the key is preserved as file_path if missing in body
+                                if "FilePath" not in entry_dict:
+                                    entry_dict["FilePath"] = path
+
+                                self._data[path] = VideoEntry(**entry_dict)
+                            except Exception as e:
+                                print(f"⚠️ Skipping corrupted cache entry for {path}: {e}")
                                 
-                            self._data[path] = VideoEntry(**entry_dict)
-                        except Exception as e:
-                            print(f"⚠️ Skipping corrupted cache entry for {path}: {e}")
-                            
-            except Exception as e:
-                print(f"❌ Error loading cache: {e}")
+                except Exception as e:
+                    print(f"❌ Error loading cache: {e}")
+                    self._data = {}
+            else:
                 self._data = {}
-        else:
-            self._data = {}
 
     def save(self) -> None:
         """
@@ -53,11 +56,12 @@ class JSONStore:
         import shutil
         
         try:
-            # Convert models back to JSON-compatible dicts (using aliases like Size_MB)
-            dump_data = {
-                path: entry.model_dump(by_alias=True) 
-                for path, entry in self._data.items()
-            }
+            with self._lock:
+                # Convert models back to JSON-compatible dicts (using aliases like Size_MB)
+                dump_data = {
+                    path: entry.model_dump(by_alias=True)
+                    for path, entry in self._data.items()
+                }
             
             # Atomic write pattern: write to temp file, then rename
             cache_dir = os.path.dirname(self.cache_file)
@@ -78,7 +82,7 @@ class JSONStore:
                 # This is atomic on POSIX systems
                 shutil.move(temp_path, self.cache_file)
                 
-                print(f"✅ Database saved ({len(self._data)} entries)")
+                print(f"✅ Database saved ({len(dump_data)} entries)")
                 
             except Exception as e:
                 # Cleanup temp file on error
@@ -93,7 +97,8 @@ class JSONStore:
             print(f"❌ Error saving database: {e}")
 
     def get_all(self) -> List[VideoEntry]:
-        return list(self._data.values())
+        with self._lock:
+            return list(self._data.values())
 
     def get(self, path: str) -> Optional[VideoEntry]:
         return self._data.get(path)
@@ -132,12 +137,14 @@ class JSONStore:
                 mtime=entry.mtime
             )
             entry = video_entry
-            
-        self._data[entry.file_path] = entry
+
+        with self._lock:
+            self._data[entry.file_path] = entry
 
     def remove(self, path: str) -> None:
-        if path in self._data:
-            del self._data[path]
+        with self._lock:
+            if path in self._data:
+                del self._data[path]
 
 # Singleton instance
 db = JSONStore()
