@@ -134,6 +134,9 @@ class DuplicateDetector:
         # Build signature -> files mapping
         signature_map: Dict[str, List] = defaultdict(list)
         
+        skipped_no_size = 0
+        skipped_no_duration = 0
+        
         for video in videos:
             # Create signature from key metadata
             size_mb = round(getattr(video, 'size_mb', 0), 1)
@@ -142,11 +145,20 @@ class DuplicateDetector:
             height = getattr(video, 'height', 0)
             
             # Skip if missing key metadata
-            if size_mb <= 0 or duration <= 0:
+            if size_mb <= 0:
+                skipped_no_size += 1
+                continue
+            if duration <= 0:
+                skipped_no_duration += 1
                 continue
             
             signature = f"v:{size_mb}:{duration}:{width}x{height}"
             signature_map[signature].append(video)
+        
+        # Debug output
+        potential_dups = sum(1 for files in signature_map.values() if len(files) > 1)
+        print(f"🔍 DEBUG: {len(videos)} videos, skipped {skipped_no_size} (no size), {skipped_no_duration} (no duration)")
+        print(f"🔍 DEBUG: {len(signature_map)} unique signatures, {potential_dups} have potential duplicates")
         
         # Convert to DuplicateGroups with content verification
         groups = []
