@@ -59,22 +59,43 @@ class AsyncFileSystem:
         loop = asyncio.get_event_loop()
         
         def sync_walk():
-            try:
-                for root, dirs, files in os.walk(root_dir):
-                    # 1. Prune exclusions (in-place modification of dirs)
-                    dirs[:] = [d for d in dirs if not self._is_excluded(root, d)]
-                    
-                    # Check root itself
-                    if self._should_skip_root(root):
-                        continue
+            # Use stack-based traversal to avoid recursion limit and mimic os.walk
+            stack = [root_dir]
+
+            while stack:
+                current_dir = stack.pop()
+
+                # Check root itself
+                if self._should_skip_root(current_dir):
+                    # Optimization: If root is skipped (because an exclude path is a substring),
+                    # all its children will also contain that substring and be skipped.
+                    # So we can safely stop recursion here.
+                    continue
+
+                try:
+                    with os.scandir(current_dir) as it:
+                        dirs_to_visit = []
+                        for entry in it:
+                            try:
+                                if entry.is_dir(follow_symlinks=False):
+                                    if not self._is_excluded(current_dir, entry.name):
+                                        dirs_to_visit.append(entry.path)
+
+                                elif entry.is_file():
+                                    if self._is_video(entry.name):
+                                        if self._is_valid_size_entry(entry):
+                                            loop.call_soon_threadsafe(queue.put_nowait, entry.path)
+                            except OSError:
+                                continue
+
+                        # Add to stack (traversal order is not strictly guaranteed like os.walk top-down
+                        # but that's fine for our purpose)
+                        stack.extend(dirs_to_visit)
                         
-                    for file in files:
-                        if self._is_video(file):
-                            full_path = os.path.join(root, file)
-                            if self._is_valid_size(full_path):
-                                loop.call_soon_threadsafe(queue.put_nowait, full_path)
-            except Exception as e:
-                print(f"❌ Error walking {root_dir}: {e}")
+                except OSError as e:
+                    print(f"❌ Error walking {current_dir}: {e}")
+                except Exception as e:
+                    print(f"❌ Unexpected error walking {current_dir}: {e}")
 
         # Run in default executor
         await loop.run_in_executor(None, sync_walk)
@@ -113,6 +134,30 @@ class AsyncFileSystem:
             return any(filename.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS)
             
         return False
+
+    def _is_valid_size_entry(self, entry: os.DirEntry) -> bool:
+        """
+        Check if file meets size requirements using cached stat info if available.
+        """
+        name = entry.name
+
+        # Images use KB threshold (configurable, e.g., 500 KB)
+        if any(name.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS):
+            try:
+                size_bytes = entry.stat().st_size
+                min_image_bytes = config.settings.min_image_size_kb * 1024
+                return size_bytes >= min_image_bytes
+            except OSError:
+                return False
+
+        # Optimization check for videos
+        if "_opt." in name or "_trim." in name:
+            return True
+
+        try:
+            return entry.stat().st_size >= self.min_size_bytes
+        except OSError:
+            return False
 
     def _is_valid_size(self, path: str) -> bool:
         # Images use KB threshold (configurable, e.g., 500 KB)
