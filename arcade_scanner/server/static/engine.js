@@ -245,7 +245,13 @@ function setDateFilter(val) {
  */
 function setSort(s) {
     currentSort = s;
-    filterAndSort();
+
+    // If in folder browser mode, re-render the folder browser to apply sorting
+    if (currentLayout === 'folderbrowser') {
+        renderFolderBrowser();
+    } else {
+        filterAndSort();
+    }
 }
 
 // --- WORKSPACE & LAYOUT ---
