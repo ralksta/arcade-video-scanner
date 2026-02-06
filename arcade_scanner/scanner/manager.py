@@ -67,8 +67,7 @@ class ScannerManager:
         found_paths: Set[str] = set()
         
         processed_count = 0
-        
-        processed_count = 0
+        last_save_time = time.time()
         
         # Concurrency: Using self.sem_video and self.sem_image defined in __init__
         pending_tasks = set()
@@ -99,7 +98,7 @@ class ScannerManager:
                 else:
                     try:
                         # Basic existence check and stat
-                        file_stat = os.stat(path)
+                        file_stat = await asyncio.to_thread(os.stat, path)
                         # Check if file size changed significantly (more than 10MB difference)
                         # This catches files that were optimized/replaced
                         current_size_mb = file_stat.st_size / (1024 * 1024)
@@ -142,7 +141,7 @@ class ScannerManager:
                             # We need to re-stat if we didn't get it above (e.g. if needs_update was True from start)
                             # But optimization: we can just stat here.
                             if not 'file_stat' in locals():
-                                file_stat = os.stat(path)
+                                file_stat = await asyncio.to_thread(os.stat, path)
                             
                             entry.mtime = int(file_stat.st_mtime)
                             
@@ -166,11 +165,17 @@ class ScannerManager:
                         db.upsert(entry)
                         
                         nonlocal processed_count
+                        nonlocal last_save_time
                         processed_count += 1
                         
                         # Quick Save periodically (every 500 for speed)
+                        # Optimized to avoid quadratic write overhead:
+                        # Only save if 500 items processed AND > 60s passed
                         if processed_count % 500 == 0:
-                            db.save()
+                            current_time = time.time()
+                            if current_time - last_save_time > 60:
+                                db.save()
+                                last_save_time = current_time
 
         try:
             # 2. Discovery Loop
