@@ -13,10 +13,8 @@ try:
     import imagehash
     from PIL import Image
     IMAGEHASH_AVAILABLE = True
-    print("✅ imagehash + PIL available for visual duplicate detection")
-except ImportError as e:
+except ImportError:
     IMAGEHASH_AVAILABLE = False
-    print(f"⚠️ imagehash not available: {e}")
 
 
 @dataclass
@@ -136,9 +134,6 @@ class DuplicateDetector:
         # Build signature -> files mapping
         signature_map: Dict[str, List] = defaultdict(list)
         
-        skipped_no_size = 0
-        skipped_no_duration = 0
-        
         for video in videos:
             # Create signature from key metadata
             size_mb = round(getattr(video, 'size_mb', 0), 1)
@@ -147,20 +142,11 @@ class DuplicateDetector:
             height = getattr(video, 'height', 0)
             
             # Skip if missing key metadata
-            if size_mb <= 0:
-                skipped_no_size += 1
-                continue
-            if duration <= 0:
-                skipped_no_duration += 1
+            if size_mb <= 0 or duration <= 0:
                 continue
             
             signature = f"v:{size_mb}:{duration}:{width}x{height}"
             signature_map[signature].append(video)
-        
-        # Debug output
-        potential_dups = sum(1 for files in signature_map.values() if len(files) > 1)
-        print(f"🔍 DEBUG: {len(videos)} videos, skipped {skipped_no_size} (no size), {skipped_no_duration} (no duration)")
-        print(f"🔍 DEBUG: {len(signature_map)} unique signatures, {potential_dups} have potential duplicates")
         
         # Convert to DuplicateGroups with content verification
         groups = []
@@ -236,17 +222,10 @@ class DuplicateDetector:
             if len(group) == 1:
                 unmatched.append(group[0])
         
-        # Debug: Show what's happening
-        print(f"🔍 DEBUG verify: {len(files)} files -> {len(hash_map)} unique hashes, {len(result_groups)} exact matches, {len(unmatched)} unmatched")
-        
         # If we have unmatched files and imagehash is available, try visual matching
         if len(unmatched) >= 2 and IMAGEHASH_AVAILABLE:
-            print(f"🔍 DEBUG verify: Trying visual hash fallback for {len(unmatched)} files...")
             visual_groups = self._verify_by_visual_hash(unmatched)
-            print(f"🔍 DEBUG verify: Visual hash found {len(visual_groups)} groups")
             result_groups.extend(visual_groups)
-        elif len(unmatched) >= 2:
-            print(f"🔍 DEBUG verify: imagehash not available, cannot check visual similarity for {len(unmatched)} files")
         
         return result_groups
     
