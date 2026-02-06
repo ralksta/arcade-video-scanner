@@ -789,28 +789,30 @@ function updateCollectionPreviewCount() {
 function syncSmartCollectionUI() {
     if (!collectionCriteriaNew) return;
 
+    const inc = collectionCriteriaNew.include || {};
+
     document.querySelectorAll('[data-filter="media_type"]').forEach(chip => {
-        chip.classList.toggle('active', collectionCriteriaNew.include.media_type.includes(chip.dataset.value));
+        chip.classList.toggle('active', inc.media_type?.includes(chip.dataset.value) || false);
     });
 
     document.querySelectorAll('[data-filter="format"]').forEach(chip => {
-        chip.classList.toggle('active', collectionCriteriaNew.include.format.includes(chip.dataset.value));
+        chip.classList.toggle('active', inc.format?.includes(chip.dataset.value) || false);
     });
 
     document.querySelectorAll('[data-filter="status"]').forEach(chip => {
-        chip.classList.toggle('active', collectionCriteriaNew.include.status.includes(chip.dataset.value));
+        chip.classList.toggle('active', inc.status?.includes(chip.dataset.value) || false);
     });
 
     document.querySelectorAll('[data-filter="codec"]').forEach(chip => {
-        chip.classList.toggle('active', collectionCriteriaNew.include.codec.includes(chip.dataset.value));
+        chip.classList.toggle('active', inc.codec?.includes(chip.dataset.value) || false);
     });
 
     document.querySelectorAll('[data-filter="resolution"]').forEach(chip => {
-        chip.classList.toggle('active', collectionCriteriaNew.include.resolution.includes(chip.dataset.value));
+        chip.classList.toggle('active', inc.resolution?.includes(chip.dataset.value) || false);
     });
 
     document.querySelectorAll('[data-filter="orientation"]').forEach(chip => {
-        chip.classList.toggle('active', collectionCriteriaNew.include.orientation.includes(chip.dataset.value));
+        chip.classList.toggle('active', inc.orientation?.includes(chip.dataset.value) || false);
     });
 
     const tagLogicBtn = document.getElementById('tagLogicBtn');
