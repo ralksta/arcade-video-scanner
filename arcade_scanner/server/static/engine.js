@@ -84,7 +84,7 @@ window.fetch = async function (...args) {
     const response = await originalFetch(...args);
     if (response.status === 401) {
         // Redirect to login if unauthorized
-        window.location.href = '/login.html';
+        window.location.href = '/static/login.html';
         return response; // Propagate response but we are leaving
     }
     return response;
