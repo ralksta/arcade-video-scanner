@@ -40,7 +40,11 @@ class JSONStore:
         else:
             self._data = {}
 
-    def save(self) -> None:
+    def get_data_snapshot(self) -> Dict[str, VideoEntry]:
+        """Returns a thread-safe snapshot of the current data."""
+        return self._data.copy()
+
+    def save(self, data_snapshot: Optional[Dict[str, VideoEntry]] = None) -> None:
         """
         Persists current state to disk using atomic write pattern.
         
@@ -53,10 +57,12 @@ class JSONStore:
         import shutil
         
         try:
+            target_data = data_snapshot if data_snapshot is not None else self._data
+
             # Convert models back to JSON-compatible dicts (using aliases like Size_MB)
             dump_data = {
                 path: entry.model_dump(by_alias=True) 
-                for path, entry in self._data.items()
+                for path, entry in target_data.items()
             }
             
             # Atomic write pattern: write to temp file, then rename
@@ -78,7 +84,7 @@ class JSONStore:
                 # This is atomic on POSIX systems
                 shutil.move(temp_path, self.cache_file)
                 
-                print(f"✅ Database saved ({len(self._data)} entries)")
+                print(f"✅ Database saved ({len(target_data)} entries)")
                 
             except Exception as e:
                 # Cleanup temp file on error
