@@ -48,8 +48,8 @@ class ScannerManager:
         # Create semaphores bound to current event loop (fixes asyncio event loop mismatch)
         # Heavy Lane (FFprobe/FFmpeg) - CPU bound
         self.sem_video = asyncio.Semaphore(os.cpu_count() or 4)
-        # Fast Lane (Pillow) - IO bound, increased for image speed
-        self.sem_image = asyncio.Semaphore(200)
+        # Fast Lane (sips/Pillow) - reduced from 200 to prevent FD exhaustion with subprocess-based sips
+        self.sem_image = asyncio.Semaphore(50)
         try:
             from ..database.user_store import user_db
             scan_images = False
@@ -212,6 +212,9 @@ class ScannerManager:
                     print(f"🗑 Removed {removed_count} files (deleted or now excluded).")
 
             db.save()
+            
+            # Save scan timestamp for incremental scanning
+            fs_scanner.save_last_scan_time()
             
         except Exception as e:
             print(f"❌ Scan failed: {e}")

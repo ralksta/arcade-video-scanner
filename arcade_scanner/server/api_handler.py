@@ -93,12 +93,13 @@ def clear_duplicate_cache():
     except Exception as e:
         print(f"⚠️ Could not remove duplicate cache file: {e}")
 
-def background_duplicate_scan(user_scan_targets=None):
+def background_duplicate_scan(user_scan_targets=None, batch_offset: int = 0):
     """Background worker for duplicate detection.
 
     Args:
         user_scan_targets: Optional list of absolute paths to filter files by user's scan targets.
                           If None, scans all files in database.
+        batch_offset: Starting offset for image batching (default 0 = first batch)
     """
     global DUPLICATE_RESULTS_CACHE
     from arcade_scanner.core.duplicate_detector import DuplicateDetector
@@ -107,6 +108,8 @@ def background_duplicate_scan(user_scan_targets=None):
     DUPLICATE_SCAN_STATE["is_running"] = True
     DUPLICATE_SCAN_STATE["progress"] = 0
     DUPLICATE_SCAN_STATE["message"] = "Initializing scan..."
+    DUPLICATE_SCAN_STATE["has_more"] = False
+    DUPLICATE_SCAN_STATE["batch_offset"] = batch_offset
 
     try:
         def progress_cb(msg, pct):
@@ -127,18 +130,20 @@ def background_duplicate_scan(user_scan_targets=None):
         # Count by media type
         videos = [v for v in all_videos if getattr(v, 'media_type', 'video') == 'video']
         images = [v for v in all_videos if getattr(v, 'media_type', 'video') == 'image']
-        print(f"🔍 Scanning {len(videos)} videos + {len(images)} images = {len(all_videos)} total")
+        print(f"🔍 Scanning {len(videos)} videos + {len(images)} images (batch offset: {batch_offset})")
 
-        results = detector.find_all_duplicates(all_videos, progress_cb)
-        print(f"🔍 Found {len(results)} duplicate groups")
+        results, has_more = detector.find_all_duplicates(all_videos, progress_cb, batch_offset=batch_offset)
+        print(f"🔍 Found {len(results)} duplicate groups (has_more: {has_more})")
 
         # Serialize results slightly earlier to avoid main thread blocking later
         DUPLICATE_RESULTS_CACHE = [g.to_dict() for g in results]
+        DUPLICATE_SCAN_STATE["has_more"] = has_more
+        DUPLICATE_SCAN_STATE["next_offset"] = batch_offset + 5000 if has_more else 0
 
         # Save to disk for future sessions
         save_duplicate_cache()
 
-        DUPLICATE_SCAN_STATE["message"] = "Scan complete"
+        DUPLICATE_SCAN_STATE["message"] = "Scan complete" + (" - more batches available" if has_more else "")
         DUPLICATE_SCAN_STATE["progress"] = 100
 
     except Exception as e:
@@ -153,8 +158,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     QUIET_PATHS = {"/api/duplicates/status"}
 
     def log_message(self, format, *args):
-        """Override to suppress noisy polling requests."""
-        if self.path in self.QUIET_PATHS or self.path.startswith("/thumbnails/"):
+        """Override to suppress noisy requests (static files, thumbnails, polling)."""
+        if self.path in self.QUIET_PATHS or self.path.startswith(("/thumbnails/", "/static/")):
             return  # Suppress logging
         super().log_message(format, *args)
 
@@ -1696,7 +1701,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # DUPLICATE DETECTION - DELETE FILES
             # ================================================================
             elif self.path == "/api/duplicates/scan":
-                # POST: Start duplicate scan
+                # POST: Start duplicate scan (supports batch_offset for pagination)
                 user_name = self.get_current_user()
                 if not user_name:
                     self.send_error(401, "Unauthorized")
@@ -1706,22 +1711,33 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(409, "Scan already in progress")
                     return
 
+                # Parse optional batch_offset from request body
+                batch_offset = 0
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length > 0 and content_length <= MAX_REQUEST_SIZE:
+                    try:
+                        body = self.rfile.read(content_length).decode("utf-8")
+                        data = json.loads(body)
+                        batch_offset = int(data.get("batch_offset", 0))
+                    except:
+                        pass  # Default to 0 if parsing fails
+
                 # Get user's scan targets for filtering
                 u = user_db.get_user(user_name)
                 user_targets = None
                 if u and u.data.scan_targets:
                     user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
 
-                # Start background thread with user's scan targets
+                # Start background thread with user's scan targets and batch offset
                 import threading
-                t = threading.Thread(target=background_duplicate_scan, args=(user_targets,))
+                t = threading.Thread(target=background_duplicate_scan, args=(user_targets, batch_offset))
                 t.daemon = True
                 t.start()
                 
                 self.send_response(202)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps({"status": "started"}).encode("utf-8"))
+                self.wfile.write(json.dumps({"status": "started", "batch_offset": batch_offset}).encode("utf-8"))
 
             elif self.path == "/api/duplicates/delete":
                 user_name = self.get_current_user()

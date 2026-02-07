@@ -20,24 +20,31 @@ let duplicatePollInterval = null;
 
 /**
  * Load duplicate data from API, triggering a scan if no cached results exist
+ * @param {number} batchOffset - Optional offset for batched scanning (default 0)
  * @returns {Promise<Object|string|null>} Duplicate data, "scanning" if scan started, or null on error
  */
-async function loadDuplicates() {
+async function loadDuplicates(batchOffset = 0) {
     try {
-        // 1. Check if we already have results cached
-        const res = await fetch('/api/duplicates');
-        if (res.ok) {
-            const data = await res.json();
-            if (data.summary && data.summary.scan_run) {
-                duplicateData = data;
-                console.log(`🔍 Found cached results: ${duplicateData.summary.total_groups} groups`);
-                return duplicateData;
+        // 1. Check if we already have results cached (only if first batch)
+        if (batchOffset === 0) {
+            const res = await fetch('/api/duplicates');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.summary && data.summary.scan_run) {
+                    duplicateData = data;
+                    console.log(`🔍 Found cached results: ${duplicateData.summary.total_groups} groups`);
+                    return duplicateData;
+                }
             }
         }
 
-        // 2. If no cache, trigger a new scan
-        console.log("No cached results, triggering scan...");
-        const scanRes = await fetch('/api/duplicates/scan', { method: 'POST' });
+        // 2. Trigger a scan (new or next batch)
+        console.log(`Triggering scan with batch_offset: ${batchOffset}`);
+        const scanRes = await fetch('/api/duplicates/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ batch_offset: batchOffset })
+        });
         if (scanRes.status === 202 || scanRes.status === 409) {
             // Scan started or already running
             return "scanning";
@@ -48,6 +55,10 @@ async function loadDuplicates() {
     }
     return null;
 }
+
+// Track batch state for "Scan Next Batch" button
+let nextBatchOffset = 0;
+let hasMoreBatches = false;
 
 /**
  * Poll the duplicate scan status and update UI
@@ -81,7 +92,10 @@ function pollDuplicateStatus(grid) {
                 if (progressBar) progressBar.style.width = `${status.progress}%`;
                 if (progressText) progressText.textContent = `${status.progress}%`;
             } else {
-                // Scan finished
+                // Scan finished - store batch state
+                hasMoreBatches = status.has_more || false;
+                nextBatchOffset = status.next_offset || 0;
+
                 clearInterval(duplicatePollInterval);
                 duplicatePollInterval = null;
 
@@ -193,6 +207,13 @@ function renderDuplicatesView() {
     if (countEl) countEl.textContent = duplicateData.summary.total_groups;
 
     // Render summary header
+    const nextBatchButton = hasMoreBatches ? `
+        <button onclick="scanNextBatch()" class="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/30">
+            <span class="material-icons text-[18px]">arrow_forward</span>
+            Scan Next Batch
+        </button>
+    ` : '';
+
     let html = `
             <div class="col-span-full bg-gradient-to-r from-purple-200 to-pink-200 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-300 dark:border-purple-500/30 rounded-xl p-6 mb-4">
                 <div class="flex items-center justify-between flex-wrap gap-4">
@@ -206,14 +227,16 @@ function renderDuplicatesView() {
                                 Found <span class="text-purple-700 dark:text-purple-400 font-bold">${duplicateData.summary.total_groups}</span> groups
                                 (<span class="text-cyan-700 dark:text-cyan-400">${duplicateData.summary.video_groups}</span> videos,
                                 <span class="text-pink-700 dark:text-pink-400">${duplicateData.summary.image_groups}</span> images)
+                                ${hasMoreBatches ? '<span class="text-orange-600 dark:text-orange-400 ml-2">(more images available)</span>' : ''}
                             </p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4 flex-wrap">
                         <div class="text-right">
                             <div class="text-2xl font-bold text-green-700 dark:text-green-400">${duplicateData.summary.potential_savings_mb.toFixed(1)} MB</div>
                             <div class="text-xs text-gray-600 dark:text-gray-500 uppercase tracking-wider">Potential Savings</div>
                         </div>
+                        ${nextBatchButton}
                         <button onclick="deleteAllDuplicates()" class="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
                             <span class="material-icons text-[18px]">delete_sweep</span>
                             Delete All Duplicates
@@ -561,8 +584,9 @@ function showDuplicateScanningUI() {
 
 /**
  * Start a duplicate scan - called when user clicks the scan button
+ * @param {number} batchOffset - Optional offset for batch scanning
  */
-async function startDuplicateScan() {
+async function startDuplicateScan(batchOffset = 0) {
     const grid = document.getElementById('videoGrid');
     if (!grid) return;
 
@@ -570,13 +594,39 @@ async function startDuplicateScan() {
     showDuplicateScanningUI();
 
     // Trigger the scan
-    const result = await loadDuplicates();
+    const result = await loadDuplicates(batchOffset);
 
     if (result === "scanning") {
         pollDuplicateStatus(grid);
     } else if (result && result.groups) {
         renderDuplicatesView(); // Render the results
     }
+}
+
+/**
+ * Scan the next batch of images for duplicates
+ * Called when user clicks "Scan Next Batch" button
+ */
+async function scanNextBatch() {
+    if (!hasMoreBatches || nextBatchOffset === 0) {
+        alert('No more batches to scan');
+        return;
+    }
+
+    console.log(`📦 Scanning next batch at offset: ${nextBatchOffset}`);
+
+    // Clear the duplicate cache first
+    try {
+        await fetch('/api/duplicates/clear', { method: 'POST' });
+    } catch (e) {
+        console.warn('Could not clear cache:', e);
+    }
+
+    // Clear client-side data
+    duplicateData = null;
+
+    // Start scan with the next batch offset
+    startDuplicateScan(nextBatchOffset);
 }
 
 

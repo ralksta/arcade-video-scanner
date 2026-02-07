@@ -1,5 +1,7 @@
 import os
 import asyncio
+import time
+import json
 from typing import List, AsyncIterator, Set
 from ..config import config
 
@@ -9,11 +11,14 @@ class AsyncFileSystem:
     Uses asyncio to prevent blocking the main event loop during long scans.
     """
     
-    VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.avi', '.mov', '.m4v', '.wmv', '.flv', '.webm', '.ts')
-    IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic')
+    VIDEO_EXTENSIONS = frozenset({'.mp4', '.mkv', '.avi', '.mov', '.m4v', '.wmv', '.flv', '.webm', '.ts'})
+    IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'})
 
     def __init__(self):
         self.allow_images = False # Toggled by ScannerManager based on user settings
+        self._last_scan_time = 0.0
+        self._scan_time_file = None  # Set lazily when config is available
+        self._skipped_dirs = 0
 
     def _load_settings(self):
         """Reload settings from config (called at scan start)."""
@@ -24,6 +29,31 @@ class AsyncFileSystem:
         for p in config.active_exclude_paths:
             resolved = os.path.abspath(os.path.expanduser(p))
             self.exclude_abs.add(resolved)
+        
+        # Load last scan time
+        self._scan_time_file = os.path.join(config.hidden_data_dir, ".last_scan_time")
+        self._load_last_scan_time()
+        self._skipped_dirs = 0
+
+    def _load_last_scan_time(self):
+        """Load the timestamp of the last successful scan."""
+        try:
+            if self._scan_time_file and os.path.exists(self._scan_time_file):
+                with open(self._scan_time_file, 'r') as f:
+                    data = json.load(f)
+                    self._last_scan_time = float(data.get('last_scan_time', 0))
+        except Exception:
+            self._last_scan_time = 0.0
+
+    def save_last_scan_time(self):
+        """Save the current time as last scan timestamp."""
+        try:
+            if self._scan_time_file:
+                os.makedirs(os.path.dirname(self._scan_time_file), exist_ok=True)
+                with open(self._scan_time_file, 'w') as f:
+                    json.dump({'last_scan_time': time.time()}, f)
+        except Exception as e:
+            print(f"⚠️ Could not save scan time: {e}")
 
     async def scan_directories(self, targets: List[str]) -> AsyncIterator[str]:
         """
@@ -50,6 +80,9 @@ class AsyncFileSystem:
                 if path is None:
                     break
                 yield path
+        
+        if self._skipped_dirs > 0:
+            print(f"\n⚡ Skipped {self._skipped_dirs} unchanged directories (incremental scan)")
 
     async def _walker_worker(self, root_dir: str, queue: asyncio.Queue) -> None:
         """
@@ -67,11 +100,30 @@ class AsyncFileSystem:
                     # Check root itself
                     if self._should_skip_root(root):
                         continue
+                    
+                    # 2. Incremental scan: skip directories unchanged since last scan
+                    #    Only yield files from dirs that have been modified
+                    dir_changed = True
+                    if self._last_scan_time > 0:
+                        try:
+                            dir_mtime = os.stat(root).st_mtime
+                            if dir_mtime < self._last_scan_time:
+                                dir_changed = False
+                                self._skipped_dirs += 1
+                        except OSError:
+                            pass  # If we can't stat, assume changed
                         
                     for file in files:
                         if self._is_video(file):
                             full_path = os.path.join(root, file)
-                            if self._is_valid_size(full_path):
+                            if dir_changed:
+                                # Directory changed — yield for full inspection
+                                if self._is_valid_size(full_path):
+                                    loop.call_soon_threadsafe(queue.put_nowait, full_path)
+                            else:
+                                # Directory unchanged — still yield so orphan pruning 
+                                # knows the file exists, but manager will skip inspection
+                                # because cache entry is still valid
                                 loop.call_soon_threadsafe(queue.put_nowait, full_path)
             except Exception as e:
                 print(f"❌ Error walking {root_dir}: {e}")
@@ -105,27 +157,26 @@ class AsyncFileSystem:
         if filename.startswith("._"):
             return False
         
-        is_video = any(filename.lower().endswith(ext) for ext in self.VIDEO_EXTENSIONS)
-        if is_video:
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in self.VIDEO_EXTENSIONS:
             return True
-            
-        if self.allow_images:
-            return any(filename.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS)
-            
+        if self.allow_images and ext in self.IMAGE_EXTENSIONS:
+            return True
         return False
 
     def _is_valid_size(self, path: str) -> bool:
+        ext = os.path.splitext(path)[1].lower()
+        
         # Images use KB threshold (configurable, e.g., 500 KB)
-        if any(path.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS):
+        if ext in self.IMAGE_EXTENSIONS:
             try:
-                size_bytes = os.path.getsize(path)
-                min_image_bytes = config.settings.min_image_size_kb * 1024
-                return size_bytes >= min_image_bytes
+                return os.path.getsize(path) >= config.settings.min_image_size_kb * 1024
             except OSError:
                 return False
             
         # Optimization check for videos
-        if "_opt." in os.path.basename(path) or "_trim." in os.path.basename(path):
+        basename = os.path.basename(path)
+        if "_opt." in basename or "_trim." in basename:
             return True
             
         try:
@@ -135,3 +186,4 @@ class AsyncFileSystem:
 
 # Singleton
 fs_scanner = AsyncFileSystem()
+

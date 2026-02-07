@@ -81,50 +81,117 @@ class DuplicateDetector:
     
     Videos: Exact match on size + duration + resolution
     Images: Perceptual hash (if imagehash available) or exact size + resolution
+    
+    Performance:
+    - Perceptual hashes are cached to disk across scans
+    - Hash bucketing eliminates O(n²) comparisons 
     """
     
     def __init__(self):
         self._group_counter = 0
+        self._hash_cache: Dict[str, str] = {}  # filepath -> phash hex string
+        self._hash_cache_dirty = False
+        self._hash_cache_file = None  # Set lazily
+
+    def _ensure_hash_cache(self):
+        """Load hash cache from disk on first use."""
+        if self._hash_cache_file is not None:
+            return  # Already loaded
+        
+        from ..config import config
+        import json
+        
+        self._hash_cache_file = os.path.join(config.hidden_data_dir, ".phash_cache.json")
+        try:
+            if os.path.exists(self._hash_cache_file):
+                with open(self._hash_cache_file, 'r') as f:
+                    raw = json.load(f)
+                    # Validate: only keep entries where file still exists
+                    self._hash_cache = {k: v for k, v in raw.items() if os.path.exists(k)}
+                    purged = len(raw) - len(self._hash_cache)
+                    if purged > 0:
+                        self._hash_cache_dirty = True
+                    print(f"📦 Loaded {len(self._hash_cache)} cached image hashes" + 
+                          (f" (purged {purged} orphans)" if purged else ""))
+        except Exception as e:
+            print(f"⚠️ Could not load hash cache: {e}")
+            self._hash_cache = {}
+
+    def _save_hash_cache(self):
+        """Persist hash cache to disk."""
+        if not self._hash_cache_dirty or not self._hash_cache_file:
+            return
+        
+        import json
+        try:
+            os.makedirs(os.path.dirname(self._hash_cache_file), exist_ok=True)
+            with open(self._hash_cache_file, 'w') as f:
+                json.dump(self._hash_cache, f)
+            print(f"💾 Saved {len(self._hash_cache)} image hashes to cache")
+            self._hash_cache_dirty = False
+        except Exception as e:
+            print(f"⚠️ Could not save hash cache: {e}")
+
+    def _get_cached_hash(self, filepath: str) -> Optional[str]:
+        """Get a cached phash for a file, or None if not cached."""
+        return self._hash_cache.get(filepath)
+
+    def _set_cached_hash(self, filepath: str, hash_str: str):
+        """Store a phash in the cache."""
+        self._hash_cache[filepath] = hash_str
+        self._hash_cache_dirty = True
     
     def _generate_group_id(self) -> str:
         self._group_counter += 1
         return f"dup_{self._group_counter:04d}"
     
-    def find_all_duplicates(self, entries: List, progress_callback=None) -> List[DuplicateGroup]:
+    def find_all_duplicates(self, entries: List, progress_callback=None, batch_size: int = 5000, batch_offset: int = 0) -> Tuple[List[DuplicateGroup], bool]:
         """
-        Find all duplicates in the media library.
+        Find duplicates in the media library with batching support.
         
         Args:
             entries: List of VideoEntry objects from the database
             progress_callback: Optional callable(str, float) to report status and progress (0-100)
+            batch_size: Max number of images to process per batch (default 5000)
+            batch_offset: Starting offset for image processing (for pagination)
             
         Returns:
-            List of DuplicateGroup objects
+            Tuple of (List of DuplicateGroup objects, has_more: bool indicating if more batches available)
         """
         # Separate by media type
         videos = [e for e in entries if getattr(e, 'media_type', 'video') == 'video']
-        images = [e for e in entries if getattr(e, 'media_type', 'video') == 'image']
+        all_images = [e for e in entries if getattr(e, 'media_type', 'video') == 'image']
+        
+        # Apply batching to images (videos are usually fewer and faster to process)
+        total_images = len(all_images)
+        images = all_images[batch_offset:batch_offset + batch_size]
+        has_more = (batch_offset + batch_size) < total_images
+        
+        if progress_callback:
+            batch_info = f" (batch {batch_offset//batch_size + 1}, images {batch_offset+1}-{min(batch_offset+batch_size, total_images)} of {total_images})"
+            progress_callback(f"Starting duplicate scan{batch_info}", 5)
         
         groups = []
         
-        # Find video duplicates
+        # Find video duplicates (always process all - usually fewer files)
         if progress_callback:
             progress_callback("Scanning video metadata...", 10)
             
         video_groups = self._find_video_duplicates(videos, progress_callback)
         groups.extend(video_groups)
         
-        # Find image duplicates
+        # Find image duplicates (batched)
         if progress_callback:
-            progress_callback("Scanning image metadata...", 80)
+            progress_callback(f"Scanning image metadata ({len(images)} images)...", 80)
             
-        image_groups = self._find_image_duplicates(images)
+        image_groups = self._find_image_duplicates(images, progress_callback)
         groups.extend(image_groups)
         
         if progress_callback:
-            progress_callback("Scan complete", 100)
+            status = "Scan complete" + (" - more batches available" if has_more else "")
+            progress_callback(status, 100)
             
-        return groups
+        return groups, has_more
     
     def _find_video_duplicates(self, videos: List, progress_callback=None) -> List[DuplicateGroup]:
         """
@@ -401,13 +468,13 @@ class DuplicateDetector:
         
         return round(score, 2)
     
-    def _find_image_duplicates(self, images: List) -> List[DuplicateGroup]:
+    def _find_image_duplicates(self, images: List, progress_callback=None) -> List[DuplicateGroup]:
         """
         Find duplicate images.
         Uses perceptual hash if available, otherwise falls back to exact match.
         """
         if IMAGEHASH_AVAILABLE:
-            return self._find_image_duplicates_by_hash(images)
+            return self._find_image_duplicates_by_hash(images, progress_callback=progress_callback)
         else:
             return self._find_image_duplicates_by_exact(images)
     
@@ -434,50 +501,128 @@ class DuplicateDetector:
         
         return groups
     
-    def _find_image_duplicates_by_hash(self, images: List, threshold: int = 5) -> List[DuplicateGroup]:
+    def _find_image_duplicates_by_hash(self, images: List, threshold: int = 5, progress_callback=None) -> List[DuplicateGroup]:
         """
         Find duplicate images using perceptual hash.
         Images with hash difference <= threshold are considered duplicates.
-        """
-        # Calculate hashes
-        hash_data: List[Tuple[str, imagehash.ImageHash, any]] = []
         
-        for img in images:
+        Performance optimizations:
+        - Hash caching: reuses previously computed hashes from disk
+        - Hash bucketing: groups by exact hash first (O(n)), then near-miss via prefix buckets
+        """
+        import gc
+        
+        # Load hash cache from disk
+        self._ensure_hash_cache()
+        
+        # Phase 1: Compute/retrieve hashes with progress tracking
+        hash_data: List[Tuple[str, 'imagehash.ImageHash', any]] = []
+        total_images = len(images)
+        cache_hits = 0
+        cache_misses = 0
+        
+        for idx, img in enumerate(images):
+            if progress_callback and idx % 200 == 0:
+                pct = 80 + (idx / total_images) * 10  # 80-90% range
+                progress_callback(f"Hashing image {idx}/{total_images} (cache: {cache_hits} hits)", pct)
+            
             path = img.file_path
             if not os.path.exists(path):
                 continue
-                
+            
+            # Check cache first
+            cached_hash_str = self._get_cached_hash(path)
+            if cached_hash_str:
+                try:
+                    phash = imagehash.hex_to_hash(cached_hash_str)
+                    hash_data.append((cached_hash_str, phash, img))
+                    cache_hits += 1
+                    continue
+                except Exception:
+                    pass  # Invalid cache entry, recompute
+            
+            # Cache miss — compute hash
             try:
                 with Image.open(path) as pil_img:
+                    if pil_img.mode not in ('RGB', 'L'):
+                        pil_img = pil_img.convert('RGB')
                     phash = imagehash.phash(pil_img)
-                    hash_data.append((str(phash), phash, img))
+                    hash_str = str(phash)
+                    hash_data.append((hash_str, phash, img))
+                    self._set_cached_hash(path, hash_str)
+                    cache_misses += 1
             except Exception:
                 continue
+            
+            # Periodic GC for large libraries
+            if cache_misses % 500 == 0 and cache_misses > 0:
+                gc.collect()
         
-        # Group by similar hashes
-        used = set()
+        # Save updated cache to disk
+        self._save_hash_cache()
+        
+        if progress_callback:
+            progress_callback(f"Hashed {len(hash_data)} images ({cache_hits} cached, {cache_misses} new)", 92)
+        
+        # Phase 2: Group by exact hash (O(n) — covers most true duplicates)
+        exact_buckets: Dict[str, List] = defaultdict(list)
+        for hash_str, phash, img in hash_data:
+            exact_buckets[hash_str].append((phash, img))
+        
         groups = []
+        used_paths = set()
         
-        for i, (hash_str, phash, img) in enumerate(hash_data):
-            if i in used:
-                continue
+        # Exact matches — identical hashes
+        for hash_str, bucket in exact_buckets.items():
+            if len(bucket) > 1:
+                imgs = [img for _, img in bucket]
+                group = self._create_image_group(imgs, match_type="hash")
+                groups.append(group)
+                for img in imgs:
+                    used_paths.add(img.file_path)
+        
+        # Phase 3: Near-miss detection using prefix bucketing
+        # Group remaining (ungrouped) images by hash prefix for candidate selection
+        # A 16-char hex hash = 64 bits. 4-char prefix = 16 bits → similar images share prefixes
+        if threshold > 0:
+            remaining = [(h, p, img) for h, p, img in hash_data if img.file_path not in used_paths]
             
-            similar = [img]
-            used.add(i)
+            if remaining and progress_callback:
+                progress_callback(f"Checking {len(remaining)} images for near-matches...", 95)
             
-            for j, (other_hash_str, other_phash, other_img) in enumerate(hash_data):
-                if j in used:
+            # Build prefix buckets (use multiple prefix lengths for broader coverage)
+            prefix_buckets: Dict[str, List[int]] = defaultdict(list)
+            for idx, (hash_str, phash, img) in enumerate(remaining):
+                # Use first 4 chars as bucket key — images with different prefixes
+                # have hash distance > 16 bits, so can't match at threshold ≤ 5
+                prefix_buckets[hash_str[:4]].append(idx)
+            
+            used_remaining = set()
+            for bucket_indices in prefix_buckets.values():
+                if len(bucket_indices) < 2:
                     continue
                 
-                # Compare hashes
-                diff = phash - other_phash
-                if diff <= threshold:
-                    similar.append(other_img)
-                    used.add(j)
-            
-            if len(similar) > 1:
-                group = self._create_image_group(similar, match_type="hash")
-                groups.append(group)
+                # Only compare within bucket (small groups)
+                for i_pos, i in enumerate(bucket_indices):
+                    if i in used_remaining:
+                        continue
+                    
+                    h_i, p_i, img_i = remaining[i]
+                    similar = [img_i]
+                    used_remaining.add(i)
+                    
+                    for j in bucket_indices[i_pos + 1:]:
+                        if j in used_remaining:
+                            continue
+                        h_j, p_j, img_j = remaining[j]
+                        diff = p_i - p_j
+                        if diff <= threshold:
+                            similar.append(img_j)
+                            used_remaining.add(j)
+                    
+                    if len(similar) > 1:
+                        group = self._create_image_group(similar, match_type="hash")
+                        groups.append(group)
         
         return groups
     

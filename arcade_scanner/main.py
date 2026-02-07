@@ -40,72 +40,72 @@ def run_scanner(args_list=None):
     print("📦 Checking for legacy user data to migrate...")
     user_db.migrate_from_db(db)
 
-    # 1. Run Async Scan
-    try:
-        # Run the metadata scan
-        print("🚀 Starting Library Scan...")
-        mgr = get_scanner_manager()
-        
-        should_force = args.rebuild or args.rebuild_thumbs
-        if should_force:
-            print("Usage of rebuild flags will force a re-scan of metadata and assets.")
-            
-        # Progress Tracker
-        scan_counter = 0
-        def print_progress(msg):
-            nonlocal scan_counter
-            scan_counter += 1
-            # Clean up message to just show filename
-            filename = msg.replace("Analyzing ", "")
-            if len(filename) > 60:
-                filename = filename[:57] + "..."
-            
-            # Use ANSI escape code to clear line and CR to go to start
-            # \033[K clears to end of line
-            import sys
-            sys.stdout.write(f"\r\033[K  🔍 Scanned {scan_counter} files... {filename}")
-            sys.stdout.flush()
-    
-        asyncio.run(mgr.run_scan(
-            progress_callback=print_progress,
-            force_rescan=should_force
-        ))
-        print() # Newline after scan completion
-            
-        # 2. Asset Generation (Thumbs/Previews)
-        pass # Handled in run_scan now
-    except KeyboardInterrupt:
-        print("\n⚠️ Scan interrupted.")
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    # 1. Load cached data (fast — just reads JSON from disk)
+    db.load()
+    cached_count = len(db.get_all())
+    print(f"📂 Loaded {cached_count} cached entries")
 
-    # 3. Report Generation
-    print("📊 Generating Report...")
-    results = [e.model_dump(by_alias=True) for e in db.get_all()]
-    
-    # Start Server first to know port
+    # 2. Start Server FIRST — user sees dashboard immediately with cached data
+    print("🌐 Starting server...")
     server, port = start_server(use_ssl=args.ssl)
     
+    # 3. Generate initial report from cache
+    results = [e.model_dump(by_alias=True) for e in db.get_all()]
     generate_html_report(results, config.report_file, server_port=port)
-    
-    # 4. DeoVR JSON Generation (if enabled)
-    if config.settings.enable_deovr:
-        from arcade_scanner.core.deovr_generator import save_deovr_library
-        import os
-        
-        protocol = "https" if args.ssl else "http"
-        deovr_path = os.path.join(config.hidden_data_dir, "deovr_library.json")
-        server_url = f"{protocol}://localhost:{port}"
-        
-        print("🥽 Generating DeoVR library...")
-        save_deovr_library(deovr_path, db.get_all(), server_url)
-    
-    # 5. Open Browser
+
+    # 4. Open browser immediately
     protocol = "https" if args.ssl else "http"
     url = f"{protocol}://localhost:{port}/"
     print(f"Opening dashboard: {url}")
     webbrowser.open(url)
-    
+
+    # 5. Run scan in BACKGROUND thread
+    def background_scan():
+        try:
+            mgr = get_scanner_manager()
+            should_force = args.rebuild or args.rebuild_thumbs
+            if should_force:
+                print("Usage of rebuild flags will force a re-scan of metadata and assets.")
+            
+            scan_counter = 0
+            def print_progress(msg):
+                nonlocal scan_counter
+                scan_counter += 1
+                filename = msg.replace("Analyzing ", "")
+                if len(filename) > 60:
+                    filename = filename[:57] + "..."
+                import sys
+                sys.stdout.write(f"\r\033[K  🔍 Scanned {scan_counter} files... {filename}")
+                sys.stdout.flush()
+            
+            print("🚀 Starting Library Scan (background)...")
+            asyncio.run(mgr.run_scan(
+                progress_callback=print_progress,
+                force_rescan=should_force
+            ))
+            print()  # Newline after scan completion
+            
+            # Regenerate report with fresh data
+            results = [e.model_dump(by_alias=True) for e in db.get_all()]
+            generate_html_report(results, config.report_file, server_port=port)
+            
+            # DeoVR JSON Generation (if enabled)
+            if config.settings.enable_deovr:
+                from arcade_scanner.core.deovr_generator import save_deovr_library
+                deovr_path = os.path.join(config.hidden_data_dir, "deovr_library.json")
+                server_url = f"{protocol}://localhost:{port}"
+                print("🥽 Generating DeoVR library...")
+                save_deovr_library(deovr_path, db.get_all(), server_url)
+                
+        except KeyboardInterrupt:
+            print("\n⚠️ Scan interrupted.")
+        except Exception as e:
+            print(f"❌ Scan error: {e}")
+
+    import threading
+    scan_thread = threading.Thread(target=background_scan, daemon=True)
+    scan_thread.start()
+
     # Keep alive
     try:
         while True:
