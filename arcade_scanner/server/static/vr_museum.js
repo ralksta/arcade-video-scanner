@@ -936,19 +936,22 @@ AFRAME.registerComponent('candle-flicker', {
         const player = document.getElementById('video-player');
         const screen = document.getElementById('player-screen');
 
-        // Remove old video element
-        const old = document.getElementById('vr-active-video');
-        if (old) old.remove();
+        // Reuse existing video element or create if missing
+        let videoEl = document.getElementById('vr-active-video');
+        if (!videoEl) {
+            videoEl = document.createElement('video');
+            videoEl.id = 'vr-active-video';
+            videoEl.crossOrigin = 'anonymous';
+            videoEl.setAttribute('playsinline', '');
+            videoEl.setAttribute('webkit-playsinline', '');
+            videoEl.loop = false;
+            document.getElementById('scene-assets').appendChild(videoEl);
+        }
 
-        const videoEl = document.createElement('video');
-        videoEl.id = 'vr-active-video';
-        videoEl.crossOrigin = 'anonymous';
-        videoEl.setAttribute('playsinline', '');
-        videoEl.setAttribute('webkit-playsinline', '');
+        // Update source and play
         videoEl.src = streamUrl;
-        videoEl.loop = false;
 
-        document.getElementById('scene-assets').appendChild(videoEl);
+        // Ensure A-Frame knows about the update
         screen.setAttribute('src', '#vr-active-video');
 
         // Position in front of user
@@ -967,7 +970,7 @@ AFRAME.registerComponent('candle-flicker', {
         if (activeVideo) {
             activeVideo.pause();
             activeVideo.src = '';
-            activeVideo.remove();
+            // Do not remove element, keep for reuse to avoid texture caching bugs
             activeVideo = null;
         }
     }
