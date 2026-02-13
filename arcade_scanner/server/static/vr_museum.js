@@ -956,9 +956,22 @@ AFRAME.registerComponent('candle-flicker', {
         // Ensure A-Frame knows about the update
         screen.setAttribute('src', '#vr-active-video');
 
-        // Position in front of user
-        const rigPos = document.getElementById('camera-rig').getAttribute('position');
-        player.setAttribute('position', `${rigPos.x} ${rigPos.y + 1.8} ${rigPos.z - 3}`);
+        // Position 5m in front of user based on current heading
+        const rig = document.getElementById('camera-rig');
+        const camera = document.getElementById('camera');
+
+        // Get rig world position
+        const rigPos = rig.object3D.position;
+        // Total Y rotation (rig + camera)
+        const rotY = rig.object3D.rotation.y + camera.object3D.rotation.y;
+
+        // Calculate offset vector (-Z forward in A-Frame)
+        const dist = 5.0;
+        const dx = -Math.sin(rotY) * dist;
+        const dz = -Math.cos(rotY) * dist;
+
+        player.setAttribute('position', `${rigPos.x + dx} ${rigPos.y + 2.2} ${rigPos.z + dz}`);
+        player.setAttribute('rotation', `0 ${THREE.MathUtils.radToDeg(rotY)} 0`);
         player.setAttribute('visible', 'true');
 
         videoEl.play().catch(e => {

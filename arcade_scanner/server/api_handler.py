@@ -1264,6 +1264,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     room_videos = []
                     for video in all_videos:
+                        # Filter by duration (min 5 minutes / 300 seconds)
+                        if not video.duration_sec or video.duration_sec < 300:
+                            continue
                         if video.vaulted:
                             continue
                         if _video_matches_criteria(video, criteria):
