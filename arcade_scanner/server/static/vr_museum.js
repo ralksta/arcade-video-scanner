@@ -172,6 +172,7 @@ AFRAME.registerComponent('candle-flicker', {
     let currentRoomIndex = 0;
     let activeVideo = null;
     let leatherTexture = null;
+    let marbleTexture = null;
 
     // ======================== BOOT ========================
     document.addEventListener('DOMContentLoaded', init);
@@ -179,6 +180,7 @@ AFRAME.registerComponent('candle-flicker', {
     async function init() {
         setStatus('Generating textures…');
         leatherTexture = generateLeatherTexture();
+        marbleTexture = generateMarbleTexture();
         setStatus('Connecting to library…');
         try {
             const resp = await fetch('/api/vr/gallery');
@@ -408,8 +410,8 @@ AFRAME.registerComponent('candle-flicker', {
         floor.setAttribute('height', d);
         floor.setAttribute('position', '0 0.005 0');
         floor.setAttribute('rotation', '-90 0 0');
-        // Add tiling repeat to texture if possible, or simulate with grid
-        floor.setAttribute('material', `color: ${C.floor}; roughness: 0.15; metalness: 0.5; side: double`);
+        // Marble texture with high polish
+        floor.setAttribute('material', `src: ${marbleTexture}; repeat: ${w / 2} ${d / 2}; color: #aaaaaa; roughness: 0.05; metalness: 0.8; side: double`);
         parent.appendChild(floor);
 
 
@@ -1060,6 +1062,66 @@ AFRAME.registerComponent('candle-flicker', {
                     ctx.fill();
                 }
             }
+        }
+
+        return canvas.toDataURL('image/jpeg', 0.9);
+    }
+
+    /**
+     * Procedural Dark Marble Texture Generator
+     */
+    function generateMarbleTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;
+        canvas.height = 1024;
+        const ctx = canvas.getContext('2d');
+
+        // Dark background (void -> dark stone)
+        ctx.fillStyle = '#050505';
+        ctx.fillRect(0, 0, 1024, 1024);
+
+        // Add "cloudy" noise
+        for (let i = 0; i < 200; i++) {
+            const x = Math.random() * 1024;
+            const y = Math.random() * 1024;
+            const r = Math.random() * 100 + 50;
+            const alpha = Math.random() * 0.05;
+            ctx.fillStyle = `rgba(50, 50, 60, ${alpha})`;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Add veins (thin jagged white/grey lines)
+        ctx.strokeStyle = 'rgba(200, 200, 220, 0.15)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 15; i++) {
+            let x = Math.random() * 1024;
+            let y = Math.random() * 1024;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for (let j = 0; j < 20; j++) {
+                x += (Math.random() - 0.5) * 200;
+                y += (Math.random() - 0.5) * 200;
+                ctx.quadraticCurveTo(x + (Math.random() - 0.5) * 50, y + (Math.random() - 0.5) * 50, x, y);
+            }
+            ctx.stroke();
+        }
+
+        // Add sharper veins
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 8; i++) {
+            let x = Math.random() * 1024;
+            let y = Math.random() * 1024;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for (let j = 0; j < 30; j++) {
+                x += (Math.random() - 0.5) * 150;
+                y += (Math.random() - 0.5) * 150;
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
         }
 
         return canvas.toDataURL('image/jpeg', 0.9);
