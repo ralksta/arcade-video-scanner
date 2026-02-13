@@ -102,18 +102,41 @@ AFRAME.registerComponent('button-listener', {
 });
 
 
+// Candle Flicker (Animation)
+AFRAME.registerComponent('candle-flicker', {
+    schema: {
+        intensity: { type: 'number', default: 1.0 },
+        variation: { type: 'number', default: 0.3 },
+        speed: { type: 'number', default: 0.1 }
+    },
+    init: function () {
+        this.baseIntensity = this.data.intensity;
+        this.light = this.el.getObject3D('light'); // A-Frame light is on object3D
+    },
+    tick: function (t, dt) {
+        if (!this.light) {
+            this.light = this.el.getObject3D('light'); // Retry if not ready
+            return;
+        }
+        const noise = Math.sin(t * this.data.speed) + Math.cos(t * this.data.speed * 1.3) + Math.sin(t * this.data.speed * 0.7);
+        const flicker = noise * this.data.variation;
+        this.light.intensity = this.baseIntensity + flicker;
+    }
+});
+
+
 (function () {
     'use strict';
 
     // ======================== CONSTANTS ========================
     const ROOM_WIDTH = 16;
     const ROOM_DEPTH = 16;
-    const ROOM_HEIGHT = 5;
+    const ROOM_HEIGHT = 7.5; // High ceilings
     const FRAMES_PER_WALL = 4;
     const FRAME_WIDTH = 2.4;
-    const FRAME_HEIGHT = 1.5;
-    const FRAME_BORDER = 0.12;
-    const FRAME_Y = 2.1;
+    const FRAME_HEIGHT = 1.6;
+    const FRAME_BORDER = 0.15; // Thicker ornate border
+    const FRAME_Y = 2.4; // Higher on wall due to ceiling height
 
     // Colors — dark luxury gallery
     const C = {
@@ -148,11 +171,14 @@ AFRAME.registerComponent('button-listener', {
     let galleryData = null;
     let currentRoomIndex = 0;
     let activeVideo = null;
+    let leatherTexture = null;
 
     // ======================== BOOT ========================
     document.addEventListener('DOMContentLoaded', init);
 
     async function init() {
+        setStatus('Generating textures…');
+        leatherTexture = generateLeatherTexture();
         setStatus('Connecting to library…');
         try {
             const resp = await fetch('/api/vr/gallery');
@@ -326,40 +352,43 @@ AFRAME.registerComponent('button-listener', {
         // Front wall with doorway
         buildFrontWallWithDoor(el, W, H, D);
 
-        // ---- Distribute videos across walls ----
+        // ---- Distribute videos across walls & add sconces ----
         const videos = roomData.videos || [];
         const walls = distributeToWalls(videos);
 
         placeFramesOnWall(el, walls.back, {
             center: [0, FRAME_Y, D / 2 - 0.15],
             facing: [0, 180, 0],
-            max: FRAMES_PER_WALL
+            max: FRAMES_PER_WALL,
+            sconces: true
         }, idx);
 
         placeFramesOnWall(el, walls.left, {
             center: [-W / 2 + 0.15, FRAME_Y, 0],
             facing: [0, 90, 0],
             max: FRAMES_PER_WALL,
-            axis: 'z'
+            axis: 'z',
+            sconces: true
         }, idx);
 
         placeFramesOnWall(el, walls.right, {
             center: [W / 2 - 0.15, FRAME_Y, 0],
             facing: [0, -90, 0],
             max: FRAMES_PER_WALL,
-            axis: 'z'
+            axis: 'z',
+            sconces: true
         }, idx);
 
         placeFramesOnWall(el, walls.front, {
             center: [0, FRAME_Y, -D / 2 + 0.15],
             facing: [0, 0, 0],
-            max: 2
+            max: 2,
+            sconces: false
         }, idx);
 
         // ---- Room lighting ----
-        addLight(el, 'point', C.spotWarm, 0.7, 20, `0 ${H - 0.3} 0`);
-        addLight(el, 'point', C.spotPink, 0.12, 10, `${W / 3} ${H - 1} ${D / 4}`);
-        addLight(el, 'point', C.spotAmber, 0.1, 8, `${-W / 3} 1.5 ${-D / 4}`);
+        addLight(el, 'point', C.spotWarm, 0.4, 25, `0 ${H - 2} 0`);
+        addLight(el, 'ambient', '#442222', 0.15, 0, '0 0 0'); // Fill light
 
         // ---- Return portal ----
         buildPortal(el, '← LOBBY', null, -1, 0, -D / 2, '0 180 0', true);
@@ -370,7 +399,7 @@ AFRAME.registerComponent('button-listener', {
     // ======================== ARCHITECTURAL ELEMENTS ========================
 
     /**
-     * Polished floor with center accent strip and subtle reflection look.
+     * Polished floor with tiling effect.
      */
     function buildFloor(parent, w, d) {
         // Main floor
@@ -379,8 +408,10 @@ AFRAME.registerComponent('button-listener', {
         floor.setAttribute('height', d);
         floor.setAttribute('position', '0 0.005 0');
         floor.setAttribute('rotation', '-90 0 0');
-        floor.setAttribute('material', `color: ${C.floor}; roughness: 0.25; metalness: 0.4; side: double`);
+        // Add tiling repeat to texture if possible, or simulate with grid
+        floor.setAttribute('material', `color: ${C.floor}; roughness: 0.15; metalness: 0.5; side: double`);
         parent.appendChild(floor);
+
 
         // Perimeter border (brass inlay effect)
         const borderW = 0.08;
@@ -440,7 +471,7 @@ AFRAME.registerComponent('button-listener', {
         wall.setAttribute('width', wallW);
         wall.setAttribute('height', wallH);
         wall.setAttribute('position', `0 ${wallH / 2} 0`);
-        wall.setAttribute('material', `color: ${C.wallDark}; roughness: 0.85; metalness: 0.03; side: double`);
+        wall.setAttribute('material', `src: ${leatherTexture}; repeat: ${wallW / 2} ${wallH / 2}; color: #ffffff; roughness: 0.3; metalness: 0.1; side: double; normalScale: 2 -2`);
         wallGroup.appendChild(wall);
 
         // Wainscoting panel (lower 1/3 of wall, slightly lighter)
@@ -562,7 +593,7 @@ AFRAME.registerComponent('button-listener', {
     function placeFramesOnWall(parent, videos, opts, roomIdx) {
         if (!videos.length) return;
         const count = Math.min(videos.length, opts.max);
-        const gap = 0.8;
+        const gap = 1.0; // wider gap for sconces
         const totalW = count * FRAME_WIDTH + (count - 1) * gap;
         const start = -totalW / 2 + FRAME_WIDTH / 2;
         const axis = opts.axis || 'x';
@@ -576,7 +607,81 @@ AFRAME.registerComponent('button-listener', {
                 pos = [opts.center[0], opts.center[1], opts.center[2] + off];
             }
             buildVideoFrame(parent, videos[i], pos, opts.facing, `r${roomIdx}_f${i}`);
+
+            // Add sconce between frames (except after last)
+            if (opts.sconces && i < count - 1) {
+                const sconceOff = off + FRAME_WIDTH / 2 + gap / 2;
+                let sPos;
+                if (axis === 'x') {
+                    sPos = [opts.center[0] + sconceOff, opts.center[1], opts.center[2]];
+                } else {
+                    sPos = [opts.center[0], opts.center[1], opts.center[2] + sconceOff];
+                }
+                buildSconce(parent, sPos, opts.facing);
+            }
         }
+    }
+
+    /**
+     * Build decorative candle sconce with flickering light.
+     */
+    function buildSconce(parent, pos, rot) {
+        const sconce = document.createElement('a-entity');
+        sconce.setAttribute('position', pos.join(' '));
+        sconce.setAttribute('rotation', rot.join(' '));
+
+        // Back plate (brass oval)
+        const plate = document.createElement('a-cylinder');
+        plate.setAttribute('radius', '0.12');
+        plate.setAttribute('height', '0.02');
+        plate.setAttribute('rotation', '90 0 0');
+        plate.setAttribute('position', '0 0 0.02');
+        plate.setAttribute('material', `color: ${C.brass}; roughness: 0.3; metalness: 0.8`);
+        sconce.appendChild(plate);
+
+        // Arm (curved tube simulated with box)
+        const arm = document.createElement('a-box');
+        arm.setAttribute('width', '0.03');
+        arm.setAttribute('height', '0.15');
+        arm.setAttribute('depth', '0.15');
+        arm.setAttribute('position', '0 -0.05 0.08');
+        arm.setAttribute('material', `color: ${C.brass}; roughness: 0.3; metalness: 0.8`);
+        sconce.appendChild(arm);
+
+        // Candle holder cup
+        const cup = document.createElement('a-cylinder');
+        cup.setAttribute('radius', '0.05');
+        cup.setAttribute('height', '0.04');
+        cup.setAttribute('position', '0 0.02 0.15');
+        cup.setAttribute('material', `color: ${C.brass}; roughness: 0.3; metalness: 0.8`);
+        sconce.appendChild(cup);
+
+        // Candle wax
+        const candle = document.createElement('a-cylinder');
+        candle.setAttribute('radius', '0.035');
+        candle.setAttribute('height', '0.25');
+        candle.setAttribute('position', '0 0.15 0.15');
+        candle.setAttribute('material', `color: #ffffee; roughness: 0.8; metalness: 0.0; emissive: #ffaa55; emissiveIntensity: 0.1`);
+        sconce.appendChild(candle);
+
+        // Flame (simple small sphere)
+        const flame = document.createElement('a-sphere');
+        flame.setAttribute('radius', '0.015');
+        flame.setAttribute('position', '0 0.29 0.15');
+        flame.setAttribute('material', `color: #ffaa00; emissive: #ff5500; emissiveIntensity: 1.0; shader: flat`);
+
+        // Add simple scale animation for flicker
+        flame.setAttribute('animation', 'property: scale; to: 1.2 1.5 1.2; dir: alternate; loop: true; dur: 150');
+        sconce.appendChild(flame);
+
+        // Light source (flickering point)
+        const light = document.createElement('a-entity');
+        light.setAttribute('light', 'type: point; color: #ffaa55; intensity: 0.4; distance: 3; decay: 2');
+        light.setAttribute('position', '0 0.35 0.25');
+        light.setAttribute('candle-flicker', 'intensity: 0.4; variation: 0.2; speed: 0.015');
+        sconce.appendChild(light);
+
+        parent.appendChild(sconce);
     }
 
     /**
@@ -615,6 +720,14 @@ AFRAME.registerComponent('button-listener', {
         matte.setAttribute('position', '0 0 -0.008');
         matte.setAttribute('material', `color: ${C.frameMatte}; roughness: 0.5; metalness: 0.05; side: double`);
         frame.appendChild(matte);
+
+        // Gold inlay (chamfer effect between matte and art)
+        const inlay = document.createElement('a-plane');
+        inlay.setAttribute('width', FRAME_WIDTH + 0.015);
+        inlay.setAttribute('height', FRAME_HEIGHT + 0.015);
+        inlay.setAttribute('position', '0 0 -0.005');
+        inlay.setAttribute('material', `color: ${C.frameGold}; roughness: 0.2; metalness: 0.8; side: double`);
+        frame.appendChild(inlay);
 
         // Thumbnail image (clickable)
         const thumb = document.createElement('a-plane');
@@ -893,6 +1006,60 @@ AFRAME.registerComponent('button-listener', {
         const m = Math.floor(seconds / 60);
         const s = Math.floor(seconds % 60);
         return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * Procedural Tufted Leather Texture Generator
+     * Creates a seamless diamond-tufted pattern with shadows and highlights.
+     */
+    function generateLeatherTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        // Base leather color (dark brown)
+        ctx.fillStyle = '#1a0d0d';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // Grid parameters
+        const cols = 4;
+        const rows = 4;
+        const cellW = 512 / cols;
+        const cellH = 512 / rows;
+
+        // Draw tufts (diamonds)
+        for (let y = -1; y <= rows + 1; y++) {
+            for (let x = -1; x <= cols + 1; x++) {
+                const cx = (x + (y % 2 ? 0.5 : 0)) * cellW;
+                const cy = y * cellH * 0.5; // Hexagonal packing
+
+                // Shade gradient for depth
+                const grad = ctx.createRadialGradient(cx, cy, 5, cx, cy, cellW * 0.8);
+                grad.addColorStop(0, '#2a1a1a');      // Highlight center (button)
+                grad.addColorStop(0.1, '#0f0505');    // Deep crease around button
+                grad.addColorStop(0.4, '#241212');    // Leather highlight
+                grad.addColorStop(1, '#0a0404');      // Deep shadow at edges
+
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, cellW * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Button (brass stud detail)
+                if (true) {
+                    const btnGrad = ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, 8);
+                    btnGrad.addColorStop(0, '#aa8855');
+                    btnGrad.addColorStop(1, '#332211');
+                    ctx.fillStyle = btnGrad;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        return canvas.toDataURL('image/jpeg', 0.9);
     }
 
 })();
