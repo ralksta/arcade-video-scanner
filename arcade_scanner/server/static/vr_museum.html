@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Arcade Gallery — VR Museum</title>
+    <meta name="description" content="Immersive VR gallery for your media library">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/static/aframe.min.js"></script>
+    <link rel="stylesheet" href="/static/vr_museum.css">
+</head>
+<body>
+    <!-- Loading overlay -->
+    <div id="loading-overlay">
+        <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <h1>Arcade Gallery</h1>
+            <p id="loading-status">Loading collection data…</p>
+        </div>
+    </div>
+
+    <!-- VR HUD: Room name -->
+    <div id="room-hud" class="room-hud hidden">
+        <span id="room-hud-name"></span>
+    </div>
+
+    <a-scene
+        id="vr-scene"
+        vr-mode-ui="enabled: true"
+        renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true"
+        loading-screen="enabled: false"
+        cursor="rayOrigin: mouse; fuse: false"
+        raycaster="objects: .clickable"
+    >
+        <!-- ======================== ASSETS ======================== -->
+        <a-assets id="scene-assets" timeout="30000">
+            <!-- Dynamically populated by JS -->
+        </a-assets>
+
+        <!-- ======================== ENVIRONMENT ======================== -->
+
+        <!-- Ambient light (very dim for mood) -->
+        <a-light type="ambient" color="#1a0a0a" intensity="0.3"></a-light>
+
+        <!-- Hemisphere light for subtle fill -->
+        <a-light type="hemisphere" color="#2a1520" groundColor="#0a0505" intensity="0.4"></a-light>
+
+        <!-- ======================== CAMERA RIG ======================== -->
+        <a-entity id="camera-rig" position="0 0 0">
+            <a-entity
+                id="camera"
+                camera
+                look-controls="pointerLockEnabled: false"
+                wasd-controls="acceleration: 20"
+                position="0 1.7 0"
+            >
+                <!-- Cursor for desktop (gaze/click) -->
+                <a-entity
+                    cursor="fuse: false; fuseTimeout: 0"
+                    raycaster="far: 30; objects: .clickable"
+                    position="0 0 -1"
+                    geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.012"
+                    material="color: #ff3366; shader: flat; opacity: 0.8"
+                ></a-entity>
+            </a-entity>
+        </a-entity>
+
+        <!-- ======================== GALLERY CONTAINER ======================== -->
+        <a-entity id="gallery-root"></a-entity>
+
+        <!-- ======================== VIDEO PLAYER OVERLAY ======================== -->
+        <a-entity id="video-player" visible="false" position="0 1.8 -3">
+            <!-- Dark backdrop -->
+            <a-plane
+                id="player-backdrop"
+                width="5.4"
+                height="3.4"
+                color="#000000"
+                opacity="0.95"
+                position="0 0 -0.05"
+            ></a-plane>
+            <!-- Video screen -->
+            <a-video
+                id="player-screen"
+                width="5"
+                height="3"
+                position="0 0 0"
+            ></a-video>
+            <!-- Close button -->
+            <a-entity
+                id="player-close"
+                class="clickable"
+                geometry="primitive: plane; width: 0.5; height: 0.5"
+                material="color: #cc0033; shader: flat; opacity: 0.9"
+                position="2.9 1.9 0.01"
+                text="value: ✕; align: center; width: 3; color: white"
+            ></a-entity>
+        </a-entity>
+
+    </a-scene>
+
+    <script src="/static/vr_museum.js"></script>
+</body>
+</html>

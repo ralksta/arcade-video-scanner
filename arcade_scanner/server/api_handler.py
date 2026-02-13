@@ -171,6 +171,29 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 return session_manager.get_username(cookie["session_token"].value)
         return None
 
+    # Cache: thumb filename → source file path (shared across all handler instances)
+    _thumb_source_cache: dict = {}
+
+    def _resolve_thumb_source(self, thumb_filename: str):
+        """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path."""
+        import hashlib
+        # Check cache first
+        if thumb_filename in FinderHandler._thumb_source_cache:
+            path = FinderHandler._thumb_source_cache[thumb_filename]
+            if os.path.exists(path):
+                return path
+            else:
+                del FinderHandler._thumb_source_cache[thumb_filename]
+
+        # Build/rebuild cache from DB entries
+        if not FinderHandler._thumb_source_cache:
+            for entry in db.get_all():
+                file_hash = hashlib.md5(entry.file_path.encode()).hexdigest()
+                t_name = f"thumb_{file_hash}.jpg"
+                FinderHandler._thumb_source_cache[t_name] = entry.file_path
+
+        return FinderHandler._thumb_source_cache.get(thumb_filename)
+
 
     def do_GET(self):
         try:
@@ -208,10 +231,41 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
                 return
             
-            # 1. ROOT / INDEX -> Serve REPORT_FILE
+            # 1a. VR MUSEUM -> Serve VR museum HTML
             # Normalize path to ignore query parameters for routing
             clean_path = self.path.split('?')[0]
+
+            if clean_path == "/vr":
+                user = self.get_current_user()
+                if not user:
+                    login_path = os.path.join(os.path.dirname(__file__), "static", "login.html")
+                    if os.path.exists(login_path):
+                        self.send_response(200)
+                        self.send_header("Content-type", "text/html; charset=utf-8")
+                        with open(login_path, 'rb') as f:
+                            data = f.read()
+                            self.send_header("Content-Length", str(len(data)))
+                            self.end_headers()
+                            self.wfile.write(data)
+                        return
+                    else:
+                        self.send_error(404, "Login page not found")
+                        return
+
+                vr_path = os.path.join(os.path.dirname(__file__), "static", "vr_museum.html")
+                if os.path.exists(vr_path):
+                    self.send_response(200)
+                    self.send_header("Content-type", "text/html; charset=utf-8")
+                    with open(vr_path, 'rb') as f:
+                        data = f.read()
+                        self.send_header("Content-Length", str(len(data)))
+                        self.end_headers()
+                        self.wfile.write(data)
+                else:
+                    self.send_error(404, "VR Museum page not found")
+                return
             
+            # 1b. ROOT / INDEX -> Serve REPORT_FILE
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates"]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
                 
@@ -249,7 +303,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(404, "Report file not found")
                 return
 
-            # 2. THUMBNAILS -> Serve from THUMB_DIR (with security checks)
+            # 2. THUMBNAILS -> Serve from THUMB_DIR (with security checks + lazy generation)
             elif self.path.startswith("/thumbnails/"):
                 try:
                     rel_path = unquote(self.path[12:])  # remove /thumbnails/
@@ -270,6 +324,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         print(f"🚨 Invalid thumbnail name: {filename}")
                         self.send_error(400, "Invalid thumbnail name")
                         return
+                    
+                    # Lazy generation: if thumb doesn't exist on disk, generate on-demand
+                    if not (os.path.exists(file_path) and os.path.isfile(file_path)):
+                        source_path = self._resolve_thumb_source(filename)
+                        if source_path:
+                            from arcade_scanner.core.video_processor import create_thumbnail
+                            create_thumbnail(source_path)
                     
                     if os.path.exists(file_path) and os.path.isfile(file_path):
                         self.send_response(200)
@@ -1156,6 +1217,84 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             
 
             
+            elif self.path == "/api/vr/gallery":
+                # VR Museum: Return gallery rooms structured from smart collections
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401)
+                    return
+
+                u = user_db.get_user(user_name)
+                if not u:
+                    self.send_error(401)
+                    return
+
+                from arcade_scanner.core.deovr_generator import _video_matches_criteria
+                from urllib.parse import quote as url_quote
+
+                host = self.headers.get("Host", "localhost:8000")
+                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+                if isinstance(self.connection, ssl.SSLSocket):
+                    protocol = "https"
+                server_url = f"{protocol}://{host}"
+
+                # Get all videos
+                all_videos = db.get_all()
+                # Filter by user scan targets
+                user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
+                if user_targets:
+                    all_videos = [v for v in all_videos if any(
+                        os.path.abspath(v.file_path).startswith(t) for t in user_targets
+                    )]
+                elif not u.is_admin:
+                    all_videos = []
+
+                # Build rooms from smart collections
+                rooms = []
+                collections = u.data.smart_collections or []
+
+                for coll in collections:
+                    coll_name = coll.get("name", "Collection")
+                    criteria = coll.get("criteria", {})
+
+                    # Only include video collections (skip photos-only)
+                    inc_media = criteria.get("include", {}).get("media_type", [])
+                    if inc_media and "video" not in inc_media:
+                        continue
+
+                    room_videos = []
+                    for video in all_videos:
+                        if video.vaulted:
+                            continue
+                        if _video_matches_criteria(video, criteria):
+                            filename = video.file_path.split('/')[-1].split('\\')[-1]
+                            title = filename.rsplit('.', 1)[0] if '.' in filename else filename
+                            v_obj = {
+                                "title": title,
+                                "stream_url": f"{server_url}/stream?path={url_quote(video.file_path)}",
+                                "thumbnail": f"{server_url}/thumbnails/{video.thumb}" if video.thumb else None,
+                                "duration": int(video.duration_sec) if video.duration_sec else 0,
+                            }
+                            room_videos.append(v_obj)
+
+                    if room_videos:
+                        rooms.append({
+                            "name": coll_name,
+                            "id": coll.get("id", coll_name),
+                            "color": coll.get("color", "#d4a574"),
+                            "video_count": len(room_videos),
+                            "videos": room_videos[:14]  # Max 14 per room (4 walls)
+                        })
+
+                gallery_data = {"rooms": rooms}
+                print(f"🏛️ VR Gallery: {len(rooms)} rooms, {sum(r['video_count'] for r in rooms)} total videos")
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps(gallery_data).encode("utf-8"))
+
             elif self.path == "/api/videos":
                 # GET: Return all videos, filtered by user's scan targets
                 user_name = self.get_current_user()

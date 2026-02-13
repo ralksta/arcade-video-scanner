@@ -1,0 +1,119 @@
+/* =============================================
+   VR Museum — Loading & UI Overlay Styles
+   Dark leather gallery aesthetic
+   ============================================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0a0505;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ---- Loading Overlay ---- */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, #1a0e12 0%, #0a0505 70%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
+#loading-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loader-content {
+    text-align: center;
+    color: #d4a574;
+}
+
+.loader-content h1 {
+    font-size: 2.4rem;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 0.8rem;
+    background: linear-gradient(135deg, #d4a574, #c4916a, #b87333);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.loader-content p {
+    font-size: 0.9rem;
+    color: #8a6050;
+    letter-spacing: 0.1em;
+}
+
+.loader-spinner {
+    width: 48px;
+    height: 48px;
+    border: 2px solid rgba(180, 115, 51, 0.15);
+    border-top-color: #b87333;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ---- Room HUD ---- */
+.room-hud {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: rgba(10, 5, 5, 0.85);
+    border: 1px solid rgba(180, 115, 51, 0.3);
+    border-radius: 8px;
+    padding: 8px 24px;
+    backdrop-filter: blur(10px);
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.room-hud.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.room-hud span {
+    color: #d4a574;
+    font-size: 1rem;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+/* ---- A-Frame Overrides ---- */
+.a-enter-vr-button {
+    background: linear-gradient(135deg, #3d1a1a, #2a0e0e) !important;
+    border: 1px solid rgba(180, 115, 51, 0.4) !important;
+    border-radius: 8px !important;
+    color: #d4a574 !important;
+    font-family: 'Segoe UI', system-ui, sans-serif !important;
+    letter-spacing: 0.1em !important;
+}
+
+.a-enter-vr-button:hover {
+    background: linear-gradient(135deg, #4d2a2a, #3a1e1e) !important;
+    border-color: #b87333 !important;
+}
