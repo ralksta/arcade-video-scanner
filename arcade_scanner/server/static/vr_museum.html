@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>Arcade Gallery — VR Museum</title>
@@ -8,6 +9,7 @@
     <script src="/static/aframe.min.js"></script>
     <link rel="stylesheet" href="/static/vr_museum.css">
 </head>
+
 <body>
     <!-- Loading overlay -->
     <div id="loading-overlay">
@@ -23,14 +25,9 @@
         <span id="room-hud-name"></span>
     </div>
 
-    <a-scene
-        id="vr-scene"
-        vr-mode-ui="enabled: true"
-        renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true"
-        loading-screen="enabled: false"
-        cursor="rayOrigin: mouse; fuse: false"
-        raycaster="objects: .clickable"
-    >
+    <a-scene id="vr-scene" vr-mode-ui="enabled: true"
+        renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true" loading-screen="enabled: false"
+        cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .clickable">
         <!-- ======================== ASSETS ======================== -->
         <a-assets id="scene-assets" timeout="30000">
             <!-- Dynamically populated by JS -->
@@ -45,23 +42,25 @@
         <a-light type="hemisphere" color="#2a1520" groundColor="#0a0505" intensity="0.4"></a-light>
 
         <!-- ======================== CAMERA RIG ======================== -->
-        <a-entity id="camera-rig" position="0 0 0">
-            <a-entity
-                id="camera"
-                camera
-                look-controls="pointerLockEnabled: false"
-                wasd-controls="acceleration: 20"
-                position="0 1.7 0"
-            >
-                <!-- Cursor for desktop (gaze/click) -->
-                <a-entity
-                    cursor="fuse: false; fuseTimeout: 0"
-                    raycaster="far: 30; objects: .clickable"
-                    position="0 0 -1"
-                    geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.012"
-                    material="color: #ff3366; shader: flat; opacity: 0.8"
-                ></a-entity>
+        <a-entity id="camera-rig" position="0 0 2">
+            <!-- Head -->
+            <a-entity id="camera" camera look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 20"
+                position="0 1.6 0">
+                <!-- Reticle cursor for non-VR (center screen) -->
+                <a-entity cursor="fuse: false; fuseTimeout: 0" raycaster="far: 30; objects: .clickable"
+                    position="0 0 -1" geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.012"
+                    material="color: #ff3366; shader: flat; opacity: 0.8" visible="false" id="cursor-visual"></a-entity>
             </a-entity>
+
+            <!-- Left Controller: Teleport/Locomotion + Menu -->
+            <a-entity id="left-hand" laser-controls="hand: left"
+                raycaster="objects: .clickable; far: 10; lineColor: #ff3366"
+                smooth-locomotion="target: #camera-rig; speed: 2.5" button-listener></a-entity>
+
+            <!-- Right Controller: Snap Turn + Interaction -->
+            <a-entity id="right-hand" laser-controls="hand: right"
+                raycaster="objects: .clickable; far: 10; lineColor: #ff3366" snap-turn="target: #camera-rig; angle: 45"
+                button-listener></a-entity>
         </a-entity>
 
         <!-- ======================== GALLERY CONTAINER ======================== -->
@@ -70,34 +69,19 @@
         <!-- ======================== VIDEO PLAYER OVERLAY ======================== -->
         <a-entity id="video-player" visible="false" position="0 1.8 -3">
             <!-- Dark backdrop -->
-            <a-plane
-                id="player-backdrop"
-                width="5.4"
-                height="3.4"
-                color="#000000"
-                opacity="0.95"
-                position="0 0 -0.05"
-            ></a-plane>
+            <a-plane id="player-backdrop" width="5.4" height="3.4" color="#000000" opacity="0.95"
+                position="0 0 -0.05"></a-plane>
             <!-- Video screen -->
-            <a-video
-                id="player-screen"
-                width="5"
-                height="3"
-                position="0 0 0"
-            ></a-video>
+            <a-video id="player-screen" width="5" height="3" position="0 0 0"></a-video>
             <!-- Close button -->
-            <a-entity
-                id="player-close"
-                class="clickable"
-                geometry="primitive: plane; width: 0.5; height: 0.5"
-                material="color: #cc0033; shader: flat; opacity: 0.9"
-                position="2.9 1.9 0.01"
-                text="value: ✕; align: center; width: 3; color: white"
-            ></a-entity>
+            <a-entity id="player-close" class="clickable" geometry="primitive: plane; width: 0.5; height: 0.5"
+                material="color: #cc0033; shader: flat; opacity: 0.9" position="2.9 1.9 0.01"
+                text="value: ✕; align: center; width: 3; color: white"></a-entity>
         </a-entity>
 
     </a-scene>
 
     <script src="/static/vr_museum.js"></script>
 </body>
+
 </html>

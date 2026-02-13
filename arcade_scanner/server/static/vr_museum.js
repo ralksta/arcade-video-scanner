@@ -10,6 +10,98 @@
  *  - Click thumbnail → floating video player
  */
 
+/* ======================== AFRAME COMPONENTS ======================== */
+
+// Smooth Locomotion (Left Thumbstick)
+AFRAME.registerComponent('smooth-locomotion', {
+    schema: {
+        speed: { type: 'number', default: 2.0 },
+        active: { type: 'boolean', default: true }
+    },
+    init: function () {
+        this.camera = document.querySelector('[camera]');
+        this.rig = document.querySelector('#camera-rig');
+        this.axisX = 0;
+        this.axisY = 0;
+    },
+    events: {
+        axismove: function (evt) {
+            if (!this.data.active) return;
+            // axis 2 = X, axis 3 = Y for 'ochulus-touch-controls' usually
+            // but standard gamepad mapping is axis 0, 1 for left stick on standard mapping, 2,3 for right.
+            // A-Frame laser-controls abstracts this slightly.
+            // Let's assume standard Gamepad API mapping for XR:
+            // Axes: [x, y]
+
+            const detail = evt.detail;
+            if (!detail.axis || detail.axis.length < 2) return;
+
+            this.axisX = detail.axis[2] || detail.axis[0] || 0;
+            this.axisY = detail.axis[3] || detail.axis[1] || 0;
+        }
+    },
+    tick: function (time, dt) {
+        if (!this.axisX && !this.axisY) return;
+        if (Math.abs(this.axisX) < 0.1 && Math.abs(this.axisY) < 0.1) return;
+
+        const rotation = this.camera.object3D.rotation.y;
+        const speed = this.data.speed * (dt / 1000);
+
+        const x = this.axisX * speed; // Strafe
+        const z = this.axisY * speed; // Forward/Back
+
+        // Rotate movement vector by camera heading
+        const dx = x * Math.cos(rotation) + z * Math.sin(rotation);
+        const dz = -x * Math.sin(rotation) + z * Math.cos(rotation);
+
+        this.rig.object3D.position.x += dx;
+        this.rig.object3D.position.z += dz;
+    }
+});
+
+// Snap Turn (Right Thumbstick)
+AFRAME.registerComponent('snap-turn', {
+    schema: {
+        angle: { type: 'number', default: 45 },
+        threshold: { type: 'number', default: 0.8 }
+    },
+    init: function () {
+        this.rig = document.querySelector('#camera-rig');
+        this.canTurn = true;
+    },
+    events: {
+        axismove: function (evt) {
+            const axisX = evt.detail.axis[2] || evt.detail.axis[0] || 0;
+
+            if (Math.abs(axisX) > this.data.threshold) {
+                if (this.canTurn) {
+                    const dir = axisX > 0 ? -1 : 1;
+                    this.rig.object3D.rotation.y += THREE.MathUtils.degToRad(this.data.angle * dir);
+                    this.canTurn = false;
+                }
+            } else {
+                this.canTurn = true;
+            }
+        }
+    }
+});
+
+// Button Listener (B/Y/Menu to close video)
+AFRAME.registerComponent('button-listener', {
+    init: function () {
+        this.el.addEventListener('buttondown', (evt) => {
+            // ID 1 = Grip, ID 3 = Thumbstick click, ID 4/5 = A/B or X/Y
+            // Typically B/Y (top buttons) are good for 'Back' or 'Close'
+            // We'll just trigger close on any face button for simplicity
+            if (!document.getElementById('video-player').getAttribute('visible')) return;
+
+            // Dispatch custom event or call global
+            window.dispatchEvent(new CustomEvent('vr-button-close'));
+        });
+    }
+});
+
+
 (function () {
     'use strict';
 
@@ -114,8 +206,9 @@
             showRoomHud('Lobby');
         }, 800);
 
-        // Video player close
+        // Video player close (click or VR button)
         document.getElementById('player-close').addEventListener('click', closeVideoPlayer);
+        window.addEventListener('vr-button-close', closeVideoPlayer);
     }
 
     function getRoomPosition(index) {
