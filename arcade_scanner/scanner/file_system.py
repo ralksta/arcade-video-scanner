@@ -144,12 +144,10 @@ class AsyncFileSystem:
         return False
 
     def _should_skip_root(self, root: str) -> bool:
-        # Check if any exclude path is a substring (legacy behavior)
-        # Optimized: Only check if exclude path is inside? 
-        # Actually legacy `_is_excluded_root` checked `if ex in root`.
+        abs_root = os.path.abspath(root)
         for ex in self.exclude_abs:
-             if ex in root:
-                 return True
+            if abs_root == ex or abs_root.startswith(ex + os.sep):
+                return True
         return False
 
     def _is_video(self, filename: str) -> bool:

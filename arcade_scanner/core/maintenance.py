@@ -127,7 +127,7 @@ def purge_missing_from_db():
     Remove database entries for files that no longer exist on disk.
     Call this after deleting files from Finder to clean up the database.
     """
-    from arcade_scanner.database.json_store import db
+    from arcade_scanner.database import db
     
     print("🧹 Checking database for missing files...")
     

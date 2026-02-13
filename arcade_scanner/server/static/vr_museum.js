@@ -119,16 +119,21 @@
         lobby.setAttribute('id', 'room-lobby');
         lobby.setAttribute('position', '0 0 0');
 
+        // Scale lobby width based on portal count (min 14, ~4m per portal)
+        const portalCount = rooms.length;
+        const lobbyWidth = Math.max(ROOM_WIDTH, portalCount * 4);
+        const lobbyDepth = ROOM_DEPTH;
+
         // Floor
         addPlane(lobby, {
-            w: ROOM_WIDTH, h: ROOM_DEPTH,
+            w: lobbyWidth, h: lobbyDepth,
             pos: `0 0.01 0`, rot: '-90 0 0',
             color: C.floor, roughness: 0.7, metalness: 0.2
         });
 
         // Ceiling
         addPlane(lobby, {
-            w: ROOM_WIDTH, h: ROOM_DEPTH,
+            w: lobbyWidth, h: lobbyDepth,
             pos: `0 ${ROOM_HEIGHT} 0`, rot: '90 0 0',
             color: C.ceiling, roughness: 0.9
         });
@@ -136,29 +141,29 @@
         // Walls (left, right, back)
         // Back wall (behind spawn)
         addWall(lobby, {
-            w: ROOM_WIDTH, h: ROOM_HEIGHT,
-            pos: `0 ${ROOM_HEIGHT / 2} ${ROOM_DEPTH / 2}`,
+            w: lobbyWidth, h: ROOM_HEIGHT,
+            pos: `0 ${ROOM_HEIGHT / 2} ${lobbyDepth / 2}`,
             rot: '0 0 0'
         });
 
         // Left wall
         addWall(lobby, {
-            w: ROOM_DEPTH, h: ROOM_HEIGHT,
-            pos: `${-ROOM_WIDTH / 2} ${ROOM_HEIGHT / 2} 0`,
+            w: lobbyDepth, h: ROOM_HEIGHT,
+            pos: `${-lobbyWidth / 2} ${ROOM_HEIGHT / 2} 0`,
             rot: '0 90 0'
         });
 
         // Right wall  
         addWall(lobby, {
-            w: ROOM_DEPTH, h: ROOM_HEIGHT,
-            pos: `${ROOM_WIDTH / 2} ${ROOM_HEIGHT / 2} 0`,
+            w: lobbyDepth, h: ROOM_HEIGHT,
+            pos: `${lobbyWidth / 2} ${ROOM_HEIGHT / 2} 0`,
             rot: '0 -90 0'
         });
 
         // Lobby title
         addText(lobby, {
             value: 'ARCADE GALLERY',
-            pos: `0 ${ROOM_HEIGHT - 0.6} ${ROOM_DEPTH / 2 - 0.2}`,
+            pos: `0 ${ROOM_HEIGHT - 0.6} ${lobbyDepth / 2 - 0.2}`,
             rot: '0 180 0',
             scale: '6 6 6',
             color: C.frameBorder
@@ -166,8 +171,8 @@
 
         // Leather trim strip along bottom of back wall
         addPlane(lobby, {
-            w: ROOM_WIDTH, h: 0.4,
-            pos: `0 0.2 ${ROOM_DEPTH / 2 - 0.06}`,
+            w: lobbyWidth, h: 0.4,
+            pos: `0 0.2 ${lobbyDepth / 2 - 0.06}`,
             rot: '0 180 0',
             color: C.trimStrip, roughness: 0.4, metalness: 0.3
         });
@@ -177,17 +182,16 @@
         lobbyLight.setAttribute('type', 'point');
         lobbyLight.setAttribute('color', C.spotWarm);
         lobbyLight.setAttribute('intensity', '0.6');
-        lobbyLight.setAttribute('distance', '15');
+        lobbyLight.setAttribute('distance', String(lobbyWidth));
         lobbyLight.setAttribute('position', `0 ${ROOM_HEIGHT - 0.5} 0`);
         lobby.appendChild(lobbyLight);
 
-        // Portal doors to each room (placed along the front/far wall as doorways)
-        const portalCount = rooms.length;
-        const spacing = ROOM_WIDTH / (portalCount + 1);
+        // Portal doors to each room — spaced evenly across the front wall
+        const spacing = lobbyWidth / (portalCount + 1);
 
         rooms.forEach((room, i) => {
-            const px = -ROOM_WIDTH / 2 + spacing * (i + 1);
-            const pz = -ROOM_DEPTH / 2;
+            const px = -lobbyWidth / 2 + spacing * (i + 1);
+            const pz = -lobbyDepth / 2;
             buildPortal(lobby, room.name, i, px, pz, '0 0 0');
         });
 
@@ -524,36 +528,37 @@
         portal.setAttribute('position', `${x} 0 ${z}`);
         portal.setAttribute('rotation', rot);
 
-        // Portal frame (archway)
+        // Portal frame (archway) — compact 1.6m wide
+        const archHalfW = 0.8;
         const archLeft = document.createElement('a-box');
-        archLeft.setAttribute('width', '0.15');
-        archLeft.setAttribute('height', '2.8');
-        archLeft.setAttribute('depth', '0.15');
-        archLeft.setAttribute('position', '-1.1 1.4 0');
+        archLeft.setAttribute('width', '0.12');
+        archLeft.setAttribute('height', '2.6');
+        archLeft.setAttribute('depth', '0.12');
+        archLeft.setAttribute('position', `${-archHalfW} 1.3 0`);
         archLeft.setAttribute('material', `color: ${C.portalFrame}; roughness: 0.4; metalness: 0.5`);
         portal.appendChild(archLeft);
 
         const archRight = document.createElement('a-box');
-        archRight.setAttribute('width', '0.15');
-        archRight.setAttribute('height', '2.8');
-        archRight.setAttribute('depth', '0.15');
-        archRight.setAttribute('position', '1.1 1.4 0');
+        archRight.setAttribute('width', '0.12');
+        archRight.setAttribute('height', '2.6');
+        archRight.setAttribute('depth', '0.12');
+        archRight.setAttribute('position', `${archHalfW} 1.3 0`);
         archRight.setAttribute('material', `color: ${C.portalFrame}; roughness: 0.4; metalness: 0.5`);
         portal.appendChild(archRight);
 
         const archTop = document.createElement('a-box');
-        archTop.setAttribute('width', '2.4');
-        archTop.setAttribute('height', '0.15');
-        archTop.setAttribute('depth', '0.15');
-        archTop.setAttribute('position', '0 2.85 0');
+        archTop.setAttribute('width', String(archHalfW * 2 + 0.12));
+        archTop.setAttribute('height', '0.12');
+        archTop.setAttribute('depth', '0.12');
+        archTop.setAttribute('position', '0 2.66 0');
         archTop.setAttribute('material', `color: ${C.portalFrame}; roughness: 0.4; metalness: 0.5`);
         portal.appendChild(archTop);
 
         // Glowing portal plane (clickable)
         const portalPlane = document.createElement('a-plane');
-        portalPlane.setAttribute('width', '2');
-        portalPlane.setAttribute('height', '2.7');
-        portalPlane.setAttribute('position', '0 1.4 0');
+        portalPlane.setAttribute('width', String(archHalfW * 2 - 0.1));
+        portalPlane.setAttribute('height', '2.5');
+        portalPlane.setAttribute('position', '0 1.3 0');
         portalPlane.setAttribute('class', 'clickable');
         portalPlane.setAttribute('material', `color: ${C.portalGlow}; opacity: 0.12; shader: flat; side: double`);
         portalPlane.dataset.targetRoom = String(targetIndex);
@@ -568,15 +573,17 @@
         });
         portal.appendChild(portalPlane);
 
-        // Label above portal
+        // Label above portal — small, constrained width
         const text = document.createElement('a-text');
-        text.setAttribute('value', label.toUpperCase());
-        text.setAttribute('position', '0 3.2 0');
+        text.setAttribute('value', truncate(label.toUpperCase(), 16));
+        text.setAttribute('position', '0 2.95 0');
         text.setAttribute('align', 'center');
         text.setAttribute('color', isReturn ? '#ff6699' : C.textColor);
-        text.setAttribute('scale', '2.5 2.5 2.5');
+        text.setAttribute('scale', '1.6 1.6 1.6');
         text.setAttribute('font', 'mozillavr');
         text.setAttribute('side', 'double');
+        text.setAttribute('wrapCount', '20');
+        text.setAttribute('width', '3');
         portal.appendChild(text);
 
         // Glow light at portal
@@ -584,8 +591,8 @@
         glow.setAttribute('type', 'point');
         glow.setAttribute('color', C.portalGlow);
         glow.setAttribute('intensity', '0.25');
-        glow.setAttribute('distance', '5');
-        glow.setAttribute('position', '0 1.5 0.5');
+        glow.setAttribute('distance', '4');
+        glow.setAttribute('position', '0 1.3 0.4');
         portal.appendChild(glow);
 
         parent.appendChild(portal);

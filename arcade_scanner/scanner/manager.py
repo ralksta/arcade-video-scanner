@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import os
 import time
 from typing import Callable, Optional, List, Set
@@ -11,7 +12,6 @@ from .file_system import fs_scanner
 from .media_probe import MediaProbe
 from .video_inspector import VideoInspector
 from .image_inspector import ImageInspector
-from ..core.video_processor import create_thumbnail
 
 class ScannerManager:
     """
@@ -92,23 +92,24 @@ class ScannerManager:
                 if self._stop_event.is_set():
                     return
                 
+                # Single stat call — reuse for cache check + metadata population
+                try:
+                    file_stat = await asyncio.to_thread(os.stat, path)
+                except OSError:
+                    return  # file gone
+                
                 # Check cache state
                 cached_entry = db.get(path)
                 needs_update = False
                 if not cached_entry:
                     needs_update = True
                 else:
-                    try:
-                        # Basic existence check and stat
-                        file_stat = await asyncio.to_thread(os.stat, path)
-                        # Check if file size changed significantly (more than 10MB difference)
-                        # This catches files that were optimized/replaced
-                        current_size_mb = file_stat.st_size / (1024 * 1024)
-                        if abs(current_size_mb - cached_entry.size_mb) > 10:  # 10MB threshold
-                            needs_update = True
-                            print(f"📊 Size changed: {os.path.basename(path)} ({cached_entry.size_mb:.1f}MB → {current_size_mb:.1f}MB)")
-                    except OSError:
+                    # Check if file size changed significantly (more than 10MB difference)
+                    # This catches files that were optimized/replaced
+                    current_size_mb = file_stat.st_size / (1024 * 1024)
+                    if abs(current_size_mb - cached_entry.size_mb) > 10:  # 10MB threshold
                         needs_update = True
+                        print(f"📊 Size changed: {os.path.basename(path)} ({cached_entry.size_mb:.1f}MB → {current_size_mb:.1f}MB)")
 
                 if needs_update or force_rescan:
                     if progress_callback:
@@ -133,34 +134,19 @@ class ScannerManager:
                             entry.favorite = cached_entry.favorite
                             entry.vaulted = cached_entry.vaulted
                             entry.tags = cached_entry.tags
-                            # Preserve original import time if available, otherwise it stays what get_metadata gave (0 or now?)
-                            # Actually get_metadata creates fresh. We should copy from cache if exists.
                             if cached_entry.imported_at > 0:
                                 entry.imported_at = cached_entry.imported_at
                         
-                        # Populate date fields
-                        try:
-                            # We need to re-stat if we didn't get it above (e.g. if needs_update was True from start)
-                            # But optimization: we can just stat here.
-                            if not 'file_stat' in locals():
-                                file_stat = await asyncio.to_thread(os.stat, path)
-                            
-                            entry.mtime = int(file_stat.st_mtime)
-                            
-                            # If imported_at is still 0 (new file), set to now
-                            if entry.imported_at == 0:
-                                entry.imported_at = int(time.time())
-                        except:
-                            pass
+                        # Populate date fields (reuse file_stat from above)
+                        entry.mtime = int(file_stat.st_mtime)
                         
-                        # ASSET GENERATION (Thumbnails & Previews)
-                        loop = asyncio.get_event_loop()
+                        # If imported_at is still 0 (new file), set to now
+                        if entry.imported_at == 0:
+                            entry.imported_at = int(time.time())
                         
-                        # We execute thumbnail generation concurrently
-                        thumb_name = await loop.run_in_executor(self.probe.executor, create_thumbnail, path)
-                        if thumb_name:
-                            entry.thumb = thumb_name
-                        
+                        # Deterministic thumb name (generated lazily on first HTTP request)
+                        file_hash = hashlib.md5(path.encode()).hexdigest()
+                        entry.thumb = f"thumb_{file_hash}.jpg"
 
                             
                         # Upsert AFTER populating assets
@@ -202,7 +188,7 @@ class ScannerManager:
 
             # 4. Prune Orphans (files deleted OR now excluded)
             if found_paths:
-                orphans = [p for p in existing_paths if p not in found_paths]
+                orphans = existing_paths - found_paths
                 removed_count = 0
                 for orphan in orphans:
                     db.remove(orphan)

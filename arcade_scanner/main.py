@@ -34,7 +34,6 @@ def run_scanner(args_list=None):
         purge_thumbnails()
 
     
-    purge_broken_media()
     
     # 0.5 Data Migration
     print("📦 Checking for legacy user data to migrate...")
@@ -62,6 +61,9 @@ def run_scanner(args_list=None):
     # 5. Run scan in BACKGROUND thread
     def background_scan():
         try:
+            # Deferred from startup path — runs here so dashboard opens instantly
+            purge_broken_media()
+            
             mgr = get_scanner_manager()
             should_force = args.rebuild or args.rebuild_thumbs
             if should_force:
