@@ -159,7 +159,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Override to suppress noisy requests (static files, thumbnails, polling)."""
-        if self.path in self.QUIET_PATHS or self.path.startswith(("/thumbnails/", "/static/")):
+        path = getattr(self, 'path', None)
+        if path and (path in self.QUIET_PATHS or path.startswith(("/thumbnails/", "/static/"))):
             return  # Suppress logging
         super().log_message(format, *args)
 

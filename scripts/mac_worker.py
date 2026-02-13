@@ -196,15 +196,16 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
     client.update_status(job_id, "encoding")
 
     try:
-        from video_optimizer import process_file, detect_encoder
+        from video_optimizer import process_file, detect_encoder, ENCODER_PROFILES
 
-        profile = detect_encoder()
-        if not profile:
+        encoder_key = detect_encoder()
+        if not encoder_key or encoder_key not in ENCODER_PROFILES:
             print(f"  {R}✗ No hardware encoder detected{NC}")
             client.update_status(job_id, "failed", message="No hardware encoder on this Mac")
             _cleanup(src_path)
             return
 
+        profile = ENCODER_PROFILES[encoder_key]
         print(f"  Using encoder: {profile['name']}")
 
         opt_path = os.path.join(work_dir, f"{stem}_opt.mp4")
