@@ -27,6 +27,7 @@ services:
       - PGID=1000
       # Uncomment for GPU support (NVIDIA only)
       # - NVIDIA_VISIBLE_DEVICES=all
+    command: ["python", "-m", "arcade_scanner.main", "--skip-setup", "--ssl"]
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()" ]
