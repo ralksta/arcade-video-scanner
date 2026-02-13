@@ -169,6 +169,17 @@ class WorkerClient:
         except Exception as e:
             print(f"{Y}⚠ Status update failed: {e}{NC}")
 
+    def check_cancelled(self, job_id: int) -> bool:
+        """Check if a job was cancelled by the user."""
+        url = f"{self.server}/api/queue/check?job_id={job_id}"
+        req = urllib.request.Request(url, headers=self._headers())
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+                return data.get("cancelled", False)
+        except Exception:
+            return False
+
 
 def process_job(client: WorkerClient, job: dict, work_dir: str):
     """Download, encode, and upload a single job."""
@@ -190,6 +201,12 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
 
     src_size = os.path.getsize(src_path)
     print(f"  {G}✓ Downloaded: {src_size / (1024*1024):.1f} MB{NC}")
+
+    # Check for cancellation before encoding
+    if client.check_cancelled(job_id):
+        print(f"  {Y}⏹ Job cancelled by user{NC}")
+        _cleanup(src_path)
+        return
 
     # 2. Encode
     print(f"  {C}⚡ Encoding with VideoToolbox...{NC}")
@@ -244,6 +261,12 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
         print(f"  {R}✗ Encoding error: {e}{NC}")
         client.update_status(job_id, "failed", message=f"Encoding error: {e}")
         _cleanup(src_path)
+        return
+
+    # Check for cancellation before upload
+    if client.check_cancelled(job_id):
+        print(f"  {Y}⏹ Job cancelled by user{NC}")
+        _cleanup(src_path, opt_path)
         return
 
     # 3. Upload

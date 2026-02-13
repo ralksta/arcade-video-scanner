@@ -899,7 +899,8 @@ async function loadQueueStatus() {
                 encoding: 'bg-purple-500/20 text-purple-300',
                 uploading: 'bg-cyan-500/20 text-cyan-300',
                 done: 'bg-green-500/20 text-green-300',
-                failed: 'bg-red-500/20 text-red-300'
+                failed: 'bg-red-500/20 text-red-300',
+                cancelled: 'bg-gray-500/20 text-gray-300'
             };
             return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-white/10 text-gray-400'}">${s}</span>`;
         };
@@ -918,7 +919,7 @@ async function loadQueueStatus() {
                 <td class="px-4 py-3 text-white text-xs font-mono truncate max-w-[200px]" title="${j.file_path}">${j.file_path.split(/[\\/]/).pop()}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">${timeAgo(j.created_at)}</td>
                 <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">${j.result_message || (j.saved_bytes > 0 ? `Saved ${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB` : '—')}</td>
-                <td class="px-4 py-3 text-right">${j.status === 'pending' ? `<button onclick="cancelQueueJob(${j.id})" class="text-xs text-red-400 hover:text-red-300 transition-colors">Cancel</button>` : ''}</td>
+                <td class="px-4 py-3 text-right">${['pending', 'downloading', 'encoding'].includes(j.status) ? `<button onclick="cancelQueueJob(${j.id})" class="text-xs text-red-400 hover:text-red-300 transition-colors">Cancel</button>` : ''}</td>
             </tr>
         `).join('');
     } catch (e) {

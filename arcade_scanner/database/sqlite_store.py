@@ -182,13 +182,30 @@ class SQLiteStore:
         return [dict(row) for row in cursor.fetchall()]
 
     def cancel_job(self, job_id: int) -> bool:
-        """Cancel a pending job. Returns True if cancelled, False if not pending."""
+        """Cancel a pending or active job. Returns True if cancelled."""
         self._ensure_connection()
+        # Delete if still pending
         cursor = self._conn.execute(
             "DELETE FROM encoding_queue WHERE id = ? AND status = 'pending'",
             (job_id,)
         )
+        if cursor.rowcount > 0:
+            return True
+        # Mark active jobs as cancelled so the worker can detect it
+        cursor = self._conn.execute(
+            "UPDATE encoding_queue SET status = 'cancelled', result_message = 'Cancelled by user' "
+            "WHERE id = ? AND status IN ('downloading', 'encoding', 'uploading')",
+            (job_id,)
+        )
         return cursor.rowcount > 0
+
+    def is_job_cancelled(self, job_id: int) -> bool:
+        """Check if a job has been cancelled (worker polls this)."""
+        self._ensure_connection()
+        row = self._conn.execute(
+            "SELECT status FROM encoding_queue WHERE id = ?", (job_id,)
+        ).fetchone()
+        return row is not None and row[0] == 'cancelled'
 
     # ------------------------------------------------------------------
     # Public interface (matches JSONStore exactly)

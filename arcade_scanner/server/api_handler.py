@@ -1482,6 +1482,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error in queue/next: {e}")
                     self.send_error(500, str(e))
 
+            elif self.path.startswith("/api/queue/check?"):
+                try:
+                    params = parse_qs(urlparse(self.path).query)
+                    job_id = int(params.get("job_id", [0])[0])
+                    cancelled = db.is_job_cancelled(job_id) if job_id else False
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"cancelled": cancelled}).encode())
+                except Exception as e:
+                    self.send_error(500, str(e))
+
             elif self.path.startswith("/api/queue/download?"):
                 try:
                     params = parse_qs(urlparse(self.path).query)
@@ -2273,7 +2285,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.send_response(200)
                         self.send_header("Content-Type", "application/json")
                         self.end_headers()
-                        self.wfile.write(json.dumps({"success": False, "error": "Job not pending"}).encode())
+                        self.wfile.write(json.dumps({"success": False, "error": "Job not cancellable"}).encode())
                 except Exception as e:
                     print(f"❌ Error in queue/cancel: {e}")
                     self.send_error(500, str(e))
