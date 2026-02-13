@@ -1133,8 +1133,8 @@ function createVideoCard(v) {
                     <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
                   ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? `
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${encodeURIComponent(v.FilePath)}&audio=standard', 'h_frame')">
-                    <span class="material-icons">bolt</span>
+                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${window.IS_DOCKER ? 'Queue for Mac' : 'Optimize'}" onclick="event.stopPropagation(); ${window.IS_DOCKER ? `queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\\\'")}')` : `window.open('/compress?path=${encodeURIComponent(v.FilePath)}&audio=standard', 'h_frame')`}">
+                    <span class="material-icons">${window.IS_DOCKER ? 'cloud_upload' : 'bolt'}</span>
                  </button>` : ''}
              </div>
              
@@ -1552,9 +1552,15 @@ function triggerBatchCompress() {
     message += `\n${'─'.repeat(40)}\nProceed with ${processable.length} file(s)?`;
 
     if (confirm(message)) {
-        // Use ||| as separator to avoid issues with commas in filenames
-        fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')));
-        alert(`🚀 Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
+        if (window.IS_DOCKER) {
+            // Docker mode: queue all files for remote Mac encoding
+            queueBatchForRemoteEncode(processable.map(f => f.path));
+        } else {
+            // Local mode: use batch_compress endpoint
+            // Use ||| as separator to avoid issues with commas in filenames
+            fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')));
+            alert(`🚀 Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
+        }
         clearSelection();
     }
 }
@@ -2613,6 +2619,14 @@ function cinemaOptimize() {
 
     if (window.ENABLE_OPTIMIZER !== true || window.userSettings?.enable_optimizer === false) return;
 
+    // Docker mode: queue for remote encoding instead of opening local optimizer
+    if (window.IS_DOCKER) {
+        if (currentCinemaPath) {
+            queueForRemoteEncode(currentCinemaPath);
+        }
+        return;
+    }
+
     // Populate Initial State
     currentOptAudio = 'standard'; // Reset to default (audio enhancement off)
     updateOptAudioUI();
@@ -2829,6 +2843,15 @@ function triggerOptimization() {
     // Simple validation
     // (Could add regex check for HH:MM:SS here but backend/ffmpeg handles partials well usually)
 
+    if (window.IS_DOCKER) {
+        // Docker mode: queue for remote encoding
+        if (currentCinemaPath) {
+            queueForRemoteEncode(currentCinemaPath);
+            closeOptimize();
+        }
+        return;
+    }
+
     const params = new URLSearchParams();
     params.set('path', currentCinemaPath);
     params.set('audio', currentOptAudio);
@@ -2891,6 +2914,59 @@ function importSettings() {
     };
     reader.readAsText(file);
 }
+// --- REMOTE ENCODING QUEUE ---
+/**
+ * Queue a single file for remote encoding on the Mac worker.
+ * Used in Docker mode where local Terminal optimization isn't available.
+ */
+function queueForRemoteEncode(filePath) {
+    fetch('/api/queue/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: filePath })
+    })
+        .then(r => r.json())
+        .then(data => {
+            const name = filePath.split(/[\\/]/).pop();
+            if (data.success) {
+                showToast(`☁️ Queued: ${name}`, 'success');
+            } else {
+                showToast(`⚠️ ${data.error || 'Already queued'}: ${name}`, 'warning');
+            }
+        })
+        .catch(err => {
+            console.error('Queue error:', err);
+            showToast('❌ Failed to queue file', 'error');
+        });
+}
+
+/**
+ * Queue multiple files for remote encoding.
+ * Used in Docker mode for batch operations.
+ */
+async function queueBatchForRemoteEncode(paths) {
+    let queued = 0;
+    let skipped = 0;
+    for (const p of paths) {
+        try {
+            const r = await fetch('/api/queue/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_path: p })
+            });
+            const data = await r.json();
+            if (data.success) queued++;
+            else skipped++;
+        } catch (e) {
+            console.error('Batch queue error:', e);
+            skipped++;
+        }
+    }
+    showToast(`☁️ Queued ${queued} file(s) for Mac encoding${skipped > 0 ? ` (${skipped} skipped)` : ''}`, 'success');
+}
+
+window.queueForRemoteEncode = queueForRemoteEncode;
+window.queueBatchForRemoteEncode = queueBatchForRemoteEncode;
 
 // --- GLOBAL UTILS ---
 window.toggleLayout = toggleLayout;

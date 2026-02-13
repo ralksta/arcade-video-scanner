@@ -1850,6 +1850,12 @@ SETTINGS_MODAL_COMPONENT = """
                     <span class="hidden md:inline">Backup & Restore</span>
                     <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
+                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
+                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="queue">
+                    <span class="material-icons text-lg">cloud_sync</span>
+                    <span class="hidden md:inline">Remote Queue</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
+                </button>
             </nav>
         </aside>
         
@@ -2208,6 +2214,41 @@ SETTINGS_MODAL_COMPONENT = """
                                 <div>Restoring will reload the page and apply settings immediately.</div>
                             </div>
                          </div>
+                    </section>
+                </div>
+
+                <!-- REMOTE QUEUE SECTION -->
+                <div class="content-section hidden space-y-6" id="content-queue">
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-cyan">cloud_sync</span>
+                                Encoding Queue
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Files queued for remote Mac encoding. The Mac worker polls for pending jobs.</p>
+                        </div>
+
+                        <div class="bg-black/30 rounded-xl border border-white/5 overflow-hidden">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-white/5 text-gray-500 text-xs uppercase tracking-wider">
+                                        <th class="text-left px-4 py-3">Status</th>
+                                        <th class="text-left px-4 py-3">File</th>
+                                        <th class="text-left px-4 py-3 hidden md:table-cell">Queued</th>
+                                        <th class="text-left px-4 py-3 hidden md:table-cell">Result</th>
+                                        <th class="text-right px-4 py-3">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="queueTableBody">
+                                    <tr><td colspan="5" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-3 text-sm text-blue-300">
+                            <span class="material-icons text-blue-400 text-lg">info</span>
+                            <div>Start the Mac worker with: <code class="px-2 py-0.5 bg-black/40 rounded text-arcade-cyan">python3 mac_worker.py --server http://&lt;ip&gt;:8000 --user admin</code></div>
+                        </div>
                     </section>
                 </div>
             </div>

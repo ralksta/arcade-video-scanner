@@ -374,6 +374,10 @@ function updateSettingsHeader(sectionId) {
         'privacy': {
             title: 'Privacy & Safety',
             subtitle: 'Configure Safe Mode and hidden content'
+        },
+        'queue': {
+            title: 'Remote Queue',
+            subtitle: 'Monitor Mac encoding queue'
         }
     };
 
@@ -871,3 +875,90 @@ window.saveSettingsWithoutReload = saveSettingsWithoutReload;
 // Backup & Restore
 window.exportSettings = exportSettings;
 window.importSettings = importSettings;
+
+// --- REMOTE QUEUE STATUS ---
+let _queuePollInterval = null;
+
+async function loadQueueStatus() {
+    try {
+        const r = await fetch('/api/queue/status');
+        if (!r.ok) return;
+        const jobs = await r.json();
+        const tbody = document.getElementById('queueTableBody');
+        if (!tbody) return;
+
+        if (!jobs.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>';
+            return;
+        }
+
+        const statusBadge = (s) => {
+            const map = {
+                pending: 'bg-yellow-500/20 text-yellow-300',
+                downloading: 'bg-blue-500/20 text-blue-300',
+                encoding: 'bg-purple-500/20 text-purple-300',
+                uploading: 'bg-cyan-500/20 text-cyan-300',
+                done: 'bg-green-500/20 text-green-300',
+                failed: 'bg-red-500/20 text-red-300'
+            };
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-white/10 text-gray-400'}">${s}</span>`;
+        };
+
+        const timeAgo = (ts) => {
+            if (!ts) return '—';
+            const diff = Math.floor(Date.now() / 1000 - ts);
+            if (diff < 60) return `${diff}s ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            return `${Math.floor(diff / 3600)}h ago`;
+        };
+
+        tbody.innerHTML = jobs.map(j => `
+            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                <td class="px-4 py-3">${statusBadge(j.status)}</td>
+                <td class="px-4 py-3 text-white text-xs font-mono truncate max-w-[200px]" title="${j.file_path}">${j.file_path.split(/[\\/]/).pop()}</td>
+                <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">${timeAgo(j.created_at)}</td>
+                <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">${j.result_message || (j.saved_bytes > 0 ? `Saved ${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB` : '—')}</td>
+                <td class="px-4 py-3 text-right">${j.status === 'pending' ? `<button onclick="cancelQueueJob(${j.id})" class="text-xs text-red-400 hover:text-red-300 transition-colors">Cancel</button>` : ''}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Queue status error:', e);
+    }
+}
+
+async function cancelQueueJob(jobId) {
+    try {
+        await fetch('/api/queue/cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id: jobId })
+        });
+        loadQueueStatus();
+    } catch (e) {
+        console.error('Cancel error:', e);
+    }
+}
+
+// Start polling when queue section is visible
+function startQueuePolling() {
+    if (_queuePollInterval) return;
+    loadQueueStatus();
+    _queuePollInterval = setInterval(loadQueueStatus, 5000);
+}
+
+function stopQueuePolling() {
+    if (_queuePollInterval) clearInterval(_queuePollInterval);
+    _queuePollInterval = null;
+}
+
+// Hook into settings nav to start/stop polling
+document.addEventListener('click', (e) => {
+    const navItem = e.target.closest('.settings-nav-item[data-section]');
+    if (navItem) {
+        if (navItem.dataset.section === 'queue') startQueuePolling();
+        else stopQueuePolling();
+    }
+});
+
+window.loadQueueStatus = loadQueueStatus;
+window.cancelQueueJob = cancelQueueJob;

@@ -79,9 +79,116 @@ class SQLiteStore:
         self._create_table()
 
     def _create_table(self):
-        """Create the media table if it doesn't exist."""
+        """Create the media table and encoding_queue table if they don't exist."""
         cols = ", ".join(f"{name} {typedef}" for name, typedef in _COLUMNS)
         self._conn.execute(f"CREATE TABLE IF NOT EXISTS media ({cols})")
+
+        # Encoding queue for remote optimization
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS encoding_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                size_bytes INTEGER DEFAULT 0,
+                created_at INTEGER DEFAULT 0,
+                started_at INTEGER DEFAULT 0,
+                completed_at INTEGER DEFAULT 0,
+                worker_id TEXT DEFAULT '',
+                result_message TEXT DEFAULT '',
+                saved_bytes INTEGER DEFAULT 0
+            )
+        """)
+
+    # ------------------------------------------------------------------
+    # Encoding Queue methods
+    # ------------------------------------------------------------------
+
+    def queue_encode(self, file_path: str, size_bytes: int = 0) -> Optional[int]:
+        """Add a file to the encoding queue. Returns job ID or None if already pending."""
+        self._ensure_connection()
+        import time
+
+        # Check for existing pending/active job for this file
+        cursor = self._conn.execute(
+            "SELECT id FROM encoding_queue WHERE file_path = ? AND status IN ('pending', 'downloading', 'encoding', 'uploading')",
+            (file_path,)
+        )
+        if cursor.fetchone():
+            return None  # Already queued
+
+        self._conn.execute(
+            "INSERT INTO encoding_queue (file_path, status, size_bytes, created_at) VALUES (?, 'pending', ?, ?)",
+            (file_path, size_bytes, int(time.time()))
+        )
+        cursor = self._conn.execute("SELECT last_insert_rowid()")
+        return cursor.fetchone()[0]
+
+    def get_next_pending(self, worker_id: str = "") -> Optional[dict]:
+        """Atomically claim the oldest pending job. Returns job dict or None."""
+        self._ensure_connection()
+        import time
+
+        # Atomic claim: update first pending row
+        cursor = self._conn.execute(
+            "SELECT id, file_path, size_bytes FROM encoding_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        job_id = row["id"]
+        self._conn.execute(
+            "UPDATE encoding_queue SET status = 'downloading', started_at = ?, worker_id = ? WHERE id = ? AND status = 'pending'",
+            (int(time.time()), worker_id, job_id)
+        )
+        return {"id": job_id, "file_path": row["file_path"], "size_bytes": row["size_bytes"]}
+
+    def update_job_status(self, job_id: int, status: str, **kwargs) -> None:
+        """Update a job's status and optional fields (result_message, saved_bytes, completed_at)."""
+        self._ensure_connection()
+        import time
+
+        sets = ["status = ?"]
+        vals = [status]
+
+        if status in ("done", "failed"):
+            sets.append("completed_at = ?")
+            vals.append(int(time.time()))
+
+        for key in ("result_message", "saved_bytes", "worker_id"):
+            if key in kwargs:
+                sets.append(f"{key} = ?")
+                vals.append(kwargs[key])
+
+        vals.append(job_id)
+        self._conn.execute(
+            f"UPDATE encoding_queue SET {', '.join(sets)} WHERE id = ?",
+            tuple(vals)
+        )
+
+    def get_queue_status(self, limit: int = 20) -> List[dict]:
+        """Return active + recent jobs for the UI."""
+        self._ensure_connection()
+        cursor = self._conn.execute(
+            """SELECT id, file_path, status, size_bytes, created_at, started_at,
+                      completed_at, worker_id, result_message, saved_bytes
+               FROM encoding_queue
+               ORDER BY
+                   CASE WHEN status IN ('pending','downloading','encoding','uploading') THEN 0 ELSE 1 END,
+                   created_at DESC
+               LIMIT ?""",
+            (limit,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def cancel_job(self, job_id: int) -> bool:
+        """Cancel a pending job. Returns True if cancelled, False if not pending."""
+        self._ensure_connection()
+        cursor = self._conn.execute(
+            "DELETE FROM encoding_queue WHERE id = ? AND status = 'pending'",
+            (job_id,)
+        )
+        return cursor.rowcount > 0
 
     # ------------------------------------------------------------------
     # Public interface (matches JSONStore exactly)
