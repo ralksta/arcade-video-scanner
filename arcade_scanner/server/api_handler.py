@@ -1596,14 +1596,24 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         token = session_manager.create_session(username)
                         print(f"✅ Login succeeded for user: '{username}' from {client_ip}")
 
+                        # Detect whether we're serving over HTTPS
+                        is_https = (
+                            self.headers.get("X-Forwarded-Proto") == "https"
+                            or isinstance(self.connection, ssl.SSLSocket)
+                        )
+
                         self.send_response(200)
                         cookie = SimpleCookie()
                         cookie["session_token"] = token
                         cookie["session_token"]["path"] = "/"
                         cookie["session_token"]["httponly"] = True
-                        cookie["session_token"]["secure"] = True   # HTTPS only
-                        cookie["session_token"]["samesite"] = "Strict"
                         cookie["session_token"]["max-age"] = 86400 * 30
+                        # Only set Secure over HTTPS — plain HTTP drops the cookie silently
+                        if is_https:
+                            cookie["session_token"]["secure"] = True
+                            cookie["session_token"]["samesite"] = "Strict"
+                        else:
+                            cookie["session_token"]["samesite"] = "Lax"
 
                         for morsel in cookie.values():
                             self.send_header("Set-Cookie", morsel.OutputString())
