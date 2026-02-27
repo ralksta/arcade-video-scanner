@@ -94,6 +94,31 @@
             font-size: 14px;
             display: none;
         }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .remember-row input[type="checkbox"] {
+            width: 16px;
+            min-width: 16px;
+            height: 16px;
+            padding: 0;
+            margin: 0;
+            accent-color: #DE1A58;
+            cursor: pointer;
+        }
+
+        .remember-row label {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            user-select: none;
+        }
     </style>
 </head>
 
@@ -106,6 +131,10 @@
         <form id="loginForm">
             <input type="text" id="username" placeholder="Username" required autocomplete="username">
             <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+            <div class="remember-row">
+                <input type="checkbox" id="rememberMe" checked>
+                <label for="rememberMe">Remember me (30 days)</label>
+            </div>
             <button type="submit">Enter Arcade</button>
         </form>
         <div id="errorMsg" class="error">Invalid credentials</div>
@@ -134,17 +163,21 @@
             e.preventDefault();
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
+            const remember = document.getElementById('rememberMe').checked;
             const err = document.getElementById('errorMsg');
 
             try {
                 const res = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: u, password: p })
+                    body: JSON.stringify({ username: u, password: p, remember: remember })
                 });
 
                 if (res.ok) {
                     window.location.reload();
+                } else if (res.status === 429) {
+                    err.innerText = 'Too many attempts. Try again in 15 minutes.';
+                    err.style.display = 'block';
                 } else {
                     err.style.display = 'block';
                 }

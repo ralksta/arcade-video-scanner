@@ -1576,6 +1576,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     data = json.loads(post_body)
                     username = data.get("username", "")
                     password = data.get("password", "")
+                    remember = data.get("remember", True)  # Default: remember me
 
                     username = username.strip() if username else ""
 
@@ -1609,7 +1610,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         cookie["session_token"] = token
                         cookie["session_token"]["path"] = "/"
                         cookie["session_token"]["httponly"] = True
-                        cookie["session_token"]["max-age"] = 86400 * 30
+                        if remember:
+                            cookie["session_token"]["max-age"] = 86400 * 30  # 30 days
+                        # (no max-age = session cookie, expires on browser close)
                         # Only set Secure over HTTPS — plain HTTP drops the cookie silently
                         if is_https:
                             cookie["session_token"]["secure"] = True

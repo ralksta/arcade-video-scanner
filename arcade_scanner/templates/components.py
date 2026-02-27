@@ -241,8 +241,10 @@ HEADER_COMPONENT = """
 
 NAVIGATION_COMPONENT = """
 <!-- Desktop Sidebar (Hidden on Mobile) -->
-<nav class="hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-white/5 p-4 gap-1 z-[100]">
-    <div class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 px-3">Workspace</div>
+<nav class="hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-white/5 z-[100]">
+    <!-- Scrollable content area -->
+    <div class="flex-1 overflow-y-auto p-4 gap-1 flex flex-col scrollbar-hide">
+        <div class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 px-3">Workspace</div>
     
     <button id="m-lobby" onclick="setWorkspaceMode('lobby')" class="nav-item active group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
         <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-cyan rounded-r transition-opacity"></div>
@@ -291,8 +293,10 @@ NAVIGATION_COMPONENT = """
             <!-- Populated by JS -->
         </div>
     </div>
-    
-    <div class="mt-auto border-t border-white/5 pt-3 space-y-1">
+    </div>
+
+    <!-- Settings pinned at bottom -->
+    <div class="border-t border-white/5 p-4">
         <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
             <span class="material-icons text-[20px]">settings</span>
             <span>Settings</span>
@@ -300,6 +304,7 @@ NAVIGATION_COMPONENT = """
     </div>
     
 </nav>
+
 
 <!-- Mobile Bottom Tab Bar (Fixed Bottom) -->
 <nav class="md:hidden fixed bottom-0 left-0 right-0 h-[60px] pb-safe-bottom bg-[#090012]/95 backdrop-blur-xl border-t border-white/10 z-50 flex justify-around items-center px-2">
