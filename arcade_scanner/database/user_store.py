@@ -191,15 +191,17 @@ class UserStore:
         return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
 
     def verify_password(self, username: str, password: str) -> bool:
+        import hmac as _hmac
         user = self.get_user(username)
         if not user:
             return False
-            
+
         try:
             salt = binascii.unhexlify(user.salt)
             stored_hash = binascii.unhexlify(user.password_hash)
             new_hash = self.hash_password(password, salt)
-            return new_hash == stored_hash
+            # Constant-time comparison prevents timing side-channel attacks
+            return _hmac.compare_digest(new_hash, stored_hash)
         except Exception:
             return False
 

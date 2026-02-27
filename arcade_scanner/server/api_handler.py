@@ -1572,42 +1572,49 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 post_body = self.rfile.read(content_len)
                 try:
                     data = json.loads(post_body)
-                    username = data.get("username")
-                    password = data.get("password")
-                    
-                    # Check auth
+                    username = data.get("username", "")
+                    password = data.get("password", "")
+
                     username = username.strip() if username else ""
-                    # password = password.strip() if password else "" # Passwords might have spaces
 
-                    print(f"LOGIN DEBUG: Attempting login for user: '{username}'", flush=True)
-                    
-                    u = user_db.get_user(username)
-                    if u:
-                        print(f"LOGIN DEBUG: User found in DB. Salt: {u.salt}", flush=True)
-                    else:
-                        print(f"LOGIN DEBUG: User '{username}' NOT found", flush=True)
+                    # ── Brute-force rate limiting ────────────────────────────
+                    client_ip = (
+                        self.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+                        or self.client_address[0]
+                    )
 
+                    if session_manager.is_locked_out(client_ip):
+                        print(f"🔒 Blocked login attempt from locked-out IP {client_ip}")
+                        self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
+                        return
+
+                    # ── Verify credentials ───────────────────────────────────
                     is_valid = user_db.verify_password(username, password)
-                    print(f"LOGIN DEBUG: verify_password result: {is_valid}", flush=True)
-                    
+
                     if is_valid:
+                        session_manager.record_success(client_ip)
                         token = session_manager.create_session(username)
-                        
+                        print(f"✅ Login succeeded for user: '{username}' from {client_ip}")
+
                         self.send_response(200)
                         cookie = SimpleCookie()
                         cookie["session_token"] = token
                         cookie["session_token"]["path"] = "/"
                         cookie["session_token"]["httponly"] = True
+                        cookie["session_token"]["secure"] = True   # HTTPS only
+                        cookie["session_token"]["samesite"] = "Strict"
                         cookie["session_token"]["max-age"] = 86400 * 30
-                        
+
                         for morsel in cookie.values():
                             self.send_header("Set-Cookie", morsel.OutputString())
-                        
+
                         self.end_headers()
                         self.wfile.write(json.dumps({"success": True}).encode())
                     else:
+                        remaining = session_manager.record_failure(client_ip)
+                        print(f"❌ Login failed for IP {client_ip} ({remaining} attempts remaining)")
                         self.send_error(401, "Invalid credentials")
-                        
+
                 except Exception as e:
                     print(f"Login error: {e}")
                     self.send_error(400)
