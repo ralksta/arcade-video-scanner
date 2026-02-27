@@ -215,7 +215,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 server_url = f"{protocol}://{host}"
                 
                 all_videos = db.get_all()
-                smart_collections = list(config.settings.smart_collections)
+                # Smart collections are stored per-user, not in global config
+                admin_user = user_db.get_user("admin")
+                smart_collections = list(admin_user.data.smart_collections) if admin_user else []
                 
                 deovr_data = generate_deovr_json(all_videos, server_url, smart_collections)
                 
