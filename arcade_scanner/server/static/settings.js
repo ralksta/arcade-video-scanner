@@ -44,6 +44,9 @@ async function openSettings() {
         const imageScanCheckbox = document.getElementById('settingsScanImages');
         if (imageScanCheckbox) imageScanCheckbox.checked = data.enable_image_scanning === true;
 
+        const deovrCheckbox = document.getElementById('settingsDeoVR');
+        if (deovrCheckbox) deovrCheckbox.checked = data.enable_deovr === true;
+
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
             `Standard: ${data.default_scan_targets.slice(0, 2).join(', ')}${data.default_scan_targets.length > 2 ? '...' : ''}`;
