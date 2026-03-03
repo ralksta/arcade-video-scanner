@@ -909,6 +909,12 @@ BATCH_BAR_COMPONENT = """
         <span>VAULT</span>
     </button>
     
+    <!-- DELETE Button -->
+    <button class="batch-action-btn" style="--btn-color: #EF4444" onclick="triggerBatchDelete()">
+        <span class="material-icons text-base">delete_forever</span>
+        <span>DELETE</span>
+    </button>
+    
     <div class="h-8 w-px bg-white/10"></div>
     
     <button class="text-gray-400 hover:text-white transition-colors p-1" onclick="clearSelection()" title="Clear Selection">
@@ -1494,6 +1500,22 @@ COLLECTION_MODAL_COMPONENT = """
                                            class="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
                                            oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
                                            aria-label="Maximum file size in megabytes">
+                                </div>
+                            </div>
+
+                            <!-- Duration (Runtime) -->
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1.5 block">Runtime (Seconds)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="collectionMinDuration" placeholder="Min"
+                                           class="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                           oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
+                                           aria-label="Minimum duration in seconds">
+                                    <span class="text-gray-500 text-xs">-</span>
+                                    <input type="number" id="collectionMaxDuration" placeholder="Max"
+                                           class="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                           oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
+                                           aria-label="Maximum duration in seconds">
                                 </div>
                             </div>
 
@@ -2317,6 +2339,7 @@ FILTER_BAR_COMPONENT = """
             <select id="sortSelect" onchange="setSort(this.value)" class="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full pl-9 pr-4 py-1.5 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:border-arcade-cyan/50 appearance-none min-w-[140px] cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
                 <option value="bitrate">Bitrate ↓</option>
                 <option value="size">Size ↓</option>
+                <option value="runtime">Runtime ↓</option>
                 <option value="date">Date ↓</option>
             </select>
         </div>

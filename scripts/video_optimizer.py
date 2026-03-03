@@ -769,9 +769,9 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             if error in ('early_abort', 'too_large'):
                 # Need less compression (better quality)
                 if profile['quality_direction'] > 0:
-                    high = mid - 1  # Try lower Q values
+                    high = mid - 1  # Lower Q = better quality for NVENC/QSV
                 else:
-                    low = mid + 1   # Try higher Q values
+                    high = mid - 1  # Higher Q = better quality for VideoToolbox (array sorted high→low)
                 continue
 
             if not success:
@@ -785,11 +785,11 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             # Check SSIM threshold
             if ssim < 0.940:
                 print(f" {R}   -> Quality too low for this level.{NC}")
-                # Need better quality (less compression)
+                # Need better quality (less compression) → move toward index 0 (best quality)
                 if profile['quality_direction'] > 0:
-                    high = mid - 1
+                    high = mid - 1  # Lower Q = better quality for NVENC/QSV
                 else:
-                    low = mid + 1
+                    high = mid - 1  # Higher Q = better quality for VideoToolbox (array sorted high→low)
                 if output_path.exists(): output_path.unlink()
                 continue
 

@@ -819,6 +819,7 @@ function filterAndSort(scrollToTop = false) {
             filteredVideos.sort((a, b) => {
                 if (currentSort === 'bitrate') return (b.Bitrate_Mbps || 0) - (a.Bitrate_Mbps || 0);
                 if (currentSort === 'size') return b.Size_MB - a.Size_MB;
+                if (currentSort === 'runtime') return (b.Duration_Sec || 0) - (a.Duration_Sec || 0);
                 if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
                 if (currentSort === 'date') return (b.mtime || 0) - (a.mtime || 0); // Newest first
                 return 0;
@@ -1301,6 +1302,47 @@ function triggerBatchFavorite(state) {
     clearSelection();
     if (workspaceMode === 'favorites' && !state) {
         setTimeout(() => filterAndSort(), 350);
+    }
+}
+
+/**
+ * Trigger bulk deletion for selected videos
+ * Asks for confirmation before sending request to backend
+ */
+async function triggerBatchDelete() {
+    const selected = document.querySelectorAll('.video-card-container input[type="checkbox"]:checked');
+    if (selected.length === 0) return;
+
+    if (!confirm(`Are you sure you want to PERMANENTLY delete these ${selected.length} files from disk? This cannot be undone.`)) {
+        return;
+    }
+
+    const paths = Array.from(selected).map(cb => cb.closest('.video-card-container').getAttribute('data-path'));
+
+    try {
+        const response = await fetch('/api/bulk_delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: paths })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(`Successfully deleted ${result.deleted.length} files`, 'success');
+
+            // Update local data
+            window.ALL_VIDEOS = window.ALL_VIDEOS.filter(v => !result.deleted.includes(v.FilePath));
+
+            // Clear selection and re-render
+            clearSelection();
+            filterAndSort();
+        } else {
+            showToast(`Deletion failed: ${result.error || 'Unknown error'}`, 'error');
+        }
+    } catch (err) {
+        console.error('Bulk delete error:', err);
+        showToast('Failed to connect to server for deletion', 'error');
     }
 }
 

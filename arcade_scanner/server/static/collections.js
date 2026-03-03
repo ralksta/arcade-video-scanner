@@ -39,6 +39,8 @@ function openCollectionModal(editId = null) {
     document.getElementById('collectionDateFilter').value = 'all';
     document.getElementById('collectionMinSize').value = '';
     document.getElementById('collectionMaxSize').value = '';
+    document.getElementById('collectionMinDuration').value = '';
+    document.getElementById('collectionMaxDuration').value = '';
     document.getElementById('collectionColor').value = '#64FFDA';
     document.getElementById('collectionColorBtn').style.backgroundColor = '#64FFDA';
     document.getElementById('selectedCollectionIcon').innerText = 'folder_special';
@@ -64,6 +66,8 @@ function openCollectionModal(editId = null) {
             document.getElementById('collectionDateFilter').value = existing.criteria?.date || 'all';
             document.getElementById('collectionMinSize').value = existing.criteria?.size?.min || '';
             document.getElementById('collectionMaxSize').value = existing.criteria?.size?.max || '';
+            document.getElementById('collectionMinDuration').value = existing.criteria?.duration?.min || '';
+            document.getElementById('collectionMaxDuration').value = existing.criteria?.duration?.max || '';
 
             document.getElementById('collectionColor').value = existing.color || '#64FFDA';
             document.getElementById('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
@@ -180,6 +184,10 @@ function updateFilterSectionBadge(sectionName) {
 
         const searchTerm = document.getElementById('collectionSearch');
         if (searchTerm && searchTerm.value.trim()) additionalFilters++;
+
+        const minDur = document.getElementById('collectionMinDuration');
+        const maxDur = document.getElementById('collectionMaxDuration');
+        if ((minDur && minDur.value) || (maxDur && maxDur.value)) additionalFilters++;
     }
 
     const totalActive = activeFilters + additionalFilters;
@@ -287,6 +295,8 @@ function saveCollection() {
     const dateVal = document.getElementById('collectionDateFilter').value;
     const sizeMin = document.getElementById('collectionMinSize').value;
     const sizeMax = document.getElementById('collectionMaxSize').value;
+    const durMin = document.getElementById('collectionMinDuration').value;
+    const durMax = document.getElementById('collectionMaxDuration').value;
 
     if (collectionCriteriaNew) {
         collectionCriteriaNew.search = search;
@@ -294,6 +304,10 @@ function saveCollection() {
         collectionCriteriaNew.size = {
             min: sizeMin ? parseInt(sizeMin) : null,
             max: sizeMax ? parseInt(sizeMax) : null
+        };
+        collectionCriteriaNew.duration = {
+            min: durMin ? parseInt(durMin) : null,
+            max: durMax ? parseInt(durMax) : null
         };
     }
 
@@ -495,7 +509,7 @@ function evaluateCollectionMatch(video, criteria) {
     const orientation = getVideoOrientation(video);
     const isHidden = video.hidden || false;
     const isFavorite = video.favorite || false;
-    const duration = video.duration || 0;
+    const duration = video.Duration_Sec || 0;
     const sizeMB = video.Size_MB || 0;
     const mediaType = video.media_type || 'video';
 
@@ -751,6 +765,17 @@ function updateCollectionPreviewCount() {
         tempCriteria.size = { min: minVal, max: maxVal };
     } else {
         tempCriteria.size = null;
+    }
+
+    const minDurInput = document.getElementById('collectionMinDuration');
+    const maxDurInput = document.getElementById('collectionMaxDuration');
+    const minDurVal = minDurInput && minDurInput.value ? parseInt(minDurInput.value) : null;
+    const maxDurVal = maxDurInput && maxDurInput.value ? parseInt(maxDurInput.value) : null;
+
+    if (minDurVal !== null || maxDurVal !== null) {
+        tempCriteria.duration = { min: minDurVal, max: maxDurVal };
+    } else {
+        tempCriteria.duration = null;
     }
 
     const allVideos = window.ALL_VIDEOS || [];

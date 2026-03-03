@@ -2067,6 +2067,78 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error deleting duplicates: {e}")
                     self.send_error(500, str(e))
 
+            elif self.path == "/api/bulk_delete":
+                user_name = self.get_current_user()
+                if not user_name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                
+                try:
+                    content_length = int(self.headers.get("Content-Length", 0))
+                    if content_length > MAX_REQUEST_SIZE:
+                        self.send_error(413, "Request too large")
+                        return
+                    
+                    body = self.rfile.read(content_length).decode("utf-8")
+                    data = json.loads(body)
+                    
+                    paths_to_delete = data.get("paths", [])
+                    
+                    if not paths_to_delete:
+                        self.send_error(400, "No paths provided")
+                        return
+                    
+                    deleted = []
+                    failed = []
+                    
+                    for path in paths_to_delete:
+                        try:
+                            abs_path = os.path.abspath(path)
+                            
+                            # Security check
+                            if not is_path_allowed(abs_path):
+                                failed.append({"path": path, "error": "Path not allowed"})
+                                continue
+                            
+                            if os.path.exists(abs_path):
+                                # Delete file
+                                os.remove(abs_path)
+                                
+                                # Remove from database
+                                db.remove(abs_path)
+                                
+                                deleted.append(abs_path)
+                                print(f"🗑️ Bulk Deleted: {os.path.basename(abs_path)}")
+                            else:
+                                # Even if file is missing, make sure it's gone from DB
+                                db.remove(abs_path)
+                                failed.append({"path": path, "error": "File not found"})
+                                
+                        except Exception as e:
+                            failed.append({"path": path, "error": str(e)})
+                    
+                    # Save database changes
+                    if deleted:
+                        db.save()
+                    
+                    response = {
+                        "success": True,
+                        "deleted": deleted,
+                        "failed": failed
+                    }
+                    
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response).encode("utf-8"))
+                    print(f"✅ Bulk Deleted {len(deleted)} files")
+                    
+                except json.JSONDecodeError:
+                    self.send_error(400, "Invalid JSON")
+                except Exception as e:
+                    print(f"❌ Error in bulk delete: {e}")
+                    self.send_error(500, str(e))
+
             elif self.path == "/api/duplicates/clear":
                 # Clear duplicate cache and force rescan
                 user_name = self.get_current_user()
