@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 import time
 
 class MediaType(str, Enum):
@@ -117,7 +117,8 @@ class MediaAsset(BaseModel):
              d['format'] = self.image_metadata.format
         return d
 
-    class Config:
-        populate_by_name = True
-        use_enum_values = True
-        extra = "ignore"
+    model_config = ConfigDict(
+        populate_by_name=True,
+        use_enum_values=True,
+        extra="ignore",
+    )

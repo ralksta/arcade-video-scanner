@@ -22,9 +22,30 @@ dependencies = [
     "pydantic-settings>=2.0.0"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-mock>=3.0",
+    "ruff>=0.4",
+    "mypy>=1.0",
+]
+
 [project.scripts]
 arcade-scanner = "arcade_scanner.main:run_scanner"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["arcade_scanner*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

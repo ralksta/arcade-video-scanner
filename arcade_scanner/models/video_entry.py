@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -39,7 +39,8 @@ class VideoEntry(BaseModel):
     mtime: Optional[int] = Field(0, description="Last modification timestamp of the file")
 
     
-    class Config:
-        populate_by_name = True
-        extra = "ignore"  # Robustness against cache mismatch
-        
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",  # Robustness against cache mismatch
+    )
+

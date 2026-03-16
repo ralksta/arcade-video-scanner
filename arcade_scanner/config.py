@@ -3,7 +3,7 @@ import sys
 import json
 import socket
 from typing import List, Dict, Any, Optional
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from pydantic_settings import BaseSettings
 
 # ==============================================================================
@@ -140,9 +140,10 @@ class AppSettings(BaseSettings):
     enable_deovr: bool = Field(False)
     enable_image_scanning: bool = Field(False)
 
-    class Config:
-        env_prefix = "ARCADE_"
-        extra = "ignore"
+    model_config = ConfigDict(
+        env_prefix="ARCADE_",
+        extra="ignore",
+    )
 
 # ==============================================================================
 # CONFIG MANAGER

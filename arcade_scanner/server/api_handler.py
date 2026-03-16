@@ -21,13 +21,46 @@ from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
-# Global state for duplicate scanning
-DUPLICATE_SCAN_STATE = {
-    "is_running": False,
-    "progress": 0,
-    "message": "",
-}
-DUPLICATE_RESULTS_CACHE = None
+class DuplicateScanManager:
+    """Thread-safe manager for duplicate scan state and cached results."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._state: dict = {
+            "is_running": False,
+            "progress": 0,
+            "message": "",
+            "has_more": False,
+            "batch_offset": 0,
+            "next_offset": 0,
+        }
+        self._cache = None
+
+    def update_state(self, **kwargs) -> None:
+        with self._lock:
+            self._state.update(kwargs)
+
+    def get_state(self) -> dict:
+        with self._lock:
+            return dict(self._state)
+
+    @property
+    def cache(self):
+        with self._lock:
+            return self._cache
+
+    @cache.setter
+    def cache(self, value) -> None:
+        with self._lock:
+            self._cache = value
+
+
+# Module-level singleton – replaces bare global dicts
+_dup_mgr = DuplicateScanManager()
+
+# Backwards-compat shims (removed after full migration)
+def _dup_state() -> dict:
+    return _dup_mgr.get_state()
 
 class ReportDebouncer:
     def __init__(self, delay=1.0):
@@ -54,38 +87,34 @@ class ReportDebouncer:
 
 report_debouncer = ReportDebouncer(delay=1.0)
 
-def load_duplicate_cache():
+def load_duplicate_cache() -> bool:
     """Load cached duplicate results from disk."""
-    global DUPLICATE_RESULTS_CACHE
     try:
         if os.path.exists(DUPLICATES_CACHE_FILE):
             with open(DUPLICATES_CACHE_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                DUPLICATE_RESULTS_CACHE = data.get('groups', [])
-                print(f"✅ Loaded {len(DUPLICATE_RESULTS_CACHE)} duplicate groups from cache")
+                _dup_mgr.cache = data.get('groups', [])
+                print(f"✅ Loaded {len(_dup_mgr.cache)} duplicate groups from cache")
                 return True
     except Exception as e:
         print(f"⚠️ Could not load duplicate cache: {e}")
     return False
 
-def save_duplicate_cache():
+def save_duplicate_cache() -> None:
     """Save duplicate results to disk."""
     try:
-        if DUPLICATE_RESULTS_CACHE is not None:
-            cache_data = {
-                'groups': DUPLICATE_RESULTS_CACHE,
-                'timestamp': time.time()
-            }
+        cache = _dup_mgr.cache
+        if cache is not None:
+            cache_data = {'groups': cache, 'timestamp': time.time()}
             with open(DUPLICATES_CACHE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f)
-            print(f"✅ Saved {len(DUPLICATE_RESULTS_CACHE)} duplicate groups to cache")
+            print(f"✅ Saved {len(cache)} duplicate groups to cache")
     except Exception as e:
         print(f"⚠️ Could not save duplicate cache: {e}")
 
-def clear_duplicate_cache():
+def clear_duplicate_cache() -> None:
     """Clear the duplicate cache from memory and disk."""
-    global DUPLICATE_RESULTS_CACHE
-    DUPLICATE_RESULTS_CACHE = None
+    _dup_mgr.cache = None
     try:
         if os.path.exists(DUPLICATES_CACHE_FILE):
             os.remove(DUPLICATES_CACHE_FILE)
@@ -93,64 +122,68 @@ def clear_duplicate_cache():
     except Exception as e:
         print(f"⚠️ Could not remove duplicate cache file: {e}")
 
-def background_duplicate_scan(user_scan_targets=None, batch_offset: int = 0):
+def background_duplicate_scan(
+    user_scan_targets=None,
+    batch_offset: int = 0,
+) -> None:
     """Background worker for duplicate detection.
 
     Args:
-        user_scan_targets: Optional list of absolute paths to filter files by user's scan targets.
-                          If None, scans all files in database.
-        batch_offset: Starting offset for image batching (default 0 = first batch)
+        user_scan_targets: Optional list of absolute paths to filter files by user's
+                          scan targets.  If None, scans all files in database.
+        batch_offset: Starting offset for image batching (default 0 = first batch).
     """
-    global DUPLICATE_RESULTS_CACHE
     from arcade_scanner.core.duplicate_detector import DuplicateDetector
-    import threading
 
-    DUPLICATE_SCAN_STATE["is_running"] = True
-    DUPLICATE_SCAN_STATE["progress"] = 0
-    DUPLICATE_SCAN_STATE["message"] = "Initializing scan..."
-    DUPLICATE_SCAN_STATE["has_more"] = False
-    DUPLICATE_SCAN_STATE["batch_offset"] = batch_offset
+    _dup_mgr.update_state(
+        is_running=True,
+        progress=0,
+        message="Initializing scan...",
+        has_more=False,
+        batch_offset=batch_offset,
+    )
 
     try:
-        def progress_cb(msg, pct):
-            DUPLICATE_SCAN_STATE["message"] = msg
-            DUPLICATE_SCAN_STATE["progress"] = int(pct)
+        def progress_cb(msg: str, pct: float) -> None:
+            _dup_mgr.update_state(message=msg, progress=int(pct))
 
         detector = DuplicateDetector()
-        # Get all videos (thread-safe enough for read)
         all_videos = db.get_all()
         print(f"🔍 Duplicate scan: {len(all_videos)} total files in database")
 
-        # Filter by user's scan targets if provided
         if user_scan_targets:
-            all_videos = [v for v in all_videos
-                         if any(os.path.abspath(v.file_path).startswith(t) for t in user_scan_targets)]
+            all_videos = [
+                v for v in all_videos
+                if any(os.path.abspath(v.file_path).startswith(t) for t in user_scan_targets)
+            ]
             print(f"🔍 After user filter: {len(all_videos)} files match scan targets")
 
-        # Count by media type
         videos = [v for v in all_videos if getattr(v, 'media_type', 'video') == 'video']
         images = [v for v in all_videos if getattr(v, 'media_type', 'video') == 'image']
         print(f"🔍 Scanning {len(videos)} videos + {len(images)} images (batch offset: {batch_offset})")
 
-        results, has_more = detector.find_all_duplicates(all_videos, progress_cb, batch_offset=batch_offset)
+        results, has_more = detector.find_all_duplicates(
+            all_videos, progress_cb, batch_offset=batch_offset
+        )
         print(f"🔍 Found {len(results)} duplicate groups (has_more: {has_more})")
 
-        # Serialize results slightly earlier to avoid main thread blocking later
-        DUPLICATE_RESULTS_CACHE = [g.to_dict() for g in results]
-        DUPLICATE_SCAN_STATE["has_more"] = has_more
-        DUPLICATE_SCAN_STATE["next_offset"] = batch_offset + 5000 if has_more else 0
-
-        # Save to disk for future sessions
+        _dup_mgr.cache = [g.to_dict() for g in results]
+        _dup_mgr.update_state(
+            has_more=has_more,
+            next_offset=batch_offset + 5000 if has_more else 0,
+        )
         save_duplicate_cache()
 
-        DUPLICATE_SCAN_STATE["message"] = "Scan complete" + (" - more batches available" if has_more else "")
-        DUPLICATE_SCAN_STATE["progress"] = 100
+        _dup_mgr.update_state(
+            message="Scan complete" + (" - more batches available" if has_more else ""),
+            progress=100,
+        )
 
     except Exception as e:
         print(f"❌ Error in duplicate scan: {e}")
-        DUPLICATE_SCAN_STATE["message"] = f"Error: {e}"
+        _dup_mgr.update_state(message=f"Error: {e}")
     finally:
-        DUPLICATE_SCAN_STATE["is_running"] = False
+        _dup_mgr.update_state(is_running=False)
 
 
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
@@ -214,7 +247,27 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         try:
+            # 0. Health check endpoint - no auth required
+            if self.path == "/api/health" or self.path == "/api/health/":
+                try:
+                    total = db.count()
+                except Exception:
+                    total = -1
+                health = {
+                    "status": "ok",
+                    "version": "1.0",
+                    "db_entries": total,
+                }
+                body = json.dumps(health).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
             # 0. DeoVR AUTO-DETECTION ENDPOINT: /deovr serves library JSON
+
             # DeoVR browser checks for this endpoint when navigating to any site
             if self.path == "/deovr" or self.path == "/deovr/":
                 from arcade_scanner.core.deovr_generator import generate_deovr_json

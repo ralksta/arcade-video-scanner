@@ -288,6 +288,32 @@ class SQLiteStore:
             self._ensure_connection()
             self._conn.execute("DELETE FROM media WHERE file_path = ?", (path,))
 
+    def get_page(self, page: int = 0, page_size: int = 100) -> List[VideoEntry]:
+        """Return a paginated slice of entries. page=0 is the first page.
+
+        This avoids loading the entire library into memory for large collections.
+        Use together with count() to build pagination UI.
+        """
+        self._ensure_connection()
+        offset = page * page_size
+        cursor = self._conn.execute(
+            "SELECT * FROM media ORDER BY mtime DESC LIMIT ? OFFSET ?",
+            (page_size, offset),
+        )
+        results = []
+        for row in cursor:
+            try:
+                results.append(self._row_to_entry(row))
+            except Exception as e:
+                logger.warning("Skipping corrupted DB row during get_page: %s", e)
+        return results
+
+    def count(self) -> int:
+        """Return the total number of entries in the store."""
+        self._ensure_connection()
+        cursor = self._conn.execute("SELECT COUNT(*) FROM media")
+        return cursor.fetchone()[0]
+
     def cleanup_old_jobs(self, older_than_days: int = 30) -> int:
         """Delete completed/failed/cancelled jobs older than N days. Returns number of deleted rows."""
         self._ensure_connection()

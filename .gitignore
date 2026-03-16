@@ -48,3 +48,4 @@ test_*.py
 
 # Generated HTML report (user-specific)
 video_dashboard.html
+*.egg-info/
