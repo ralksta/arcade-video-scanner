@@ -584,7 +584,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         # macOS: Use shlex.quote() for safe AppleScript string building
                         safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
                         print(f"🚀 Launching Optimizer (Mac): {safe_cmd}")
-                        applescript = f'tell application "Terminal" to do script "{safe_cmd}"'
+                        # Open a NEW Terminal window (not just a tab) and bring it to front
+                        applescript = (
+                            'tell application "Terminal"\n'
+                            '    activate\n'
+                            f'    do script "{safe_cmd}"\n'
+                            'end tell'
+                        )
                         subprocess.run(["osascript", "-e", applescript])
                         
                     self.send_response(204)

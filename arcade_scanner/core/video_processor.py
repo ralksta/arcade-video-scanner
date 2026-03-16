@@ -241,9 +241,28 @@ def get_optimal_workers() -> int:
         return 6
     
     elif encoder == "h264_videotoolbox":
-        workers = min(8, cpu_cores)
+        # Detect actual Performance-core count via sysctl (macOS only)
+        # Apple Silicon Media Engine runs independently from CPU cores,
+        # so we can saturate P-cores without hurting encode throughput.
+        p_cores = None
+        try:
+            result = subprocess.run(
+                ["sysctl", "-n", "hw.perflevel0.logicalcpu"],
+                capture_output=True, text=True, timeout=3
+            )
+            if result.returncode == 0:
+                p_cores = int(result.stdout.strip())
+        except Exception:
+            pass
+
+        if p_cores is None:
+            # Fallback: use total logical CPUs
+            p_cores = cpu_cores
+
+        # Allow up to P-core count parallel jobs; cap at 16 to stay sane
+        workers = min(16, p_cores)
         _cached_workers = workers
-        print(f"🍎 Apple Silicon detected → using {workers} parallel workers")
+        print(f"🍎 Apple Silicon detected → {p_cores} P-cores → using {workers} parallel workers")
         return workers
     
     elif encoder == "h264_qsv":
