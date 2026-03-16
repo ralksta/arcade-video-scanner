@@ -1,9 +1,16 @@
 import hashlib
 import json
+import logging
 import os
 import subprocess
 from typing import Any, Dict, Optional
 from arcade_scanner.config import config
+
+logger = logging.getLogger(__name__)
+
+# Module-level constants (not recreated on every call)
+IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'})
+
 
 def get_video_metadata(filepath: str) -> Dict[str, Any]:
     cmd = [
@@ -25,8 +32,8 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
         data = json.loads(result.stdout)
         if "streams" in data and len(data["streams"]) > 0:
             return data
-    except:
-        pass
+    except Exception as e:
+        logger.debug("get_video_metadata failed for %s: %s", filepath, e)
     return {}
 
 def create_thumbnail(video_path: str) -> str:
@@ -36,7 +43,6 @@ def create_thumbnail(video_path: str) -> str:
     
     if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
         # Check if image (Image processing without seeking)
-        IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic')
         is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
         
         if is_image:
@@ -51,8 +57,8 @@ def create_thumbnail(video_path: str) -> str:
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
                 if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
                     return thumb_name
-             except:
-                pass
+             except Exception as e:
+                logger.warning("Image thumbnail failed for %s: %s", video_path, e)
              return ""
 
         # Get duration for smart seeking
@@ -60,8 +66,8 @@ def create_thumbnail(video_path: str) -> str:
         try:
             cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
             duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=5).decode().strip())
-        except:
-            pass
+        except Exception as e:
+            logger.debug("Duration probe failed for %s: %s", video_path, e)
 
         # Smart seek: 10% into the video, max 60s
         ss = "0"
@@ -69,9 +75,6 @@ def create_thumbnail(video_path: str) -> str:
             ss = str(min(60, int(duration * 0.1)))
 
         def try_extract(seek_time):
-            # Use pad filter to add letterboxing/pillarboxing while preserving aspect ratio
-            # scale: fit within 480x270 while preserving aspect ratio
-            # pad: add black bars to reach exactly 480x270
             vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
             cmd = [
                 "ffmpeg", "-ss", seek_time, "-i", video_path,
@@ -82,7 +85,8 @@ def create_thumbnail(video_path: str) -> str:
             try:
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
                 return os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0
-            except:
+            except Exception as e:
+                logger.warning("Thumbnail extract failed at %s for %s: %s", seek_time, video_path, e)
                 return False
 
         # Attempt 1: Smart Seek
@@ -103,12 +107,19 @@ def create_thumbnail(video_path: str) -> str:
 # --- HARDWARE ENCODER DETECTION ---
 _cached_encoder = None
 
-def detect_hw_encoder() -> tuple:
+def detect_hw_encoder(log_fn=None) -> tuple:
     """
     Detect available hardware encoders.
     Returns: (encoder_name, encoder_options_list)
+    
+    Args:
+        log_fn: Optional callable for logging (default: logger.info). 
+                Use print for CLI output, None for structured logging.
     """
     import sys
+    
+    if log_fn is None:
+        log_fn = logger.info
     
     # Try NVIDIA NVENC first (fastest)
     try:
@@ -151,13 +162,12 @@ def detect_hw_encoder() -> tuple:
         if "h264_vaapi" in encoders_output:
             # Try multiple common VAAPI devices
             vaapi_devices = ["/dev/dri/renderD128", "/dev/dri/card0"]
-            found_device = None
             
             for dev in vaapi_devices:
                 if not os.path.exists(dev):
                     continue
                     
-                print(f"🕵️ Testing VAAPI on {dev}...")
+                log_fn(f"🕵️ Testing VAAPI on {dev}...")
                 test_cmd = [
                     "ffmpeg", "-f", "lavfi", "-i", "color=c=black:s=256x256:d=0.1",
                     "-vaapi_device", dev,
@@ -168,38 +178,40 @@ def detect_hw_encoder() -> tuple:
                 
                 test_result = subprocess.run(test_cmd, capture_output=True, timeout=10)
                 if test_result.returncode == 0:
-                    print(f"✅ VAAPI Working on {dev}")
+                    log_fn(f"✅ VAAPI Working on {dev}")
                     return ("h264_vaapi", [
                         "-vaapi_device", dev, 
                         "-vf", "format=nv12,hwupload"
                     ])
                 else:
-                     print(f"❌ Failed on {dev}: {test_result.stderr.decode().strip()}")
+                    log_fn(f"❌ Failed on {dev}: {test_result.stderr.decode().strip()}")
             
-            print("⚠️ VAAPI failed on all devices. Possible fixes:")
-            print("  1. Install drivers: sudo apt-get install intel-media-va-driver-non-free")
-            print("  2. Fix permissions: sudo usermod -aG render $USER")
+            log_fn("⚠️ VAAPI failed on all devices. Possible fixes:")
+            log_fn("  1. Install drivers: sudo apt-get install intel-media-va-driver-non-free")
+            log_fn("  2. Fix permissions: sudo usermod -aG render $USER")
         else:
-             print("ℹ️ h264_vaapi not found in ffmpeg encoders")
+            log_fn("ℹ️ h264_vaapi not found in ffmpeg encoders")
             
     except Exception as e:
-        print(f"⚠️ Encoder detection critical error: {e}")
+        logger.warning("Encoder detection critical error: %s", e)
     
     # Fallback to software encoder
-    print("⚠️ Falling back to software encoding (libx264)")
+    log_fn("⚠️ Falling back to software encoding (libx264)")
     return ("libx264", ["-preset", "ultrafast", "-crf", "28"])
 
 
-def get_best_encoder() -> tuple:
+def get_best_encoder(log_fn=None) -> tuple:
     """Get cached best encoder, detecting on first call."""
     global _cached_encoder
+    if log_fn is None:
+        log_fn = logger.info
     if _cached_encoder is None:
-        _cached_encoder = detect_hw_encoder()
+        _cached_encoder = detect_hw_encoder(log_fn=log_fn)
         encoder_name = _cached_encoder[0]
         if encoder_name != "libx264":
-            print(f"🚀 Using hardware encoder: {encoder_name}")
+            log_fn(f"🚀 Using hardware encoder: {encoder_name}")
         else:
-            print(f"📦 Using software encoder: {encoder_name}")
+            log_fn(f"📦 Using software encoder: {encoder_name}")
     return _cached_encoder
 
 
@@ -213,9 +225,6 @@ def get_optimal_workers() -> int:
     global _cached_workers
     if _cached_workers is not None:
         return _cached_workers
-    
-    import os
-    import sys
     
     encoder, _ = get_best_encoder()
     cpu_cores = os.cpu_count() or 4
@@ -232,18 +241,16 @@ def get_optimal_workers() -> int:
                 vram_mb = int(result.stdout.strip().split('\n')[0])
                 workers = max(4, min(12, vram_mb // 3000))
                 _cached_workers = workers
-                print(f"🎮 Detected {vram_mb}MB GPU VRAM → using {workers} parallel workers")
+                logger.info("Detected %dMB GPU VRAM → using %d parallel workers", vram_mb, workers)
                 return workers
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("nvidia-smi query failed: %s", e)
         _cached_workers = 6
-        print(f"🎮 NVIDIA GPU detected → using 6 parallel workers")
+        logger.info("NVIDIA GPU detected → using 6 parallel workers")
         return 6
     
     elif encoder == "h264_videotoolbox":
         # Detect actual Performance-core count via sysctl (macOS only)
-        # Apple Silicon Media Engine runs independently from CPU cores,
-        # so we can saturate P-cores without hurting encode throughput.
         p_cores = None
         try:
             result = subprocess.run(
@@ -252,33 +259,31 @@ def get_optimal_workers() -> int:
             )
             if result.returncode == 0:
                 p_cores = int(result.stdout.strip())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("sysctl P-core query failed: %s", e)
 
         if p_cores is None:
-            # Fallback: use total logical CPUs
             p_cores = cpu_cores
 
-        # Allow up to P-core count parallel jobs; cap at 16 to stay sane
         workers = min(16, p_cores)
         _cached_workers = workers
-        print(f"🍎 Apple Silicon detected → {p_cores} P-cores → using {workers} parallel workers")
+        logger.info("Apple Silicon detected → %d P-cores → using %d parallel workers", p_cores, workers)
         return workers
     
     elif encoder == "h264_qsv":
         _cached_workers = 4
-        print(f"🔵 Intel QuickSync detected → using 4 parallel workers")
+        logger.info("Intel QuickSync detected → using 4 parallel workers")
         return 4
 
     elif encoder == "h264_vaapi":
         _cached_workers = 4
-        print(f"🐧 VAAPI Hardware Acceleration detected → using 4 parallel workers")
+        logger.info("VAAPI Hardware Acceleration detected → using 4 parallel workers")
         return 4
     
     else:
         workers = max(2, cpu_cores // 2)
         _cached_workers = workers
-        print(f"💻 Using {workers} parallel workers (CPU-based)")
+        logger.info("Using %d parallel workers (CPU-based)", workers)
         return workers
 
 def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None) -> Optional[Dict[str, Any]]:
@@ -341,5 +346,6 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
             "favorite": is_favorite
         }
         return result
-    except:
+    except Exception as e:
+        logger.error("process_video failed for %s: %s", filepath, e)
         return None

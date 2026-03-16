@@ -172,28 +172,44 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 return session_manager.get_username(cookie["session_token"].value)
         return None
 
-    # Cache: thumb filename → source file path (shared across all handler instances)
+    # LRU thumb filename → source file path (shared across handler instances, bounded size)
     _thumb_source_cache: dict = {}
+    _THUMB_CACHE_MAX = 2000
 
     def _resolve_thumb_source(self, thumb_filename: str):
         """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path."""
         import hashlib
-        # Check cache first
-        if thumb_filename in FinderHandler._thumb_source_cache:
-            path = FinderHandler._thumb_source_cache[thumb_filename]
+        from collections import OrderedDict
+
+        cache = FinderHandler._thumb_source_cache
+
+        # Move-to-end (LRU touch) on hit
+        if thumb_filename in cache:
+            path = cache[thumb_filename]
             if os.path.exists(path):
+                if isinstance(cache, OrderedDict):
+                    cache.move_to_end(thumb_filename)
                 return path
             else:
-                del FinderHandler._thumb_source_cache[thumb_filename]
+                del cache[thumb_filename]
 
-        # Build/rebuild cache from DB entries
-        if not FinderHandler._thumb_source_cache:
+        # Promote to OrderedDict if still a plain dict
+        if not isinstance(cache, OrderedDict):
+            FinderHandler._thumb_source_cache = OrderedDict(cache)
+            cache = FinderHandler._thumb_source_cache
+
+        # Rebuild from DB
+        if not cache:
             for entry in db.get_all():
                 file_hash = hashlib.md5(entry.file_path.encode()).hexdigest()
                 t_name = f"thumb_{file_hash}.jpg"
-                FinderHandler._thumb_source_cache[t_name] = entry.file_path
+                cache[t_name] = entry.file_path
 
-        return FinderHandler._thumb_source_cache.get(thumb_filename)
+        # Evict oldest entries when over capacity
+        while len(cache) > FinderHandler._THUMB_CACHE_MAX:
+            cache.popitem(last=False)
+
+        return cache.get(thumb_filename)
 
 
     def do_GET(self):
@@ -487,8 +503,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         try:
                             if os.path.exists(abs_path):
                                 size_mb = os.path.getsize(abs_path) / (1024 * 1024)
-                        except:
-                            pass
+                        except OSError as e:
+                            print(f"⚠️ Could not stat file {abs_path}: {e}")
                         from arcade_scanner.models.video_entry import VideoEntry
                         entry = VideoEntry(
                             FilePath=abs_path,
@@ -727,29 +743,29 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                 print("🔄 Scan requested via API...")
                 try:
-                    # Run Async Scanner via sync wrapper or asyncio.run_coroutine_threadsafe if we had a loop.
-                    # Given simplehttp server is threaded, we can just run the scanner loop.
-                    # BUT `scanner_mgr` uses asyncio.
-                    
+                    # asyncio.run() creates a new event loop; safe to call from this
+                    # worker thread since SimpleHTTPServer runs each request in its own thread.
                     import asyncio
                     mgr = get_scanner_manager()
-                    new_count = asyncio.run(mgr.run_scan())
-                    
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        new_count = loop.run_until_complete(mgr.run_scan())
+                    finally:
+                        loop.close()
+                        asyncio.set_event_loop(None)
+
                     # Generate Report
                     port = self.server.server_address[1]
                     results = [e.model_dump(by_alias=True) for e in db.get_all()]
                     generate_html_report(results, config.report_file, server_port=port)
-                    
+
                     self.send_response(200)
                     self.send_header("Content-type", "application/json")
                     self.end_headers()
                     self.wfile.write(json.dumps({"status": "complete", "count": new_count}).encode())
                     print("✅ Rescan complete.")
-                    
-                except Exception as e:
-                    print(f"❌ Rescan failed: {e}")
-                    self.send_error(500, str(e))
-                    
+
                 except Exception as e:
                     print(f"❌ Rescan failed: {e}")
                     self.send_error(500, str(e))
@@ -1088,7 +1104,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                                 total += entry.stat().st_size
                             elif entry.is_dir():
                                 total += get_dir_size(entry.path)
-                    except:
+                    except OSError:
                         pass
                     return total
                 
@@ -1976,7 +1992,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         body = self.rfile.read(content_length).decode("utf-8")
                         data = json.loads(body)
                         batch_offset = int(data.get("batch_offset", 0))
-                    except:
+                    except (ValueError, json.JSONDecodeError) as e:
+                        print(f"⚠️ Could not parse duplicate scan body: {e}")
                         pass  # Default to 0 if parsing fails
 
                 # Get user's scan targets for filtering

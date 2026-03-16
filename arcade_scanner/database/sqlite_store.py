@@ -10,11 +10,16 @@ Benefits over JSONStore:
     - ACID guarantees for concurrent access
     - Scales to 100K+ entries without memory pressure
 """
+import logging
 import os
 import sqlite3
 import json
 import hashlib
+import threading
+import time
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from ..config import config
 from ..models.video_entry import VideoEntry
@@ -51,13 +56,14 @@ _COLUMNS = [
 class SQLiteStore:
     """
     SQLite-backed media metadata store.
-    Thread-safe, auto-commits on every write.
+    Thread-safe via per-thread connections + write lock.
     """
 
     def __init__(self):
         self.db_file = os.path.join(config.hidden_data_dir, "media_library.db")
         self._conn: Optional[sqlite3.Connection] = None
         self._migrated = False
+        self._write_lock = threading.Lock()  # Serialise all writes
 
     def _ensure_connection(self):
         """Lazy-init the connection and create schema if needed."""
@@ -79,9 +85,17 @@ class SQLiteStore:
         self._create_table()
 
     def _create_table(self):
-        """Create the media table and encoding_queue table if they don't exist."""
+        """Create the media table, indexes, and encoding_queue table if they don't exist."""
         cols = ", ".join(f"{name} {typedef}" for name, typedef in _COLUMNS)
         self._conn.execute(f"CREATE TABLE IF NOT EXISTS media ({cols})")
+
+        # Performance indexes for common filter/sort queries
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON media(status)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_codec ON media(codec)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_size_mb ON media(size_mb)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_mtime ON media(mtime)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_favorite ON media(favorite)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_vaulted ON media(vaulted)")
 
         # Encoding queue for remote optimization
         self._conn.execute("""
@@ -106,7 +120,6 @@ class SQLiteStore:
     def queue_encode(self, file_path: str, size_bytes: int = 0) -> Optional[int]:
         """Add a file to the encoding queue. Returns job ID or None if already pending."""
         self._ensure_connection()
-        import time
 
         # Check for existing pending/active job for this file
         cursor = self._conn.execute(
@@ -126,7 +139,6 @@ class SQLiteStore:
     def get_next_pending(self, worker_id: str = "") -> Optional[dict]:
         """Atomically claim the oldest pending job. Returns job dict or None."""
         self._ensure_connection()
-        import time
 
         # Atomic claim: update first pending row
         cursor = self._conn.execute(
@@ -146,7 +158,6 @@ class SQLiteStore:
     def update_job_status(self, job_id: int, status: str, **kwargs) -> None:
         """Update a job's status and optional fields (result_message, saved_bytes, completed_at)."""
         self._ensure_connection()
-        import time
 
         sets = ["status = ?"]
         vals = [status]
@@ -255,25 +266,42 @@ class SQLiteStore:
 
     def upsert(self, entry) -> None:
         """Insert or replace an entry. Accepts VideoEntry or MediaAsset."""
-        self._ensure_connection()
         from ..models.media_asset import MediaAsset
 
-        if isinstance(entry, MediaAsset):
-            entry = self._asset_to_video_entry(entry)
+        with self._write_lock:
+            self._ensure_connection()
+            if isinstance(entry, MediaAsset):
+                entry = self._asset_to_video_entry(entry)
 
-        placeholders = ", ".join("?" for _ in _COLUMNS)
-        col_names = ", ".join(name for name, _ in _COLUMNS)
-        values = self._entry_to_tuple(entry)
+            placeholders = ", ".join("?" for _ in _COLUMNS)
+            col_names = ", ".join(name for name, _ in _COLUMNS)
+            values = self._entry_to_tuple(entry)
 
-        self._conn.execute(
-            f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
-            values,
-        )
+            self._conn.execute(
+                f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
+                values,
+            )
 
     def remove(self, path: str) -> None:
         """Delete an entry by file_path."""
+        with self._write_lock:
+            self._ensure_connection()
+            self._conn.execute("DELETE FROM media WHERE file_path = ?", (path,))
+
+    def cleanup_old_jobs(self, older_than_days: int = 30) -> int:
+        """Delete completed/failed/cancelled jobs older than N days. Returns number of deleted rows."""
         self._ensure_connection()
-        self._conn.execute("DELETE FROM media WHERE file_path = ?", (path,))
+        cutoff = int(time.time()) - (older_than_days * 86400)
+        cursor = self._conn.execute(
+            "DELETE FROM encoding_queue "
+            "WHERE status IN ('done', 'failed', 'cancelled') "
+            "  AND completed_at > 0 AND completed_at < ?",
+            (cutoff,),
+        )
+        deleted = cursor.rowcount
+        if deleted > 0:
+            logger.info("Cleaned up %d old encoding_queue jobs (>%dd)", deleted, older_than_days)
+        return deleted
 
     # ------------------------------------------------------------------
     # Internal helpers
