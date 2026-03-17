@@ -350,8 +350,11 @@ def handle_post(handler) -> bool:
             if not file_path:
                 handler.send_error(400, "Missing file_path")
                 return True
+            target_codec = data.get("codec", "hevc")
+            if target_codec not in ("hevc", "av1"):
+                target_codec = "hevc"
             size_bytes = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-            job_id = db.queue_encode(file_path, size_bytes)
+            job_id = db.queue_encode(file_path, size_bytes, target_codec=target_codec)
             if job_id:
                 print(f"📋 Queued for remote encoding: {os.path.basename(file_path)} (job {job_id})")
                 send_json(handler, {"success": True, "job_id": job_id})

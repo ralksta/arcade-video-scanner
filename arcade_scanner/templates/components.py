@@ -390,6 +390,17 @@ OPTIMIZE_PANEL_COMPONENT = """
         <span class="text-xs text-gray-500" id="optVideoDesc">Optimize to efficient HEVC/H.265</span>
     </div>
 
+    <!-- Codec Row -->
+    <div class="flex items-center gap-4 flex-wrap" id="optCodecRow">
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px]">Codec</div>
+        <div class="flex bg-white/5 rounded-lg p-0.5">
+            <div class="px-4 py-1.5 text-sm cursor-pointer rounded-md text-white bg-white/10 shadow-sm transition-all" id="optCodecHevc" data-codec-btn="hevc" onclick="setOptCodec('hevc')">HEVC</div>
+            <div class="px-4 py-1.5 text-sm cursor-pointer rounded-md text-gray-400 hover:text-white transition-all" id="optCodecAv1" data-codec-btn="av1" onclick="setOptCodec('av1')">🧪 AV1</div>
+        </div>
+        <div class="flex-1"></div>
+        <span class="text-xs text-gray-500" id="optCodecDesc">Efficient HEVC/H.265 encoding</span>
+    </div>
+
     <!-- Audio Row -->
     <div class="flex items-center gap-4 flex-wrap">
         <div class="text-xs text-gray-400 font-bold uppercase tracking-widest w-[60px]">Audio</div>

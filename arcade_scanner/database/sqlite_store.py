@@ -104,6 +104,7 @@ class SQLiteStore:
                 file_path TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
                 size_bytes INTEGER DEFAULT 0,
+                target_codec TEXT DEFAULT 'hevc',
                 created_at INTEGER DEFAULT 0,
                 started_at INTEGER DEFAULT 0,
                 completed_at INTEGER DEFAULT 0,
@@ -112,12 +113,17 @@ class SQLiteStore:
                 saved_bytes INTEGER DEFAULT 0
             )
         """)
+        # Add target_codec column to existing installations (migration)
+        try:
+            self._conn.execute("ALTER TABLE encoding_queue ADD COLUMN target_codec TEXT DEFAULT 'hevc'")
+        except Exception:
+            pass  # Column already exists
 
     # ------------------------------------------------------------------
     # Encoding Queue methods
     # ------------------------------------------------------------------
 
-    def queue_encode(self, file_path: str, size_bytes: int = 0) -> Optional[int]:
+    def queue_encode(self, file_path: str, size_bytes: int = 0, target_codec: str = 'hevc') -> Optional[int]:
         """Add a file to the encoding queue. Returns job ID or None if already pending."""
         self._ensure_connection()
 
@@ -130,8 +136,8 @@ class SQLiteStore:
             return None  # Already queued
 
         self._conn.execute(
-            "INSERT INTO encoding_queue (file_path, status, size_bytes, created_at) VALUES (?, 'pending', ?, ?)",
-            (file_path, size_bytes, int(time.time()))
+            "INSERT INTO encoding_queue (file_path, status, size_bytes, target_codec, created_at) VALUES (?, 'pending', ?, ?, ?)",
+            (file_path, size_bytes, target_codec, int(time.time()))
         )
         cursor = self._conn.execute("SELECT last_insert_rowid()")
         return cursor.fetchone()[0]
@@ -142,7 +148,7 @@ class SQLiteStore:
 
         # Atomic claim: update first pending row
         cursor = self._conn.execute(
-            "SELECT id, file_path, size_bytes FROM encoding_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
+            "SELECT id, file_path, size_bytes, target_codec FROM encoding_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
         )
         row = cursor.fetchone()
         if not row:
@@ -153,7 +159,12 @@ class SQLiteStore:
             "UPDATE encoding_queue SET status = 'downloading', started_at = ?, worker_id = ? WHERE id = ? AND status = 'pending'",
             (int(time.time()), worker_id, job_id)
         )
-        return {"id": job_id, "file_path": row["file_path"], "size_bytes": row["size_bytes"]}
+        return {
+            "id": job_id,
+            "file_path": row["file_path"],
+            "size_bytes": row["size_bytes"],
+            "target_codec": row["target_codec"] or "hevc",
+        }
 
     def update_job_status(self, job_id: int, status: str, **kwargs) -> None:
         """Update a job's status and optional fields (result_message, saved_bytes, completed_at)."""

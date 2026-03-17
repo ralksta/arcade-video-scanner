@@ -2793,6 +2793,36 @@ function setOptAudio(mode) {
 }
 
 let currentOptVideo = 'compress';
+let currentOptCodec = 'hevc';  // 'hevc' or 'av1' (experimental)
+
+/**
+ * Set target codec for encoding
+ * @param {string} codec - 'hevc' (default) or 'av1' (experimental)
+ */
+function setOptCodec(codec) {
+    currentOptCodec = codec;
+    updateOptCodecUI();
+}
+
+/**
+ * Update codec selector button UI
+ */
+function updateOptCodecUI() {
+    document.querySelectorAll('[data-codec-btn]').forEach(btn => {
+        const isActive = btn.dataset.codecBtn === currentOptCodec;
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('bg-white/10', isActive);
+        btn.classList.toggle('shadow-sm', isActive);
+        btn.classList.toggle('text-gray-400', !isActive);
+        btn.classList.toggle('hover:text-white', !isActive);
+    });
+    const desc = document.getElementById('optCodecDesc');
+    if (desc) {
+        desc.textContent = currentOptCodec === 'av1'
+            ? '🧪 Experimental – requires M3/M4 or RTX 40xx'
+            : 'Efficient HEVC/H.265 encoding';
+    }
+}
 
 /**
  * Set video optimization mode
@@ -2824,6 +2854,10 @@ function updateOptVideoUI() {
         copyBtn.classList.add(...inactiveClasses);
 
         document.getElementById('optVideoDesc').innerText = "Optimize to efficient HEVC/H.265";
+
+        // Show codec selector when compressing
+        const codecRow = document.getElementById('optCodecRow');
+        if (codecRow) codecRow.style.display = '';
     } else {
         compressBtn.classList.remove(...activeClasses);
         compressBtn.classList.add(...inactiveClasses);
@@ -2832,6 +2866,10 @@ function updateOptVideoUI() {
         copyBtn.classList.remove(...inactiveClasses);
 
         document.getElementById('optVideoDesc').innerText = "Copy video stream (Passthrough)";
+
+        // Hide codec selector when copying (no encoding = no codec choice)
+        const codecRow = document.getElementById('optCodecRow');
+        if (codecRow) codecRow.style.display = 'none';
     }
 }
 
@@ -2967,13 +3005,14 @@ function queueForRemoteEncode(filePath) {
     fetch('/api/queue/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path: filePath })
+        body: JSON.stringify({ file_path: filePath, codec: currentOptCodec })
     })
         .then(r => r.json())
         .then(data => {
             const name = filePath.split(/[\\/]/).pop();
             if (data.success) {
-                showToast(`☁️ Queued: ${name}`, 'success');
+                const codecLabel = currentOptCodec === 'av1' ? '🧪 AV1' : 'HEVC';
+                showToast(`☁️ Queued [${codecLabel}]: ${name}`, 'success');
             } else {
                 showToast(`⚠️ ${data.error || 'Already queued'}: ${name}`, 'warning');
             }
@@ -2996,7 +3035,7 @@ async function queueBatchForRemoteEncode(paths) {
             const r = await fetch('/api/queue/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_path: p })
+                body: JSON.stringify({ file_path: p, codec: currentOptCodec })
             });
             const data = await r.json();
             if (data.success) queued++;
@@ -3006,11 +3045,13 @@ async function queueBatchForRemoteEncode(paths) {
             skipped++;
         }
     }
-    showToast(`☁️ Queued ${queued} file(s) for Mac encoding${skipped > 0 ? ` (${skipped} skipped)` : ''}`, 'success');
+    const codecLabel = currentOptCodec === 'av1' ? '🧪 AV1' : 'HEVC';
+    showToast(`☁️ Queued ${queued} file(s) [${codecLabel}]${skipped > 0 ? ` (${skipped} skipped)` : ''}`, 'success');
 }
 
 window.queueForRemoteEncode = queueForRemoteEncode;
 window.queueBatchForRemoteEncode = queueBatchForRemoteEncode;
+window.setOptCodec = setOptCodec;
 
 // --- GLOBAL UTILS ---
 window.toggleLayout = toggleLayout;

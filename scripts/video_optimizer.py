@@ -130,7 +130,40 @@ ENCODER_PROFILES = {
         ],
         'quality_flag': '-crf',
         'video_filter': 'format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2',
-    }
+    },
+    # --- AV1 Profiles (Experimental) ---
+    'av1_videotoolbox': {
+        'name': 'Apple VideoToolbox AV1 (M3/M4)',
+        'codec': 'av1_videotoolbox',
+        'quality_range': (60, 35, -10),  # q:v – higher is better
+        'quality_direction': -1,
+        'hwaccel_input': [],
+        'encoder_args': [
+            '-allow_sw', '0',
+            '-realtime', '0',
+        ],
+        'quality_flag': '-q:v',
+        'video_filter': 'format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2',
+    },
+    'av1_nvenc': {
+        'name': 'NVIDIA NVENC AV1 (RTX 40xx)',
+        'codec': 'av1_nvenc',
+        'quality_range': (28, 48, 4),  # CQ – lower is better
+        'quality_direction': 1,
+        'hwaccel_input': ['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda'],
+        'encoder_args': [
+            '-preset', 'p5',
+            '-tune', 'hq',
+            '-rc', 'vbr',
+            '-multipass', 'fullres',
+            '-tier', 'high',
+            '-spatial-aq', '1',
+            '-temporal-aq', '1',
+            '-rc-lookahead', '32',
+        ],
+        'quality_flag': '-cq',
+        'video_filter': 'scale_cuda=trunc(iw/2)*2:trunc(ih/2)*2:format=yuv420p',
+    },
 }
 
 # --- COLORS ---
@@ -889,6 +922,15 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 if effective_out != output_path and effective_out.exists(): effective_out.unlink()
                 return (False, size_after, 0, 'too_large')
 
+            # Early savings check: skip SSIM if compression is not worth it
+            saved_bytes_pre = size_to_compare - size_after
+            saved_pct_pre = saved_bytes_pre * 100 / size_to_compare
+            MIN_SAVINGS_FOR_SSIM = 10.0  # Only run SSIM if we saved at least 10%
+            if saved_pct_pre < MIN_SAVINGS_FOR_SSIM:
+                print(f" {Y}-> Saved only {saved_pct_pre:.2f}% – skipping SSIM (below {MIN_SAVINGS_FOR_SSIM:.0f}% threshold). Not optimal.{NC}")
+                if effective_out != output_path and effective_out.exists(): effective_out.unlink()
+                return (False, size_after, 0.0, 'poor_savings')
+
             # Quality verification: single ffmpeg pass over 3 segments (25 / 50 / 75 %)
             # concat-based comparison → natural mean, no skew from fades like min() had
             dur_for_samples = trim_duration if is_trim else info['duration']
@@ -972,8 +1014,18 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                     high = mid - 1
                 continue
 
+            if error == 'poor_savings':
+                # Not enough compression achieved – push toward more compression
+                # (same direction as early_abort / too_large would, but opposite of quality failure)
+                if profile['quality_direction'] > 0:
+                    low = mid + 1   # VideoToolbox: lower Q = more compression
+                else:
+                    high = mid - 1  # NVENC: higher CQ = more compression
+                if staging.exists(): staging.unlink()
+                continue
+
             if not success:
-                # Unexpected failure
+                # Unexpected failure – push toward better quality to stay safe
                 if profile['quality_direction'] > 0:
                     high = mid - 1
                 else:
@@ -1120,6 +1172,12 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             quality += step
             continue
 
+        if error == 'poor_savings':
+            # SSIM skipped – savings too low. Try next quality step (more compression).
+            # staging already deleted by run_encode_pass()
+            quality += step
+            continue
+
         if not success:
             quality += step
             continue
@@ -1228,6 +1286,8 @@ def main():
     parser.add_argument('files', nargs='*', help='Video files to optimize')
     parser.add_argument('--encoder', choices=['auto', 'nvenc', 'videotoolbox', 'qsv', 'libx265'], default='auto',
                         help='Encoder to use (default: auto-detect)')
+    parser.add_argument('--codec', choices=['hevc', 'av1'], default='hevc',
+                        help='Target codec: hevc (default) or av1 (experimental, requires modern GPU)')
     parser.add_argument('--min-size', type=int, default=DEFAULT_MIN_SIZE_MB,
                         help=f'Skip files smaller than N MB (default: {DEFAULT_MIN_SIZE_MB})')
     parser.add_argument('--copy-audio', action='store_true',
@@ -1240,6 +1300,7 @@ def main():
                         help='Video processing mode: compress (default) or copy (passthrough)')
     parser.add_argument('--q', type=int, help='Manual starting quality value')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
+    parser.add_argument('--no-fun-facts', action='store_true', help='Suppress fun facts output')
     args = parser.parse_args()
 
     if args.port:
@@ -1252,7 +1313,20 @@ def main():
         encoder_key = detect_encoder()
     else:
         encoder_key = args.encoder
-    
+
+    # AV1 codec override: map hardware encoder → AV1 variant
+    if getattr(args, 'codec', 'hevc') == 'av1':
+        av1_map = {
+            'videotoolbox': 'av1_videotoolbox',
+            'nvenc': 'av1_nvenc',
+        }
+        av1_key = av1_map.get(encoder_key)
+        if av1_key and av1_key in ENCODER_PROFILES:
+            print(f"{Y}🧪 AV1 Experimental: switching from {encoder_key} → {av1_key}{NC}")
+            encoder_key = av1_key
+        else:
+            print(f"{Y}⚠️  AV1 not supported for encoder '{encoder_key}', falling back to HEVC.{NC}")
+
     profile = ENCODER_PROFILES[encoder_key]
     print(f"{BG}VIDEO OPTIMIZER V2.1{NC} - {G}{profile['name']}{NC}")
     if args.copy_audio:

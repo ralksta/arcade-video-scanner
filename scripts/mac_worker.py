@@ -209,7 +209,8 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
         return
 
     # 2. Encode
-    print(f"  {C}⚡ Encoding with VideoToolbox...{NC}")
+    target_codec = job.get("target_codec", "hevc")
+    print(f"  {C}⚡ Encoding with VideoToolbox (codec: {target_codec})...{NC}")
     client.update_status(job_id, "encoding")
 
     try:
@@ -221,6 +222,19 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
             client.update_status(job_id, "failed", message="No hardware encoder on this Mac")
             _cleanup(src_path)
             return
+
+        # AV1 codec override: map hardware encoder → AV1 variant
+        if target_codec == "av1":
+            av1_map = {
+                "videotoolbox": "av1_videotoolbox",
+                "nvenc": "av1_nvenc",
+            }
+            av1_key = av1_map.get(encoder_key)
+            if av1_key and av1_key in ENCODER_PROFILES:
+                print(f"  {Y}🧪 AV1 Experimental: {encoder_key} → {av1_key}{NC}")
+                encoder_key = av1_key
+            else:
+                print(f"  {Y}⚠ AV1 not available for '{encoder_key}', falling back to HEVC{NC}")
 
         profile = ENCODER_PROFILES[encoder_key]
         print(f"  Using encoder: {profile['name']}")
