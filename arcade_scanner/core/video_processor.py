@@ -9,7 +9,7 @@ from arcade_scanner.config import config
 logger = logging.getLogger(__name__)
 
 # Module-level constants (not recreated on every call)
-IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'})
+IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif'})
 
 
 def get_video_metadata(filepath: str) -> Dict[str, Any]:

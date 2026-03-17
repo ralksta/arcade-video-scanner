@@ -1435,6 +1435,7 @@ COLLECTION_MODAL_COMPONENT = """
                                             <button class="filter-chip" data-filter="format" data-value="gif" onclick="toggleSmartFilterChip(this)" aria-pressed="false">GIF</button>
                                             <button class="filter-chip" data-filter="format" data-value="webp" onclick="toggleSmartFilterChip(this)" aria-pressed="false">WebP</button>
                                             <button class="filter-chip" data-filter="format" data-value="heic" onclick="toggleSmartFilterChip(this)" aria-pressed="false">HEIC</button>
+                                            <button class="filter-chip" data-filter="format" data-value="avif" onclick="toggleSmartFilterChip(this)" aria-pressed="false">AVIF</button>
                                         </div>
 
                                         <!-- RAW formats (nested collapse) -->
@@ -2083,18 +2084,41 @@ SETTINGS_MODAL_COMPONENT = """
                             </label>
                         </div>
 
-                        <!-- SCAN IMAGES -->
+                        <!-- INCLUDE PHOTOS -->
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
-                                <div class="text-white font-medium text-sm">Scan Images</div>
+                                <div class="text-white font-medium text-sm">Include Photos</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Include <span class="text-arcade-cyan">.jpg, .png, .gif</span> etc. in library</div>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="settingsScanImages" class="sr-only peer" onchange="markSettingsUnsaved()">
+                                <input type="checkbox" id="settingsScanImages" class="sr-only peer" onchange="onIncludePhotosChange(this)">
                                 <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-cyan"></div>
                             </label>
                         </div>
-                        
+
+                        <!-- REMOVE PHOTOS CONFIRMATION MODAL -->
+                        <div id="removePhotosModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                            <div class="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <span class="material-icons text-yellow-400 text-2xl">warning</span>
+                                    <h3 class="text-white font-semibold text-lg">Remove existing photos?</h3>
+                                </div>
+                                <p class="text-gray-400 text-sm mb-6">
+                                    Do you want to <span class="text-white font-medium">remove all existing photos</span> from the library database?
+                                    They won't be deleted from disk — just removed from the index.
+                                </p>
+                                <div class="flex gap-3">
+                                    <button onclick="confirmRemovePhotos(true)" class="flex-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 rounded-xl py-2.5 text-sm font-medium transition-colors">
+                                        Yes, remove from DB
+                                    </button>
+                                    <button onclick="confirmRemovePhotos(false)" class="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 rounded-xl py-2.5 text-sm font-medium transition-colors">
+                                        Keep in library
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">DeoVR Integration</div>

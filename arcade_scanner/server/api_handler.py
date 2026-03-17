@@ -21,6 +21,44 @@ from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
+
+class _MediaCache:
+    """Thread-safe in-memory cache für db.get_all() mit 30s TTL.
+    
+    Verhindert wiederholte Full-Table-Scans für API-Requests, die in kurzer
+    Zeit mehrfach alle Einträge lesen. Wird explizit invalidiert wenn Daten
+    verändert werden (upsert, remove etc.).
+    """
+    TTL = 30.0  # Sekunden
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._data: list | None = None
+        self._timestamp: float = 0.0
+
+    def get(self) -> list:
+        """Gibt gecachte Resultate zurück (max. TTL alt) oder liest frisch aus DB."""
+        now = time.monotonic()
+        with self._lock:
+            if self._data is not None and (now - self._timestamp) < self.TTL:
+                return self._data
+        # Cache-Miss: außerhalb des Locks lesen um Blocking zu minimieren
+        fresh = db.get_all()
+        with self._lock:
+            self._data = fresh
+            self._timestamp = time.monotonic()
+        return fresh
+
+    def invalidate(self) -> None:
+        """Muss nach jeder Schreiboperation aufgerufen werden."""
+        with self._lock:
+            self._data = None
+            self._timestamp = 0.0
+
+
+_media_cache = _MediaCache()
+
+
 class DuplicateScanManager:
     """Thread-safe manager for duplicate scan state and cached results."""
 
@@ -58,9 +96,7 @@ class DuplicateScanManager:
 # Module-level singleton – replaces bare global dicts
 _dup_mgr = DuplicateScanManager()
 
-# Backwards-compat shims (removed after full migration)
-def _dup_state() -> dict:
-    return _dup_mgr.get_state()
+
 
 class ReportDebouncer:
     def __init__(self, delay=1.0):
@@ -79,7 +115,7 @@ class ReportDebouncer:
     def _generate(self, port):
         try:
             # Re-fetch results to ensure freshness
-            results = [e.model_dump(by_alias=True) for e in db.get_all()]
+            results = [e.model_dump(by_alias=True) for e in _media_cache.get()]
             generate_html_report(results, config.report_file, server_port=port)
             # print(f"✅ HTML Report regenerated (debounced)")
         except Exception as e:
@@ -148,7 +184,7 @@ def background_duplicate_scan(
             _dup_mgr.update_state(message=msg, progress=int(pct))
 
         detector = DuplicateDetector()
-        all_videos = db.get_all()
+        all_videos = _media_cache.get()
         print(f"🔍 Duplicate scan: {len(all_videos)} total files in database")
 
         if user_scan_targets:
@@ -240,7 +276,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         # Always re-read DB on miss so entries added after server start are found.
         # Using a set to track known entries avoids re-hashing already cached paths.
         known_paths = set(cache.values())
-        for entry in db.get_all():
+        for entry in _media_cache.get():
             if entry.file_path not in known_paths:
                 file_hash = hashlib.md5(entry.file_path.encode()).hexdigest()
                 t_name = f"thumb_{file_hash}.jpg"
@@ -292,7 +328,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     
                 server_url = f"{protocol}://{host}"
                 
-                all_videos = db.get_all()
+                all_videos = _media_cache.get()
                 # Smart collections are stored per-user, not in global config
                 admin_user = user_db.get_user("admin")
                 smart_collections = list(admin_user.data.smart_collections) if admin_user else []
@@ -575,6 +611,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         )
                     db.upsert(entry)
                     db.save()
+                    _media_cache.invalidate()  # Entry geändert → Cache leeren
                     
                     # Regenerate HTML report so refresh works
                     try:
@@ -749,6 +786,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                                 db.remove(orig_abs)
                                 
                             db.save()
+                            _media_cache.invalidate()  # Einträge entfernt → Cache leeren
                             
                         else:
                             print(f"❌ Optimized file not found: {opt_abs}")
@@ -814,7 +852,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     # Generate Report
                     port = self.server.server_address[1]
-                    results = [e.model_dump(by_alias=True) for e in db.get_all()]
+                    results = [e.model_dump(by_alias=True) for e in _media_cache.get()]
+                    _media_cache.invalidate()  # Neue Scan-Ergebnisse sofort sichtbar
                     generate_html_report(results, config.report_file, server_port=port)
 
                     self.send_response(200)
@@ -1104,7 +1143,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 server_url = f"{protocol}://{host}"
                 
                 # Generate iOS-compatible JSON
-                all_videos = db.get_all()
+                all_videos = _media_cache.get()
                 ios_data = generate_ios_json(all_videos, server_url)
                 
                 self.send_response(200)
@@ -1137,7 +1176,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 server_url = f"{protocol}://{host}"
                 
                 # Generate DeoVR JSON for collection
-                all_videos = db.get_all()
+                all_videos = _media_cache.get()
                 deovr_data = generate_collection_deovr_json(
                     all_videos,
                     collection.get("name", collection_id),
@@ -1321,7 +1360,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 server_url = f"{protocol}://{host}"
 
                 # Get all videos
-                all_videos = db.get_all()
+                all_videos = _media_cache.get()
                 # Filter by user scan targets
                 user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
                 if user_targets:
@@ -1401,12 +1440,15 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 # Request was "include and excludes already different for every user?".
                 # Implies users only see what they define.
                 
+                # Fetch once, use in both branches below
+                all_entries = _media_cache.get()
+
                 # ADMIN OVERRIDE: If no targets defined, Admin sees all.
                 if not user_targets and u.is_admin:
-                    filtered_videos = [e.model_dump(by_alias=True) for e in db.get_all()]
+                    filtered_videos = [e.model_dump(by_alias=True) for e in all_entries]
                 elif user_targets:
                     # Optimized: Check path BEFORE serialization
-                    for entry in db.get_all():
+                    for entry in all_entries:
                         v_path = os.path.abspath(entry.file_path)
                         if any(v_path.startswith(t) for t in user_targets):
                              filtered_videos.append(entry.model_dump(by_alias=True))
@@ -1451,7 +1493,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps(DUPLICATE_SCAN_STATE).encode("utf-8"))
+                self.wfile.write(json.dumps(_dup_mgr.get_state()).encode("utf-8"))
                 return
 
             elif self.path == "/api/duplicates" or self.path == "/api/duplicates/":
@@ -1463,7 +1505,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 
                 try:
                     # Return cached results or empty list if not run yet
-                    groups_data = DUPLICATE_RESULTS_CACHE if DUPLICATE_RESULTS_CACHE is not None else []
+                    cache = _dup_mgr.cache
+                    groups_data = cache if cache is not None else []
                     
                     # Calculate summary stats
                     total_groups = len(groups_data)
@@ -1477,7 +1520,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             "video_groups": total_videos,
                             "image_groups": total_images,
                             "potential_savings_mb": potential_savings,
-                            "scan_run": DUPLICATE_RESULTS_CACHE is not None
+                            "scan_run": cache is not None
                         },
                         "groups": groups_data
                     }
@@ -1728,6 +1771,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 for morsel in cookie.values():
                     self.send_header("Set-Cookie", morsel.OutputString())
                 self.end_headers()
+                return
+
+            if self.path == "/api/settings/remove-photos":
+                from .routes.settings import handle_post_remove_photos
+                handle_post_remove_photos(self)
                 return
 
             if self.path == "/api/settings":
@@ -2037,7 +2085,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(401, "Unauthorized")
                     return
 
-                if DUPLICATE_SCAN_STATE["is_running"]:
+                if _dup_mgr.get_state()["is_running"]:
                     self.send_error(409, "Scan already in progress")
                     return
 

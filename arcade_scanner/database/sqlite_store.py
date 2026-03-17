@@ -288,6 +288,16 @@ class SQLiteStore:
             self._ensure_connection()
             self._conn.execute("DELETE FROM media WHERE file_path = ?", (path,))
 
+    def delete_all_photos(self) -> int:
+        """Delete all entries where media_type = 'image'. Returns the number of deleted rows."""
+        with self._write_lock:
+            self._ensure_connection()
+            cursor = self._conn.execute("DELETE FROM media WHERE media_type = 'image'")
+            deleted = cursor.rowcount
+            if deleted > 0:
+                logger.info("Deleted %d photo entries from DB (include_photos disabled)", deleted)
+            return deleted
+
     def get_page(self, page: int = 0, page_size: int = 100) -> List[VideoEntry]:
         """Return a paginated slice of entries. page=0 is the first page.
 

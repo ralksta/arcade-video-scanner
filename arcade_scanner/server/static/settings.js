@@ -964,3 +964,64 @@ document.addEventListener('click', (e) => {
 
 window.loadQueueStatus = loadQueueStatus;
 window.cancelQueueJob = cancelQueueJob;
+
+// ============================================================================
+// INCLUDE PHOTOS TOGGLE + CONFIRMATION MODAL
+// ============================================================================
+
+/**
+ * Called when the "Include Photos" checkbox changes.
+ * If the user is DISABLING photos, show the confirmation modal.
+ * If the user is ENABLING photos, just mark settings as unsaved.
+ * @param {HTMLInputElement} checkbox
+ */
+function onIncludePhotosChange(checkbox) {
+    if (!checkbox.checked) {
+        // Temporarily restore checked state until user confirms
+        checkbox.checked = true;
+        // Show the confirmation modal
+        const modal = document.getElementById('removePhotosModal');
+        if (modal) modal.classList.remove('hidden');
+    } else {
+        markSettingsUnsaved();
+    }
+}
+
+/**
+ * Handle user choice in the "Remove Photos" modal.
+ * @param {boolean} removeFromDb - true = remove, false = keep
+ */
+async function confirmRemovePhotos(removeFromDb) {
+    const modal = document.getElementById('removePhotosModal');
+    const checkbox = document.getElementById('settingsScanImages');
+
+    if (modal) modal.classList.add('hidden');
+
+    if (!removeFromDb) {
+        // User chose to keep photos → toggle stays OFF (user wanted to disable)
+        if (checkbox) checkbox.checked = false;
+        markSettingsUnsaved();
+        return;
+    }
+
+    // User confirmed removal → uncheck, save setting, then purge DB
+    if (checkbox) checkbox.checked = false;
+    markSettingsUnsaved();
+
+    try {
+        const resp = await fetch('/api/settings/remove-photos', { method: 'POST' });
+        if (resp.ok) {
+            const data = await resp.json();
+            showSettingsToast(`Removed ${data.deleted} photo(s) from library`, false);
+        } else {
+            showSettingsToast('Could not remove photos', true);
+        }
+    } catch (e) {
+        console.error('Remove photos error:', e);
+        showSettingsToast('Error removing photos', true);
+    }
+}
+
+window.onIncludePhotosChange = onIncludePhotosChange;
+window.confirmRemovePhotos = confirmRemovePhotos;
+

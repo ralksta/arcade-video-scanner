@@ -177,10 +177,12 @@ class ScannerManager:
                 task = asyncio.create_task(_process_path(file_path))
                 pending_tasks.add(task)
                 
-                # Moderate task list size
-                if len(pending_tasks) > 200:
-                    done, pending = await asyncio.wait(pending_tasks, timeout=0.01, return_when=asyncio.FIRST_COMPLETED)
-                    pending_tasks = pending
+                # Moderate task list size: 500 cap reduces asyncio overhead at scale.
+                # 50ms timeout is long enough to let tasks drain without busy-waiting.
+                if len(pending_tasks) > 500:
+                    done, pending_tasks = await asyncio.wait(
+                        pending_tasks, timeout=0.05, return_when=asyncio.FIRST_COMPLETED
+                    )
 
             # Wait for remaining
             if pending_tasks:

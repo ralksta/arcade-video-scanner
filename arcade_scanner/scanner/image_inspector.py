@@ -21,7 +21,7 @@ class ImageInspector(MediaInspector):
     def __init__(self):
         self.IMAGE_EXTENSIONS = (
             # Standard formats
-            '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic',
+            '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif',
             # RAW formats
             '.cr2',   # Canon RAW
             '.cr3',   # Canon RAW (newer)

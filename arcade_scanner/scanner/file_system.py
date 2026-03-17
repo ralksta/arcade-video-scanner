@@ -12,7 +12,7 @@ class AsyncFileSystem:
     """
     
     VIDEO_EXTENSIONS = frozenset({'.mp4', '.mkv', '.avi', '.mov', '.m4v', '.wmv', '.flv', '.webm', '.ts'})
-    IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic'})
+    IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif'})
 
     def __init__(self):
         self.allow_images = False # Toggled by ScannerManager based on user settings
@@ -68,13 +68,12 @@ class AsyncFileSystem:
                 print(f"⚠️ Warning: Scan target not found: {abs_target}")
                 continue
                 
-            # Offload blocking os.walk to a thread
-            queue = asyncio.Queue()
-            
-            # Start the synchronous walker in a thread
-            # We use a sentinel 'None' to indicate completion
+            # Bounded queue: limits RAM usage to ~500 paths at a time.
+            # The walker thread blocks on put() when full → natural backpressure.
+            queue: asyncio.Queue = asyncio.Queue(maxsize=500)
+
             asyncio.create_task(self._walker_worker(abs_target, queue))
-            
+
             while True:
                 path = await queue.get()
                 if path is None:
@@ -86,69 +85,59 @@ class AsyncFileSystem:
 
     async def _walker_worker(self, root_dir: str, queue: asyncio.Queue) -> None:
         """
-        Worker that runs in a thread. 
-        Streams results to the queue immediately to avoid blocking for long periods.
+        Worker that runs in a thread.
+        Uses a bounded queue to prevent memory explosion with 50K+ files.
+        Blocking put() inside a thread + run_in_executor provides natural backpressure.
         """
         loop = asyncio.get_event_loop()
-        
+
         def sync_walk():
             try:
                 for root, dirs, files in os.walk(root_dir):
-                    # 1. Prune exclusions (in-place modification of dirs)
-                    dirs[:] = [d for d in dirs if not self._is_excluded(root, d)]
-                    
-                    # Check root itself
-                    if self._should_skip_root(root):
+                    abs_root = os.path.abspath(root)
+
+                    # 1. Skip root if it matches any exclusion (O(n_excludes))
+                    if any(abs_root == ex or abs_root.startswith(ex + os.sep)
+                           for ex in self.exclude_abs):
+                        dirs.clear()  # Don't descend into excluded subtrees
                         continue
-                    
-                    # 2. Incremental scan: skip directories unchanged since last scan
-                    #    Only yield files from dirs that have been modified
+
+                    # 2. Prune excluded subdirs in-place
+                    dirs[:] = [
+                        d for d in dirs
+                        if os.path.abspath(os.path.join(root, d)) not in self.exclude_abs
+                    ]
+
+                    # 3. Incremental scan: skip dirs unchanged since last scan
                     dir_changed = True
                     if self._last_scan_time > 0:
                         try:
-                            dir_mtime = os.stat(root).st_mtime
-                            if dir_mtime < self._last_scan_time:
+                            if os.stat(root).st_mtime < self._last_scan_time:
                                 dir_changed = False
                                 self._skipped_dirs += 1
                         except OSError:
-                            pass  # If we can't stat, assume changed
-                        
+                            pass  # Can't stat → assume changed
+
                     for file in files:
-                        if self._is_video(file):
-                            full_path = os.path.join(root, file)
-                            if dir_changed:
-                                # Directory changed — yield for full inspection
-                                if self._is_valid_size(full_path):
-                                    loop.call_soon_threadsafe(queue.put_nowait, full_path)
-                            else:
-                                # Directory unchanged — still yield so orphan pruning 
-                                # knows the file exists, but manager will skip inspection
-                                # because cache entry is still valid
-                                loop.call_soon_threadsafe(queue.put_nowait, full_path)
+                        if not self._is_video(file):
+                            continue
+                        full_path = os.path.join(root, file)
+                        if dir_changed and not self._is_valid_size(full_path):
+                            continue
+                        # Blocking put provides natural backpressure on the bounded queue
+                        asyncio.run_coroutine_threadsafe(
+                            queue.put(full_path), loop
+                        ).result()
             except Exception as e:
                 print(f"❌ Error walking {root_dir}: {e}")
 
-        # Run in default executor
         await loop.run_in_executor(None, sync_walk)
         await queue.put(None)
 
     def _is_excluded(self, parent: str, dirname: str) -> bool:
-        """Check if directory is excluded."""
+        """Check if a subdirectory should be pruned (O(1) set lookup)."""
         full = os.path.abspath(os.path.join(parent, dirname))
-        
-        # Exact match
-        if full in self.exclude_abs:
-            return True
-        
-        # Parent match (substring) logic from legacy scanner
-        return False
-
-    def _should_skip_root(self, root: str) -> bool:
-        abs_root = os.path.abspath(root)
-        for ex in self.exclude_abs:
-            if abs_root == ex or abs_root.startswith(ex + os.sep):
-                return True
-        return False
+        return full in self.exclude_abs
 
     def _is_video(self, filename: str) -> bool:
         # Skip macOS resource fork files (e.g., ._video.mp4)
