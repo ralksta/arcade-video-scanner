@@ -165,20 +165,32 @@ class ConfigManager:
         if os.path.exists(SETTINGS_FILE):
             try:
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                    file_data = json.load(f)
+                    content = f.read().strip()
 
-                # Check for missing defaults and update file if needed
-                dirty = False
-                for k, v in DEFAULT_SETTINGS_JSON.items():
-                    if k not in file_data:
-                        file_data[k] = v
-                        dirty = True
-
-                if dirty:
+                if not content:
+                    # Empty file (e.g. write interrupted) → restore defaults
+                    print("⚠️ settings.json is empty – restoring defaults")
+                    file_data = dict(DEFAULT_SETTINGS_JSON)
                     self._save_json_raw(file_data)
+                else:
+                    file_data = json.loads(content)
 
-            except Exception as e:
-                print(f"⚠️ Warning: Could not read settings.json: {e}")
+                    # Check for missing defaults and update file if needed
+                    dirty = False
+                    for k, v in DEFAULT_SETTINGS_JSON.items():
+                        if k not in file_data:
+                            file_data[k] = v
+                            dirty = True
+
+                    if dirty:
+                        self._save_json_raw(file_data)
+
+            except json.JSONDecodeError as e:
+                print(f"⚠️ settings.json is corrupted ({e}) – restoring defaults")
+                file_data = dict(DEFAULT_SETTINGS_JSON)
+                self._save_json_raw(file_data)
+            except OSError as e:
+                print(f"⚠️ Could not read settings.json: {e}")
 
         # Initialize proper settings from file data (env vars will override defaults if set)
         # Note: Pydantic BaseSettings usually loads files via _env_file, but here we explicitly pass dict
