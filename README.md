@@ -6,298 +6,116 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **Visual Analysis**: Instantly see which videos are "High Bitrate" (candidates for compression) vs. "Optimized".
 - **Privacy-First**: No data ever leaves your computer. The scan, database, and web dashboard run 100% locally.
 - **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, file size, media type, and image formats.
-- **Interactive Previews**: Hover over any video to see a 5-second preview clip.
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
+---
+
 ## 🚀 Version 7.0.0 Highlights (New!)
 
-This release adds **AV1 Encoding Support** and a **Smart SSIM Skip Optimization** for faster video processing.
+This release adds **AV1 Encoding Support** (powered by FFmpeg 8.1) and a **Smart SSIM Skip Optimization** for faster video processing.
 
 ### ✅ AV1 Encoding (Experimental)
 - **Next-Gen Codec**: Optional AV1 encoding alongside the default HEVC for superior compression ratios.
 - **Hardware Accelerated**: Uses `av1_videotoolbox` on Apple Silicon M3/M4 and `av1_nvenc` on NVIDIA RTX 40xx (Lovelace).
 - **Automatic Fallback**: If your hardware doesn't support AV1, the optimizer automatically falls back to HEVC.
 - **Database Tracked**: Codec preference is stored per-job in the encoding queue (`target_codec` column).
-- **UI Selection**: Toggle between HEVC and AV1 directly in the Optimize panel — the codec row is hidden in Copy mode.
+- **UI Selection**: Toggle between HEVC and AV1 directly in the Optimize panel — hidden in Copy mode.
 
 ### ⚡ Smart SSIM Skip
-- **Faster Passes**: SSIM (quality verification) is now skipped when the preliminary savings are below 10%.
-- **No Wasted Time**: If a pass already shows poor compression results, the optimizer immediately moves to the next quality level without running the expensive SSIM comparison.
-- **Smarter Search**: Both Binary Search and Linear Search callers handle the new `poor_savings` result correctly, always pushing toward more compression when savings are insufficient.
+- **Faster Passes**: SSIM quality verification is now skipped when preliminary savings are below 10%.
+- **No Wasted Time**: If a pass shows poor compression results, the optimizer immediately moves to the next quality level without running the expensive SSIM comparison.
+- **Smarter Search**: Both Binary and Linear Search callers handle the new `poor_savings` result correctly.
+
+📖 **[Full Video Optimizer Technical Reference →](dev-docs/video-optimizer.md)**
 
 ---
 
 ## 🚀 Version 6.8.0 Highlights
 
-This release adds a **Visual Timeline Scrubber**, **GIF Export Panel**, and **Cinema UX Redesign**.
-
 ### ✅ Visual Timeline & Scrubber
-- **Frame-Accurate Seeking**: Implemented a professional visual timeline scrubber with real-time thumbnail previews.
+- **Frame-Accurate Seeking**: Professional visual timeline scrubber with real-time thumbnail previews.
 - **Trim Handles**: Visual markers for setting export start/end points with frame-perfect precision.
-- **Playback Sync**: Scrubber position automatically stays in sync with video playback state.
+- **Playback Sync**: Scrubber stays in sync with video playback state.
 
 ### ✅ GIF Export Panel
-- **UX Redesign**: Replaced the intrusive GIF modal with a sleek bottom panel matching the optimizer workflow.
+- **UX Redesign**: Replaced the intrusive GIF modal with a sleek bottom panel.
 - **Production Presets**: Quick buttons for resolution (360p to 1080p) and frame rates (10fps to 30fps).
-- **Size Estimation**: Real-time file size calculation based on your selected resolution, FPS, and trim duration.
-- **Current Time Capture**: One-click buttons to set trim handles to the current video playback position.
+- **Size Estimation**: Real-time file size calculation based on resolution, FPS, and trim duration.
 
 ### ✅ Cinema Mode UX Overhaul
-- **Improved Readability**: Redesigned all action buttons with always-visible labels and improved grouping.
-- **Premium Interaction**: Larger touch targets, backdrop blur effects, and scale-on-hover animations (1.05x).
-- **Docker-Aware UI**: Automatically hides "Reveal in Finder" buttons when running in Docker environments.
+- **Improved Readability**: Redesigned action buttons with always-visible labels.
+- **Premium Interaction**: Larger touch targets, backdrop blur, scale-on-hover animations (1.05x).
+- **Docker-Aware UI**: Automatically hides "Reveal in Finder" when running in Docker.
 
 ---
 
-### ✅ Visual Timeline & Scrubber
-- **Frame-Accurate Seeking**: Implemented a professional visual timeline scrubber with real-time thumbnail previews.
-- **Trim Handles**: Visual markers for setting export start/end points with frame-perfect precision.
-- **Playback Sync**: Scrubber position automatically stays in sync with video playback state.
+## 📋 Previous Releases
 
-### ✅ GIF Export Panel
-- **UX Redesign**: Replaced the intrusive GIF modal with a sleek bottom panel matching the optimizer workflow.
-- **Production Presets**: Quick buttons for resolution (360p to 1080p) and frame rates (10fps to 30fps).
-- **Size Estimation**: Real-time file size calculation based on your selected resolution, FPS, and trim duration.
-- **Current Time Capture**: One-click buttons to set trim handles to the current video playback position.
+<details>
+<summary>v6.7.x – Fullscreen Duplicate Checker</summary>
 
-### ✅ Cinema Mode UX Overhaul
-- **Improved Readability**: Redesigned all action buttons with always-visible labels and improved grouping.
-- **Premium Interaction**: Larger touch targets, backdrop blur effects, and scale-on-hover animations (1.05x).
-- **Docker-Aware UI**: Automatically hides "Reveal in Finder" buttons when running in Docker environments.
-
----
-
-## 🚀 Version 6.7.1 Highlights
-
-This release adds a **Fullscreen Duplicate Checker Mode** for efficient duplicate resolution.
-
-### ✅ Fullscreen Duplicate Checker
+### v6.7.1 – Fullscreen Duplicate Checker
 - **Immersive Interface**: Dedicated fullscreen mode with side-by-side comparison of duplicate files.
-- **Keyboard Shortcuts**: Lightning-fast workflow with `1`/`←` to keep File A, `2`/`→` to keep File B, `S`/`Space` to skip, `A` for auto-keep recommended file, and `ESC` to exit.
-- **Smart Recommendations**: Visual highlighting of recommended file (green border + badge) based on quality score.
-- **Quality Metrics**: See quality score difference, resolution, file size, and bitrate for informed decisions.
-- **Progress Tracking**: Clear counter showing your position (e.g., "47 / 13,771 groups").
-- **Preview Integration**: Click any thumbnail to preview the file in cinema mode before making a decision.
+- **Keyboard Shortcuts**: `1`/`←` keep File A, `2`/`→` keep File B, `S`/`Space` skip, `A` auto-keep, `ESC` exit.
+- **Smart Recommendations**: Visual highlighting of the recommended file based on quality score.
+- **Quality Metrics**: Quality score difference, resolution, file size, and bitrate shown per file.
 
----
+### v6.7.0 – Batch Selection UX
+- **Selection Mode**: Click one video to enter selection mode – click others to add/remove from selection.
+- **Visual Feedback**: Large checkmark overlay on hover, cyan highlight on selected cards.
+- **List View Fixed**: Properly constrained thumbnail sizes; fixed malformed media queries.
 
-## 🚀 Version 6.7.0 Highlights
+</details>
 
-This release focuses on **Batch Selection UX**, **List View Fixes**, and **CSS Architecture Cleanup**.
+<details>
+<summary>v6.6.0 – Smart Video Optimizer</summary>
 
-### ✅ Batch Selection Mode
-- **Selection Mode**: Check one video to enter selection mode - then simply click any other video card to add/remove from selection (no need to hunt for tiny checkboxes).
-- **Visual Feedback**: Large checkmark overlay appears on hover when in selection mode, with cyan highlight on cards.
-- **Clean UI**: Action buttons (favorite, vault, optimize) hidden during selection mode to reduce clutter.
-- **Smart Exit**: Selection mode automatically deactivates when all items are deselected.
+- **Binary Search Quality**: Finds optimal quality in O(log n) passes – up to 50% fewer encode passes.
+- **Early Size Abort**: Encoding stops mid-pass if output exceeds 95% of original size.
+- **Fallback Mode**: When strict targets can't be met, uses best acceptable result (SSIM ≥ 0.945).
+- **JavaScript Modules**: Extracted `cinema.js`, `collections.js`, `formatters.js` from monolithic `engine.js`.
 
-### 🔧 List View & CSS Fixes
-- **List View Fixed**: Properly constrained thumbnail sizes in list view (was displaying full-size images).
-- **CSS Architecture**: Fixed malformed media queries that were applying mobile styles to desktop.
-- **Stylesheet Loading**: Added missing `styles.css` link to dashboard template.
+</details>
 
----
+<details>
+<summary>v6.4.x – Image Support, Duplicate Detection, First-Run Wizard</summary>
 
-## 🚀 Version 6.6.0 Highlights
+- **RAW Format Support**: CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW, RWL.
+- **Persistent Duplicate Cache**: Scan results saved to disk.
+- **Default Smart Collections**: All Photos, All Videos, Large Files, High Bitrate, Recent Imports.
+- **First-Run Setup Wizard**: ASCII terminal wizard for initial configuration.
+- **Database Cleanup Tools**: Remove orphan entries and unused thumbnails.
 
-This release focuses on **Video Optimizer Intelligence**, **Review Workflow**, and **Code Refactoring**.
+</details>
 
-### ⚡ Smart Video Optimizer
-- **Binary Search Quality**: New algorithm finds optimal quality in O(log n) passes instead of linear search - up to 50% fewer encode passes.
-- **Early Size Abort**: Encoding stops mid-pass if output exceeds 95% of original size, saving time on files that would fail anyway.
-- **Fallback Mode**: When strict targets can't be met, automatically uses best acceptable result (SSIM >= 0.945).
-- **Better Feedback**: Clear status messages explaining why optimization succeeded or failed.
+<details>
+<summary>v6.2.0 – Multi-User Support & SQLite Migration</summary>
 
-### 🔄 Review Workflow
-- **Keep/Discard Fixed**: The "Keep" button now correctly replaces the original with the optimized file.
-- **Error Handling**: Proper error messages shown in browser when file operations fail.
-- **Docker Compatible**: Keep/Discard operations work correctly in containerized deployments.
+- **User Accounts**: Multiple accounts with `PBKDF2` password hashing and full data isolation.
+- **SQLite Backend**: Migrated from flat JSON files; handles 10,000+ file libraries with instant startup.
+- **Negative Tag Filters**: Click a tag twice to exclude it from search results.
+- **State Persistence**: View preference (Grid/List/Tree) saved in URL.
 
-### 🧹 Code Refactoring
-- **JavaScript Modules**: Extracted `cinema.js`, `collections.js`, and `formatters.js` from monolithic `engine.js`.
-- **JSDoc Documentation**: Added comprehensive documentation to all major functions.
-- **Import Cleanup**: Fixed Python import shadowing issues causing runtime errors.
+</details>
 
----
+<details>
+<summary>v6.1.0 – Query Builder, Tags & Theming</summary>
 
-## 🚀 Version 6.5.0 Highlights
-
-This release focuses on **Cinema Mode Usability**, **Tag Management Stability**, and **Developer Experience**.
-
-### 🎬 Cinema Mode Upgrades
-- **Assigned Tags Display**: See assigned tags directly in the Cinema overlay (top-left) with one-click removal (X).
-- **Shortcut Fixes**: The 'F' key now correctly toggles favorites with immediate UI feedback.
-- **Improved Navigation**: Smoother keyboard handling.
-
-### 🏷️ Tag System 2.0
-- **Instant Updates**: New cache-busting logic ensures tags appear immediately after creation.
-- **Clean Deletion**: Removing a tag now reliably updates the backend and UI.
-- **Smart Validation**: Better handling of duplicate tag names and invalid inputs.
-
-### 🐳 Docker & Dev Experience
-- **Live Code Reloading**: `docker-compose.yml` updated to mount source code, enabling instant feedback during development.
-- **Log Noise Reduction**: Reduced terminal clutter during large scans with in-place progress updates.
-- **Layout Fixes**: Resolved grid breakage in Duplicates view for massive libraries.
-
----
-
-## 🚀 Version 6.4.1 Highlights
-
-This release enhances **Image Support**, improves **Duplicate Detection UX**, and adds **RAW Image Formats**.
-
-### 📸 Enhanced Image Support
-- **Image Smart Collections**: Filter by media type (Videos/Images) and image formats (JPG, PNG, GIF, WebP, HEIC) in smart collections.
-- **RAW Format Support**: Extended scanner to handle 12 RAW formats including CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW, and RWL.
-- **Image-Specific UI**: Removed irrelevant bitrate display from image tiles.
-- **Separate Image Count**: Header now shows video count and image count separately (when images are present).
-- **Combined Total Size**: Header size stat includes both videos and images.
-
-### 🔍 Duplicate Detection Improvements
-- **Persistent Cache**: Scan results saved to disk - no need to rescan on page refresh or server restart.
-- **Manual Rescan**: New "Rescan" button in duplicate view to force a fresh analysis.
-- **Improved Stability**: Fixed "Scan Images" toggle persistence and optimized path security validation.
-- **Bookmarkable URL**: Direct access to duplicates view via `/duplicates` URL.
-
-### 🎁 Default Smart Collections
-- **Library Overview**: New users automatically get 5 curated smart collections:
-  - 📸 **All Photos** - Filter by image media type
-  - 🎬 **All Videos** - Filter by video media type  
-  - 💾 **Large Files** - Files over 1GB
-  - 💎 **High Bitrate** - Videos flagged for optimization
-  - 📅 **Recent Imports** - Media added in the last 7 days
-
-### 🐛 Critical Bug Fixes
-- **Connection Leak**: Fixed "Too many open files" error caused by SQLite connections not being properly closed.
-- **Path Validation**: Resolved compression endpoint crash when accessing files in allowed directories.
-
----
-
-## 🚀 Version 6.4.0 Highlights
-
-This release adds **Duplicate Detection**, **First-Run Setup Wizard**, and **Database Cleanup Tools**.
-
-### 🔍 Duplicate Detection
-- **Smart Detection**: Finds duplicate videos and images using metadata matching + content verification.
-- **Content Sampling**: Hashes first/last 512KB of files to eliminate false positives.
-- **Quality Scoring**: Recommends which file to keep based on bitrate, resolution, and codec.
-- **Visual Comparison**: Side-by-side thumbnails with metadata and "Reveal in Finder" buttons.
-- **One-Click Cleanup**: Delete duplicates directly from the UI with space savings summary.
-
-### 🧙 First-Run Setup Wizard
-- **Interactive Onboarding**: ASCII-based terminal wizard guides new users through configuration.
-- **Auto-Detection**: Automatically finds ffmpeg/ffprobe on your system.
-- **Quick Setup**: Configure scan directories, exclusions, and thresholds in minutes.
-- **Optional Reset**: Wipe database and start fresh if upgrading from older versions.
-
-### 🧹 Maintenance Tools
-- **Database Cleanup**: Remove entries for files deleted from Finder.
-- **Orphan Cleanup**: Purge unused thumbnails and preview files.
-
----
-
-## 🚀 Version 6.3.0 Highlights
-
-This release adds **Image Support**, **Cinema Keyboard Navigation**, and **Media Type Detection**.
-
-### 📸 Image Support
-- **Unified Media Library**: Scan both videos AND images (`.jpg`, `.png`, `.gif`, `.webp`, `.heic`, etc.).
-- **Image Viewer**: Click any image to open it in the cinema modal with proper image display (not video player).
-- **Visual Indicators**: Image cards display a purple "IMG" badge for easy identification.
-- **Image-Specific Metadata**: Info panel shows image-appropriate data (Resolution, Size, Type).
-- **Per-User Setting**: Enable/disable image scanning in Settings → "Scan Images" toggle.
-
-### ⌨️ Keyboard Navigation
-- **Arrow Keys in Cinema**: Use ← and → to navigate through your library without closing the modal.
-- **Wrap-Around**: Navigation seamlessly loops from last to first item and vice-versa.
-
----
-
-## 🚀 Version 6.2.0 Highlights
-
-This major release introduces **Multi-User Support**, a **SQLite Database Migration**, **Deep Filtering**, and **Layout Precision**.
-
-### 👤 Multi-User Support & Data Isolation
-- **User Accounts**: Create multiple user accounts with secure password hashing (`PBKDF2`).
-- **Data Isolation**: Each user has their own **Scan Targets**, **Favorites**, **Vaulted** items, and **Private Tags**.
-- **Admin Tools**: CLI ecosystem for managing users (`scripts/manage_users.py`).
-
-### 🗄️ SQLite Database
-- **Scalability**: Migrated from flat JSON files to a robust **SQLite** backend.
-- **Performance**: Instant startup times and efficient querying for libraries with 10,000+ files.
-- **Security**: Binary storage prevents casual data snooping.
-
-### 🔎 Advanced Filtering
-- **Negative Tag Filters**: Click a tag twice to **Exclude** it (marked in red). Search for "HD" but exclude "Project X".
-- **Precision Size & Date**: Filter videos by specific file size (e.g., "> 1GB") or import date (Last 24h, 7d, 30d). 
-- **Smart Collection Upgrades**: Collections now persist all advanced filters (Size, Date, Exclusions) and apply immediately upon saving.
-
-### 📐 Layout & Workflow
-- **Perfect List View**: Fixed thumbnail sizing and layout consistency across desktop and mobile.
-- **State Persistence**: Your view preference (Grid/List/Tree) is now saved in the URL (`?view=list`), allowing for easy bookmarking and refreshing.
-
-### 🧹 Automatic Cleanup
-- **Seamless Migration**: Automatically imports your legacy `settings.json` and `users.json` on first run.
-
----
-
-## 🚀 Version 6.1.0 Highlights
-
-This release introduces a powerful **Query Builder**, **Custom Tags**, and full **Light/Dark Mode** support, powered by a new semantic theming engine.
-
-### 🎨 Global Theming & Light Mode
-
-- **Theme Architecture**: New `theme.py` system decouples styles from logic.
-- **Multiple Themes**: 
-  - **Arcade**: The classic Neon Dark mode.
-  - **Professional**: A clean, high-contrast Light mode.
-  - **Candy**: A soft, pastel-colored theme.
-- **Theme Switcher**: Instantly toggle themes via the new **Interface Settings**.
-
-### 🏷️ Tags & Smart Collections
-- **Tagging System**: Add custom tags (e.g., "Funny", "Project X") to videos.
-- **Visual Query Builder**: Create complex filters (e.g., "Include: 4K AND Tag:Space, Exclude: 1080p").
-- **Smart Collections**: Save any search query as a sidebar collection for instant access.
+- **Theme System**: Arcade (dark), Professional (light), Candy (pastel) with live switching.
+- **Tagging System**: Custom tags with visual query builder and smart collections.
 - **Batch Tagging**: Apply tags to multiple videos at once.
 
----
+</details>
 
-## 🚀 Version 6.0.0 Highlights
+<details>
+<summary>v5.x – Cinema Mode, VAAPI, Treemap</summary>
 
-This major release combined a complete visual overhaul with enterprise-grade security hardening, a modular architectural refactor, and professional-grade desktop UX enhancements.
+- **Cinema Player**: Full in-browser player with Favorite, Vault, and Optimize integrated.
+- **Linux VAAPI**: Native hardware acceleration for Intel/AMD GPUs.
+- **Treemap Log Scale**: Toggle Linear/Logarithmic visualization modes.
 
-### 🎨 UI & Experience Overhaul
-- **Workspace Differentiation**: Context-aware color accents and background tints for Lobby (Cyan), Favorites (Gold), Review (Cyan), and Vault (Magenta).
-- **Professional Navigation**: Enhanced sidebar with structural active states, indicator bars, and workspace-specific iconography.
-- **Settings Redesign**: A completely new, sidebar-based settings interface inspired by modern OS design standards (Apple/Linear/Stripe).
-- **Responsive Precision**: Fixed all horizontal overflow issues in list view and optimized grid tile density for high-resolution displays.
-- **State Management**: Integrated toast notifications, loading spinners, and unsaved changes tracking.
-- **Smooth Transitions**: 500ms GPU-accelerated fade-in animations when switching between workspaces and layouts.
-- **Modern Interactions**: iOS-style toggles, number steppers, and keyboard shortcuts (`Cmd+S` to save, `ESC` to close).
-
-### 🔒 Enterprise-Grade Security
-- **Path whitelisting**: Strict `PathValidator` ensures the scanner *only* accesses directories explicitly allowed in configuration.
-- **Directory Traversal Protection**: Active protection against `../` attacks and attempts to access system files.
-- **Input Sanitization**: All filenames and API parameters are rigorously validated and sanitized before processing.
-- **Safe Media Serving**: Video streaming uses secure byte-range handling with strict bounds checking.
-
-### 🏗️ Modular Architecture
-- **Refactored Core**: The monolithic codebase has been split into specialized packages (`core`, `security`, `database`, `server`) for better maintainability and testing.
-- **Type Safety**: Enhanced Pydantic models ensure data integrity throughout the application pipeline.
-
----
-
-## 🚀 Previous Highlights
-
-### v5.4.0 (Performance & Visualization)
-- **Treemap Log Scale**: Toggle between Linear and Logarithmic visualization modes.
-- **Master Optimizer Toggle**: Completely disable optimization features for read-only setups.
-- **Linux VAAPI**: Native hardware acceleration support for Intel/AMD GPUs on Linux.
-
-### v5.2.0 - Cinema Mode Edition
-- **Cinema Player**: Full-featured in-browser player with integrated "Favorite", "Vault", and "Optimize" actions.
-- **Deep Linking**: Direct links to specific views (`/treeview`, `/review`) supported.
-- **Saved Views**: Create custom presets for "Large Files", "Unoptimized 4K", etc.
+</details>
 
 ---
 
@@ -309,13 +127,12 @@ The tool includes a specialized cross-platform video optimizer (`scripts/video_o
   - **NVIDIA NVENC**: Windows/Linux (RTX 40-series optimized)
   - **Apple VideoToolbox**: macOS (Apple Silicon and Intel)
   - **Intel/AMD VAAPI**: Linux (Native hardware support)
-  - **Software Fallback**: Robust CPU encoding if no hardware is found.
-- **AV1 Encoding Support** *(Experimental)*: Select AV1 as an alternative to HEVC for better compression. Requires Apple M3/M4 or NVIDIA RTX 40xx. Falls back to HEVC automatically on unsupported hardware.
-- **Intelligent Transcoding**: Binary search finds the optimal quality in O(log n) passes. Savings are checked *before* the expensive SSIM calculation — passes with < 10% savings are skipped immediately.
+  - **Software Fallback**: CPU encoding if no hardware is found.
+- **AV1 Encoding Support** *(Experimental, FFmpeg 8.1+)*: Requires Apple M3/M4 or NVIDIA RTX 40xx. Falls back to HEVC automatically.
+- **Intelligent Transcoding**: Binary search finds optimal quality in O(log n) passes. Savings are checked *before* SSIM — passes with < 10% savings are skipped immediately.
 - **Batch Processing**: Select multiple videos in the dashboard to queue them up.
-- **Interactive Terminal**: Real-time progress bars, quality metrics, and fun facts during processing.
 
-### Codec Selection (`--codec`)
+### Codec Selection
 
 ```bash
 # Default: HEVC (H.265) — best compatibility
@@ -324,6 +141,8 @@ The tool includes a specialized cross-platform video optimizer (`scripts/video_o
 # AV1 — better compression, requires M3/M4 or RTX 40xx
 .venv/bin/python3 scripts/video_optimizer.py /path/to/video.mp4 --codec av1
 ```
+
+📖 **[Full technical reference including SSIM, binary search, staging strategy →](dev-docs/video-optimizer.md)**
 
 ---
 
@@ -334,7 +153,6 @@ All settings can be configured through the **Settings UI** (gear icon) or by edi
 **Settings include:**
 - **Scan targets**: Directories to scan.
 - **enable_optimizer**: Master toggle for optimization features (true/false).
-- **enable_previews**: Toggle hover preview generation (CPU/disk usage).
 - **Custom exclusions**: Paths to skip.
 
 ### Default Exclusions
@@ -346,11 +164,7 @@ All settings can be configured through the **Settings UI** (gear icon) or by edi
 
 ---
 
----
-
 ## 🐳 Docker Deployment
-
-Run Arcade Media Scanner in Docker for easy deployment:
 
 ```bash
 # Using Docker Compose (Recommended)
@@ -360,28 +174,17 @@ docker-compose up -d
 # Default login: admin/admin (change immediately!)
 ```
 
-**📖 Full Docker Guide**: See [DOCKER.md](DOCKER.md) for:
-- Volume configuration
-- GPU support (NVIDIA)
-- Environment variables
-- Troubleshooting
-- Backup/restore
+**📖 Full Docker Guide**: See [DOCKER.md](DOCKER.md) for volume configuration, GPU support, environment variables, and troubleshooting.
 
 ---
 
 ## 👥 User Management
 
-Arcade Media Scanner supports multi-user accounts with data isolation. Each user has their own scan targets, favorites, vault, and tags.
-
-### Managing Users
-
-Use the `scripts/manage_users.py` CLI tool to manage user accounts:
-
 ```bash
 # List all users
 .venv/bin/python3 scripts/manage_users.py list
 
-# Add a new user (will prompt for password)
+# Add a new user
 .venv/bin/python3 scripts/manage_users.py add john
 
 # Add an admin user
@@ -391,19 +194,7 @@ Use the `scripts/manage_users.py` CLI tool to manage user accounts:
 .venv/bin/python3 scripts/manage_users.py passwd john
 ```
 
-**Note**: Use `.venv/bin/python3` to ensure the script runs with the correct dependencies. Alternatively, activate the virtual environment first:
-```bash
-source .venv/bin/activate
-python3 scripts/manage_users.py list
-```
-
-### Default Admin Account
-
-On first run, an admin account is automatically created:
-- **Username**: `admin`
-- **Password**: `admin`
-
-**⚠️ Security**: Change the default password immediately after first login!
+**Default admin account**: `admin` / `admin` — ⚠️ change immediately after first login!
 
 ---
 
@@ -411,7 +202,7 @@ On first run, an admin account is automatically created:
 
 ### Prerequisites
 - **Python 3.10+**
-- **FFmpeg & FFprobe**: Required.
+- **FFmpeg 8.1+ & FFprobe**: Required.
   ```bash
   # macOS
   brew install ffmpeg
@@ -422,22 +213,7 @@ On first run, an admin account is automatically created:
 
 ### Run the App
 ```bash
-# Clone the repo
 git clone https://github.com/ralksta/arcade-video-scanner.git
 cd arcade-video-scanner
-
-# Run the startup script (Handles venv & dependencies automatically)
 ./run.sh
-```
-
-### Manual Usage
-```bash
-# Scan without starting server
-python3 scan_videos_mit_shell.py
-
-# Cleanup orphan files
-python3 scan_videos_mit_shell.py --cleanup
-
-# Force regenerate all thumbnails & previews
-python3 scan_videos_mit_shell.py --rebuild
 ```
