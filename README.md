@@ -1,4 +1,4 @@
-# Arcade Media Scanner 6.8.0
+# Arcade Media Scanner 7.0.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -10,9 +10,45 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 
-## 🚀 Version 6.8.0 Highlights (New!)
+## 🚀 Version 7.0.0 Highlights (New!)
+
+This release adds **AV1 Encoding Support** and a **Smart SSIM Skip Optimization** for faster video processing.
+
+### ✅ AV1 Encoding (Experimental)
+- **Next-Gen Codec**: Optional AV1 encoding alongside the default HEVC for superior compression ratios.
+- **Hardware Accelerated**: Uses `av1_videotoolbox` on Apple Silicon M3/M4 and `av1_nvenc` on NVIDIA RTX 40xx (Lovelace).
+- **Automatic Fallback**: If your hardware doesn't support AV1, the optimizer automatically falls back to HEVC.
+- **Database Tracked**: Codec preference is stored per-job in the encoding queue (`target_codec` column).
+- **UI Selection**: Toggle between HEVC and AV1 directly in the Optimize panel — the codec row is hidden in Copy mode.
+
+### ⚡ Smart SSIM Skip
+- **Faster Passes**: SSIM (quality verification) is now skipped when the preliminary savings are below 10%.
+- **No Wasted Time**: If a pass already shows poor compression results, the optimizer immediately moves to the next quality level without running the expensive SSIM comparison.
+- **Smarter Search**: Both Binary Search and Linear Search callers handle the new `poor_savings` result correctly, always pushing toward more compression when savings are insufficient.
+
+---
+
+## 🚀 Version 6.8.0 Highlights
 
 This release adds a **Visual Timeline Scrubber**, **GIF Export Panel**, and **Cinema UX Redesign**.
+
+### ✅ Visual Timeline & Scrubber
+- **Frame-Accurate Seeking**: Implemented a professional visual timeline scrubber with real-time thumbnail previews.
+- **Trim Handles**: Visual markers for setting export start/end points with frame-perfect precision.
+- **Playback Sync**: Scrubber position automatically stays in sync with video playback state.
+
+### ✅ GIF Export Panel
+- **UX Redesign**: Replaced the intrusive GIF modal with a sleek bottom panel matching the optimizer workflow.
+- **Production Presets**: Quick buttons for resolution (360p to 1080p) and frame rates (10fps to 30fps).
+- **Size Estimation**: Real-time file size calculation based on your selected resolution, FPS, and trim duration.
+- **Current Time Capture**: One-click buttons to set trim handles to the current video playback position.
+
+### ✅ Cinema Mode UX Overhaul
+- **Improved Readability**: Redesigned all action buttons with always-visible labels and improved grouping.
+- **Premium Interaction**: Larger touch targets, backdrop blur effects, and scale-on-hover animations (1.05x).
+- **Docker-Aware UI**: Automatically hides "Reveal in Finder" buttons when running in Docker environments.
+
+---
 
 ### ✅ Visual Timeline & Scrubber
 - **Frame-Accurate Seeking**: Implemented a professional visual timeline scrubber with real-time thumbnail previews.
@@ -265,18 +301,29 @@ This major release combined a complete visual overhaul with enterprise-grade sec
 
 ---
 
-## ⚡Video Optimizer
+## ⚡ Video Optimizer
 
 The tool includes a specialized cross-platform video optimizer (`scripts/video_optimizer.py`).
 
-- **Cross-Platform Hardware Acceleration**: 
+- **Cross-Platform Hardware Acceleration**:
   - **NVIDIA NVENC**: Windows/Linux (RTX 40-series optimized)
   - **Apple VideoToolbox**: macOS (Apple Silicon and Intel)
   - **Intel/AMD VAAPI**: Linux (Native hardware support)
   - **Software Fallback**: Robust CPU encoding if no hardware is found.
-- **Intelligent Transcoding**: Automatically adjusts quality (CQ) and verifies results using **SSIM** to ensure quality.
+- **AV1 Encoding Support** *(Experimental)*: Select AV1 as an alternative to HEVC for better compression. Requires Apple M3/M4 or NVIDIA RTX 40xx. Falls back to HEVC automatically on unsupported hardware.
+- **Intelligent Transcoding**: Binary search finds the optimal quality in O(log n) passes. Savings are checked *before* the expensive SSIM calculation — passes with < 10% savings are skipped immediately.
 - **Batch Processing**: Select multiple videos in the dashboard to queue them up.
 - **Interactive Terminal**: Real-time progress bars, quality metrics, and fun facts during processing.
+
+### Codec Selection (`--codec`)
+
+```bash
+# Default: HEVC (H.265) — best compatibility
+.venv/bin/python3 scripts/video_optimizer.py /path/to/video.mp4 --codec hevc
+
+# AV1 — better compression, requires M3/M4 or RTX 40xx
+.venv/bin/python3 scripts/video_optimizer.py /path/to/video.mp4 --codec av1
+```
 
 ---
 
