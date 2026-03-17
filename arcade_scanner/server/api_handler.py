@@ -210,33 +210,42 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     _THUMB_CACHE_MAX = 2000
 
     def _resolve_thumb_source(self, thumb_filename: str):
-        """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path."""
+        """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path.
+        
+        Strategy:
+        1. Check in-memory LRU cache (fast path)
+        2. On miss: do a full cache warm from DB (first call) or a targeted scan for new entries
+        3. On persistent miss: scan full DB once more (catches entries added after server start)
+        """
         import hashlib
         from collections import OrderedDict
 
         cache = FinderHandler._thumb_source_cache
 
-        # Move-to-end (LRU touch) on hit
-        if thumb_filename in cache:
-            path = cache[thumb_filename]
-            if os.path.exists(path):
-                if isinstance(cache, OrderedDict):
-                    cache.move_to_end(thumb_filename)
-                return path
-            else:
-                del cache[thumb_filename]
-
-        # Promote to OrderedDict if still a plain dict
+        # Promote to OrderedDict if still a plain dict (happens once)
         if not isinstance(cache, OrderedDict):
             FinderHandler._thumb_source_cache = OrderedDict(cache)
             cache = FinderHandler._thumb_source_cache
 
-        # Rebuild from DB
-        if not cache:
-            for entry in db.get_all():
+        # Fast path: LRU hit
+        if thumb_filename in cache:
+            path = cache[thumb_filename]
+            if os.path.exists(path):
+                cache.move_to_end(thumb_filename)
+                return path
+            else:
+                del cache[thumb_filename]
+
+        # Slow path: populate/refresh from DB
+        # Always re-read DB on miss so entries added after server start are found.
+        # Using a set to track known entries avoids re-hashing already cached paths.
+        known_paths = set(cache.values())
+        for entry in db.get_all():
+            if entry.file_path not in known_paths:
                 file_hash = hashlib.md5(entry.file_path.encode()).hexdigest()
                 t_name = f"thumb_{file_hash}.jpg"
                 cache[t_name] = entry.file_path
+                known_paths.add(entry.file_path)
 
         # Evict oldest entries when over capacity
         while len(cache) > FinderHandler._THUMB_CACHE_MAX:
