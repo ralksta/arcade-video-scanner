@@ -1,6 +1,6 @@
 # Video Optimizer — Technical Deep-Dive
 
-> `scripts/video_optimizer.py` · V2.4 · Multi-Platform Hardware Encoder
+> `scripts/video_optimizer.py` · V2.5 · Multi-Platform Hardware Encoder
 
 ---
 
@@ -127,7 +127,35 @@ Result: best accepted = q=50
 
 When Binary Search can't find an acceptable result, Linear Search tries each quality step from worst-to-best compression. It acts as a safety net that exhausts all options before giving up.
 
-The fallback also handles the case where a strict quality target is unreachable — it accepts the best SSIM it found (≥ `SSIM_ACCEPTABLE = 0.945`) to avoid completely failing on difficult source material.
+**Best Acceptable Tracking (v7.0.1)**: Each pass that meets `SSIM >= SSIM_ACCEPTABLE (0.945)` AND `savings >= MIN_SAVINGS (20%)` is saved as a *staged fallback*. If a subsequent pass hits the `SSIM_MIN` hard floor and gets aborted, the best staged fallback is promoted instead of failing completely.
+
+```
+Real-world case (H.265 source, VideoToolbox Linear Search):
+
+  Pass Q=65 → SSIM 0.9581, saved 26.6% → not optimal (below MIN_QUALITY=0.960)
+               saved_pct >= 20% AND ssim >= 0.945 → KEEP as fallback
+
+  Pass Q=55 → SSIM 0.9481, saved 39.8% → not optimal
+               saved_pct >= 20% AND ssim >= 0.945 → UPDATE fallback (better savings)
+
+  Pass Q=45 → SSIM 0.9321 < SSIM_MIN (0.940) → Quality too low. Aborting.
+               ↓
+               Rescue fallback Q=55: 39.8% saved, SSIM 0.9481
+               → SUCCESS (fallback)!
+
+Without fallback tracking: FAILED, original kept, 0 bytes saved.
+With fallback tracking:    SUCCESS, 39.8% saved — 160+ MB recovered.
+```
+
+**SSIM threshold decision tree:**
+
+| SSIM Score | Savings | Outcome |
+|:---|:---|:---|
+| ≥ 0.960 (`MIN_QUALITY`) | ≥ 20% | ✅ Strict success — promote immediately |
+| ≥ 0.960 | ≥ 50% (`EXCELLENT_SAVINGS_PCT`) | ✅ Excellent — promote immediately |
+| ≥ 0.945 (`SSIM_ACCEPTABLE`) | ≥ 20% | 🟡 Store as fallback, try next pass |
+| ≥ 0.940 (`SSIM_MIN`) | any | ⚠️ Not useful — discard, try next pass |
+| < 0.940 | any | 🛑 Hard abort — rescue fallback if available |
 
 ---
 
@@ -297,6 +325,8 @@ All tuning constants are defined at the top of `video_optimizer.py`:
 | `MIN_SAVINGS_FOR_SSIM` | `10.0` | Skip SSIM when savings below this % *(v7.0)* |
 | `DEFAULT_MIN_SIZE_MB` | `0` | No minimum file size — process all files |
 
+> **Fallback logic summary**: `MIN_SAVINGS_FOR_SSIM` (10%) gates SSIM computation. `SSIM_ACCEPTABLE` (0.945) + `MIN_SAVINGS` (20%) together gate fallback storage. `SSIM_MIN` (0.940) is the hard abort floor. `MIN_QUALITY` (0.960) is the strict success gate.
+
 ---
 
 ## CLI Reference
@@ -326,4 +356,4 @@ Examples:
 
 ---
 
-*Last updated: v7.0.0 — AV1 support + SSIM Skip Optimization*
+*Last updated: v7.0.1 — Linear Search fallback tracking (best_acceptable rescue on SSIM abort)*

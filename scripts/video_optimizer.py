@@ -1139,6 +1139,9 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     quality = q_override if q_override is not None else quality_values[0]
     linear_best_path: 'Path | None' = None
     linear_best_result = None
+    # Track best acceptable result: (quality, size_after, ssim, saved_pct, staging_path)
+    linear_best_acceptable: 'tuple | None' = None
+    linear_best_acceptable_path: 'Path | None' = None
 
     while should_continue(quality):
         staging = output_path.with_name(f"{output_path.stem}._staging_q{quality}{output_path.suffix}")
@@ -1185,6 +1188,33 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         if ssim < SSIM_MIN:
             print(f" {R}   -> Quality too low. Aborting.{NC}")
             if staging.exists(): staging.unlink()
+
+            # Rescue best acceptable result found in previous passes
+            if linear_best_acceptable and linear_best_acceptable_path and linear_best_acceptable_path.exists():
+                _ba_quality, _ba_size, _ba_ssim, _ba_saved_pct = linear_best_acceptable
+                _ba_saved_bytes = size_to_compare - _ba_size
+                linear_best_acceptable_path.rename(output_path)
+                _cleanup_staging()
+                file_time = time.time() - file_start_time
+                print(f" {Y}   -> Using best acceptable result: Q={_ba_quality} | "
+                      f"Saved: {_ba_saved_pct:.1f}% | SSIM: {_ba_ssim:.4f}{NC}")
+                print(f" {BG}>>> SUCCESS (fallback)! {format_size(_ba_saved_bytes)} "
+                      f"({_ba_saved_bytes*100/size_to_compare:.1f}%) saved in {format_time(file_time)}.{NC}")
+                batch_stats['total_saved_bytes'] += _ba_saved_bytes
+                batch_stats['total_time'] += file_time
+                batch_stats['success'] += 1
+                last_encode_result['filename'] = input_path.name
+                last_encode_result['status'] = 'success'
+                last_encode_result['quality'] = _ba_quality
+                last_encode_result['ssim'] = _ba_ssim
+                last_encode_result['saved_pct'] = _ba_saved_pct
+                last_encode_result['saved_bytes'] = _ba_saved_bytes
+                last_encode_result['duration'] = file_time
+                last_encode_result['reason'] = 'fallback_acceptable'
+                if port:
+                    notify_server(port, input_path)
+                return (True, _ba_saved_bytes)
+
             _cleanup_staging()
             batch_stats['failed'] += 1
             file_time = time.time() - file_start_time
@@ -1192,7 +1222,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             last_encode_result['status'] = 'failed'
             last_encode_result['quality'] = quality
             last_encode_result['ssim'] = ssim
-            last_encode_result['reason'] = f'Quality too low (SSIM {ssim:.4f} < 0.940)'
+            last_encode_result['reason'] = f'Quality too low (SSIM {ssim:.4f} < {SSIM_MIN:.3f})'
             last_encode_result['duration'] = file_time
             return (False, 0)
 
@@ -1201,7 +1231,10 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
         if (saved_pct >= MIN_SAVINGS and ssim >= MIN_QUALITY) or \
            (saved_pct >= EXCELLENT_SAVINGS_PCT and ssim >= SSIM_ACCEPTABLE):
-            # Good result – promote staging file to final output
+            # Great result – promote staging file to final output
+            # Discard any previously saved fallback
+            if linear_best_acceptable_path and linear_best_acceptable_path.exists():
+                linear_best_acceptable_path.unlink()
             staging.rename(output_path)
             _cleanup_staging()
             file_time = time.time() - file_start_time
@@ -1224,10 +1257,46 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
             return (True, saved_bytes)
 
-        print(f" {R}   -> Not optimal. Next pass...{NC}")
-        if staging.exists(): staging.unlink()
+        # Not ideal, but worth keeping as a fallback?
+        if saved_pct >= MIN_SAVINGS and ssim >= SSIM_ACCEPTABLE:
+            # Save this as the best fallback so far
+            if linear_best_acceptable_path and linear_best_acceptable_path.exists():
+                linear_best_acceptable_path.unlink()  # discard older, worse fallback
+            linear_best_acceptable = (quality, size_after, ssim, saved_pct)
+            linear_best_acceptable_path = staging
+            print(f" {Y}   -> Not optimal (SSIM {ssim:.4f}, saved {saved_pct:.1f}%). Trying more compression...{NC}")
+        else:
+            print(f" {R}   -> Not optimal. Next pass...{NC}")
+            if staging.exists(): staging.unlink()
         quality += step
 
+    # Loop exhausted – try the best acceptable fallback if we have one
+    if linear_best_acceptable and linear_best_acceptable_path and linear_best_acceptable_path.exists():
+        _ba_quality, _ba_size, _ba_ssim, _ba_saved_pct = linear_best_acceptable
+        _ba_saved_bytes = size_to_compare - _ba_size
+        linear_best_acceptable_path.rename(output_path)
+        _cleanup_staging()
+        file_time = time.time() - file_start_time
+        print(f" {Y}   -> Using best acceptable result: Q={_ba_quality} | "
+              f"Saved: {_ba_saved_pct:.1f}% | SSIM: {_ba_ssim:.4f}{NC}")
+        print(f" {BG}>>> SUCCESS (fallback)! {format_size(_ba_saved_bytes)} "
+              f"({_ba_saved_bytes*100/size_to_compare:.1f}%) saved.{NC}")
+        batch_stats['total_saved_bytes'] += _ba_saved_bytes
+        batch_stats['success'] += 1
+        last_encode_result['filename'] = input_path.name
+        last_encode_result['status'] = 'success'
+        last_encode_result['quality'] = _ba_quality
+        last_encode_result['ssim'] = _ba_ssim
+        last_encode_result['saved_pct'] = _ba_saved_pct
+        last_encode_result['saved_bytes'] = _ba_saved_bytes
+        last_encode_result['reason'] = 'fallback_acceptable'
+        if port:
+            notify_server(port, input_path)
+        return (True, _ba_saved_bytes)
+
+    if linear_best_acceptable_path and linear_best_acceptable_path.exists():
+        linear_best_acceptable_path.unlink()
+    _cleanup_staging()
     batch_stats['failed'] += 1
     file_time = time.time() - file_start_time
     last_encode_result['filename'] = input_path.name
