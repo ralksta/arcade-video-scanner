@@ -2070,16 +2070,7 @@ SETTINGS_MODAL_COMPONENT = """
                             <p class="text-sm text-gray-500 mt-1">Customize the dashboard experience.</p>
                         </div>
                         
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
-                            <div class="flex-1">
-                                <div class="text-white font-medium text-sm">Fun Facts</div>
-                                <div class="text-xs text-gray-500 mt-0.5">Educational overlays during optimization</div>
-                            </div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="settingsFunFacts" class="sr-only peer" onchange="markSettingsUnsaved()">
-                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-gold"></div>
-                            </label>
-                        </div>
+
                         
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">

@@ -94,8 +94,7 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_bitrate": "Mark videos above this kbps as HIGH bitrate.",
     "bitrate_threshold_kbps": 15000,
 
-    "_comment_fun_facts": "Show educational overlays during optimization.",
-    "enable_fun_facts": True,
+
     "_comment_optimizer": "Master toggle for optimization features.",
     "enable_optimizer": True,
     "_comment_tags": "User-created tags for video categorization.",
@@ -133,7 +132,7 @@ class AppSettings(BaseSettings):
     bitrate_threshold_kbps: int = Field(15000)
 
 
-    enable_fun_facts: bool = Field(True)
+
     enable_optimizer: bool = Field(True)
 
     theme: str = Field("arcade")

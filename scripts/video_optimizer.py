@@ -43,9 +43,7 @@ MIN_SAVINGS = 20.0
 MIN_QUALITY = 0.960
 SAMPLE_DURATION = 5
 DEFAULT_MIN_SIZE_MB = 0  # No minimum file size – process all files
-FUNFACT_INTERVAL = 30     # Seconds between fun facts
-ENABLE_FUNFACTS = True    # Default, overridden by main args
-FUNFACT_THRESHOLD = 300   # Start showing facts after 5 minutes (300 seconds)
+
 
 # --- SSIM / SAVINGS THRESHOLDS ---
 SSIM_MIN = 0.940           # Hard lower bound – reject anything below this
@@ -167,23 +165,7 @@ last_encode_result = {
     'reason': None
 }
 
-# --- FUN FACTS ---
-import random
 
-def load_funfacts() -> list:
-    """Load fun facts from external JSON file."""
-    facts_file = Path(__file__).parent / 'funfacts.json'
-    try:
-        if facts_file.exists():
-            with open(facts_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        pass
-    return ["Did you know? HEVC can achieve 50% better compression than H.264!"]
-
-funfacts = load_funfacts() if ENABLE_FUNFACTS else []
-last_funfact_time = 0
-current_funfact = ""
 
 def detect_encoder() -> str:
     """Auto-detect the best available encoder based on platform and hardware."""
@@ -391,8 +373,6 @@ def format_size(bytes_val):
 
 def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elapsed=0):
     """Enhanced console progress bar with encoder info, elapsed time and ETA."""
-    global last_funfact_time, current_funfact
-    
     percent = float(current) * 100 / total if total > 0 else 0
     percent = min(100.0, percent)
 
@@ -417,36 +397,6 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     
     # \r = go to line start, \033[2K = erase entire line → no resize artefacts
     sys.stdout.write(f"\r\033[2K {G}{encoder}{NC} [{arrow}{spaces}] {BG}{int(percent)}%{NC} | {speed} | {bitrate} | {elapsed_str} / {eta_str}")
-    
-    # Fun facts widget for long encodes
-    if ENABLE_FUNFACTS and funfacts and elapsed >= FUNFACT_THRESHOLD:
-        if elapsed - last_funfact_time >= FUNFACT_INTERVAL or current_funfact == "":
-            current_funfact = random.choice(funfacts)
-            last_funfact_time = elapsed
-
-        # Wrap text to fit in box (max ~82 chars per line)
-        wrapped = textwrap.wrap(current_funfact, width=82)
-        
-        # Build the retro BBS widget (90 chars wide)
-        widget_lines = [
-            "",
-            f" {Y}╔══════════════════════════════════════════════════════════════════════════════════════════╗{NC}",
-            f" {Y}║{NC}             🕹️  {BG}D I D   Y O U   K N O W ?{NC}  🎮                                           {Y}║{NC}",
-            f" {Y}╠══════════════════════════════════════════════════════════════════════════════════════════╣{NC}",
-        ]
-        for line in wrapped:
-            padded = line.center(86)
-            widget_lines.append(f" {Y}║{NC}  {G}{padded}{NC}{Y}║{NC}")
-        widget_lines.append(f" {Y}╠══════════════════════════════════════════════════════════════════════════════════════════╣{NC}")
-        widget_lines.append(f" {Y}║{NC}     👾 RETRO GAMING TRIVIA 👾     ⭐ ARCADE CLASSICS ⭐     🏆 HIGH SCORE 🏆            {Y}║{NC}")
-        widget_lines.append(f" {Y}╚══════════════════════════════════════════════════════════════════════════════════════════╝{NC}")
-        
-        # Print widget below progress bar
-        for wl in widget_lines:
-            sys.stdout.write(f"\n{wl}")
-        # Move cursor back up
-        sys.stdout.write(f"\033[{len(widget_lines)}F")
-    
     sys.stdout.flush()
 
 def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress', maxrate_kbps=None, bufsize_kbps=None, target_bitrate_kbps=None):
@@ -1286,15 +1236,11 @@ def main():
                         help='Audio processing mode (default: enhanced)')
     parser.add_argument('--ss', type=str, help='Start time (e.g. 00:00:10 or 10)')
     parser.add_argument('--to', type=str, help='End time (e.g. 00:00:20 or 20)')
-    parser.add_argument('--no-fun-facts', action='store_true', help='Disable fun facts display')
     parser.add_argument('--video-mode', choices=['compress', 'copy'], default='compress',
                         help='Video processing mode: compress (default) or copy (passthrough)')
     parser.add_argument('--q', type=int, help='Manual starting quality value')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     args = parser.parse_args()
-    
-    global ENABLE_FUNFACTS
-    ENABLE_FUNFACTS = not args.no_fun_facts
 
     if args.port:
         print(f"🔌 Notification Port: {args.port}")

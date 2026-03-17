@@ -633,9 +633,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"🔌 Current Server Port: {current_port}")
                     print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Q: {q_val} | Trim: {ss}-{to}")
                     
-                    # Load latest settings to check fun facts preference
-                    enable_fun_facts = config.settings.enable_fun_facts
-
                     # Build command as list (NEVER use shell=True!)
                     cmd_parts = [sys.executable, config.optimizer_path, file_path,
                                  "--port", str(current_port),
@@ -648,8 +645,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         cmd_parts.extend(["--to", to])
                     if q_val:
                          cmd_parts.extend(["--q", q_val])
-                    if not enable_fun_facts:
-                        cmd_parts.append("--no-fun-facts")
                     
                     if IS_WIN:
                         # Windows: Launch in new console WITHOUT shell=True

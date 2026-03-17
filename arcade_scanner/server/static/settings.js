@@ -37,7 +37,6 @@ async function openSettings() {
 
         // New Features
         document.getElementById('settingsTheme').value = data.theme || 'arcade';
-        document.getElementById('settingsFunFacts').checked = data.enable_fun_facts ?? true;
         const optimizerCheckbox = document.getElementById('settingsOptimizer');
         if (optimizerCheckbox) optimizerCheckbox.checked = data.enable_optimizer !== false;
 
@@ -132,7 +131,6 @@ async function saveSettings() {
         min_image_size_kb: parseInt(document.getElementById('settingsMinImageSize').value) || 100,
         bitrate_threshold_kbps: parseInt(document.getElementById('settingsBitrate').value) || 15000,
 
-        enable_fun_facts: document.getElementById('settingsFunFacts')?.checked || false,
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
         enable_deovr: document.getElementById('settingsDeoVR')?.checked || false,

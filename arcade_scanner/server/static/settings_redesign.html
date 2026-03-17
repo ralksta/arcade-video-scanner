@@ -1199,7 +1199,6 @@
                 exclude_paths: ['/Users/demo/Private'],
                 min_size_mb: 100,
                 bitrate_threshold_kbps: 15000,
-                enable_fun_facts: true,
 
                 default_scan_targets: ['/Users/demo'],
                 default_exclusions: [
@@ -1214,8 +1213,6 @@
             document.getElementById('settingsExcludes').value = mockSettings.exclude_paths.join('\n');
             document.getElementById('settingsMinSize').value = mockSettings.min_size_mb;
             document.getElementById('settingsBitrate').value = mockSettings.bitrate_threshold_kbps;
-            document.getElementById('settingsFunFacts').checked = mockSettings.enable_fun_facts;
-            document.getElementById('settingsFunFacts').checked = mockSettings.enable_fun_facts;
 
             // Show default hint
             document.getElementById('defaultTargetsHint').textContent =
