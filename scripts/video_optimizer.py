@@ -1369,7 +1369,6 @@ def main():
                         help='Video processing mode: compress (default) or copy (passthrough)')
     parser.add_argument('--q', type=int, help='Manual starting quality value')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
-    parser.add_argument('--no-fun-facts', action='store_true', help='Suppress fun facts output')
     args = parser.parse_args()
 
     if args.port:
