@@ -72,18 +72,18 @@ class TimelineScrubber {
 
         this.container.innerHTML = `
             <div class="timeline-scrubber">
-                <div class="timeline-track" id="timelineTrack">
-                    <canvas class="timeline-thumbnails" id="timelineThumbnails"></canvas>
-                    <div class="timeline-selection" id="timelineSelection"></div>
-                    <div class="timeline-handle timeline-handle-start" id="handleStart" data-handle="start">
+                <div class="timeline-track">
+                    <canvas class="timeline-thumbnails"></canvas>
+                    <div class="timeline-selection"></div>
+                    <div class="timeline-handle timeline-handle-start" data-handle="start">
                         <div class="timeline-handle-inner"></div>
-                        <div class="timeline-tooltip" id="tooltipStart">00:00</div>
+                        <div class="timeline-tooltip">00:00</div>
                     </div>
-                    <div class="timeline-handle timeline-handle-end" id="handleEnd" data-handle="end">
+                    <div class="timeline-handle timeline-handle-end" data-handle="end">
                         <div class="timeline-handle-inner"></div>
-                        <div class="timeline-tooltip" id="tooltipEnd">00:00</div>
+                        <div class="timeline-tooltip">00:00</div>
                     </div>
-                    <div class="timeline-playhead" id="timelinePlayhead"></div>
+                    <div class="timeline-playhead"></div>
                 </div>
                 <div class="timeline-labels">
                     <span class="timeline-label-start">0:00</span>
@@ -94,11 +94,11 @@ class TimelineScrubber {
 
 
         // Get element references
-        this.track = document.getElementById('timelineTrack');
-        this.handleStart = document.getElementById('handleStart');
-        this.handleEnd = document.getElementById('handleEnd');
-        this.selection = document.getElementById('timelineSelection');
-        this.playhead = document.getElementById('timelinePlayhead');
+        this.track = this.container.querySelector('.timeline-track');
+        this.handleStart = this.container.querySelector('.timeline-handle-start');
+        this.handleEnd = this.container.querySelector('.timeline-handle-end');
+        this.selection = this.container.querySelector('.timeline-selection');
+        this.playhead = this.container.querySelector('.timeline-playhead');
 
 
         // Initial positions
@@ -249,7 +249,7 @@ class TimelineScrubber {
         if (this.generatingThumbnails) return;
         this.generatingThumbnails = true;
 
-        const canvas = document.getElementById('timelineThumbnails');
+        const canvas = this.container.querySelector('.timeline-thumbnails');
         // Use currentSrc if src is empty (e.g. source element used)
         const videoSrc = this.video.currentSrc || this.video.src;
 

@@ -122,6 +122,68 @@ BASE_LAYOUT = """<!DOCTYPE html>
             scrollbar-width: none;
         }}
         
+        /* Modern Range Slider Styling */
+        input[type=range] {{
+            -webkit-appearance: none;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            height: 6px;
+            border-radius: 4px;
+            outline: none;
+        }}
+        input[type=range]::-webkit-slider-thumb {{
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--arcade-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 208, 0.5);
+            transition: transform 0.1s;
+        }}
+        input[type=range]::-webkit-slider-thumb:hover {{
+            transform: scale(1.2);
+            box-shadow: 0 0 15px rgba(0, 255, 208, 0.8);
+        }}
+
+        /* Glow Pulses for Panels */
+        @keyframes subtle-glow {{
+            0% {{ box-shadow: 0 15px 50px var(--glow-color, rgba(0, 255, 208, 0.2)); }}
+            50% {{ box-shadow: 0 15px 50px var(--glow-color, rgba(0, 255, 208, 0.5)); }}
+            100% {{ box-shadow: 0 15px 50px var(--glow-color, rgba(0, 255, 208, 0.2)); }}
+        }}
+        .animate-glow-pulse {{
+            animation: subtle-glow 4s infinite ease-in-out;
+        }}
+        .glow-cyan {{
+            --glow-color: rgba(0, 255, 208, 0.3);
+        }}
+        .glow-purple {{
+            --glow-color: rgba(168, 85, 247, 0.3);
+        }}
+        
+        /* Button Ripple/Glitch Effect */
+        .btn-glitch {{
+            position: relative;
+            overflow: hidden;
+        }}
+        .btn-glitch::after {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -150%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+            transform: skewX(-20deg);
+            transition: none;
+        }}
+        .btn-glitch:hover::after {{
+            left: 200%;
+            transition: left 0.6s ease-in-out;
+        }}
+        
         /* Treemap Tooltip */
         #treemapTooltip {{
             position: fixed;
@@ -383,7 +445,7 @@ VIDEO_CARD_COMPONENT = """
 """
 OPTIMIZE_PANEL_COMPONENT = """
 <!-- Optimize Panel (Tailwind) -->
-<div id="optimizePanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] shadow-[0_15px_50px_rgba(0,255,208,0.2)] flex flex-col gap-3">
+<div id="optimizePanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] animate-glow-pulse glow-cyan flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS and inline CSS in HEAD -->
     
     <!-- Header -->
@@ -492,7 +554,7 @@ OPTIMIZE_PANEL_COMPONENT = """
             <button class="px-4 py-2 rounded-xl text-sm font-bold text-gray-400 bg-transparent hover:bg-white/5 hover:text-white transition-colors" onclick="closeOptimize()">
                 Cancel
             </button>
-            <button class="px-5 py-2 rounded-xl text-sm font-bold cursor-pointer text-[#000] bg-arcade-cyan hover:bg-white transition-all duration-300 shadow-[0_0_15px_rgba(0,255,208,0.3)] hover:shadow-[0_0_25px_rgba(0,255,208,0.5)] transform hover:-translate-y-0.5 flex items-center justify-center gap-1.5" onclick="triggerOptimization()">
+            <button class="btn-glitch px-5 py-2 rounded-xl text-sm font-bold cursor-pointer text-[#000] bg-arcade-cyan hover:bg-white transition-all duration-300 shadow-[0_0_15px_rgba(0,255,208,0.3)] hover:shadow-[0_0_25px_rgba(0,255,208,0.5)] transform hover:-translate-y-0.5 flex items-center justify-center gap-1.5" onclick="triggerOptimization()">
                 <span class="material-icons text-[16px]">bolt</span> START
             </button>
         </div>
@@ -502,7 +564,7 @@ OPTIMIZE_PANEL_COMPONENT = """
 
 GIF_EXPORT_PANEL_COMPONENT = """
 <!-- GIF Export Panel (Tailwind) -->
-<div id="gifExportPanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] shadow-[0_15px_50px_rgba(168,85,247,0.2)] flex flex-col gap-3">
+<div id="gifExportPanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] animate-glow-pulse glow-purple flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS -->
     
     <!-- Header -->
@@ -603,7 +665,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
             <button class="px-4 py-2 rounded-xl text-sm font-bold text-gray-400 bg-transparent hover:bg-white/5 hover:text-white transition-colors" onclick="closeGifExport()">
                 Cancel
             </button>
-            <button class="px-5 py-2 rounded-xl text-sm font-bold cursor-pointer text-[#000] bg-purple-500 hover:bg-white transition-all duration-300 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] transform hover:-translate-y-0.5 flex items-center justify-center gap-1.5" onclick="triggerGifExport()">
+            <button class="btn-glitch px-5 py-2 rounded-xl text-sm font-bold cursor-pointer text-[#000] bg-purple-500 hover:bg-white transition-all duration-300 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] transform hover:-translate-y-0.5 flex items-center justify-center gap-1.5" onclick="triggerGifExport()">
                 <span class="material-icons text-[16px]">gif</span> EXPORT
             </button>
         </div>
@@ -626,7 +688,7 @@ CINEMA_MODAL_COMPONENT = """
     
     <img id="cinemaImage" class="hidden max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg object-contain transition-all duration-500 origin-bottom" src="">
     
-    <div id="cinemaInfoPanel" class="absolute top-20 right-4 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 transform translate-x-[120%] transition-transform duration-300 z-40 text-sm text-gray-300">
+    <div id="cinemaInfoPanel" class="absolute top-20 right-4 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 transform translate-x-[120%] transition-transform duration-300 z-40 text-sm text-gray-300 animate-glow-pulse glow-cyan">
         <div class="flex items-center gap-2 mb-3 text-white font-bold border-b border-white/10 pb-2">
             <span class="material-icons text-sm">info</span>
             <span>Technical Details</span>
@@ -640,7 +702,7 @@ CINEMA_MODAL_COMPONENT = """
     </div>
     
     <!-- Tag Picker Dropdown (appears above the Tags button) -->
-    <div id="cinemaTagPanel" class="hidden absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-3 z-50 min-w-[200px] max-w-[320px]">
+    <div id="cinemaTagPanel" class="hidden absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-3 z-50 min-w-[200px] max-w-[320px] animate-glow-pulse glow-cyan">
         <div class="flex items-center gap-2 mb-2 text-white/80 text-xs border-b border-white/10 pb-2">
             <span class="material-icons text-sm text-arcade-cyan">label</span>
             <span class="font-semibold uppercase tracking-wide">Assign Tags</span>
@@ -949,8 +1011,8 @@ FOLDER_BROWSER_LEGEND_COMPONENT = """
 
 
 BATCH_BAR_COMPONENT = """
-<!-- Batch Selection Bar (Floating) -->
-<div id="batchBar" class="fixed bottom-20 md:bottom-8 left-1/2 md:left-[calc(50%+128px)] -translate-x-1/2 z-50 bg-[#0d0d14] border-2 border-arcade-cyan/30 rounded-2xl shadow-[0_0_40px_rgba(0,255,208,0.15)] px-4 py-2.5 flex items-center gap-2 transition-transform duration-300 translate-y-32">
+<!-- Batch Action Bar -->
+<div id="batchBar" class="fixed bottom-20 md:bottom-8 left-1/2 md:left-[calc(50%+128px)] -translate-x-1/2 z-50 bg-[#0d0d14] border-2 border-arcade-cyan/30 rounded-2xl animate-glow-pulse glow-cyan px-4 py-2.5 flex items-center gap-2 transition-transform duration-300 translate-y-32">
     <!-- Active class 'translate-y-0' handled by JS -->
     
     <!-- Select All Button -->
@@ -1322,9 +1384,9 @@ TAG_MANAGER_MODAL_COMPONENT = """
 """
 
 COLLECTION_MODAL_COMPONENT = """
-<!-- Smart Collection Modal - Compact Accordion Design -->
+<!-- Collection Manager Modal -->
 <div id="collectionModal" class="fixed inset-0 z-[95] bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
-    <div class="w-full max-w-2xl bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 transform scale-95 transition-transform duration-300 overflow-hidden max-h-[90vh] flex flex-col">
+    <div class="bg-[#101018] border border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] animate-glow-pulse glow-cyan">
 
         <!-- Header -->
         <div class="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
@@ -1913,7 +1975,7 @@ SETUP_WIZARD_COMPONENT = """
 
 SETTINGS_MODAL_COMPONENT = """
 <div id="settingsModal" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
-    <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-[#1a1a24] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-white/10 transform scale-95 transition-transform duration-300">
+    <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-[#1a1a24] rounded-2xl animate-glow-pulse glow-cyan flex flex-col md:flex-row overflow-hidden border border-white/10 transform scale-95 transition-transform duration-300">
         
         <!-- Sidebar Navigation -->
         <aside class="w-full md:w-56 bg-[#12121a] border-b md:border-b-0 md:border-r border-white/5 flex md:flex-col shrink-0">
