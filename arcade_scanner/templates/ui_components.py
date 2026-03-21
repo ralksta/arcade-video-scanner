@@ -60,7 +60,7 @@ def render_base_layout(theme: BaseTheme, content: str, scripts: str, active_them
         
         .responsive-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(var(--grid-min-width, 240px), 1fr));
             gap: 1rem;
             justify-content: start;
         }}

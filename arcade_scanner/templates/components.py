@@ -203,7 +203,7 @@ BASE_LAYOUT = """<!DOCTYPE html>
         
         .responsive-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(var(--grid-min-width, 240px), 1fr));
             gap: 1rem;
             justify-content: start;
         }}
@@ -2536,18 +2536,25 @@ FILTER_BAR_COMPONENT = """
             </select>
         </div>
         
-        <!-- View Toggles -->
+        <!-- View Toggles & Grid Scale -->
         <div class="hidden md:flex items-center bg-black/5 dark:bg-white/5 rounded-lg p-0.5 ml-2 border border-black/5 dark:border-white/5">
-            <button onclick="setLayout('grid')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Grid View">
+            <!-- Grid Scale Slider -->
+            <div class="flex items-center gap-1.5 px-2 mr-1 border-r border-black/10 dark:border-white/10 group" id="gridScaleContainer">
+                <span class="material-icons text-[14px] text-gray-500/70 group-hover:text-arcade-cyan transition-colors">photo_size_select_small</span>
+                <input type="range" id="gridScaleSlider" min="150" max="500" value="240" step="10" oninput="updateGridScale(this.value)" class="w-16 h-1 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer">
+                <span class="material-icons text-[16px] text-gray-500/70 group-hover:text-arcade-cyan transition-colors">photo_size_select_large</span>
+            </div>
+            
+            <button id="viewToggleGrid" onclick="setLayout('grid')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Grid View">
                 <span class="material-icons text-[18px]">grid_view</span>
             </button>
-            <button onclick="setLayout('list')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="List View">
+            <button id="viewToggleList" onclick="setLayout('list')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="List View">
                  <span class="material-icons text-[18px]">view_list</span>
             </button>
-            <button onclick="setLayout('treemap')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Tree View">
+            <button id="viewToggleTreemap" onclick="setLayout('treemap')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Tree View">
                 <span class="material-icons text-[18px]">account_tree</span>
             </button>
-            <button onclick="setLayout('folderbrowser')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Folder Browser">
+            <button id="viewToggleFolder" onclick="setLayout('folderbrowser')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Folder Browser">
                 <span class="material-icons text-[18px]">folder</span>
             </button>
         </div>

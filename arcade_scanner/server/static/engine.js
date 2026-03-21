@@ -388,8 +388,30 @@ function toggleLayout() {
 
     // Update button icon to show what's next
     const btn = document.getElementById('toggleView');
-    btn.innerHTML = `<span class="material-icons">${icons[nextMode]}</span>`;
+    if (btn) btn.innerHTML = `<span class="material-icons">${icons[nextMode]}</span>`;
 }
+
+/**
+ * Update the CSS variable for grid column min-width
+ * @param {string|number} value - The new min-width in pixels
+ */
+function updateGridScale(value) {
+    document.documentElement.style.setProperty('--grid-min-width', `${value}px`);
+    // Optionally, save preference
+    localStorage.setItem('gridScale', value);
+}
+
+// Initialize grid scale from localStorage if available
+(function initGridScale() {
+    const saved = localStorage.getItem('gridScale');
+    if (saved) {
+        document.documentElement.style.setProperty('--grid-min-width', `${saved}px`);
+        window.addEventListener('DOMContentLoaded', () => {
+            const slider = document.getElementById('gridScaleSlider');
+            if (slider) slider.value = saved;
+        });
+    }
+})();
 
 /**
  * Set the display layout mode
@@ -409,6 +431,12 @@ function setLayout(layout, skipURLUpdate = false) {
     const workspaceBar = document.querySelector('.workspace-bar');
     const treemapLegend = document.getElementById('treemapLegend');
     const folderBrowserLegend = document.getElementById('folderBrowserLegend');
+    const gridScaleContainer = document.getElementById('gridScaleContainer');
+
+    // Show/hide grid scale slider
+    if (gridScaleContainer) {
+        gridScaleContainer.style.display = layout === 'grid' ? 'flex' : 'none';
+    }
 
     // Hide all legends first
     if (treemapLegend) treemapLegend.style.display = 'none';

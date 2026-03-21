@@ -19,20 +19,24 @@ from typing import Optional, Tuple, Dict, Any
 import threading
 import queue
 
-# Import bitrate analyzer for maxrate caps
-# Use sys.path to avoid circular dependencies through arcade_scanner's __init__.py
+# Import arcade_scanner core utilities
+# Use sys.path to avoid circular dependencies and keep script standalone
 try:
     import sys as _sys
-    _analyzer_path = Path(__file__).parent.parent / "arcade_scanner" / "core"
-    if _analyzer_path.exists():
-        _sys.path.insert(0, str(_analyzer_path))
+    _core_path = Path(__file__).parent.parent / "arcade_scanner" / "core"
+    if _core_path.exists():
+        _sys.path.insert(0, str(_core_path))
         from bitrate_analyzer import analyze_bitrate, BitrateProfile
+        from hw_encode_detect import detect_hevc_optimizer_encoder
         _sys.path.pop(0)
         BITRATE_ANALYZER_AVAILABLE = True
+        HW_DETECT_AVAILABLE = True
     else:
         BITRATE_ANALYZER_AVAILABLE = False
+        HW_DETECT_AVAILABLE = False
 except ImportError:
     BITRATE_ANALYZER_AVAILABLE = False
+    HW_DETECT_AVAILABLE = False
 
 # Logs directory
 LOG_DIR = Path.home() / ".arcade-scanner" / "logs"
@@ -274,6 +278,14 @@ last_encode_result = {
 
 def detect_encoder() -> str:
     """Auto-detect the best available encoder based on platform and hardware."""
+    # Attempt to use the unified hardware encoder detection from arcade_scanner core
+    if HW_DETECT_AVAILABLE:
+        encoder = detect_hevc_optimizer_encoder()
+        if encoder == 'libx265':
+            print(f"{R}No hardware encoder detected. Using software encoder (slower).{NC}")
+        return encoder
+        
+    # --- FALLBACK if running completely isolated ---
     if sys.platform == 'darwin':
         return 'videotoolbox'
 
