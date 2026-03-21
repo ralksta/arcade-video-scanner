@@ -110,7 +110,9 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_deovr": "Generate DeoVR-compatible JSON for VR headset viewing.",
     "enable_deovr": False,
     "_comment_image_scanning": "Include image files in the scanning process.",
-    "enable_image_scanning": False
+    "enable_image_scanning": False,
+    "_comment_encoding_preset": "Encoding speed/quality trade-off: fast (ultrafast), balanced (medium), best (slow).",
+    "encoding_preset": "balanced"
 }
 
 # ==============================================================================
@@ -134,6 +136,7 @@ class AppSettings(BaseSettings):
 
 
     enable_optimizer: bool = Field(True)
+    encoding_preset: str = Field("balanced")  # fast | balanced | best
 
     theme: str = Field("arcade")
     enable_deovr: bool = Field(False)

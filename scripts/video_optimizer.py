@@ -125,6 +125,7 @@ ENCODER_PROFILES = {
         'quality_direction': 1,  # +1 means increase CRF = worse quality
         'hwaccel_input': [],  # No hardware acceleration
         'encoder_args': [
+            '-threads', '0',
             '-preset', 'medium',
             '-x265-params', 'log-level=error',
         ],
@@ -165,6 +166,77 @@ ENCODER_PROFILES = {
         'video_filter': 'scale_cuda=trunc(iw/2)*2:trunc(ih/2)*2:format=yuv420p',
     },
 }
+
+# --- ENCODING PRESET MAP ---
+# Maps user-friendly preset names to encoder-specific ffmpeg preset strings.
+# Keys are user presets: 'fast' | 'balanced' | 'best'
+ENCODING_PRESET_MAP = {
+    # libx265 (CPU software encoder)
+    'libx265': {'fast': 'veryfast', 'balanced': 'medium', 'best': 'slow'},
+    # NVIDIA NVENC: p1=fastest, p7=slowest/best quality
+    'nvenc':   {'fast': 'p2',      'balanced': 'p5',    'best': 'p7'},
+    # Intel QSV: veryfast/fast/medium/slow/veryslow
+    'qsv':     {'fast': 'veryfast','balanced': 'medium', 'best': 'slow'},
+    # AV1 NVENC inherits same as nvenc
+    'av1_nvenc': {'fast': 'p2',    'balanced': 'p5',    'best': 'p7'},
+    # VideoToolbox / VAAPI / AV1 VideoToolbox: no standard preset arg – handled separately
+}
+
+
+def apply_encoding_preset(profile: dict, preset: str) -> dict:
+    """
+    Return a modified copy of *profile* with the encoding preset applied.
+    For encoders that support a -preset arg (nvenc, qsv, libx265) the mapped
+    value replaces the existing entry.  For VideoToolbox / VAAPI we only
+    touch the -realtime flag (0 = quality, 1 = speed).
+    """
+    import copy
+    profile = copy.deepcopy(profile)
+    codec = profile.get('codec', '')
+
+    # Determine encoder family from codec name
+    encoder_family = None
+    for family in ENCODING_PRESET_MAP:
+        if family in codec or codec.startswith(family.replace('_', '_')):
+            encoder_family = family
+            break
+    # Special case: hevc_nvenc → nvenc family
+    if codec == 'hevc_nvenc':
+        encoder_family = 'nvenc'
+    elif codec == 'hevc_qsv':
+        encoder_family = 'qsv'
+    elif codec == 'libx265':
+        encoder_family = 'libx265'
+    elif codec == 'av1_nvenc':
+        encoder_family = 'av1_nvenc'
+
+    preset_map = ENCODING_PRESET_MAP.get(encoder_family) if encoder_family else None
+    target_preset = preset_map.get(preset, 'medium') if preset_map else None
+
+    args = profile.get('encoder_args', [])
+
+    if target_preset:
+        # Replace or inject -preset VALUE
+        if '-preset' in args:
+            idx = args.index('-preset')
+            args[idx + 1] = target_preset
+        else:
+            args = ['-preset', target_preset] + args
+    elif codec in ('hevc_videotoolbox', 'av1_videotoolbox', 'hevc_vaapi'):
+        # VideoToolbox / VAAPI: use -realtime as speed proxy
+        realtime_val = '1' if preset == 'fast' else '0'
+        if '-realtime' in args:
+            idx = args.index('-realtime')
+            args[idx + 1] = realtime_val
+        # VAAPI only: use -compression_level for fine-tuning
+        if codec == 'hevc_vaapi' and '-compression_level' in args:
+            level_val = '32' if preset == 'fast' else ('20' if preset == 'best' else '24')
+            idx = args.index('-compression_level')
+            args[idx + 1] = level_val
+
+    profile['encoder_args'] = args
+    return profile
+
 
 # --- COLORS ---
 G = '\033[0;32m'
@@ -1369,6 +1441,8 @@ def main():
                         help='Video processing mode: compress (default) or copy (passthrough)')
     parser.add_argument('--q', type=int, help='Manual starting quality value')
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
+    parser.add_argument('--preset', choices=['fast', 'balanced', 'best'], default='balanced',
+                        help='Encoding quality preset: fast (speed), balanced (default), best (quality/size)')
     args = parser.parse_args()
 
     if args.port:
@@ -1396,7 +1470,12 @@ def main():
             print(f"{Y}⚠️  AV1 not supported for encoder '{encoder_key}', falling back to HEVC.{NC}")
 
     profile = ENCODER_PROFILES[encoder_key]
-    print(f"{BG}VIDEO OPTIMIZER V2.1{NC} - {G}{profile['name']}{NC}")
+
+    # Apply user-selected encoding preset (fast / balanced / best)
+    preset = getattr(args, 'preset', 'balanced')
+    profile = apply_encoding_preset(profile, preset)
+    preset_labels = {'fast': '⚡ Fast', 'balanced': '⚖️  Balanced', 'best': '🏆 Best'}
+    print(f"{BG}VIDEO OPTIMIZER V2.1{NC} - {G}{profile['name']}{NC} | Preset: {preset_labels.get(preset, preset)}")
     if args.copy_audio:
         print(f"{Y}Audio: Copy (passthrough){NC}")
     elif args.audio_mode:

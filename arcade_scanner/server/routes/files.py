@@ -247,11 +247,13 @@ def _handle_compress(handler) -> None:
         current_port = handler.server.server_address[1]
         print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Q: {q_val} | Trim: {ss}-{to}")
 
+        encoding_preset = getattr(config.settings, 'encoding_preset', 'balanced')
         cmd_parts = [
             sys.executable, config.optimizer_path, file_path,
             "--port", str(current_port),
             "--audio-mode", audio_mode,
             "--video-mode", video_mode,
+            "--preset", encoding_preset,
         ]
 
         if ss:

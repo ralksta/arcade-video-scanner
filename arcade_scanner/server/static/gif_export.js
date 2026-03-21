@@ -384,31 +384,32 @@ function adjustCinemaForPanel(isPanelOpen) {
     if (!video || !cinemaModal) return;
 
     if (isPanelOpen) {
-        // Make video much smaller to ensure controls are always visible
-        video.style.maxHeight = '50vh'; // Fixed smaller size
-        video.style.transition = 'max-height 0.3s ease';
+        // Use margin-bottom: auto to push it upwards in the flex container
+        // Shrink max-height exactly to safe zone above the optimize panel.
+        video.style.transform = 'scale(1)'; // reset previous transform logic
+        video.style.maxHeight = '45vh'; 
+        video.style.marginTop = '8vh';
+        video.style.marginBottom = 'auto';
 
         if (image) {
-            image.style.maxHeight = '50vh';
-            image.style.transition = 'max-height 0.3s ease';
+            image.style.transform = 'scale(1)';
+            image.style.maxHeight = '45vh';
+            image.style.marginTop = '8vh';
+            image.style.marginBottom = 'auto';
         }
-
-        // Change alignment from center to start (top)
-        cinemaModal.classList.remove('justify-center');
-        cinemaModal.classList.add('justify-start');
-        cinemaModal.style.paddingTop = '60px';
-        cinemaModal.style.transition = 'padding-top 0.3s ease';
     } else {
-        // Restore to full height
+        // Restore to center/full size
+        video.style.transform = 'scale(1)';
         video.style.maxHeight = '80vh';
+        video.style.marginTop = '';
+        video.style.marginBottom = '';
+        
         if (image) {
+            image.style.transform = 'scale(1)';
             image.style.maxHeight = '80vh';
+            image.style.marginTop = '';
+            image.style.marginBottom = '';
         }
-
-        // Restore center alignment
-        cinemaModal.classList.remove('justify-start');
-        cinemaModal.classList.add('justify-center');
-        cinemaModal.style.paddingTop = '0';
     }
 }
 

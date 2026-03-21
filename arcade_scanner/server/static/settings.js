@@ -43,6 +43,9 @@ async function openSettings() {
         const imageScanCheckbox = document.getElementById('settingsScanImages');
         if (imageScanCheckbox) imageScanCheckbox.checked = data.enable_image_scanning === true;
 
+        // Encoding preset (fast / balanced / best)
+        selectEncodingPreset(data.encoding_preset || 'balanced');
+
         const deovrCheckbox = document.getElementById('settingsDeoVR');
         if (deovrCheckbox) deovrCheckbox.checked = data.enable_deovr === true;
 
@@ -134,6 +137,7 @@ async function saveSettings() {
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
         enable_deovr: document.getElementById('settingsDeoVR')?.checked || false,
+        encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
         theme: document.getElementById('settingsTheme').value || 'arcade'
     };
 
@@ -1024,4 +1028,16 @@ async function confirmRemovePhotos(removeFromDb) {
 
 window.onIncludePhotosChange = onIncludePhotosChange;
 window.confirmRemovePhotos = confirmRemovePhotos;
+
+// Encoding quality preset selection
+function selectEncodingPreset(value) {
+    const presets = ['fast', 'balanced', 'best'];
+    presets.forEach(p => {
+        const btn = document.querySelector(`.encoding-preset-btn[data-value="${p}"]`);
+        if (btn) btn.classList.toggle('active', p === value);
+    });
+    const hidden = document.getElementById('settingsEncodingPreset');
+    if (hidden) hidden.value = value;
+}
+window.selectEncodingPreset = selectEncodingPreset;
 

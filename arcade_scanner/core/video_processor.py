@@ -74,27 +74,38 @@ def create_thumbnail(video_path: str) -> str:
         if duration > 5:
             ss = str(min(60, int(duration * 0.1)))
 
-        def try_extract(seek_time):
+        def try_extract(seek_time, use_scene_detect=False):
             vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
-            cmd = [
-                "ffmpeg", "-ss", seek_time, "-i", video_path,
+            if use_scene_detect:
+                vf_filter = f"select='gt(scene\\,0.4)',{vf_filter}"
+            
+            cmd = ["ffmpeg", "-ss", seek_time]
+            if use_scene_detect:
+                cmd.extend(["-t", "10"])  # Search up to 10 seconds for a scene change
+                
+            cmd.extend([
+                "-i", video_path,
                 "-vframes", "1", "-q:v", "4",
                 "-vf", vf_filter,
                 thumb_path, "-y", "-loglevel", "quiet"
-            ]
+            ])
             try:
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
                 return os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0
             except Exception as e:
-                logger.warning("Thumbnail extract failed at %s for %s: %s", seek_time, video_path, e)
+                logger.warning("Thumbnail extract failed at %s (scene_detect=%s) for %s: %s", seek_time, use_scene_detect, video_path, e)
                 return False
 
-        # Attempt 1: Smart Seek
-        success = try_extract(ss)
+        # Attempt 1: Smart Seek with Scene Detection
+        success = try_extract(ss, use_scene_detect=True)
         
-        # Attempt 2: Fallback to 0s if failed
+        # Attempt 2: Smart Seek without Scene Detection
+        if not success:
+            success = try_extract(ss, use_scene_detect=False)
+        
+        # Attempt 3: Fallback to 0s if failed
         if not success and ss != "0":
-            success = try_extract("0")
+            success = try_extract("0", use_scene_detect=False)
 
         if not success:
             return ""
