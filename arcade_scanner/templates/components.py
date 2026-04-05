@@ -1587,10 +1587,10 @@ SETTINGS_MODAL_COMPONENT = """
     <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-arcade-bg dark:bg-[#1a1a24] rounded-2xl animate-glow-pulse glow-cyan flex flex-col md:flex-row overflow-hidden border border-black/10 dark:border-white/10 transform scale-95 transition-transform duration-300">
         
         <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-56 bg-black/5 dark:bg-[#12121a] border-b md:border-b-0 md:border-r border-black/5 dark:border-white/5 flex md:flex-col shrink-0">
-            <div class="p-4 md:p-5 flex items-center gap-3 text-white border-b border-white/5 md:border-none">
+        <aside class="w-full md:w-56 bg-[#f1f3f5] dark:bg-[#12121a] border-b md:border-b-0 md:border-r border-black/10 dark:border-white/5 flex md:flex-col shrink-0">
+            <div class="p-4 md:p-5 flex items-center gap-3 border-b border-black/8 dark:border-white/5 md:border-none">
                 <span class="material-icons text-arcade-gold text-xl">settings</span>
-                <h2 class="font-semibold tracking-wide text-lg">Settings</h2>
+                <h2 class="font-semibold tracking-wide text-lg text-text-main dark:text-white">Settings</h2>
             </div>
             
             <nav class="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:px-3 md:py-2 gap-1">
@@ -2082,7 +2082,7 @@ SETTINGS_MODAL_COMPONENT = """
             </div>
             
             <!-- Footer -->
-            <footer class="p-4 border-t border-black/5 dark:border-white/5 bg-black/5 dark:bg-[#12121a] flex justify-between items-center">
+            <footer class="p-4 border-t border-black/8 dark:border-white/5 bg-[#f1f3f5] dark:bg-[#12121a] flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <div class="flex items-center gap-2 text-amber-400 text-xs font-medium opacity-0 transition-opacity" id="unsavedIndicator">
                         <span class="material-icons text-sm">warning</span>
@@ -2090,7 +2090,7 @@ SETTINGS_MODAL_COMPONENT = """
                     </div>
                 </div>
                 <div class="flex gap-3">
-                    <button class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all" onclick="closeSettings()">Cancel</button>
+                    <button class="px-4 py-2 rounded-lg text-sm font-medium text-text-muted dark:text-gray-400 hover:text-text-main dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all" onclick="closeSettings()">Cancel</button>
                     <button id="saveSettingsBtn" class="px-5 py-2 rounded-lg text-sm font-bold text-black bg-arcade-cyan hover:bg-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-arcade-cyan/20 transition-all flex items-center gap-2" onclick="saveSettings()">
                         <span class="material-icons text-lg save-icon">save</span>
                         <svg class="animate-spin h-4 w-4 save-spinner hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
