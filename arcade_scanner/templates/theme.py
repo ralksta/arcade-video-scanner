@@ -95,19 +95,19 @@ class ArcadeTheme(BaseTheme):
     
     css_variables = {
         '--arcade-bg': ('#f8f9fa', '#090012'),
-        '--text-main': ('#1a202c', '#ffffff'),
-        '--text-muted': ('#64748b', '#9ca3af'),
+        '--text-main': ('#0f172a', '#ffffff'),          # slate-900 light: 18:1 contrast
+        '--text-muted': ('#374151', '#9ca3af'),         # gray-700 light: 7:1 contrast (WCAG AA+)
         
         # Brand Colors
         '--arcade-purple': ('#e2e8f0', '#1a0530'),
         '--arcade-magenta': ('#be185d', '#8F0177'),
         '--arcade-pink': ('#db2777', '#DE1A58'),
-        '--arcade-gold': ('#d97706', '#F4B342'),
-        '--arcade-cyan': ('#0d9488', '#00ffd0'),
+        '--arcade-gold': ('#b45309', '#F4B342'),        # Darker gold for light mode readability
+        '--arcade-cyan': ('#0d7a70', '#00ffd0'),        # Darker teal for light mode readability
         
         # Surfaces
-        '--surface-glass': ('rgba(255, 255, 255, 0.7)', 'rgba(20, 20, 30, 0.6)'),
-        '--surface-border': ('rgba(0, 0, 0, 0.1)', 'rgba(255, 255, 255, 0.08)'),
+        '--surface-glass': ('rgba(255, 255, 255, 0.92)', 'rgba(20, 20, 30, 0.6)'),
+        '--surface-border': ('rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)'),
     }
     
     # Semantic overrides
@@ -151,19 +151,19 @@ class CandyTheme(BaseTheme):
     
     # Palette provided: #FCF8F8 (Bg), #FBEFEF (Surface), #F9DFDF (Border), #F5AFAF (Accent)
     css_variables = {
-        '--arcade-bg': ('#FCF8F8', '#1a0510'), # Pastel Pink / Dark Rose
-        '--text-main': ('#4a4a4a', '#FBEFEF'), # Soft Charcoal / Pinkish White
-        '--text-muted': ('#9ca3af', '#F9DFDF'), 
+        '--arcade-bg': ('#FCF8F8', '#1a0510'),
+        '--text-main': ('#2d1a1a', '#FBEFEF'),          # Deep rose-charcoal, WCAG AA on #FCF8F8
+        '--text-muted': ('#6b3a4a', '#F9DFDF'),         # Muted rose, not too bright
         
         # Soft Accents
         '--arcade-purple': ('#FBEFEF', '#2d0f1a'),
-        '--arcade-magenta': ('#F5AFAF', '#d16d8e'), # Main Accent
+        '--arcade-magenta': ('#b5476a', '#d16d8e'),     # Darkened for light readability
         '--arcade-pink': ('#F9DFDF', '#be185d'),
-        '--arcade-gold': ('#F5AFAF', '#F4B342'), 
-        '--arcade-cyan': ('#be185d', '#00ffd0'), # Contrast for icons
+        '--arcade-gold': ('#c2693a', '#F4B342'), 
+        '--arcade-cyan': ('#be185d', '#00ffd0'),
         
-        '--surface-glass': ('rgba(252, 248, 248, 0.8)', 'rgba(26, 5, 16, 0.8)'),
-        '--surface-border': ('#F9DFDF', '#4a1525'),
+        '--surface-glass': ('rgba(252, 248, 248, 0.92)', 'rgba(26, 5, 16, 0.8)'),
+        '--surface-border': ('#e8c8c8', '#4a1525'),
     }
     
     header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 bg-arcade-bg/95 backdrop-blur border-b border-[#F9DFDF] dark:border-white/10"

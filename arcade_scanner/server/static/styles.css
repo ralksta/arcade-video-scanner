@@ -39,8 +39,8 @@
     --z-modal: 100;
     --z-toast: 200;
 
-    /* Force dark color scheme — prevents system light-mode bleed */
-    color-scheme: dark;
+    /* Color scheme adapts to theme — .dark class controls this via JS */
+    color-scheme: light dark;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -112,10 +112,16 @@ body[data-workspace="vault"] {
     font-family: 'Fira Code', 'SF Mono', 'Fira Mono', monospace;
 }
 
-/* Sidebar nav active state — stronger */
+/* Sidebar nav active state — theme-aware */
 .nav-item.active {
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark mode: invert to white glow */
+.dark .nav-item.active {
     background: rgba(255, 255, 255, 0.06);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .nav-item.active .nav-indicator {
@@ -137,8 +143,8 @@ body {
     padding: 0;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
-    background-color: var(--bg);
-    color: #ffffff;
+    background-color: var(--arcade-bg, var(--bg));
+    color: var(--text-main, #ffffff);
     font-family: 'Fira Sans', 'Inter',
         system-ui,
         -apple-system,
@@ -347,9 +353,9 @@ html {
 }
 
 .filter-btn {
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    color: #ffffff;
+    background: rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    color: var(--text-main, #ffffff);
     padding: 12px 20px;
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -365,12 +371,23 @@ html {
     font-size: 0.85rem;
 }
 
+/* Dark mode: use glass effect */
+.dark .filter-btn {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    color: #ffffff;
+}
+
 .filter-btn:hover {
     background: var(--glass-hover);
-    color: white;
+    color: var(--text-main, white);
     border-color: var(--action);
     box-shadow: 0 0 15px var(--action-glow);
     transform: translateY(-2px);
+}
+
+.dark .filter-btn:hover {
+    color: white;
 }
 
 .filter-btn.active {
