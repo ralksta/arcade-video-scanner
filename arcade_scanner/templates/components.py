@@ -445,7 +445,7 @@ VIDEO_CARD_COMPONENT = """
 """
 OPTIMIZE_PANEL_COMPONENT = """
 <!-- Optimize Panel (Tailwind) -->
-<div id="optimizePanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-50 animate-glow-pulse glow-cyan flex flex-col gap-3">
+<div id="optimizePanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10050] animate-glow-pulse glow-cyan flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS and inline CSS in HEAD -->
     
     <!-- Header -->
@@ -564,7 +564,7 @@ OPTIMIZE_PANEL_COMPONENT = """
 
 GIF_EXPORT_PANEL_COMPONENT = """
 <!-- GIF Export Panel (Tailwind) -->
-<div id="gifExportPanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-50 animate-glow-pulse glow-purple flex flex-col gap-3">
+<div id="gifExportPanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] animate-glow-pulse glow-purple flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS -->
     
     <!-- Header -->
