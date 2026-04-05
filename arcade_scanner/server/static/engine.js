@@ -106,7 +106,7 @@ function createComparisonCard(pair) {
 
     const container = document.createElement('div');
     // col-span-1 md:col-span-2 relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4
-    container.className = 'col-span-1 md:col-span-2 relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4';
+    container.className = 'col-span-1 md:col-span-2 relative w-full bg-arcade-bg dark:bg-[#14141c] rounded-xl overflow-hidden border border-black/8 dark:border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4';
 
     // Explicitly set grid span here, though class handles it usually, but existing grid logic might override without it if it was inline style before
     container.style.gridColumn = "span 2";
@@ -238,7 +238,7 @@ function createVideoCard(v) {
     const container = document.createElement('div');
     // Using utility classes for the card wrapper
     // group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container
-    container.className = 'group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container flex flex-col';
+    container.className = 'group relative w-full bg-arcade-bg dark:bg-[#14141c] rounded-xl overflow-hidden border border-black/8 dark:border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container flex flex-col';
     // Debug layout
     if (window.debugLayout) console.log('Created card with classes:', container.className);
     container.setAttribute('data-path', v.FilePath); // Keep this for JS logic
@@ -317,14 +317,14 @@ function createVideoCard(v) {
 
         <!-- Content -->
         <div class="card-body p-3 flex flex-col gap-1">
-            <h3 class="text-sm font-medium text-gray-200 line-clamp-1 group-hover:text-arcade-cyan transition-colors" title="${fileName}">${fileName}</h3>
-            <p class="text-[11px] text-gray-500 truncate" title="${v.FilePath}">${dirName}</p>
+            <h3 class="text-sm font-medium text-text-main dark:text-gray-200 line-clamp-1 group-hover:text-arcade-cyan transition-colors" title="${fileName}">${fileName}</h3>
+            <p class="text-[11px] text-text-muted dark:text-gray-500 truncate" title="${v.FilePath}">${dirName}</p>
             
             ${renderVideoCardTags(v.tags || [])}
             
-            <div class="flex items-center justify-between mt-1 text-xs font-mono text-gray-400" style="font-variant-numeric:tabular-nums">
+            <div class="flex items-center justify-between mt-1 text-xs font-mono text-text-muted dark:text-gray-400" style="font-variant-numeric:tabular-nums">
                 <div class="flex items-center gap-2">
-                    <span class="bg-white/5 px-1.5 py-0.5 rounded text-[10px]">${v.Size_MB.toFixed(0)} MB</span>
+                    <span class="bg-black/6 dark:bg-white/5 px-1.5 py-0.5 rounded text-[10px]">${v.Size_MB.toFixed(0)} MB</span>
                     ${v.media_type === 'video' ? `<span style="color:${(v.Bitrate_Mbps||0)>=10?'#00ffd0':(v.Bitrate_Mbps||0)>=3?'#fbbf24':'#f87171'}">${v.Bitrate_Mbps.toFixed(1)} Mb/s</span>` : ''}
                 </div>
                 <button class="text-gray-600 hover:text-white transition-colors hide-toggle-btn cursor-pointer" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))" title="${v.hidden ? 'Restore' : 'Move to Vault'}">
@@ -334,7 +334,7 @@ function createVideoCard(v) {
 
             
             <!-- Progress Bar (semantic bitrate color) -->
-            <div class="mt-2 h-0.5 w-full bg-white/5 rounded-full overflow-hidden">
+            <div class="mt-2 h-0.5 w-full bg-black/8 dark:bg-white/5 rounded-full overflow-hidden">
                 <div class="h-full rounded-full transition-all duration-500" style="width: ${barW}%; background: ${(v.Bitrate_Mbps || 0) >= 10 ? 'linear-gradient(90deg,#00ffd0,#0ea5e9)' : (v.Bitrate_Mbps || 0) >= 3 ? 'linear-gradient(90deg,#fbbf24,#f59e0b)' : 'linear-gradient(90deg,#f87171,#ef4444)'}"></div>
             </div>
         </div>

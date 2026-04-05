@@ -387,7 +387,7 @@ function getFolderBreadcrumbs() {
  */
 function createFolderCard(folder) {
     const container = document.createElement('div');
-    container.className = 'group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] folder-card cursor-pointer';
+    container.className = 'group relative w-full bg-arcade-bg dark:bg-[#14141c] rounded-xl overflow-hidden border border-black/8 dark:border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] folder-card cursor-pointer';
     container.setAttribute('data-path', folder.path);
 
     // Create 2x2 mosaic of thumbnails
