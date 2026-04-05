@@ -889,9 +889,16 @@ html {
     height: auto;
     min-height: 120px;
     gap: 15px;
-    background: rgba(13, 1, 26, 0.95);
-    border-width: 2px;
+    background: var(--surface-glass, rgba(255, 255, 255, 0.92));
+    border: 1px solid var(--surface-border, rgba(0, 0, 0, 0.1)) !important;
+    border-width: 1px !important;
     box-sizing: border-box;
+    border-radius: var(--radius-lg);
+}
+
+.dark #videoGrid.list-view .video-card-container {
+    background: rgba(13, 1, 26, 0.95);
+    border-color: var(--glass-border) !important;
 }
 
 #videoGrid.list-view .card-media {
