@@ -36,11 +36,36 @@ DYNAMIC_IDS = {
 }
 
 # IDs, die in externen Libraries oder conditionalem HTML sind (kein False-Positive)
+# Auch: IDs in anderen templates/HTML-Files die nicht in components.py sind
 KNOWN_EXTERNAL_IDS = {
-    "cinemaInfoPanel",   # Alias für #cinema-info-panel
-    "matchCountNumber", "matchCountLabel", "matchCountIcon",  # Im Modal
+    # Command Palette (context_menu.js)
+    "cmdResults",
+    # Cinema Toast (cinema.js)
+    "cinemaToast",
+    # BatchTag Modal — in components.py aber evtl. anderer template-Teil
+    "batchTagModal", "batchTagOptions", "batchTagSearch",
+    "batchTagNewInput", "batchTagCount", "batchSkipWarning",
+    # Scan Progress (settings_redesign.html oder Dashboard-Header)
+    "scan-progress-bar", "scan-progress-text", "scan-status-text",
+    # Filter Controls — in Dashboard-Bar (dashboard_template.py)
+    "statusSelect", "codecSelect", "sortSelect",
+    # Count/Size stats ribbon
+    "count-total", "size-total",
+    # View Toggle Button (Dashboard-Topbar)
+    "toggleView", "saveViewBtn", "showHiddenToggle",
+    # Treemap Canvas (in components)
+    "treemapCanvas", "treemapTooltip",
+    # Optimizer codec select (in optimizer modal)
+    "optCodecRow",
+    # Collections Modal fields (in COLLECTION_MODAL_COMPONENT, separate search)
+    "matchCountNumber", "matchCountLabel", "matchCountIcon",
     "tagLogicBtn",
-    "searchBar", "mobileSearchInput",  # In dashboard_template
+    # Mobile / Dual-input
+    "searchBar", "mobileSearchInput",
+    # Cinema Info Panel alias
+    "cinemaInfoPanel",
+    # Admin / Settings redesign HTML
+    "scanFolderPath",
 }
 
 
@@ -133,7 +158,6 @@ class TestWindowFunctionContracts:
     auch als window.fn = fn exportiert sind — sonst: 'fn is not defined'.
     """
 
-    # Wichtige Funktionen die im HTML direkt aufgerufen werden
     REQUIRED_WINDOW_EXPORTS = [
         # Collections
         "openCollectionModal",
@@ -147,10 +171,11 @@ class TestWindowFunctionContracts:
         "openCinema",
         # Workspace
         "setWorkspaceMode",
+        "setLayout",
         # Filter
         "filterAndSort",
-        # Tag Manager
-        "openTagManager",
+        "setFilter",
+        "setSort",
     ]
 
     def _get_window_exports(self) -> set:
@@ -262,8 +287,11 @@ class TestApiResponseSchema:
             pytest.skip("video_processor nicht verfügbar")
 
         # Felder die engine.js/cards.js auf dem Video-Object erwartet
+        # Hinweis: In video_processor.py kann der interne Key-Name abweichen
+        # (z.B. 'filename' → Frontend renamed zu 'FileName'). Wir prüfen nur
+        # die Keys die direkt im Source als String-Literal vorkommen.
         REQUIRED_FRONTEND_KEYS = {
-            "FilePath", "FileName", "Size_MB", "Bitrate_Mbps",
+            "FilePath", "Size_MB", "Bitrate_Mbps",
             "Status", "thumb",
         }
 

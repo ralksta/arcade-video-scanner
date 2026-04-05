@@ -336,3 +336,12 @@ function _updateQuickStats(videos, workspaceMode) {
     ribbon.innerHTML = parts.join('<span class="qs-divider">·</span>');
 }
 
+// --- EXPORTS ---
+window.filterAndSort  = filterAndSort;
+window.onSearchInput  = onSearchInput;
+window.setFilter      = setFilter;
+window.setCodecFilter = setCodecFilter;
+window.setSort        = setSort;
+window.setMinSize     = setMinSize;
+window.setMaxSize     = setMaxSize;
+window.setDateFilter  = setDateFilter;

@@ -426,3 +426,10 @@ function loadFromURL() {
     checkDeepLinks();
 }
 
+// --- EXPORTS ---
+window.setWorkspaceMode = setWorkspaceMode;
+window.setLayout        = setLayout;
+window.toggleLayout     = toggleLayout;
+window.updateURL        = updateURL;
+window.loadFromURL      = loadFromURL;
+window.updateGridScale  = updateGridScale;
