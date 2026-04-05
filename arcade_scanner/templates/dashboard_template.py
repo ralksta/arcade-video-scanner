@@ -116,9 +116,11 @@ def generate_html_report(results, report_file, server_port=8000):
         <!-- Quick Stats Ribbon -->
         <div id="quickStatsRibbon"
              style="display:none;align-items:center;gap:8px;flex-wrap:wrap;
-                    padding:6px 16px;font-size:12px;color:#9ca3af;
-                    border-bottom:1px solid rgba(255,255,255,.06);
-                    background:rgba(0,0,0,.15);backdrop-filter:blur(4px);">
+                    padding:6px 16px;font-size:12px;
+                    border-bottom:1px solid var(--surface-border, rgba(0,0,0,.08));
+                    background:var(--surface-glass, rgba(0,0,0,.05));
+                    backdrop-filter:blur(4px);
+                    color:var(--text-muted, #6b7280);">
         </div>
 
         <!-- Main Content Container with safe area padding -->
@@ -128,11 +130,11 @@ def generate_html_report(results, report_file, server_port=8000):
             <div id="videoGrid" class="responsive-grid transition-opacity duration-300 overflow-hidden">
                 <!-- Skeleton cards shown while data loads -->
                 {''.join(['''
-                <div class="group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 flex flex-col skeleton-card" aria-hidden="true">
-                    <div class="aspect-video bg-white/5 animate-pulse rounded-t-xl"></div>
+                <div class="group relative w-full bg-arcade-bg rounded-xl overflow-hidden border border-black/8 dark:border-white/5 dark:bg-[#14141c] flex flex-col skeleton-card" aria-hidden="true">
+                    <div class="aspect-video bg-black/5 dark:bg-white/5 animate-pulse rounded-t-xl"></div>
                     <div class="p-3 flex flex-col gap-2">
-                        <div class="h-3 bg-white/5 animate-pulse rounded w-3/4"></div>
-                        <div class="h-2 bg-white/5 animate-pulse rounded w-1/2"></div>
+                        <div class="h-3 bg-black/8 dark:bg-white/5 animate-pulse rounded w-3/4"></div>
+                        <div class="h-2 bg-black/6 dark:bg-white/5 animate-pulse rounded w-1/2"></div>
                         <div class="h-0.5 bg-white/5 animate-pulse rounded w-full mt-2"></div>
                     </div>
                 </div>''' for _ in range(8)])}

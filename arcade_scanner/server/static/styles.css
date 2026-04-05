@@ -927,7 +927,7 @@ html {
 #videoGrid.list-view h2.file-name {
     font-size: 1.8rem;
     margin: 0 0 8px 0;
-    color: #fff;
+    color: var(--text-main, #fff);
     line-height: 1.2;
 }
 
@@ -981,9 +981,9 @@ html {
 }
 
 .content-card {
-    background: var(--glass);
+    background: var(--surface-glass, rgba(255, 255, 255, 0.92));
     border-radius: var(--radius-lg);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--surface-border, rgba(0, 0, 0, 0.1));
     transition: all 0.35s cubic-bezier(0.2, 1, 0.2, 1);
     overflow: hidden;
     position: relative;
@@ -991,6 +991,12 @@ html {
     display: flex;
     flex-direction: column;
     z-index: var(--z-base);
+}
+
+/* Dark mode: glass effect */
+.dark .content-card {
+    background: var(--glass);
+    border-color: var(--glass-border);
 }
 
 .content-card:hover {
@@ -1076,8 +1082,13 @@ html {
 .content-card:hover {
     transform: translateY(-5px);
     border-color: var(--pink);
-    box-shadow: 0 10px 30px rgba(222, 26, 88, 0.2);
+    box-shadow: 0 10px 30px rgba(222, 26, 88, 0.15);
+    background: var(--surface-glass, rgba(255, 255, 255, 0.95));
+}
+
+.dark .content-card:hover {
     background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(222, 26, 88, 0.2);
 }
 
 .card-media {
@@ -1117,7 +1128,7 @@ html {
 }
 
 .card-body h2.file-name {
-    color: #fff;
+    color: var(--text-main, #fff);
     font-weight: 900;
     font-size: 1.25rem;
     display: block;
@@ -1128,7 +1139,7 @@ html {
 }
 
 .card-body p.file-dir {
-    color: #ccc;
+    color: var(--text-muted, #ccc);
     font-family: 'SF Mono', monospace;
     font-size: 0.85rem;
     display: block;
@@ -1142,10 +1153,15 @@ html {
 
 .card-footer {
     padding: 12px 15px;
-    border-top: 1px solid var(--glass-border);
+    border-top: 1px solid var(--surface-border, rgba(0, 0, 0, 0.1));
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .card-footer {
+    border-top-color: var(--glass-border);
     background: rgba(0, 0, 0, 0.2);
 }
 
