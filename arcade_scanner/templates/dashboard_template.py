@@ -83,7 +83,7 @@ def generate_html_report(results, report_file, server_port=8000):
     opt_btn_html = ""
     if config.optimizer_available and config.settings.enable_optimizer:
         opt_btn_html = """
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaOptimize()" title="Optimize Video">
+        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaOptimize()" title="Optimize Video" aria-label="Optimize this video">
             <div class="w-12 h-12 rounded-xl bg-arcade-cyan/15 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/40 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/60 group-hover:scale-105 transition-all shadow-lg shadow-arcade-cyan/10">
                 <span class="material-icons text-xl text-arcade-cyan group-hover:text-cyan-300">bolt</span>
             </div>

@@ -310,7 +310,7 @@ HEADER_COMPONENT = """
 
 NAVIGATION_COMPONENT = """
 <!-- Desktop Sidebar (Hidden on Mobile) -->
-<nav class="hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-white/5 z-[100]">
+<nav class="hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-white/5 z-40">
     <!-- Scrollable content area -->
     <div class="flex-1 overflow-y-auto p-4 gap-1 flex flex-col scrollbar-hide">
         <div class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 px-3">Workspace</div>
@@ -445,7 +445,7 @@ VIDEO_CARD_COMPONENT = """
 """
 OPTIMIZE_PANEL_COMPONENT = """
 <!-- Optimize Panel (Tailwind) -->
-<div id="optimizePanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] animate-glow-pulse glow-cyan flex flex-col gap-3">
+<div id="optimizePanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-50 animate-glow-pulse glow-cyan flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS and inline CSS in HEAD -->
     
     <!-- Header -->
@@ -564,7 +564,7 @@ OPTIMIZE_PANEL_COMPONENT = """
 
 GIF_EXPORT_PANEL_COMPONENT = """
 <!-- GIF Export Panel (Tailwind) -->
-<div id="gifExportPanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] animate-glow-pulse glow-purple flex flex-col gap-3">
+<div id="gifExportPanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-50 animate-glow-pulse glow-purple flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS -->
     
     <!-- Header -->
@@ -675,7 +675,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
 
 CINEMA_MODAL_COMPONENT = """
 <!-- Cinema Modal (Tailwind) -->
-<div id="cinemaModal" class="fixed inset-0 z-[10000] bg-black opacity-0 pointer-events-none transition-opacity duration-500 flex flex-col justify-center items-center">
+<div id="cinemaModal" class="fixed inset-0 z-50 bg-black opacity-0 pointer-events-none transition-opacity duration-500 flex flex-col justify-center items-center">
     <!-- Active class 'opacity-100 pointer-events-auto' toggled by JS -->
     
     <button class="absolute top-4 right-4 text-white/50 hover:text-white z-50 p-2" onclick="closeCinema()">
@@ -774,7 +774,7 @@ CINEMA_MODAL_COMPONENT = """
 
 DUPLICATE_CHECKER_MODAL_COMPONENT = """
 <!-- Duplicate Checker Fullscreen Modal -->
-<div id="duplicateCheckerModal" class="fixed inset-0 z-[10001] bg-black opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col">
+<div id="duplicateCheckerModal" class="fixed inset-0 z-50 bg-black opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col">
     <!-- Active class 'opacity-100 pointer-events-auto' toggled by JS -->
     
     <!-- Close Button -->
@@ -1090,7 +1090,7 @@ BATCH_BAR_COMPONENT = """
 
 FOLDER_SIDEBAR_COMPONENT = """
 <!-- Folder Sidebar (Off-Canvas) -->
-<div id="folderSidebar" class="fixed inset-y-0 left-0 w-80 bg-[#101018]/95 backdrop-blur-xl border-r border-white/10 transform -translate-x-full transition-transform duration-300 z-[60] flex flex-col pt-safe-top">
+<div id="folderSidebar" class="fixed inset-y-0 left-0 w-80 bg-[#101018]/95 backdrop-blur-xl border-r border-white/10 transform -translate-x-full transition-transform duration-300 z-30 flex flex-col pt-safe-top">
     <!-- Active class 'translate-x-0' handled by JS -->
     
     <div class="p-4 border-b border-white/10 flex items-center justify-between">
@@ -1115,7 +1115,7 @@ SAVED_VIEWS_COMPONENT = """
 
 FILTER_PANEL_COMPONENT = """
 <!-- Filter Panel (Drawer on Desktop, Bottom Sheet on Mobile) -->
-<div id="filterPanel" class="fixed inset-0 z-[80] hidden">
+<div id="filterPanel" class="fixed inset-0 z-40 hidden">
     <!-- Backdrop -->
     <div id="filterPanelBackdrop" class="absolute inset-0 bg-black/60 opacity-0 transition-opacity duration-300" onclick="closeFilterPanel()"></div>
     
@@ -1311,7 +1311,7 @@ FILTER_PANEL_COMPONENT = """
 
 TAG_MANAGER_MODAL_COMPONENT = """
 <!-- Tag Manager Modal -->
-<div id="tagManagerModal" class="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
+<div id="tagManagerModal" class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 transform scale-95 transition-transform duration-300 overflow-hidden">
         
         <!-- Header -->
@@ -1385,7 +1385,7 @@ TAG_MANAGER_MODAL_COMPONENT = """
 
 COLLECTION_MODAL_COMPONENT = """
 <!-- Collection Manager Modal -->
-<div id="collectionModal" class="fixed inset-0 z-[95] bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
+<div id="collectionModal" class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
     <div class="bg-[#101018] border border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] animate-glow-pulse glow-cyan">
 
         <!-- Header -->
@@ -1808,7 +1808,7 @@ COLLECTION_MODAL_COMPONENT = """
 
 HIDDEN_PATH_MODAL_COMPONENT = """
 <!-- Hidden Path Helper Modal -->
-<div id="hiddenPathModal" class="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
+<div id="hiddenPathModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
     <div class="w-full max-w-lg bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 transform scale-95 transition-transform duration-300 overflow-hidden">
 
         <!-- Header -->
@@ -1866,7 +1866,7 @@ HIDDEN_PATH_MODAL_COMPONENT = """
 
 SETUP_WIZARD_COMPONENT = """
 <!-- First-Run Setup Wizard -->
-<div id="setupWizard" class="hidden fixed inset-0 z-[200] bg-gradient-to-br from-[#0a0a12] via-[#1a1a24] to-[#0a0a12] flex items-center justify-center p-4">
+<div id="setupWizard" class="hidden fixed inset-0 z-50 bg-gradient-to-br from-[#0a0a12] via-[#1a1a24] to-[#0a0a12] flex items-center justify-center p-4">
     <div class="w-full max-w-3xl">
         
         <!-- Welcome Header -->
@@ -1974,7 +1974,7 @@ SETUP_WIZARD_COMPONENT = """
 """
 
 SETTINGS_MODAL_COMPONENT = """
-<div id="settingsModal" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
+<div id="settingsModal" class="hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
     <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-[#1a1a24] rounded-2xl animate-glow-pulse glow-cyan flex flex-col md:flex-row overflow-hidden border border-white/10 transform scale-95 transition-transform duration-300">
         
         <!-- Sidebar Navigation -->
@@ -2274,7 +2274,7 @@ SETTINGS_MODAL_COMPONENT = """
                         </div>
 
                         <!-- REMOVE PHOTOS CONFIRMATION MODAL -->
-                        <div id="removePhotosModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                        <div id="removePhotosModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
                             <div class="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
                                 <div class="flex items-center gap-3 mb-4">
                                     <span class="material-icons text-yellow-400 text-2xl">warning</span>
@@ -2498,7 +2498,7 @@ SETTINGS_MODAL_COMPONENT = """
 </div>
 
 <!-- Settings Toast Notification -->
-<div id="settingsToast" class="fixed bottom-6 right-6 z-[200] transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+<div id="settingsToast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
     <div class="bg-green-500/95 backdrop-blur text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
         <span class="material-icons">check_circle</span>
         <span class="font-medium">Settings saved</span>

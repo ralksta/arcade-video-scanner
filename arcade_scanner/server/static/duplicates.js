@@ -502,7 +502,7 @@ async function deleteAllDuplicates() {
 
     // Confirmation dialog with details
     const confirmation = confirm(
-        `⚠️ DELETE ALL DUPLICATES\n\n` +
+        `DELETE ALL DUPLICATES\n\n` +
         `This will permanently delete ${filesToDelete.length} file(s) across ${duplicateData.groups.length} groups.\n\n` +
         `Space to be freed: ${totalSavingsMb.toFixed(1)} MB\n\n` +
         `The best quality file in each group will be kept.\n\n` +

@@ -1531,12 +1531,12 @@ function triggerBatchCompress() {
     });
 
     // Build detailed confirmation message
-    let message = `🎬 Batch Compression Summary\n${'─'.repeat(40)}\n`;
-    message += `✅ Will process: ${processable.length} file(s)\n`;
+    let message = `Batch Compression Summary\n${'─'.repeat(40)}\n`;
+    message += `Will process: ${processable.length} file(s)\n`;
 
     if (skipped.length > 0) {
-        message += `⚠️ Will skip: ${skipped.length} file(s) (under ${BATCH_MIN_SIZE_MB}MB)\n`;
-        message += `\n📦 Skipped files (already compact):\n`;
+        message += `Will skip: ${skipped.length} file(s) (under ${BATCH_MIN_SIZE_MB}MB)\n`;
+        message += `\nSkipped files (already compact):\n`;
         skipped.slice(0, 5).forEach(f => {
             const shortName = f.filename.length > 40 ? f.filename.substring(0, 37) + '...' : f.filename;
             message += `   • ${shortName} (${f.size.toFixed(1)} MB)\n`;
@@ -1547,7 +1547,7 @@ function triggerBatchCompress() {
     }
 
     if (processable.length === 0) {
-        alert(`⚠️ No files to process!\n\nAll ${skipped.length} selected file(s) are under ${BATCH_MIN_SIZE_MB}MB and will be skipped.\n\nThese files are already compact and don't need optimization.`);
+        alert(`No files to process!\n\nAll ${skipped.length} selected file(s) are under ${BATCH_MIN_SIZE_MB}MB and will be skipped.\n\nThese files are already compact and don't need optimization.`);
         return;
     }
 
@@ -1561,7 +1561,7 @@ function triggerBatchCompress() {
             // Local mode: use batch_compress endpoint
             // Use ||| as separator to avoid issues with commas in filenames
             fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')));
-            alert(`🚀 Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
+            alert(`Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
         }
         clearSelection();
     }
@@ -2969,15 +2969,15 @@ function queueForRemoteEncode(filePath) {
         .then(data => {
             const name = filePath.split(/[\\/]/).pop();
             if (data.success) {
-                const codecLabel = currentOptCodec === 'av1' ? '🧪 AV1' : 'HEVC';
-                showToast(`☁️ Queued [${codecLabel}]: ${name}`, 'success');
+                const codecLabel = currentOptCodec === 'av1' ? 'AV1' : 'HEVC';
+                showToast(`Queued [${codecLabel}]: ${name}`, 'success');
             } else {
-                showToast(`⚠️ ${data.error || 'Already queued'}: ${name}`, 'warning');
+                showToast(`${data.error || 'Already queued'}: ${name}`, 'warning');
             }
         })
         .catch(err => {
             console.error('Queue error:', err);
-            showToast('❌ Failed to queue file', 'error');
+            showToast('Failed to queue file', 'error');
         });
 }
 
