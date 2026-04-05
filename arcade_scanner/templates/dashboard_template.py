@@ -177,6 +177,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/formatters.js?v={int(time.time())}"></script>
     <script src="/static/settings.js?v={int(time.time())}"></script>
     <script src="/static/duplicates.js?v={int(time.time())}"></script>
+    <script src="/static/store.js?v={int(time.time())}"></script>
     <script src="/static/engine.js?v={int(time.time())}"></script>
     <script src="/static/cinema.js?v={int(time.time())}"></script>
     <script src="/static/timeline_scrubber.js?v={int(time.time())}"></script>
