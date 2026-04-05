@@ -261,9 +261,9 @@ function renderDuplicatesView() {
         const color = isVideo ? 'cyan' : 'pink';
 
         html += `
-                <div class="col-span-full bg-[#14141c] rounded-xl border border-white/5 hover:border-${color}-500/30 overflow-hidden mb-4 transition-all">
+                <div class="col-span-full bg-arcade-bg dark:bg-[#14141c] rounded-xl border border-black/8 dark:border-white/5 hover:border-${color}-500/30 overflow-hidden mb-4 transition-all">
                     <!-- Group Header -->
-                    <div class="p-4 border-b border-white/5 flex items-center justify-between flex-wrap gap-2 bg-white/[0.02]">
+                    <div class="p-4 border-b border-black/8 dark:border-white/5 flex items-center justify-between flex-wrap gap-2 bg-black/[0.02] dark:bg-white/[0.02]">
                         <div class="flex items-center gap-3">
                             <span class="material-icons text-${color}-400">${icon}</span>
                             <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">

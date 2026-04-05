@@ -729,7 +729,7 @@ FILTER_PANEL_COMPONENT = """
     <div id="filterPanelBackdrop" class="absolute inset-0 bg-black/60 opacity-0 transition-opacity duration-300" onclick="closeFilterPanel()"></div>
     
     <!-- Panel Content -->
-    <div id="filterPanelContent" class="absolute bg-[#12121a]/95 backdrop-blur-xl border-white/10 shadow-2xl transition-transform duration-300 flex flex-col overflow-hidden
+    <div id="filterPanelContent" class="absolute bg-arcade-bg/98 dark:bg-[#12121a]/95 backdrop-blur-xl border-black/10 dark:border-white/10 shadow-2xl transition-transform duration-300 flex flex-col overflow-hidden
         right-0 top-0 bottom-0 w-80 translate-x-full rounded-l-2xl border-l">
         
         <!-- Header -->
@@ -844,7 +844,7 @@ FILTER_PANEL_COMPONENT = """
         </div>
         
         <!-- Footer -->
-        <div class="p-4 border-t border-white/5 flex items-center justify-between shrink-0 bg-[#0a0a12]">
+        <div class="p-4 border-t border-black/5 dark:border-white/5 flex items-center justify-between shrink-0 bg-black/5 dark:bg-[#0a0a12]">
             <button onclick="resetFilters()" class="text-sm text-gray-500 hover:text-white transition-colors">
                 Reset all
             </button>
@@ -1584,10 +1584,10 @@ SETUP_WIZARD_COMPONENT = """
 
 SETTINGS_MODAL_COMPONENT = """
 <div id="settingsModal" class="hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
-    <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-[#1a1a24] rounded-2xl animate-glow-pulse glow-cyan flex flex-col md:flex-row overflow-hidden border border-white/10 transform scale-95 transition-transform duration-300">
+    <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-arcade-bg dark:bg-[#1a1a24] rounded-2xl animate-glow-pulse glow-cyan flex flex-col md:flex-row overflow-hidden border border-black/10 dark:border-white/10 transform scale-95 transition-transform duration-300">
         
         <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-56 bg-[#12121a] border-b md:border-b-0 md:border-r border-white/5 flex md:flex-col shrink-0">
+        <aside class="w-full md:w-56 bg-black/5 dark:bg-[#12121a] border-b md:border-b-0 md:border-r border-black/5 dark:border-white/5 flex md:flex-col shrink-0">
             <div class="p-4 md:p-5 flex items-center gap-3 text-white border-b border-white/5 md:border-none">
                 <span class="material-icons text-arcade-gold text-xl">settings</span>
                 <h2 class="font-semibold tracking-wide text-lg">Settings</h2>
@@ -1639,7 +1639,7 @@ SETTINGS_MODAL_COMPONENT = """
         </aside>
         
         <!-- Main Content -->
-        <main class="flex-1 flex flex-col min-w-0 bg-[#1a1a24]">
+        <main class="flex-1 flex flex-col min-w-0 bg-arcade-bg dark:bg-[#1a1a24]">
             
             <!-- Header -->
             <header class="p-5 md:p-6 border-b border-white/5 flex justify-between items-center">
@@ -2082,7 +2082,7 @@ SETTINGS_MODAL_COMPONENT = """
             </div>
             
             <!-- Footer -->
-            <footer class="p-4 border-t border-white/5 bg-[#12121a] flex justify-between items-center">
+            <footer class="p-4 border-t border-black/5 dark:border-white/5 bg-black/5 dark:bg-[#12121a] flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <div class="flex items-center gap-2 text-amber-400 text-xs font-medium opacity-0 transition-opacity" id="unsavedIndicator">
                         <span class="material-icons text-sm">warning</span>
