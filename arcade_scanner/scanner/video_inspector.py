@@ -1,6 +1,5 @@
 import os
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
 from typing import Optional
 
 from ..models.media_asset import MediaAsset, MediaType, VideoMetadata

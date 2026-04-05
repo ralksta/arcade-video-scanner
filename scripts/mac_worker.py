@@ -40,7 +40,7 @@ B = "\033[1m"
 _shutdown = False
 
 
-def signal_handler(sig, frame):
+def signal_handler(_sig, _frame):
     global _shutdown
     print(f"\n{Y}⏹ Shutting down gracefully...{NC}")
     _shutdown = True

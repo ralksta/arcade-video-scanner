@@ -10,9 +10,6 @@ from arcade_scanner.templates.ui_components import (
     render_navigation
 )
 from arcade_scanner.templates.components import (
-    BASE_LAYOUT,
-    HEADER_COMPONENT,
-    NAVIGATION_COMPONENT,
     FILTER_BAR_COMPONENT,
     FILTER_PANEL_COMPONENT,
     TAG_MANAGER_MODAL_COMPONENT,
@@ -60,7 +57,6 @@ def generate_html_report(results, report_file, server_port=8000):
         r_clean["tags"] = []
         clean_results.append(r_clean)
         
-    all_videos_json = json.dumps(clean_results)
     user_settings_json = json.dumps(config.settings.model_dump())
     
     # Logic for enabled state: Must be installed AND enabled in settings

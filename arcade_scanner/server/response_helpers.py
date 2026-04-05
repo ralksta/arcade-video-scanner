@@ -61,33 +61,3 @@ def require_auth(handler: BaseHTTPRequestHandler) -> str | None:
         send_json_error(handler, 401, "Unauthorized")
     return user
 
-
-def read_json_body(handler: BaseHTTPRequestHandler) -> dict | list | None:
-    """Liest den Request-Body und parst ihn als JSON.
-
-    Prüft außerdem gegen ``MAX_REQUEST_SIZE`` um DoS zu verhindern.
-    Bei Fehler wird der passende HTTP-Error **bereits gesendet** und ``None``
-    zurückgegeben.
-
-    Args:
-        handler: Der aktive HTTP-Request-Handler.
-
-    Returns:
-        Geparste JSON-Daten oder None (Fehler wurde bereits gesendet).
-    """
-    try:
-        content_length = int(handler.headers.get("Content-Length", 0))
-    except (ValueError, TypeError):
-        send_json_error(handler, 400, "Invalid Content-Length")
-        return None
-
-    if content_length > MAX_REQUEST_SIZE:
-        handler.send_error(413, "Request payload too large")
-        return None
-
-    try:
-        raw = handler.rfile.read(content_length)
-        return json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        send_json_error(handler, 400, f"Invalid JSON: {exc}")
-        return None

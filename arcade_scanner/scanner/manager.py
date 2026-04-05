@@ -223,5 +223,3 @@ def get_scanner_manager() -> ScannerManager:
         _scanner_instance = ScannerManager()
     return _scanner_instance
 
-# Deprecated access
-scanner_mgr = None
