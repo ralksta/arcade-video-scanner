@@ -121,7 +121,7 @@ class ProfessionalTheme(BaseTheme):
     css_variables = {
         '--arcade-bg': ('#f3f4f6', '#0f172a'), # Slate-100 / Slate-900
         '--text-main': ('#111827', '#f9fafb'), # Gray-900 / Gray-50
-        '--text-muted': ('#6b7280', '#9ca3af'), # Gray-500 / Gray-400
+        '--text-muted': ('#4b5563', '#9ca3af'), # Gray-600 light: 5.74:1 WCAG AA✓ / Gray-400 dark
         
         # Re-map semantic colors to Professional Palette (Blue/Teal)
         '--arcade-purple': ('#e0e7ff', '#1e1b4b'), # Indigo

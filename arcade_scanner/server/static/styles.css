@@ -2781,3 +2781,121 @@ html {
     background: transparent;
     animation: none;
 }
+/* ============================================================
+   LIGHT MODE — WCAG 2.1 AA CONTRAST OVERRIDES
+   Target: 4.5:1 for normal text, 3:1 for large/UI text
+   Applied via :root (no .dark class) to flip dark-only values
+   ============================================================ */
+
+/* --- Settings Modal --- */
+:root:not(.dark) #settingsModal .settings-nav-item,
+:root:not(.dark) #settingsModal .settings-nav-item span {
+    color: var(--text-muted) !important; /* #374151 — 7:1 on white */
+}
+:root:not(.dark) #settingsModal .settings-nav-item:hover,
+:root:not(.dark) #settingsModal .settings-nav-item:hover span {
+    color: var(--text-main) !important;
+    background: rgba(0,0,0,0.05) !important;
+}
+:root:not(.dark) #settingsModal .settings-nav-item.active,
+:root:not(.dark) #settingsModal .settings-nav-item.active span {
+    color: var(--text-main) !important;
+    background: rgba(0,0,0,0.06) !important;
+}
+/* Section headings: text-white → text-main */
+:root:not(.dark) #settingsModal h1,
+:root:not(.dark) #settingsModal h2,
+:root:not(.dark) #settingsModal h3,
+:root:not(.dark) #settingsModal h4 {
+    color: var(--text-main) !important;
+}
+/* Sub-labels: text-gray-500 → text-muted */
+:root:not(.dark) #settingsModal p,
+:root:not(.dark) #settingsModal label,
+:root:not(.dark) #settingsModal .text-gray-400,
+:root:not(.dark) #settingsModal .text-gray-500,
+:root:not(.dark) #settingsModal .text-gray-600 {
+    color: var(--text-muted) !important;
+}
+/* Stats cards (THUMBNAILS/TOTAL) */
+:root:not(.dark) #settingsModal .stat-card,
+:root:not(.dark) #settingsModal [class*="rounded"][class*="bg-white"] {
+    background: rgba(0,0,0,0.05) !important;
+    border-color: rgba(0,0,0,0.1) !important;
+    color: var(--text-muted) !important;
+}
+/* Close button */
+:root:not(.dark) #settingsModal button.text-gray-500 {
+    color: var(--text-muted) !important;
+}
+:root:not(.dark) #settingsModal button.text-gray-500:hover {
+    color: var(--text-main) !important;
+    background: rgba(0,0,0,0.06) !important;
+}
+/* Dividers */
+:root:not(.dark) #settingsModal .bg-white\/10,
+:root:not(.dark) #settingsModal [class*="border-white"] {
+    border-color: rgba(0,0,0,0.1) !important;
+    background-color: rgba(0,0,0,0.06) !important;
+}
+/* Form inputs */
+:root:not(.dark) #settingsModal input,
+:root:not(.dark) #settingsModal textarea,
+:root:not(.dark) #settingsModal select {
+    background: rgba(0,0,0,0.04) !important;
+    border-color: rgba(0,0,0,0.15) !important;
+    color: var(--text-main) !important;
+}
+:root:not(.dark) #settingsModal input::placeholder,
+:root:not(.dark) #settingsModal textarea::placeholder {
+    color: rgba(0,0,0,0.3) !important;
+}
+/* Section borders */
+:root:not(.dark) #settingsModal header,
+:root:not(.dark) #settingsModal footer {
+    border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* --- Segmented Control Buttons (workspace chooser) --- */
+:root:not(.dark) .segment-btn {
+    color: var(--text-muted) !important;
+}
+:root:not(.dark) .segment-btn.active {
+    color: var(--text-main) !important;
+    background: var(--surface-glass) !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
+}
+
+/* --- Filter Panel light mode text --- */
+:root:not(.dark) #filterPanelContent h3,
+:root:not(.dark) #filterPanelContent label,
+:root:not(.dark) #filterPanelContent .text-gray-400,
+:root:not(.dark) #filterPanelContent .text-gray-500,
+:root:not(.dark) #filterPanelContent .text-white {
+    color: var(--text-main) !important;
+}
+:root:not(.dark) #filterPanelContent .text-gray-400 {
+    color: var(--text-muted) !important;
+}
+
+/* --- Top-bar text (search, icons) --- */
+:root:not(.dark) .top-bar .text-gray-400,
+:root:not(.dark) .top-bar .text-gray-500,
+:root:not(.dark) .top-bar .text-white {
+    color: var(--text-main) !important;
+}
+:root:not(.dark) .top-bar .text-gray-400 {
+    color: var(--text-muted) !important;
+}
+
+/* --- Collection/Tag Modals --- */
+:root:not(.dark) #collectionsModal .text-white,
+:root:not(.dark) #collectionsModal h3,
+:root:not(.dark) #tagModal .text-white,
+:root:not(.dark) #tagModal h3 {
+    color: var(--text-main) !important;
+}
+:root:not(.dark) #collectionsModal .text-gray-400,
+:root:not(.dark) #tagModal .text-gray-400 {
+    color: var(--text-muted) !important;
+}
