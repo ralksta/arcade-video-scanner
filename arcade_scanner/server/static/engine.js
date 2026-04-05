@@ -2500,22 +2500,7 @@ function updateFolderBrowserLegend() {
 // UI code moved to treemap.js
 // Export state variables for treemap.js to access
 // Expose state for treemap.js
-Object.defineProperty(window, 'filteredVideos', {
-    get: () => filteredVideos,
-    set: (v) => { filteredVideos = v; }
-});
-Object.defineProperty(window, 'searchTerm', {
-    get: () => searchTerm,
-    set: (v) => { searchTerm = v; }
-});
-Object.defineProperty(window, 'currentLayout', {
-    get: () => currentLayout,
-    set: (v) => { currentLayout = v; }
-});
-Object.defineProperty(window, 'workspaceMode', {
-    get: () => workspaceMode,
-    set: (v) => { workspaceMode = v; }
-});
+// These properties are now managed by store.js and global window context.
 
 // Expose duplicate checker state for duplicates.js
 window.duplicateCheckerState = duplicateCheckerState;

@@ -134,6 +134,7 @@ window.activeSmartCollectionCriteria = null;
 window.activeCollectionId = null;
 window.safeMode = localStorage.getItem('safe_mode') === 'true';
 window.renderedCount = 0;
+window.folderBrowserState = { currentPath: null, showVideosHere: false };
 window.folderBrowserPath = null;
 window.filteredVideos = [];
 
