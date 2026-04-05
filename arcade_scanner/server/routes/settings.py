@@ -370,3 +370,48 @@ def handle_post_remove_photos(handler) -> None:
     except Exception as e:
         print(f"❌ remove-photos error: {e}")
         handler.send_error(500, str(e))
+
+# ---------------------------------------------------------------------------
+# Router interface — called by api_handler.py
+# ---------------------------------------------------------------------------
+
+def handle_get(handler) -> bool:
+    """Dispatch GET requests for /api/settings and /api/setup/* endpoints."""
+    path = handler.path.split("?")[0]
+
+    if path == "/api/settings":
+        handle_get_settings(handler)
+        return True
+
+    if path == "/api/setup/directories":
+        handle_get_setup_directories(handler)
+        return True
+
+    if path == "/api/setup/status":
+        handle_get_setup_status(handler)
+        return True
+
+    return False
+
+
+def handle_post(handler) -> bool:
+    """Dispatch POST requests for /api/settings and /api/setup/* endpoints."""
+    path = handler.path.split("?")[0]
+
+    if path == "/api/settings":
+        handle_post_settings(handler)
+        return True
+
+    if path == "/api/setup/complete":
+        handle_post_setup_complete(handler)
+        return True
+
+    if path == "/api/restore":
+        handle_post_restore(handler)
+        return True
+
+    if path == "/api/settings/remove-photos":
+        handle_post_remove_photos(handler)
+        return True
+
+    return False
