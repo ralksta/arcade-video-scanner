@@ -2899,3 +2899,26 @@ html {
 :root:not(.dark) #tagModal .text-gray-400 {
     color: var(--text-muted) !important;
 }
+
+/* --- Settings Modal — Sidebar solid background (light mode) --- */
+/* Tailwind arbitrary value might not generate in Python strings,   */
+/* so we force it here with high specificity.                       */
+:root:not(.dark) #settingsModal aside {
+    background-color: #f1f3f5 !important;
+    backdrop-filter: none !important;
+}
+:root:not(.dark) #settingsModal .settings-container > aside {
+    background-color: #f1f3f5 !important;
+}
+:root:not(.dark) #settingsModal footer {
+    background-color: #f1f3f5 !important;
+    backdrop-filter: none !important;
+}
+/* Settings main content white */
+:root:not(.dark) #settingsModal main {
+    background-color: #ffffff !important;
+}
+/* outer container slight warmth */
+:root:not(.dark) #settingsModal .settings-container {
+    background-color: #ffffff !important;
+}
