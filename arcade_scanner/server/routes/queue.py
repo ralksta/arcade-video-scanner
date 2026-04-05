@@ -40,6 +40,13 @@ from arcade_scanner.server.response_helpers import (
 
 
 # ---------------------------------------------------------------------------
+# GIF-Job-Tracking (in-memory, resets on server restart)
+# ---------------------------------------------------------------------------
+
+GIF_JOBS: dict[str, dict] = {}
+
+
+# ---------------------------------------------------------------------------
 # GIF-Konvertierung (früher inline Closure in do_POST)
 # ---------------------------------------------------------------------------
 
@@ -54,11 +61,14 @@ def convert_to_gif(
     quality: int,
     start_time: float | None,
     end_time: float | None,
+    loop: int = 0,
+    speed: float = 1.0,
 ) -> None:
     """Führt die FFmpeg-GIF-Konvertierung in einem Worker-Thread durch.
 
     Separiert aus ``do_POST``-Closure für bessere Testbarkeit.
     """
+    GIF_JOBS[job_id] = {"status": "processing", "progress": "Starting..."}
     try:
         print(f"🎞️ Starting GIF conversion: {os.path.basename(output_path)}", flush=True)
 
@@ -70,17 +80,22 @@ def convert_to_gif(
             input_args.extend(["-to", str(end_time)])
         input_args.extend(["-i", video_path])
 
+        GIF_JOBS[job_id]["progress"] = "Generating color palette..."
         # Step 1: Palette erzeugen
+        # Apply speed filter before scaling if speed != 1.0
+        speed_filter = f"setpts={1/speed:.4f}*PTS," if speed != 1.0 else ""
+        palette_vf = f"{speed_filter}fps={fps},scale={width}:{height}:flags=lanczos,palettegen=stats_mode=diff"
         palette_cmd = input_args + [
-            "-vf", f"fps={fps},scale={width}:{height}:flags=lanczos,palettegen=stats_mode=diff",
+            "-vf", palette_vf,
             palette_path,
         ]
-        print("🎨 Generating palette...", flush=True)
         result = subprocess.run(palette_cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"❌ Palette generation failed: {result.stderr}", flush=True)
+            print(f"Palette generation failed: {result.stderr}", flush=True)
+            GIF_JOBS[job_id] = {"status": "error", "error": "Palette generation failed"}
             return
 
+        GIF_JOBS[job_id]["progress"] = "Rendering GIF..."
         # Step 2: GIF mit Palette erzeugen
         bayer_scale = int((quality / 100) * 5)
         gif_input_args = ["ffmpeg", "-y"]
@@ -88,28 +103,39 @@ def convert_to_gif(
             gif_input_args.extend(["-ss", str(start_time)])
         if end_time is not None:
             gif_input_args.extend(["-to", str(end_time)])
+        speed_filter2 = f"setpts={1/speed:.4f}*PTS," if speed != 1.0 else ""
+        gif_vf = f"{speed_filter2}fps={fps},scale={width}:{height}:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale={bayer_scale}"
         gif_cmd = gif_input_args + [
             "-i", video_path,
             "-i", palette_path,
-            "-lavfi", f"fps={fps},scale={width}:{height}:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale={bayer_scale}",
-            "-loop", "0",
+            "-lavfi", gif_vf,
+            "-loop", str(loop),
             output_path,
         ]
-        print("🎬 Creating GIF...", flush=True)
         result = subprocess.run(gif_cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"❌ GIF conversion failed: {result.stderr}", flush=True)
+            print(f"GIF conversion failed: {result.stderr}", flush=True)
+            GIF_JOBS[job_id] = {"status": "error", "error": "GIF rendering failed"}
             return
 
         if os.path.exists(palette_path):
             os.remove(palette_path)
 
         actual_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-        print(f"✅ GIF created: {os.path.basename(output_path)} ({actual_size_mb:.1f} MB)", flush=True)
+        output_filename = os.path.basename(output_path)
+        GIF_JOBS[job_id] = {
+            "status": "done",
+            "size_mb": round(actual_size_mb, 1),
+            "download_url": f"/download_gif?file={output_filename}",
+            "filename": output_filename,
+        }
+        print(f"GIF created: {output_filename} ({actual_size_mb:.1f} MB)", flush=True)
 
     except Exception as e:
-        print(f"❌ Error in GIF conversion: {e}", flush=True)
+        print(f"Error in GIF conversion: {e}", flush=True)
+        GIF_JOBS[job_id] = {"status": "error", "error": str(e)}
         traceback.print_exc()
+
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +144,19 @@ def convert_to_gif(
 
 def handle_get(handler) -> bool:
     path = handler.path
+
+    # GET /api/export/gif/status/<job_id>
+    if path.startswith("/api/export/gif/status/"):
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
+        job_id = path.split("/api/export/gif/status/")[1].split("?")[0]
+        job = GIF_JOBS.get(job_id)
+        if job is None:
+            handler.send_error(404, "Job not found")
+        else:
+            send_json(handler, job)
+        return True
 
     # GET /download_gif?file=...
     if path.startswith("/download_gif?"):
@@ -268,6 +307,8 @@ def handle_post(handler) -> bool:
             quality = int(data.get("quality", 80))
             start_time = data.get("start_time")
             end_time = data.get("end_time")
+            loop = int(data.get("loop", 0))
+            speed = float(data.get("speed", 1.0))
 
             if not video_path:
                 handler.send_error(400, "Missing video path")
@@ -319,9 +360,10 @@ def handle_post(handler) -> bool:
 
             t = threading.Thread(
                 target=convert_to_gif,
-                args=(video_path, output_path, palette_path, job_id, fps, width, height, quality, start_time, end_time),
+                args=(video_path, output_path, palette_path, job_id, fps, width, height, quality, start_time, end_time, loop, speed),
                 daemon=True,
             )
+
             t.start()
 
             send_json(handler, {

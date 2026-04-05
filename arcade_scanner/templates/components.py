@@ -578,14 +578,14 @@ GIF_EXPORT_PANEL_COMPONENT = """
         </button>
     </div>
 
-    <!-- Grid Layout (3 cols) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <!-- Grid Layout (5 cols: Preset / FPS / Loop / Speed / Quality) -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         
         <!-- Preset Card -->
         <div class="bg-white/[0.03] hover:bg-white/[0.05] rounded-xl border border-white/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Preset</div>
-                <span class="text-[9px] text-gray-500 italic leading-none" id="gifPresetDesc">1280×720</span>
+                <span class="text-[9px] text-gray-500 italic leading-none" id="gifPresetDesc">1280x720</span>
             </div>
             <div class="flex bg-black/40 rounded-lg p-1 w-full overflow-x-auto scroller-hide">
                 <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-gray-400 hover:text-white transition-all" id="gifPreset360p" onclick="setGifPreset('360p')">360p</div>
@@ -611,7 +611,33 @@ GIF_EXPORT_PANEL_COMPONENT = """
             </div>
         </div>
 
-        <!-- Target Quality Card -->
+        <!-- Loop Card -->
+        <div class="bg-white/[0.03] hover:bg-white/[0.05] rounded-xl border border-white/5 p-2.5 flex flex-col gap-2 transition-colors">
+            <div class="flex items-center justify-between">
+                <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Loop</div>
+                <span class="material-icons text-[14px] text-gray-500">loop</span>
+            </div>
+            <div class="flex bg-black/40 rounded-lg p-1 w-full">
+                <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-white bg-white/10 shadow-sm transition-all" id="gifLoop0" onclick="setGifLoop(0)" title="Loop forever">inf</div>
+                <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-gray-400 hover:text-white transition-all" id="gifLoop1" onclick="setGifLoop(1)" title="Play once">1x</div>
+                <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-gray-400 hover:text-white transition-all" id="gifLoop3" onclick="setGifLoop(3)" title="Play 3 times">3x</div>
+            </div>
+        </div>
+
+        <!-- Speed Card -->
+        <div class="bg-white/[0.03] hover:bg-white/[0.05] rounded-xl border border-white/5 p-2.5 flex flex-col gap-2 transition-colors">
+            <div class="flex items-center justify-between">
+                <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Speed</div>
+                <span class="material-icons text-[14px] text-gray-500">fast_forward</span>
+            </div>
+            <div class="flex bg-black/40 rounded-lg p-1 w-full">
+                <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-gray-400 hover:text-white transition-all" id="gifSpeed0_5" onclick="setGifSpeed(0.5)" title="Slow motion">0.5x</div>
+                <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-white bg-white/10 shadow-sm transition-all" id="gifSpeed1_0" onclick="setGifSpeed(1.0)" title="Normal">1x</div>
+                <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-gray-400 hover:text-white transition-all" id="gifSpeed2_0" onclick="setGifSpeed(2.0)" title="Fast forward">2x</div>
+            </div>
+        </div>
+
+        <!-- Quality Card -->
         <div class="bg-white/[0.03] hover:bg-white/[0.05] rounded-xl border border-white/5 p-2.5 flex flex-col justify-center transition-colors">
             <div class="flex items-center justify-between mb-1">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Quality</div>
