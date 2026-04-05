@@ -599,3 +599,11 @@ def _handle_backup(handler) -> None:
     except Exception as e:
         print(f"❌ Backup failed: {e}")
         handler.send_error(500, str(e))
+
+# ---------------------------------------------------------------------------
+# POST handler — files.py has no POST endpoints; returns False to pass through
+# ---------------------------------------------------------------------------
+
+def handle_post(handler) -> bool:
+    """files.py has no POST endpoints. Always returns False."""
+    return False
