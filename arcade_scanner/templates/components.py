@@ -315,47 +315,62 @@ NAVIGATION_COMPONENT = """
     <div class="flex-1 overflow-y-auto p-4 gap-1 flex flex-col scrollbar-hide">
         <div class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 px-3">Workspace</div>
     
-    <button id="m-lobby" onclick="setWorkspaceMode('lobby')" class="nav-item active group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-cyan rounded-r transition-opacity"></div>
-        <span class="material-icons text-[20px] text-arcade-cyan">dashboard</span>
-        <span class="font-medium group-[.active]:text-black dark:group-[.active]:text-white">Lobby</span>
-        <span id="count-lobby" class="ml-auto text-[11px] text-gray-400 dark:text-gray-500 font-mono"></span>
+    <button id="m-lobby" onclick="setWorkspaceMode('lobby')" class="nav-item active group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-arcade-cyan rounded-r transition-all"></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-cyan opacity-90 group-[.active]:opacity-100 shrink-0">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+        </svg>
+        <span class="font-semibold group-[.active]:text-white text-gray-400 group-hover:text-white transition-colors">Lobby</span>
+        <span id="count-lobby" class="ml-auto text-[11px] text-gray-500 font-mono" style="font-variant-numeric:tabular-nums"></span>
     </button>
 
-    <button id="m-favorites" onclick="setWorkspaceMode('favorites')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-gold rounded-r opacity-0 transition-opacity"></div>
-        <span class="material-icons text-[20px] group-hover:text-arcade-gold group-[.active]:text-arcade-gold">star</span>
-        <span class="font-medium group-[.active]:text-black dark:group-[.active]:text-white">Favoriten</span>
-        <span id="count-favorites" class="ml-auto text-[11px] text-gray-400 dark:text-gray-500 font-mono"></span>
-    </button>
-    
-    <button id="m-optimized" onclick="setWorkspaceMode('optimized')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
-        <span class="material-icons text-[20px] group-hover:text-arcade-cyan group-[.active]:text-arcade-cyan">offline_bolt</span>
-        <span class="font-medium group-[.active]:text-black dark:group-[.active]:text-white">Review</span>
-        <span id="count-review" class="ml-auto text-[11px] text-gray-400 dark:text-gray-500 font-mono"></span>
+    <button id="m-favorites" onclick="setWorkspaceMode('favorites')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-arcade-gold rounded-r opacity-0 transition-all"></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 group-hover:text-arcade-gold group-[.active]:text-arcade-gold transition-colors shrink-0">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        <span class="font-medium group-[.active]:text-white group-[.active]:font-semibold text-gray-400 group-hover:text-white transition-colors">Favoriten</span>
+        <span id="count-favorites" class="ml-auto text-[11px] text-gray-500 font-mono" style="font-variant-numeric:tabular-nums"></span>
     </button>
 
-    <button id="m-vault" onclick="setWorkspaceMode('vault')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-arcade-magenta rounded-r opacity-0 transition-opacity"></div>
-        <span class="material-icons text-[20px] group-hover:text-arcade-magenta group-[.active]:text-arcade-magenta">archive</span>
-        <span class="font-medium group-[.active]:text-black dark:group-[.active]:text-white">Vault</span>
-        <span id="count-vault" class="ml-auto text-[11px] text-gray-400 dark:text-gray-500 font-mono"></span>
+    <button id="m-optimized" onclick="setWorkspaceMode('optimized')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-arcade-cyan rounded-r opacity-0 transition-all"></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 group-hover:text-arcade-cyan group-[.active]:text-arcade-cyan transition-colors shrink-0">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fill-opacity="0.12"/>
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <span class="font-medium group-[.active]:text-white group-[.active]:font-semibold text-gray-400 group-hover:text-white transition-colors">Review</span>
+        <span id="count-review" class="ml-auto text-[11px] text-gray-500 font-mono" style="font-variant-numeric:tabular-nums"></span>
     </button>
-    
-    <button id="m-duplicates" onclick="setWorkspaceMode('duplicates')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-purple-500 rounded-r opacity-0 transition-opacity"></div>
-        <span class="material-icons text-[20px] group-hover:text-purple-400 group-[.active]:text-purple-400">content_copy</span>
-        <span class="font-medium group-[.active]:text-black dark:group-[.active]:text-white">Duplicates</span>
-        <span id="count-duplicates" class="ml-auto text-[11px] text-gray-400 dark:text-gray-500 font-mono"></span>
+
+    <button id="m-vault" onclick="setWorkspaceMode('vault')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-arcade-magenta rounded-r opacity-0 transition-all"></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 group-hover:text-arcade-magenta group-[.active]:text-arcade-magenta transition-colors shrink-0">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            <circle cx="12" cy="16" r="1" fill="currentColor"/>
+        </svg>
+        <span class="font-medium group-[.active]:text-white group-[.active]:font-semibold text-gray-400 group-hover:text-white transition-colors">Vault</span>
+        <span id="count-vault" class="ml-auto text-[11px] text-gray-500 font-mono" style="font-variant-numeric:tabular-nums"></span>
     </button>
-    
+
+    <button id="m-duplicates" onclick="setWorkspaceMode('duplicates')" class="nav-item group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 transition-all">
+        <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-purple-400 rounded-r opacity-0 transition-all"></div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 group-hover:text-purple-400 group-[.active]:text-purple-400 transition-colors shrink-0">
+            <rect x="8" y="8" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span class="font-medium group-[.active]:text-white group-[.active]:font-semibold text-gray-400 group-hover:text-white transition-colors">Duplicates</span>
+        <span id="count-duplicates" class="ml-auto text-[11px] text-gray-500 font-mono" style="font-variant-numeric:tabular-nums"></span>
+    </button>
+
     <!-- Smart Collections Section -->
     <div class="mt-4 border-t border-black/5 dark:border-white/5 pt-3">
         <div class="flex items-center justify-between px-3 mb-2">
             <span class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">Collections</span>
-            <button onclick="openCollectionModal()" class="text-gray-400 dark:text-gray-500 hover:text-arcade-cyan transition-colors" title="New Collection">
-                <span class="material-icons text-[16px]">add</span>
+            <button onclick="openCollectionModal()" class="text-gray-500 hover:text-arcade-cyan transition-colors cursor-pointer" title="New Collection">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
             </button>
         </div>
         <div id="collectionsNav" class="space-y-0.5">
@@ -366,13 +381,17 @@ NAVIGATION_COMPONENT = """
 
     <!-- Settings pinned at bottom -->
     <div class="border-t border-white/5 p-4">
-        <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-            <span class="material-icons text-[20px]">settings</span>
+        <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
             <span>Settings</span>
         </button>
     </div>
-    
+
 </nav>
+
 
 
 <!-- Mobile Bottom Tab Bar (Fixed Bottom) -->
@@ -739,64 +758,89 @@ CINEMA_MODAL_COMPONENT = """
     </div>
     
     <div id="cinemaActions" class="cinema-actions absolute bottom-8 flex gap-3 z-40">
+
         <!-- Info Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="toggleCinemaInfo()" title="Technical Details">
-            <div class="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover:bg-white/20 group-hover:border-white/30 group-hover:scale-105 transition-all shadow-lg">
-                <span class="material-icons text-xl text-gray-300 group-hover:text-white">info</span>
+        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="toggleCinemaInfo()" title="Technical Details [I]">
+            <div class="w-12 h-12 rounded-xl bg-white/8 backdrop-blur-sm flex items-center justify-center border border-white/15 group-hover:bg-white/18 group-hover:border-white/35 group-hover:scale-110 transition-all shadow-lg">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300 group-hover:text-white transition-colors">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
             </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-gray-400 group-hover:text-white transition-colors">Info</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-gray-500 group-hover:text-white transition-colors">Info</span>
         </button>
-        
+
         <!-- Locate Button -->
         <button id="cinemaLocateBtn" class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaLocate()" title="Show in Finder">
-            <div class="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 group-hover:bg-white/20 group-hover:border-white/30 group-hover:scale-105 transition-all shadow-lg">
-                <span class="material-icons text-xl text-gray-300 group-hover:text-white">folder_open</span>
+            <div class="w-12 h-12 rounded-xl bg-white/8 backdrop-blur-sm flex items-center justify-center border border-white/15 group-hover:bg-white/18 group-hover:border-white/35 group-hover:scale-110 transition-all shadow-lg">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300 group-hover:text-white transition-colors">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    <polyline points="12 12 17 12 17 17"/>
+                    <line x1="14" y1="10" x2="17" y2="7"/>
+                </svg>
             </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-gray-400 group-hover:text-white transition-colors">Locate</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-gray-500 group-hover:text-white transition-colors">Locate</span>
         </button>
-        
+
         <!-- Visual Separator -->
-        <div class="w-px h-12 bg-white/10 self-start mt-0.5"></div>
-        
+        <div class="w-px h-12 bg-white/8 self-start mt-0.5"></div>
+
         <!-- Favorite Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaFavorite()" title="Toggle Favorite">
-            <div class="w-12 h-12 rounded-xl bg-arcade-gold/15 backdrop-blur-sm flex items-center justify-center border border-arcade-gold/40 group-hover:bg-arcade-gold/25 group-hover:border-arcade-gold/60 group-hover:scale-105 transition-all shadow-lg shadow-arcade-gold/10">
-                <span class="material-icons text-xl text-arcade-gold group-hover:text-yellow-300">star</span>
+        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaFavorite()" title="Toggle Favorite [F]">
+            <div class="w-12 h-12 rounded-xl bg-arcade-gold/12 backdrop-blur-sm flex items-center justify-center border border-arcade-gold/35 group-hover:bg-arcade-gold/25 group-hover:border-arcade-gold/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-gold/10">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-gold group-hover:text-yellow-300 transition-colors" id="cinemaFavIcon">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
             </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-gold/80 group-hover:text-arcade-gold transition-colors">Favorite</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-gold/75 group-hover:text-arcade-gold transition-colors">Favorite</span>
         </button>
-        
+
         <!-- Tags Button -->
         <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="toggleCinemaTagPanel()" title="Manage Tags">
-            <div class="w-12 h-12 rounded-xl bg-arcade-cyan/15 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/40 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/60 group-hover:scale-105 transition-all shadow-lg shadow-arcade-cyan/10">
-                <span class="material-icons text-xl text-arcade-cyan group-hover:text-cyan-300">label</span>
+            <div class="w-12 h-12 rounded-xl bg-arcade-cyan/12 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/35 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-cyan/10">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-cyan group-hover:text-cyan-300 transition-colors">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                    <line x1="7" y1="7" x2="7.01" y2="7"/>
+                </svg>
             </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-cyan/80 group-hover:text-arcade-cyan transition-colors">Tags</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-cyan/75 group-hover:text-arcade-cyan transition-colors">Tags</span>
         </button>
-        
+
         <!-- Vault Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaVault()" title="Archive/Vault">
-            <div class="w-12 h-12 rounded-xl bg-arcade-magenta/15 backdrop-blur-sm flex items-center justify-center border border-arcade-magenta/40 group-hover:bg-arcade-magenta/25 group-hover:border-arcade-magenta/60 group-hover:scale-105 transition-all shadow-lg shadow-arcade-magenta/10">
-                <span class="material-icons text-xl text-arcade-magenta group-hover:text-pink-400">archive</span>
+        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaVault()" title="Move to Vault [V]">
+            <div class="w-12 h-12 rounded-xl bg-arcade-magenta/12 backdrop-blur-sm flex items-center justify-center border border-arcade-magenta/35 group-hover:bg-arcade-magenta/25 group-hover:border-arcade-magenta/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-magenta/10">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-magenta group-hover:text-pink-400 transition-colors">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    <circle cx="12" cy="16" r="1" fill="currentColor"/>
+                </svg>
             </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-magenta/80 group-hover:text-arcade-magenta transition-colors">Vault</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-magenta/75 group-hover:text-arcade-magenta transition-colors">Vault</span>
         </button>
-        
+
         <!-- Visual Separator -->
-        <div class="w-px h-12 bg-white/10 self-start mt-0.5"></div>
-        
+        <div class="w-px h-12 bg-white/8 self-start mt-0.5"></div>
+
         <!-- GIF Export Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group cinema-action-btn" onclick="cinemaExportGif()" title="Export as GIF">
-            <div class="w-12 h-12 rounded-xl bg-purple-500/15 backdrop-blur-sm flex items-center justify-center border border-purple-500/40 group-hover:bg-purple-500/25 group-hover:border-purple-500/60 group-hover:scale-105 transition-all shadow-lg shadow-purple-500/10">
-                <span class="material-icons text-xl text-purple-400 group-hover:text-purple-300">gif</span>
+        <button class="flex flex-col items-center gap-1.5 transition-all group cinema-action-btn" onclick="cinemaExportGif()" title="Export as GIF [G]">
+            <div class="w-12 h-12 rounded-xl bg-purple-500/12 backdrop-blur-sm flex items-center justify-center border border-purple-500/35 group-hover:bg-purple-500/25 group-hover:border-purple-500/65 group-hover:scale-110 transition-all shadow-lg shadow-purple-500/10">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-purple-400 group-hover:text-purple-300 transition-colors">
+                    <rect x="2" y="2" width="20" height="20" rx="3"/>
+                    <path d="M9 12h3v2.5a2.5 2.5 0 0 1-5 0v-5a2.5 2.5 0 0 1 5 0"/>
+                    <line x1="14" y1="8" x2="14" y2="16"/>
+                    <line x1="17" y1="8" x2="19" y2="8"/>
+                    <line x1="17" y1="12" x2="19" y2="12"/>
+                </svg>
             </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-purple-400/80 group-hover:text-purple-400 transition-colors">GIF</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-purple-400/75 group-hover:text-purple-400 transition-colors">GIF</span>
         </button>
-        
+
         {opt_btn}
     </div>
 </div>
 """
+
 
 DUPLICATE_CHECKER_MODAL_COMPONENT = """
 <!-- Duplicate Checker Fullscreen Modal -->

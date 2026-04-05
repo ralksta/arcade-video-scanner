@@ -141,6 +141,11 @@ class AppSettings(BaseSettings):
     theme: str = Field("arcade")
     enable_deovr: bool = Field(False)
     enable_image_scanning: bool = Field(False)
+    ffmpeg_path: str = Field("")
+    ffprobe_path: str = Field("")
+    is_docker: bool = Field(False)
+    first_run_completed: bool = Field(False)
+    scan_images: bool = Field(False)
 
     model_config = ConfigDict(
         env_prefix="ARCADE_",

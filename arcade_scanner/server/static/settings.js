@@ -448,42 +448,6 @@ function markSettingsSaved() {
 }
 
 // ============================================================================
-// GENERAL TOAST NOTIFICATION
-// ============================================================================
-
-/**
- * Show a toast notification message
- * @param {string} message - Message to display
- * @param {string} [type='info'] - Toast type ('info', 'success', 'error')
- */
-function showToast(message, type = 'info') {
-    // Remove existing toast if any
-    const existingToast = document.querySelector('.settings-toast');
-    if (existingToast) {
-        existingToast.remove();
-    }
-
-    // Create toast
-    const toast = document.createElement('div');
-    toast.className = `settings-toast toast-${type}`;
-    toast.innerHTML = `
-        <span class="material-icons">${type === 'success' ? 'check_circle' : 'info'}</span>
-        <span>${message}</span>
-    `;
-
-    document.body.appendChild(toast);
-
-    // Trigger animation
-    setTimeout(() => toast.classList.add('show'), 10);
-
-    // Remove after 2 seconds
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
-}
-
-// ============================================================================
 // HIDDEN PATH MODAL
 // ============================================================================
 
@@ -858,8 +822,8 @@ window.markSettingsUnsaved = markSettingsUnsaved;
 window.markSettingsSaving = markSettingsSaving;
 window.markSettingsSaved = markSettingsSaved;
 
-// Toast
-window.showToast = showToast;
+
+// Toast is defined in utils.js — do not re-export here.
 
 // Hidden path modal
 window.showHiddenPathModal = showHiddenPathModal;

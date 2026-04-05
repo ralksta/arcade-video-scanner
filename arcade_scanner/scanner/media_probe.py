@@ -2,6 +2,7 @@ import json
 import asyncio
 from typing import Dict, Any, Optional
 from ..models.video_entry import VideoEntry
+from ..config import config
 
 class MediaProbe:
     """
@@ -17,7 +18,7 @@ class MediaProbe:
         Async function to run FFprobe.
         """
         cmd = [
-            "ffprobe",
+            config.settings.ffprobe_path or "ffprobe",
             "-v", "error",
             "-show_entries", "stream=index,codec_type,codec_name,width,height,profile,level,pix_fmt,channels,avg_frame_rate:format=duration,bit_rate,size,format_name",
             "-of", "json",
@@ -46,7 +47,7 @@ class MediaProbe:
         Only checks the first 30 seconds to keep scan performance acceptable.
         """
         cmd = [
-            "ffmpeg",
+            config.settings.ffmpeg_path or "ffmpeg",
             "-v", "error",
             "-t", "30",        # Only probe first 30 seconds — fast even for large files
             "-i", filepath,

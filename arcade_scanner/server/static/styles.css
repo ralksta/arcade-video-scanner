@@ -107,6 +107,31 @@ body[data-workspace="vault"] {
     transition: border-color 0.3s, background 0.3s;
 }
 
+/* Monospace: Fira Code for all numeric/code data */
+.font-mono, code, kbd, pre, [style*="tabular-nums"] {
+    font-family: 'Fira Code', 'SF Mono', 'Fira Mono', monospace;
+}
+
+/* Sidebar nav active state — stronger */
+.nav-item.active {
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+.nav-item.active .nav-indicator {
+    opacity: 1 !important;
+    box-shadow: 0 0 8px currentColor;
+}
+
+.nav-item.active svg {
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* Context Menu background utilities */
+.bg-white\/6 { background: rgba(255,255,255,0.06); }
+.bg-white\/8 { background: rgba(255,255,255,0.08); }
+
 body {
     margin: 0;
     padding: 0;
@@ -114,7 +139,7 @@ body {
     padding-bottom: env(safe-area-inset-bottom);
     background-color: var(--bg);
     color: #ffffff;
-    font-family: 'Inter',
+    font-family: 'Fira Sans', 'Inter',
         system-ui,
         -apple-system,
         sans-serif;

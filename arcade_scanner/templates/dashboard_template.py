@@ -83,13 +83,17 @@ def generate_html_report(results, report_file, server_port=8000):
     opt_btn_html = ""
     if config.optimizer_available and config.settings.enable_optimizer:
         opt_btn_html = """
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaOptimize()" title="Optimize Video" aria-label="Optimize this video">
-            <div class="w-12 h-12 rounded-xl bg-arcade-cyan/15 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/40 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/60 group-hover:scale-105 transition-all shadow-lg shadow-arcade-cyan/10">
-                <span class="material-icons text-xl text-arcade-cyan group-hover:text-cyan-300">bolt</span>
+        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaOptimize()" title="Optimize Video [O]" aria-label="Optimize this video">
+            <div class="w-12 h-12 rounded-xl bg-arcade-cyan/12 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/35 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-cyan/10">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-cyan group-hover:text-cyan-300 transition-colors">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fill-opacity="0.15"/>
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
             </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-cyan/80 group-hover:text-arcade-cyan transition-colors">Optimize</span>
+            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-cyan/75 group-hover:text-arcade-cyan transition-colors">Optimize</span>
         </button>
         """
+
     cinema_modal_html = CINEMA_MODAL_COMPONENT.format(opt_btn=opt_btn_html)
     
     # 3. Assemble Main Content
@@ -113,12 +117,29 @@ def generate_html_report(results, report_file, server_port=8000):
 
         {FOLDER_BROWSER_LEGEND_COMPONENT}
 
+        <!-- Quick Stats Ribbon -->
+        <div id="quickStatsRibbon"
+             style="display:none;align-items:center;gap:8px;flex-wrap:wrap;
+                    padding:6px 16px;font-size:12px;color:#9ca3af;
+                    border-bottom:1px solid rgba(255,255,255,.06);
+                    background:rgba(0,0,0,.15);backdrop-filter:blur(4px);">
+        </div>
+
         <!-- Main Content Container with safe area padding -->
         <main class="flex-1 p-2 md:p-6 pb-[80px] md:pb-6 relative w-full overflow-x-hidden" id="mainContentArea">
             
             <!-- Video Grid -->
             <div id="videoGrid" class="responsive-grid transition-opacity duration-300 overflow-hidden">
-                <!-- Injected via JS -->
+                <!-- Skeleton cards shown while data loads -->
+                {''.join(['''
+                <div class="group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 flex flex-col skeleton-card" aria-hidden="true">
+                    <div class="aspect-video bg-white/5 animate-pulse rounded-t-xl"></div>
+                    <div class="p-3 flex flex-col gap-2">
+                        <div class="h-3 bg-white/5 animate-pulse rounded w-3/4"></div>
+                        <div class="h-2 bg-white/5 animate-pulse rounded w-1/2"></div>
+                        <div class="h-0.5 bg-white/5 animate-pulse rounded w-full mt-2"></div>
+                    </div>
+                </div>''' for _ in range(8)])}
             </div>
             
             <!-- List View -->
@@ -133,6 +154,7 @@ def generate_html_report(results, report_file, server_port=8000):
             </div>
             
         </main>
+
         
     </div>
     
@@ -170,19 +192,32 @@ def generate_html_report(results, report_file, server_port=8000):
     """
     
     external_scripts = f"""
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="/static/styles.css?v={int(time.time())}">
     <link rel="stylesheet" href="/static/timeline_scrubber.css?v={int(time.time())}">
+    <script src="/static/store.js?v={int(time.time())}"></script>
+    <script src="/static/formatters.js?v={int(time.time())}"></script>
+    <script src="/static/api.js?v={int(time.time())}"></script>
+    <script src="/static/utils.js?v={int(time.time())}"></script>
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
     <script src="/static/treemap.js?v={int(time.time())}"></script>
-    <script src="/static/formatters.js?v={int(time.time())}"></script>
     <script src="/static/settings.js?v={int(time.time())}"></script>
     <script src="/static/duplicates.js?v={int(time.time())}"></script>
-    <script src="/static/store.js?v={int(time.time())}"></script>
+    <script src="/static/filter_engine.js?v={int(time.time())}"></script>
+    <script src="/static/workspace.js?v={int(time.time())}"></script>
+    <script src="/static/cards.js?v={int(time.time())}"></script>
+    <script src="/static/batch_operations.js?v={int(time.time())}"></script>
+    <script src="/static/tag_manager.js?v={int(time.time())}"></script>
+    <script src="/static/folder_browser.js?v={int(time.time())}"></script>
     <script src="/static/engine.js?v={int(time.time())}"></script>
+    <script src="/static/optimizer.js?v={int(time.time())}"></script>
     <script src="/static/cinema.js?v={int(time.time())}"></script>
     <script src="/static/timeline_scrubber.js?v={int(time.time())}"></script>
     <script src="/static/gif_export.js?v={int(time.time())}"></script>
     <script src="/static/collections.js?v={int(time.time())}"></script>
+    <script src="/static/context_menu.js?v={int(time.time())}"></script>
     """
     
     # Combine content using Theme-aware Base Layout

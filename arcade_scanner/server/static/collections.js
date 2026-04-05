@@ -33,17 +33,18 @@ function openCollectionModal(editId = null) {
 
     editingCollectionId = editId;
 
-    // Reset form
-    document.getElementById('collectionName').value = '';
-    document.getElementById('collectionSearch').value = '';
-    document.getElementById('collectionDateFilter').value = 'all';
-    document.getElementById('collectionMinSize').value = '';
-    document.getElementById('collectionMaxSize').value = '';
-    document.getElementById('collectionMinDuration').value = '';
-    document.getElementById('collectionMaxDuration').value = '';
-    document.getElementById('collectionColor').value = '#64FFDA';
-    document.getElementById('collectionColorBtn').style.backgroundColor = '#64FFDA';
-    document.getElementById('selectedCollectionIcon').innerText = 'folder_special';
+    // Reset form — null-safe with optional chaining
+    const _el = (id) => document.getElementById(id);
+    if (_el('collectionName')) _el('collectionName').value = '';
+    if (_el('collectionSearch')) _el('collectionSearch').value = '';
+    if (_el('collectionDateFilter')) _el('collectionDateFilter').value = 'all';
+    if (_el('collectionMinSize')) _el('collectionMinSize').value = '';
+    if (_el('collectionMaxSize')) _el('collectionMaxSize').value = '';
+    if (_el('collectionMinDuration')) _el('collectionMinDuration').value = '';
+    if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = '';
+    if (_el('collectionColor')) _el('collectionColor').value = '#64FFDA';
+    if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = '#64FFDA';
+    if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = 'folder_special';
 
     // Initialize new criteria schema
     collectionCriteriaNew = getDefaultCollectionCriteria();
@@ -52,26 +53,26 @@ function openCollectionModal(editId = null) {
     collectionCriteria = { status: 'all', codec: 'all', tags: [], search: '' };
 
     // Update UI title
-    document.getElementById('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
-    document.getElementById('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
+    if (_el('collectionModalTitle')) _el('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
+    _el('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
 
     // If editing, load existing data
     if (editId) {
         const existing = (userSettings.smart_collections || []).find(c => c.id === editId);
         if (existing) {
-            document.getElementById('collectionName').value = existing.name || '';
-            document.getElementById('collectionSearch').value = existing.criteria?.search || '';
+            if (_el('collectionName')) _el('collectionName').value = existing.name || '';
+            if (_el('collectionSearch')) _el('collectionSearch').value = existing.criteria?.search || '';
 
             // Populate New Fields
-            document.getElementById('collectionDateFilter').value = existing.criteria?.date || 'all';
-            document.getElementById('collectionMinSize').value = existing.criteria?.size?.min || '';
-            document.getElementById('collectionMaxSize').value = existing.criteria?.size?.max || '';
-            document.getElementById('collectionMinDuration').value = existing.criteria?.duration?.min || '';
-            document.getElementById('collectionMaxDuration').value = existing.criteria?.duration?.max || '';
+            if (_el('collectionDateFilter')) _el('collectionDateFilter').value = existing.criteria?.date || 'all';
+            if (_el('collectionMinSize')) _el('collectionMinSize').value = existing.criteria?.size?.min || '';
+            if (_el('collectionMaxSize')) _el('collectionMaxSize').value = existing.criteria?.size?.max || '';
+            if (_el('collectionMinDuration')) _el('collectionMinDuration').value = existing.criteria?.duration?.min || '';
+            if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = existing.criteria?.duration?.max || '';
 
-            document.getElementById('collectionColor').value = existing.color || '#64FFDA';
-            document.getElementById('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
-            document.getElementById('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
+            if (_el('collectionColor')) _el('collectionColor').value = existing.color || '#64FFDA';
+            if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
+            if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
 
             // Check if using new schema
             if (existing.criteria?.include || existing.criteria?.exclude) {
@@ -261,7 +262,8 @@ function toggleCollectionIconPicker() {
 }
 
 function selectCollectionIcon(icon) {
-    document.getElementById('selectedCollectionIcon').innerText = icon;
+    const iconEl = document.getElementById('selectedCollectionIcon');
+    if (iconEl) iconEl.innerText = icon;
     document.getElementById('collectionIconPicker')?.classList.add('hidden');
 }
 
@@ -271,8 +273,10 @@ function toggleCollectionColorPicker() {
 }
 
 function selectCollectionColor(color) {
-    document.getElementById('collectionColor').value = color;
-    document.getElementById('collectionColorBtn').style.backgroundColor = color;
+    const colorInput = document.getElementById('collectionColor');
+    const colorBtn = document.getElementById('collectionColorBtn');
+    if (colorInput) colorInput.value = color;
+    if (colorBtn) colorBtn.style.backgroundColor = color;
     document.getElementById('collectionColorPicker')?.classList.add('hidden');
 }
 
@@ -282,21 +286,22 @@ function selectCollectionColor(color) {
  * Save the current collection (create or update)
  */
 function saveCollection() {
-    const name = document.getElementById('collectionName').value.trim();
+    const _el = (id) => document.getElementById(id);
+    const name = (_el('collectionName')?.value || '').trim();
     if (!name) {
         alert('Please enter a collection name');
         return;
     }
 
-    const icon = document.getElementById('selectedCollectionIcon').innerText;
-    const color = document.getElementById('collectionColor').value;
-    const search = document.getElementById('collectionSearch').value.trim();
+    const icon = _el('selectedCollectionIcon')?.innerText || 'folder_special';
+    const color = _el('collectionColor')?.value || '#64FFDA';
+    const search = (_el('collectionSearch')?.value || '').trim();
 
-    const dateVal = document.getElementById('collectionDateFilter').value;
-    const sizeMin = document.getElementById('collectionMinSize').value;
-    const sizeMax = document.getElementById('collectionMaxSize').value;
-    const durMin = document.getElementById('collectionMinDuration').value;
-    const durMax = document.getElementById('collectionMaxDuration').value;
+    const dateVal = _el('collectionDateFilter')?.value || 'all';
+    const sizeMin = _el('collectionMinSize')?.value || '';
+    const sizeMax = _el('collectionMaxSize')?.value || '';
+    const durMin = _el('collectionMinDuration')?.value || '';
+    const durMax = _el('collectionMaxDuration')?.value || '';
 
     if (collectionCriteriaNew) {
         collectionCriteriaNew.search = search;
@@ -1083,13 +1088,14 @@ function applyCollection(collectionId) {
     activeSmartCollectionCriteria = criteria;
     activeCollectionId = collectionId;
 
-    // Sync search UI
+    // Sync search UI — null-safe (mobileSearchInput may not exist on all layouts)
+    const mobileSearchEl = document.getElementById('mobileSearchInput');
     if (criteria.search) {
         searchTerm = criteria.search;
-        document.getElementById('mobileSearchInput').value = searchTerm;
+        if (mobileSearchEl) mobileSearchEl.value = searchTerm;
     } else {
         searchTerm = '';
-        document.getElementById('mobileSearchInput').value = '';
+        if (mobileSearchEl) mobileSearchEl.value = '';
     }
 
     filterAndSort(true);

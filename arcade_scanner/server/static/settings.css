@@ -642,31 +642,34 @@
     }
 }
 
-/* Toast Notifications */
+/* Toast Notifications — stacked queue */
 .settings-toast {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    right: 20px;
+    bottom: 20px;                      /* JS overrides this per toast */
     background: var(--color-bg-elevated);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: 12px 16px;
+    padding: 10px 14px;
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
     z-index: 10000;
     font-size: var(--font-size-sm);
     font-weight: 500;
+    min-width: 220px;
+    max-width: 340px;
     opacity: 0;
-    transform: translateY(20px) scale(0.95);
-    transition: all var(--transition-base);
-    pointer-events: none;
+    transform: translateX(20px) scale(0.96);
+    transition: opacity 250ms ease, transform 250ms ease, bottom 200ms ease;
+    pointer-events: all;
+    overflow: hidden;
 }
 
 .settings-toast.show {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(0) scale(1);
 }
 
 .settings-toast.toast-success {
@@ -679,9 +682,53 @@
     border-color: rgba(10, 132, 255, 0.3);
 }
 
+.settings-toast.toast-error {
+    color: var(--color-accent-red);
+    border-color: rgba(255, 69, 58, 0.3);
+}
+
+.settings-toast.toast-warning {
+    color: var(--color-accent-orange);
+    border-color: rgba(255, 159, 10, 0.3);
+}
+
 .settings-toast .material-icons {
     font-size: 18px;
+    flex-shrink: 0;
 }
+
+/* Progress-bar shrink animation for toast auto-dismiss */
+@keyframes toast-shrink {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
+
+/* Quick Stats Ribbon */
+.qs-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.qs-val {
+    color: #e2e8f0;
+    font-weight: 600;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.qs-sub {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.qs-divider {
+    color: rgba(255,255,255,.12);
+    padding: 0 2px;
+    user-select: none;
+}
+
 
 /* Mobile Responsive */
 @media (max-width: 768px) {

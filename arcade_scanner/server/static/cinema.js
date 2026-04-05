@@ -180,7 +180,19 @@ function navigateCinema(direction) {
 
 /**
  * Handle keyboard events in cinema mode
- * @param {KeyboardEvent} e - Keyboard event
+ *
+ * Shortcuts:
+ *   Escape       – Close cinema
+ *   ← / →        – Previous / Next in playlist
+ *   Space        – Play / Pause video
+ *   F            – Toggle Favorite
+ *   V            – Move to Vault
+ *   G            – Toggle GIF Export panel
+ *   O            – Toggle Optimizer panel
+ *   I            – Toggle Info panel
+ *   A–Z          – Tag shortcuts (configured in Settings)
+ *
+ * @param {KeyboardEvent} e
  */
 function cinemaKeyHandler(e) {
     // Skip if typing in an input field
@@ -192,27 +204,69 @@ function cinemaKeyHandler(e) {
         e.preventDefault();
         e.stopPropagation();
         closeCinema();
+
     } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         navigateCinema(-1);
+
     } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         navigateCinema(1);
+
+    } else if (e.key === ' ' || e.code === 'Space') {
+        // Play / Pause
+        e.preventDefault();
+        const video = document.getElementById('cinemaVideo');
+        if (video && !video.classList.contains('hidden')) {
+            if (video.paused) {
+                video.play();
+                showCinemaToast('▶ Play');
+            } else {
+                video.pause();
+                showCinemaToast('⏸ Pause');
+            }
+        }
+
     } else if (key === 'f') {
         e.preventDefault();
         if (currentCinemaPath) {
             cinemaFavorite();
             showCinemaToast('Favorite toggled');
         }
+
     } else if (key === 'v') {
         e.preventDefault();
         if (currentCinemaPath) {
             cinemaVault();
             showCinemaToast('Moved to Vault');
         }
+
+    } else if (key === 'g') {
+        // GIF Export panel toggle
+        e.preventDefault();
+        if (typeof cinemaExportGif === 'function') {
+            cinemaExportGif();
+            showCinemaToast('GIF Export [G]');
+        }
+
+    } else if (key === 'o') {
+        // Optimizer panel toggle
+        e.preventDefault();
+        if (typeof cinemaOptimize === 'function') {
+            cinemaOptimize();
+        }
+
+    } else if (key === 'i') {
+        // Info panel toggle
+        e.preventDefault();
+        if (typeof toggleCinemaInfo === 'function') {
+            toggleCinemaInfo();
+            showCinemaToast('Info [I]');
+        }
+
     } else {
         // Check custom tag shortcuts (A-Z except reserved)
-        const reservedKeys = ['f', 'v', ' ', 'escape', 'arrowleft', 'arrowright'];
+        const reservedKeys = ['f', 'v', 'g', 'o', 'i', ' ', 'escape', 'arrowleft', 'arrowright'];
         if (key.length === 1 && /[a-z]/i.test(key) && !reservedKeys.includes(key)) {
             const tags = window.userSettings?.available_tags || [];
             const matchingTag = tags.find(t => t.shortcut && t.shortcut.toLowerCase() === key);
@@ -224,6 +278,7 @@ function cinemaKeyHandler(e) {
         }
     }
 }
+
 
 // --- ACTION BUTTONS ---
 
