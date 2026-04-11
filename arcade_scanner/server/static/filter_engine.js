@@ -33,7 +33,9 @@ function setFilter(f) {
     // Reset codec filter when showing all videos
     if (f === 'all') {
         currentCodec = 'all';
-        document.getElementById('codecSelect').value = 'all';
+        const cs = document.getElementById('codecSelect');
+        if (cs) cs.value = 'all';
+        if (typeof setFilterOption === 'function') setFilterOption('codec', 'all');
     }
     filterAndSort();
 }
@@ -165,7 +167,7 @@ function filterAndSort(scrollToTop = false) {
             filteredVideos = window.ALL_VIDEOS.filter(v => {
                 // Extract common values once
                 const name = v.FilePath.split(/[\\/]/).pop().toLowerCase();
-                const codec = v.codec || 'unknown';
+                const codec = (v.codec || 'unknown').toLowerCase();
                 const isHidden = v.hidden || false;
                 const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
                 const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
@@ -198,8 +200,15 @@ function filterAndSort(scrollToTop = false) {
                 }
 
                 // Codec filter
-                if (currentCodec !== 'all' && !codec.includes(currentCodec)) {
-                    return false;
+                if (currentCodec !== 'all') {
+                    const targetCodec = currentCodec.toLowerCase();
+                    if (targetCodec === 'av1') {
+                        if (!codec.includes('av1') && !codec.includes('av01')) {
+                            return false;
+                        }
+                    } else if (!codec.includes(targetCodec)) {
+                        return false;
+                    }
                 }
 
                 // Search filter

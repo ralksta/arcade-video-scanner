@@ -77,8 +77,17 @@ function resetDashboard() {
 
     // Reset UI elements
     document.getElementById('mobileSearchInput').value = '';
-    document.getElementById('codecSelect').value = 'all';
-    document.getElementById('sortSelect').value = 'bitrate';
+    const cs = document.getElementById('codecSelect');
+    if (cs) cs.value = 'all';
+    
+    // Reset codec & status chips
+    if (typeof setFilterOption === 'function') {
+        setFilterOption('codec', 'all');
+        setFilterOption('status', 'all');
+    }
+
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) sortSelect.value = 'bitrate';
 
     // Reset internal state and re-render
     setFilter('all');

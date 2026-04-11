@@ -267,6 +267,7 @@ function triggerOptimization() {
     params.set('path',  currentCinemaPath);
     params.set('audio', currentOptAudio);
     params.set('video', currentOptVideo);
+    params.set('codec', currentOptCodec);
     if (ss)   params.set('ss', ss);
     if (to)   params.set('to', to);
     if (qVal) params.set('q',  qVal);

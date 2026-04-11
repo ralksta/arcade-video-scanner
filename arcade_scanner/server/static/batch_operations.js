@@ -57,8 +57,13 @@ function updateBatchSelection() {
         skipWarning.innerHTML = '';
     }
 
-    if (count > 0) bar.classList.add('active');
-    else bar.classList.remove('active');
+    if (count > 0) {
+        bar.classList.add('active');
+        bar.style.transform = 'translateX(-50%) translateY(0)';
+    } else {
+        bar.classList.remove('active');
+        bar.style.transform = 'translateX(-50%) translateY(8rem)';
+    }
 
     // Toggle selection mode class on grid for visual feedback
     const grid = document.getElementById('videoGrid');

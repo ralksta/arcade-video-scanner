@@ -128,16 +128,17 @@ class SQLiteStore:
         self._ensure_connection()
 
         # Check for existing pending/active job for this file
+        safe_path = self._get_safe_path(file_path)
         cursor = self._conn.execute(
             "SELECT id FROM encoding_queue WHERE file_path = ? AND status IN ('pending', 'downloading', 'encoding', 'uploading')",
-            (file_path,)
+            (safe_path,)
         )
         if cursor.fetchone():
             return None  # Already queued
 
         self._conn.execute(
             "INSERT INTO encoding_queue (file_path, status, size_bytes, target_codec, created_at) VALUES (?, 'pending', ?, ?, ?)",
-            (file_path, size_bytes, target_codec, int(time.time()))
+            (safe_path, size_bytes, target_codec, int(time.time()))
         )
         cursor = self._conn.execute("SELECT last_insert_rowid()")
         return cursor.fetchone()[0]
@@ -161,7 +162,7 @@ class SQLiteStore:
         )
         return {
             "id": job_id,
-            "file_path": row["file_path"],
+            "file_path": self._decode_safe_path(row["file_path"]),
             "size_bytes": row["size_bytes"],
             "target_codec": row["target_codec"] or "hevc",
         }
@@ -264,14 +265,17 @@ class SQLiteStore:
     def get(self, path: str) -> Optional[VideoEntry]:
         """Lookup a single entry by file_path. O(1) indexed."""
         self._ensure_connection()
+        # Handle surrogate-escaped paths by using hybrid str/bytes for SQLite
+        safe_path = self._get_safe_path(path)
         cursor = self._conn.execute(
-            "SELECT * FROM media WHERE file_path = ?", (path,)
+            "SELECT * FROM media WHERE file_path = ?", (safe_path,)
         )
         row = cursor.fetchone()
         if row:
             try:
                 return self._row_to_entry(row)
-            except Exception:
+            except Exception as e:
+                logger.error(f"⚠️ Failed to decode DB row: {e}")
                 return None
         return None
 
@@ -297,7 +301,8 @@ class SQLiteStore:
         """Delete an entry by file_path."""
         with self._write_lock:
             self._ensure_connection()
-            self._conn.execute("DELETE FROM media WHERE file_path = ?", (path,))
+            safe_path = self._get_safe_path(path)
+            self._conn.execute("DELETE FROM media WHERE file_path = ?", (safe_path,))
 
     def delete_all_photos(self) -> int:
         """Delete all entries where media_type = 'image'. Returns the number of deleted rows."""
@@ -356,6 +361,9 @@ class SQLiteStore:
 
     def _row_to_entry(self, row: sqlite3.Row) -> VideoEntry:
         """Convert a database row to a VideoEntry model."""
+        # Handle surrogate-escaped paths that were stored as bytes or strings
+        file_path = self._decode_safe_path(row["file_path"])
+
         tags = row["tags"]
         if isinstance(tags, str):
             try:
@@ -364,7 +372,7 @@ class SQLiteStore:
                 tags = []
 
         return VideoEntry(
-            file_path=row["file_path"],
+            file_path=file_path,
             size_mb=row["size_mb"] or 0.0,
             bitrate_mbps=row["bitrate_mbps"] or 0.0,
             status=row["status"] or "OK",
@@ -390,9 +398,12 @@ class SQLiteStore:
 
     def _entry_to_tuple(self, entry: VideoEntry) -> tuple:
         """Convert a VideoEntry to a tuple matching _COLUMNS order."""
+        # Handle surrogate-escaped paths by using hybrid str/bytes for SQLite
+        file_path = self._get_safe_path(entry.file_path)
+
         tags = json.dumps(entry.tags) if entry.tags else "[]"
         return (
-            entry.file_path,
+            file_path,
             entry.size_mb,
             entry.bitrate_mbps,
             entry.status,
@@ -499,6 +510,26 @@ class SQLiteStore:
 
         except Exception as e:
             print(f"❌ Migration failed: {e}")
+
+
+    def _get_safe_path(self, path: str):
+        """
+        Return a representation of the path safe for SQLite TEXT columns.
+        Uses str for valid UTF-8 (best for affinity/matching) and bytes for surrogates.
+        """
+        if not isinstance(path, str):
+            return path
+        try:
+            path.encode('utf-8', 'strict')
+            return path
+        except UnicodeEncodeError:
+            return path.encode('utf-8', 'surrogateescape')
+
+    def _decode_safe_path(self, db_path) -> str:
+        """Decode a path from the DB (could be str or bytes)."""
+        if isinstance(db_path, bytes):
+            return db_path.decode('utf-8', 'surrogateescape')
+        return str(db_path)
 
 
 # Singleton instance

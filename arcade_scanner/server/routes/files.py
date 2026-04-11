@@ -230,6 +230,7 @@ def _handle_compress(handler) -> None:
 
         audio_mode = params.get("audio", ["enhanced"])[0]
         video_mode = params.get("video", ["compress"])[0]
+        target_codec = params.get("codec", ["hevc"])[0]
         q_val = params.get("q", [None])[0]
         ss = params.get("ss", [None])[0]
         to = params.get("to", [None])[0]
@@ -254,6 +255,7 @@ def _handle_compress(handler) -> None:
             "--audio-mode", audio_mode,
             "--video-mode", video_mode,
             "--preset", encoding_preset,
+            "--codec", target_codec,
         ]
 
         if ss:

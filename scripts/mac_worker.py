@@ -226,7 +226,7 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
         # AV1 codec override: map hardware encoder → AV1 variant
         if target_codec == "av1":
             av1_map = {
-                "videotoolbox": "av1_videotoolbox",
+                "videotoolbox": "av1_software",
                 "nvenc": "av1_nvenc",
             }
             av1_key = av1_map.get(encoder_key)

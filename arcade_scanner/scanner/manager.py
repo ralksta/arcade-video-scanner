@@ -145,7 +145,7 @@ class ScannerManager:
                             entry.imported_at = int(time.time())
                         
                         # Deterministic thumb name (generated lazily on first HTTP request)
-                        file_hash = hashlib.md5(path.encode()).hexdigest()
+                        file_hash = hashlib.md5(path.encode('utf-8', 'surrogateescape')).hexdigest()
                         entry.thumb = f"thumb_{file_hash}.jpg"
 
                             

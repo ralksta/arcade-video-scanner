@@ -621,7 +621,7 @@ FOLDER_BROWSER_LEGEND_COMPONENT = """
 
 BATCH_BAR_COMPONENT = """
 <!-- Batch Action Bar -->
-<div id="batchBar" class="fixed bottom-20 md:bottom-8 left-1/2 md:left-[calc(50%+128px)] -translate-x-1/2 z-50 bg-[#0d0d14] border-2 border-arcade-cyan/30 rounded-2xl animate-glow-pulse glow-cyan px-4 py-2.5 flex items-center gap-2 transition-transform duration-300 translate-y-32">
+<div id="batchBar" class="fixed bottom-20 md:bottom-8 left-1/2 md:left-[calc(50%+128px)] z-50 bg-[#0d0d14] border-2 border-arcade-cyan/30 rounded-2xl animate-glow-pulse glow-cyan px-4 py-2.5 flex items-center gap-2 transition-transform duration-300" style="transform: translateX(-50%) translateY(8rem);">
     <!-- Active class 'translate-y-0' handled by JS -->
     
     <!-- Select All Button -->
@@ -814,6 +814,9 @@ FILTER_PANEL_COMPONENT = """
                     </button>
                     <button class="filter-chip" data-filter="codec" data-value="h264" onclick="setFilterOption('codec', 'h264')">
                         H.264
+                    </button>
+                    <button class="filter-chip" data-filter="codec" data-value="av1" onclick="setFilterOption('codec', 'av1')">
+                        AV1
                     </button>
                 </div>
             </section>
@@ -1145,6 +1148,7 @@ COLLECTION_MODAL_COMPONENT = """
                                             <button class="filter-chip" data-filter="codec" data-value="hevc" onclick="toggleSmartFilterChip(this)" aria-pressed="false">HEVC</button>
                                             <button class="filter-chip" data-filter="codec" data-value="h264" onclick="toggleSmartFilterChip(this)" aria-pressed="false">H.264</button>
                                             <button class="filter-chip" data-filter="codec" data-value="vp9" onclick="toggleSmartFilterChip(this)" aria-pressed="false">VP9</button>
+                                            <button class="filter-chip" data-filter="codec" data-value="av1" onclick="toggleSmartFilterChip(this)" aria-pressed="false">AV1</button>
                                         </div>
                                     </div>
 

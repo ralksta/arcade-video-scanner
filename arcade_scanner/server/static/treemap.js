@@ -437,6 +437,12 @@ function setupTreemapInteraction() {
                 const video = block.video;
                 const thumbUrl = `thumbnails/${video.thumb}`;
                 const isHevc = (video.codec || '').includes('hevc') || (video.codec || '').includes('h265');
+                const isAv1  = (video.codec || '').includes('av1') || (video.codec || '').includes('av01');
+                const codecLabel = isHevc
+                    ? '<span style="color:#00ffd0;font-weight:bold;">HEVC</span>'
+                    : isAv1
+                        ? '<span style="color:#c4b5fd;font-weight:bold;">AV1</span>'
+                        : (video.codec || 'Unknown').toUpperCase();
                 tooltip.innerHTML = `
                     <div style="display: flex; gap: 12px; align-items: flex-start;">
                         <img src="${thumbUrl}" style="width: 120px; height: 68px; object-fit: cover; border-radius: 4px; background: #333;" onerror="this.style.display='none'">
@@ -444,7 +450,7 @@ function setupTreemapInteraction() {
                             <strong style="display: block; margin-bottom: 6px;">${block.name}</strong>
                             Größe: ${video.Size_MB.toFixed(1)} MB<br>
                             Bitrate: ${video.Bitrate_Mbps.toFixed(1)} Mbps<br>
-                            Codec: ${isHevc ? 'HEVC' : (video.codec || 'Unknown').toUpperCase()}<br>
+                            Codec: ${codecLabel}<br>
                             Status: <span style="color: ${video.Status === 'HIGH' ? '#f59e0b' : '#10b981'}">${video.Status}</span>
                         </div>
                     </div>

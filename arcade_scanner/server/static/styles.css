@@ -1245,6 +1245,14 @@ html {
     margin-left: 8px;
 }
 
+.badge.av1 {
+    background: rgba(139, 92, 246, 0.25);
+    color: #c4b5fd;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+    margin-left: 8px;
+}
+
 .badge.optimized {
     background: var(--highlight);
     color: #000;

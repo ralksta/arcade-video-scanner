@@ -136,17 +136,16 @@ ENCODER_PROFILES = {
         'video_filter': 'format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2',
     },
     # --- AV1 Profiles (Experimental) ---
-    'av1_videotoolbox': {
-        'name': 'Apple VideoToolbox AV1 (M3/M4)',
-        'codec': 'av1_videotoolbox',
-        'quality_range': (60, 35, -10),  # q:v – higher is better
-        'quality_direction': -1,
+    'av1_software': {
+        'name': 'SVT-AV1 (Software AV1)',
+        'codec': 'libsvtav1',
+        'quality_range': (26, 40, 2),  # CRF: lower is better
+        'quality_direction': 1,
         'hwaccel_input': [],
         'encoder_args': [
-            '-allow_sw', '0',
-            '-realtime', '0',
+            '-preset', '6',
         ],
-        'quality_flag': '-q:v',
+        'quality_flag': '-crf',
         'video_filter': 'format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2',
     },
     'av1_nvenc': {
@@ -182,7 +181,9 @@ ENCODING_PRESET_MAP = {
     'qsv':     {'fast': 'veryfast','balanced': 'medium', 'best': 'slow'},
     # AV1 NVENC inherits same as nvenc
     'av1_nvenc': {'fast': 'p2',    'balanced': 'p5',    'best': 'p7'},
-    # VideoToolbox / VAAPI / AV1 VideoToolbox: no standard preset arg – handled separately
+    # SVT-AV1: presets are 1-13 (lower=slower/better)
+    'libsvtav1': {'fast': '8',     'balanced': '6',     'best': '4'},
+    # VideoToolbox / VAAPI: no standard preset arg – handled separately
 }
 
 
@@ -212,6 +213,8 @@ def apply_encoding_preset(profile: dict, preset: str) -> dict:
         encoder_family = 'libx265'
     elif codec == 'av1_nvenc':
         encoder_family = 'av1_nvenc'
+    elif codec == 'libsvtav1':
+        encoder_family = 'libsvtav1'
 
     preset_map = ENCODING_PRESET_MAP.get(encoder_family) if encoder_family else None
     target_preset = preset_map.get(preset, 'medium') if preset_map else None
@@ -549,14 +552,18 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
         # -q:v (quality VBR) and -b:v (bitrate-controlled VBR) are MUTUALLY EXCLUSIVE.
         # When both are present, VideoToolbox ignores -b:v and uses quality mode only.
         # → Only add -q:v when we do NOT have a target bitrate; otherwise use pure -b:v mode.
-        if not (target_bitrate_kbps and target_bitrate_kbps > 0):
+        # SVT-AV1 crashes when combining -crf (rc=0) with -b:v unless specifically configured.
+        # It relies entirely on CRF + maxrate to cap sizes accurately.
+        is_svtav1 = profile.get('codec') == 'libsvtav1'
+
+        if is_svtav1 or not (target_bitrate_kbps and target_bitrate_kbps > 0):
             cmd.extend([profile['quality_flag'], str(quality_value)])
 
         cmd.extend(['-vf', profile['video_filter']])
         
         # Bitrate-controlled VBR: -b:v sets the average target, -maxrate caps the peak.
         # This is the PRIMARY size control mechanism when target_bitrate_kbps is set.
-        if target_bitrate_kbps and target_bitrate_kbps > 0:
+        if target_bitrate_kbps and target_bitrate_kbps > 0 and not is_svtav1:
             cmd.extend(['-b:v', f'{int(target_bitrate_kbps)}k'])
         
         # Peak limiter: caps instantaneous bitrate spikes above the target average.
@@ -580,8 +587,13 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
         audio_filters = 'aformat=channel_layouts=stereo,highpass=f=100,agate=threshold=-55dB:range=0.05:ratio=2,loudnorm=I=-16:TP=-1.5:LRA=11'
         cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-af', audio_filters])
 
+    codec_name = profile.get('codec', '')
+    is_av1 = 'av1' in codec_name
+    
+    tag = 'av01' if is_av1 else 'hvc1'
+
     cmd.extend([
-        '-tag:v', 'hvc1',
+        '-tag:v', tag,
         '-movflags', '+faststart+delay_moov',  # delay_moov: prevents partial/corrupt moov on aborted encodes
         '-fps_mode', 'vfr',                    # Preserve source timestamps; no dup/drop (any VFR source)
         # Explicit BT.709 color metadata - ensures correct rendering in browsers/players
@@ -764,8 +776,14 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     # Override with manual quality if provided (use linear search from that point)
     use_binary_search = q_override is None
     if q_override is not None:
-        print(f"{Y}Manual Start Quality:{NC} Q={q_override} (linear search)")
-        quality = q_override
+        min_q, max_q = min(start_q, end_q), max(start_q, end_q)
+        if q_override < min_q or q_override > max_q:
+            print(f"{Y}Manual Quality {q_override} out of bounds [{min_q}-{max_q}], falling back to smart binary search.{NC}")
+            q_override = None
+            use_binary_search = True
+        else:
+            print(f"{Y}Manual Start Quality:{NC} Q={q_override} (linear search)")
+            quality = q_override
 
     file_start_time = time.time()
 
@@ -1470,7 +1488,7 @@ def main():
     # AV1 codec override: map hardware encoder → AV1 variant
     if getattr(args, 'codec', 'hevc') == 'av1':
         av1_map = {
-            'videotoolbox': 'av1_videotoolbox',
+            'videotoolbox': 'av1_software',
             'nvenc': 'av1_nvenc',
         }
         av1_key = av1_map.get(encoder_key)

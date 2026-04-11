@@ -244,6 +244,7 @@ function createVideoCard(v) {
     container.setAttribute('data-path', v.FilePath); // Keep this for JS logic
 
     const isHevc = (v.codec || '').includes('hevc') || (v.codec || '').includes('h265');
+    const isAv1  = (v.codec || '').includes('av1') || (v.codec || '').includes('av01');
     const barW = Math.min(100, ((v.Bitrate_Mbps || 0) / 25) * 100);
     const fileName = v.FilePath.split(/[\\\\/]/).pop();
     const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
@@ -302,10 +303,10 @@ function createVideoCard(v) {
                  </button>` : ''}
              </div>
              
-             <!-- Badges -->
              <div class="absolute bottom-2 left-2 flex gap-1 flex-wrap pr-12 pointer-events-none">
                  <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-black/60 text-white backdrop-blur border border-white/10">${v.Status}</span>
                  ${isHevc ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-arcade-cyan/20 text-arcade-cyan backdrop-blur border border-arcade-cyan/30">HEVC</span>' : ''}
+                 ${isAv1  ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-500/25 text-violet-300 backdrop-blur border border-violet-500/40">AV1</span>' : ''}
                  ${fileName.includes('_opt.') ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400 backdrop-blur border border-green-500/30">OPT</span>' : ''}
              </div>
              
