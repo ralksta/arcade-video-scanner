@@ -401,6 +401,7 @@ class SQLiteStore:
             thumb=row["thumb"] or "",
             imported_at=row["imported_at"] or 0,
             mtime=row["mtime"] or 0,
+            original_path=row["original_path"] or "",
         )
 
     def _entry_to_tuple(self, entry: VideoEntry) -> tuple:
@@ -432,6 +433,7 @@ class SQLiteStore:
             entry.thumb or "",
             entry.imported_at or 0,
             entry.mtime or 0,
+            entry.original_path or "",
         )
 
     def _asset_to_video_entry(self, entry) -> VideoEntry:
@@ -459,6 +461,7 @@ class SQLiteStore:
             thumb=entry.thumb,
             imported_at=entry.imported_at,
             mtime=entry.mtime,
+            original_path=entry.original_path,
         )
 
     def _migrate_from_json(self):
