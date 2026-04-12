@@ -621,13 +621,13 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     if not input_path.exists():
         return (False, 0)
 
-    # Skip already optimized or marked files (UNLESS trimming is active, then we allow re-processing)
-    if not is_trim and ("_opt.mp4" in input_path.name or "NO-OPT" in input_path.name):
-        print(f"{Y}Skipping:{NC} {input_path.name} (already optimized marker)")
+    # Skip already marked files (UNLESS trimming is active, then we allow re-processing)
+    if not is_trim and ("NO-OPT" in input_path.name):
+        print(f"{Y}Skipping:{NC} {input_path.name} (NO-OPT marker found)")
         batch_stats['skipped'] += 1
         last_encode_result['filename'] = input_path.name
         last_encode_result['status'] = 'skipped'
-        last_encode_result['reason'] = 'Already optimized marker'
+        last_encode_result['reason'] = 'NO-OPT marker found'
         last_encode_result['duration'] = 0
         return (False, 0)
 
