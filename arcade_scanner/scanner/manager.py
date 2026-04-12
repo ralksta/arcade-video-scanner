@@ -114,6 +114,7 @@ class ScannerManager:
                 if needs_update or force_rescan:
                     if progress_callback:
                         progress_callback(f"Analyzing {os.path.basename(path)}")
+                    print(f"🔍 Analyzing: {os.path.basename(path)}")
                     
                     # 3. Probe using Selected Inspector
                     entry: Optional[MediaAsset] = None

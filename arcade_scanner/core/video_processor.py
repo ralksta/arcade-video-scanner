@@ -47,15 +47,17 @@ def create_thumbnail(video_path: str) -> str:
     thumb_path = os.path.join(config.thumb_dir, thumb_name)
     
     if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+        print(f"🖼️  Generating thumbnail: {os.path.basename(video_path)}")
         # Check if image (Image processing without seeking)
         is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
         
         if is_image:
              vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
+             cmd = ["ffmpeg", "-i", video_path, "-vf", vf_filter, thumb_path, "-y", "-loglevel", "error"]
              try:
                 # Use os.fsencode to handle surrogates safely in subprocess
                 encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
-                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, timeout=60)
                 if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
                     return thumb_name
              except Exception as e:
@@ -88,12 +90,12 @@ def create_thumbnail(video_path: str) -> str:
                 "-i", video_path,
                 "-vframes", "1", "-q:v", "4",
                 "-vf", vf_filter,
-                thumb_path, "-y", "-loglevel", "quiet"
+                thumb_path, "-y", "-loglevel", "error"
             ])
             try:
                 # Use os.fsencode to handle surrogates safely in subprocess
                 encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
-                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, timeout=60)
                 return os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0
             except Exception as e:
                 logger.warning("Thumbnail extract failed at %s (scene_detect=%s) for %s: %s", seek_time, use_scene_detect, video_path, e)
