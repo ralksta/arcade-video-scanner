@@ -74,7 +74,7 @@ class ScannerManager:
         # Concurrency: Using self.sem_video and self.sem_image defined in __init__
         pending_tasks = set()
 
-        async def _process_path(path: str):
+        async def _process_path(path: str, current_idx: int = 0, total_count: int = 0):
             # 1. Lane Selection
             inspector = None
             sem = None
@@ -112,19 +112,27 @@ class ScannerManager:
                         print(f"📊 Size changed: {os.path.basename(path)} ({cached_entry.size_mb:.1f}MB → {current_size_mb:.1f}MB)")
 
                 if needs_update or force_rescan:
+                    progress_prefix = f"[{current_idx}/{total_count}] " if total_count > 0 else ""
+                    
                     if progress_callback:
                         progress_callback(f"Analyzing {os.path.basename(path)}")
-                    print(f"🔍 Analyzing: {os.path.basename(path)}")
+                    
+                    # Log based on verbose setting
+                    if config.settings.verbose_scanning:
+                        print(f"🔍 {progress_prefix}Analyzing: {os.path.basename(path)}")
+                    elif processed_count % 50 == 0 or current_idx == total_count:
+                        print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
                     
                     # 3. Probe using Selected Inspector
                     entry: Optional[MediaAsset] = None
                     try:
                         entry = await inspector.inspect(path)
                     except Exception as e:
-                        print(f"❌ Inspect failed for {path}: {e}")
+                        print(f"❌ {progress_prefix}Inspect failed for {path}: {e}")
                         entry = None
                     
                     if entry:
+                        # ...
                         # Apply business logic (Bitrate Threshold)
                         params_bitrate = config.settings.bitrate_threshold_kbps
                         if entry.bitrate_mbps * 1000 > params_bitrate and entry.status == "OK":
@@ -160,9 +168,7 @@ class ScannerManager:
                         # Upsert AFTER populating assets
                         db.upsert(entry)
                         
-                        nonlocal processed_count
                         nonlocal last_save_time
-                        processed_count += 1
                         
                         # Quick Save periodically (every 500 for speed)
                         # Optimized to avoid quadratic write overhead:
@@ -175,18 +181,27 @@ class ScannerManager:
 
         try:
             # 2. Discovery Loop
+            print("🔍 Walking directories to count files...")
+            discovered_paths = []
             async for file_path in fs_scanner.scan_directories(config.active_scan_targets):
                 if self._stop_event.is_set():
                     break
-                    
+                discovered_paths.append(file_path)
+            
+            total_discovered = len(discovered_paths)
+            if total_discovered > 0:
+                print(f"📂 Found {total_discovered} files. Starting processing...")
+            
+            for idx, file_path in enumerate(discovered_paths, 1):
+                if self._stop_event.is_set():
+                    break
                 found_paths.add(file_path)
                 
                 # Spawn task
-                task = asyncio.create_task(_process_path(file_path))
+                task = asyncio.create_task(_process_path(file_path, idx, total_discovered))
                 pending_tasks.add(task)
                 
                 # Moderate task list size: 500 cap reduces asyncio overhead at scale.
-                # 50ms timeout is long enough to let tasks drain without busy-waiting.
                 if len(pending_tasks) > 500:
                     done, pending_tasks = await asyncio.wait(
                         pending_tasks, timeout=0.05, return_when=asyncio.FIRST_COMPLETED

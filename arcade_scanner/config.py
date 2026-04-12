@@ -114,10 +114,10 @@ DEFAULT_SETTINGS_JSON = {
     "encoding_preset": "balanced",
     "_comment_precompute_thumbnails": "Generate thumbnails immediately during scan (prevents performance lag during scrolling).",
     "precompute_thumbnails": True,
-    "_comment_review_mode": "If enabled, optimized files are moved to a review folder instead of replacing originals.",
-    "enable_review_mode": False,
     "_comment_review_dir": "Fixed location for review files. If empty, uses the default arcade_data/review.",
-    "review_dir": ""
+    "review_dir": "",
+    "_comment_verbose_scanning": "Show individual file analysis logs during scan. If disabled, only shows progress summary.",
+    "verbose_scanning": false
 }
 
 # ==============================================================================
@@ -153,6 +153,7 @@ class AppSettings(BaseSettings):
     precompute_thumbnails: bool = Field(True)
     enable_review_mode: bool = Field(False)
     review_dir: str = Field("")
+    verbose_scanning: bool = Field(False)
 
     model_config = ConfigDict(
         env_prefix="ARCADE_",

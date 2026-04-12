@@ -1703,6 +1703,26 @@ SETTINGS_MODAL_COMPONENT = """
                         </div>
                         <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsExcludes" placeholder="/Volumes/Backup" rows="2" oninput="markSettingsUnsaved()"></textarea>
                     </section>
+
+                    <section class="space-y-3">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-gray-400">notes</span>
+                                Logging
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Control terminal output density during scans.</p>
+                        </div>
+                        <label class="flex items-center gap-3 cursor-pointer select-none group bg-black/30 p-4 rounded-xl border border-white/5 hover:border-arcade-cyan/30 transition-all">
+                            <div class="relative inline-flex items-center">
+                                <input type="checkbox" id="settingsVerboseScanning" class="sr-only peer" onchange="markSettingsUnsaved()">
+                                <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-arcade-cyan/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-arcade-cyan"></div>
+                            </div>
+                            <div>
+                                <span class="text-white font-medium">Verbose Scanning Logs</span>
+                                <p class="text-xs text-gray-500">Show individual filenames. Keep disabled for cleaner summaries.</p>
+                            </div>
+                        </label>
+                    </section>
                 </div>
                 
                 <!-- PERFORMANCE SECTION -->

@@ -49,6 +49,9 @@ async function openSettings() {
         const precomputeThumbsCheckbox = document.getElementById('settingsPrecomputeThumbs');
         if (precomputeThumbsCheckbox) precomputeThumbsCheckbox.checked = data.precompute_thumbnails !== false;
 
+        const verboseScanningCheckbox = document.getElementById('settingsVerboseScanning');
+        if (verboseScanningCheckbox) verboseScanningCheckbox.checked = data.verbose_scanning === true;
+
 
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
@@ -139,7 +142,8 @@ async function saveSettings() {
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
         encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
         theme: document.getElementById('settingsTheme').value || 'arcade',
-        precompute_thumbnails: document.getElementById('settingsPrecomputeThumbs')?.checked ?? true
+        precompute_thumbnails: document.getElementById('settingsPrecomputeThumbs')?.checked ?? true,
+        verbose_scanning: document.getElementById('settingsVerboseScanning')?.checked || false
     };
 
     try {
