@@ -75,10 +75,10 @@ class AsyncFileSystem:
             asyncio.create_task(self._walker_worker(abs_target, queue))
 
             while True:
-                path = await queue.get()
-                if path is None:
+                item = await queue.get()
+                if item is None:
                     break
-                yield path
+                yield item
         
         if self._skipped_dirs > 0:
             print(f"\n⚡ Skipped {self._skipped_dirs} unchanged directories (incremental scan)")
@@ -126,7 +126,7 @@ class AsyncFileSystem:
                             continue
                         # Blocking put provides natural backpressure on the bounded queue
                         asyncio.run_coroutine_threadsafe(
-                            queue.put(full_path), loop
+                            queue.put((full_path, dir_changed)), loop
                         ).result()
             except Exception as e:
                 print(f"❌ Error walking {root_dir}: {e}")

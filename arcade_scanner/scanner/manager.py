@@ -74,7 +74,7 @@ class ScannerManager:
         # Concurrency: Using self.sem_video and self.sem_image defined in __init__
         pending_tasks = set()
 
-        async def _process_path(path: str, current_idx: int = 0, total_count: int = 0):
+        async def _process_path(path: str, dir_changed: bool, current_idx: int = 0, total_count: int = 0):
             # 1. Lane Selection
             inspector = None
             sem = None
@@ -92,24 +92,36 @@ class ScannerManager:
                 if self._stop_event.is_set():
                     return
                 
-                # Single stat call — reuse for cache check + metadata population
+                # Check cache state
+                cached_entry = db.get(path)
+                needs_update = False
+                
+                # Fast Path: If dir hasn't changed AND we have it in DB, we can skip os.stat
+                # This is "Ultra Fast" because it avoids the filesystem overhead.
+                if not dir_changed and cached_entry and not force_rescan:
+                    # File exists and its parent dir hasn't changed structure-wise.
+                    # We still track it as found_paths to avoid orphans.
+                    return
+
+                # Normal Path: Directory changed or new file - we need to stat it
                 try:
                     file_stat = await asyncio.to_thread(os.stat, path)
                 except OSError:
                     return  # file gone
-                
-                # Check cache state
-                cached_entry = db.get(path)
-                needs_update = False
+
                 if not cached_entry:
                     needs_update = True
                 else:
-                    # Check if file size changed significantly (more than 10MB difference)
-                    # This catches files that were optimized/replaced
+                    # Strict validation: mtime or size change
                     current_size_mb = file_stat.st_size / (1024 * 1024)
-                    if abs(current_size_mb - cached_entry.size_mb) > 10:  # 10MB threshold
+                    mtime_changed = int(file_stat.st_mtime) != cached_entry.mtime
+                    size_changed = abs(current_size_mb - cached_entry.size_mb) > 0.01
+
+                    if mtime_changed or size_changed:
                         needs_update = True
-                        print(f"📊 Size changed: {os.path.basename(path)} ({cached_entry.size_mb:.1f}MB → {current_size_mb:.1f}MB)")
+                        reason = "MTime changed" if mtime_changed else "Size changed"
+                        if config.settings.verbose_scanning:
+                            print(f"📊 {reason}: {os.path.basename(path)}")
 
                 if needs_update or force_rescan:
                     progress_prefix = f"[{current_idx}/{total_count}] " if total_count > 0 else ""
@@ -120,8 +132,10 @@ class ScannerManager:
                     # Log based on verbose setting
                     if config.settings.verbose_scanning:
                         print(f"🔍 {progress_prefix}Analyzing: {os.path.basename(path)}")
-                    elif processed_count % 50 == 0 or current_idx == total_count:
-                        print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
+                    elif (processed_count > 0 and processed_count % 50 == 0) or current_idx == total_count:
+                        # Only print indexing if we actually found something new/updated and processed it
+                        if processed_count > 0:
+                            print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
                     
                     # 3. Probe using Selected Inspector
                     entry: Optional[MediaAsset] = None
@@ -182,23 +196,23 @@ class ScannerManager:
         try:
             # 2. Discovery Loop
             print("🔍 Walking directories to count files...")
-            discovered_paths = []
-            async for file_path in fs_scanner.scan_directories(config.active_scan_targets):
+            discovered_items = []  # List of (path, dir_changed)
+            async for item in fs_scanner.scan_directories(config.active_scan_targets):
                 if self._stop_event.is_set():
                     break
-                discovered_paths.append(file_path)
-            
-            total_discovered = len(discovered_paths)
+                discovered_items.append(item)
+            discovered_paths = [path for path, _ in discovered_items]
+            total_discovered = len(discovered_items)
             if total_discovered > 0:
                 print(f"📂 Found {total_discovered} files. Starting processing...")
             
-            for idx, file_path in enumerate(discovered_paths, 1):
+            for idx, (file_path, dir_changed) in enumerate(discovered_items, 1):
                 if self._stop_event.is_set():
                     break
                 found_paths.add(file_path)
                 
                 # Spawn task
-                task = asyncio.create_task(_process_path(file_path, idx, total_discovered))
+                task = asyncio.create_task(_process_path(file_path, dir_changed, idx, total_discovered))
                 pending_tasks.add(task)
                 
                 # Moderate task list size: 500 cap reduces asyncio overhead at scale.
