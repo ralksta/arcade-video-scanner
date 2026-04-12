@@ -579,7 +579,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     # Optimized: Check path BEFORE serialization
                     for entry in all_entries:
                         v_path = os.path.abspath(entry.file_path)
-                        if any(v_path.startswith(t) for t in user_targets):
+                        # Always show items in Review mode, regardless of scan targets
+                        if entry.status == "REVIEW" or any(v_path.startswith(t) for t in user_targets):
                              filtered_videos.append(entry.model_dump(by_alias=True))
                 
                 self.send_response(200)

@@ -38,6 +38,7 @@ from arcade_scanner.server.response_helpers import (
     send_json,
     require_auth,
 )
+from arcade_scanner.server.api_handler import _media_cache
 
 
 # ---------------------------------------------------------------------------
@@ -446,8 +447,15 @@ def handle_post(handler) -> bool:
 
             if config.settings.enable_review_mode:
                 # Review Mode: Move both files to a dedicated folder
-                review_job_dir = os.path.join(config.review_dir, f"job_{job_id}_{orig_stem}")
-                os.makedirs(review_job_dir, exist_ok=True)
+                # Smart Storage: Try to use .review folder next to original file to save space on system disk
+                review_job_dir = os.path.join(orig_dir, ".review", f"job_{job_id}_{orig_stem}")
+                try:
+                    os.makedirs(review_job_dir, exist_ok=True)
+                except Exception as e:
+                    # Fallback to global review directory if media directory is read-only
+                    print(f"⚠️ Could not create relative review dir ({e}), falling back to global {config.review_dir}")
+                    review_job_dir = os.path.join(config.review_dir, f"job_{job_id}_{orig_stem}")
+                    os.makedirs(review_job_dir, exist_ok=True)
                 
                 target_orig_path = os.path.join(review_job_dir, f"{orig_stem}_original{orig_ext}")
                 opt_path = os.path.join(review_job_dir, f"{orig_stem}_optimized.mp4")
@@ -518,6 +526,9 @@ def handle_post(handler) -> bool:
                 result_message=f"Optimized: {opt_size/(1024*1024):.1f}MB (saved {saved/(1024*1024):.1f}MB)"
             )
             print(f"✅ Upload received for job {job_id}: {os.path.basename(opt_path)} ({opt_size/(1024*1024):.1f} MB)")
+            
+            # Flush media cache so UI sees new entries (REVIEW status) immediately
+            _media_cache.invalidate()
 
             # Report nach Upload neu generieren
             try:
