@@ -43,6 +43,7 @@ CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
 REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
 SETTINGS_FILE = os.path.join(HIDDEN_DATA_DIR, "settings.json")
 DUPLICATES_CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "duplicates_cache.json")
+REVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "review")
 STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # Security Constants
@@ -110,7 +111,13 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_image_scanning": "Include image files in the scanning process.",
     "enable_image_scanning": False,
     "_comment_encoding_preset": "Encoding speed/quality trade-off: fast (ultrafast), balanced (medium), best (slow).",
-    "encoding_preset": "balanced"
+    "encoding_preset": "balanced",
+    "_comment_precompute_thumbnails": "Generate thumbnails immediately during scan (prevents performance lag during scrolling).",
+    "precompute_thumbnails": True,
+    "_comment_review_mode": "If enabled, optimized files are moved to a review folder instead of replacing originals.",
+    "enable_review_mode": False,
+    "_comment_review_dir": "Fixed location for review files. If empty, uses the default arcade_data/review.",
+    "review_dir": ""
 }
 
 # ==============================================================================
@@ -143,6 +150,9 @@ class AppSettings(BaseSettings):
     is_docker: bool = Field(False)
     first_run_completed: bool = Field(False)
     scan_images: bool = Field(False)
+    precompute_thumbnails: bool = Field(True)
+    enable_review_mode: bool = Field(False)
+    review_dir: str = Field("")
 
     model_config = ConfigDict(
         env_prefix="ARCADE_",
@@ -159,7 +169,7 @@ class ConfigManager:
         self.settings = self._load_settings()
 
     def _ensure_directories(self):
-        for d in [HIDDEN_DATA_DIR, THUMB_DIR]:
+        for d in [HIDDEN_DATA_DIR, THUMB_DIR, REVIEW_DIR]:
             if not os.path.exists(d):
                 os.makedirs(d)
 
@@ -315,6 +325,13 @@ class ConfigManager:
     @property
     def hidden_data_dir(self) -> str:
         return HIDDEN_DATA_DIR
+
+    @property
+    def review_dir(self) -> str:
+        # User dynamic setting overrides the default constant
+        if self.settings.review_dir:
+            return self.settings.review_dir
+        return REVIEW_DIR
 
 # Global Instance
 config = ConfigManager()

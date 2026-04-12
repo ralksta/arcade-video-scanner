@@ -130,10 +130,11 @@ function filterAndSort(scrollToTop = false) {
             const map = new Map();
 
             // 1. Map all files by stem (filename without extension)
+            // We strip _original and _optimized suffixes for better mapping
             window.ALL_VIDEOS.forEach(v => {
                 const fileName = v.FilePath.split(/[\\/]/).pop();
                 const lastDot = fileName.lastIndexOf('.');
-                const stem = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
+                let stem = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
 
                 // Normalize path to directory to ensure we only pair in same folder
                 const lastSlash = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
@@ -143,20 +144,35 @@ function filterAndSort(scrollToTop = false) {
                 map.set(key, v);
             });
 
-            // 2. Find pairs (files ending in _opt or _trim)
+            // 2. Find pairs
             map.forEach((vOpt, key) => {
-                if (key.endsWith('_opt') || key.endsWith('_trim')) {
-                    const suffixLen = key.endsWith('_opt') ? 4 : 5;
-                    const baseKey = key.substring(0, key.length - suffixLen);
+                let isOpt = false;
+                let suffixLen = 0;
+                
+                if (key.endsWith('_optimized')) {
+                    isOpt = true; suffixLen = 10;
+                } else if (key.endsWith('_opt')) {
+                    isOpt = true; suffixLen = 4;
+                } else if (key.endsWith('_trim')) {
+                    isOpt = true; suffixLen = 5;
+                }
 
-                    if (map.has(baseKey)) {
-                        const vOrig = map.get(baseKey);
+                if (isOpt) {
+                    const baseKey = key.substring(0, key.length - suffixLen);
+                    
+                    // Look for original (either exact stem or stem + _original)
+                    let vOrig = map.get(baseKey);
+                    if (!vOrig) vOrig = map.get(baseKey + '_original');
+
+                    if (vOrig) {
                         pairs.push({
                             type: 'pair',
                             original: vOrig,
                             optimized: vOpt,
                             diff: (vOpt.Size_MB || 0) - (vOrig.Size_MB || 0)
                         });
+                        vCount++;
+                        tSize += (vOrig.Size_MB || 0); // Count original size for stats
                     }
                 }
             });

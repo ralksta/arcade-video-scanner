@@ -1797,6 +1797,27 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                <span class="material-icons text-lg text-arcade-cyan">speed</span>
+                                Thumbnail Pre-computation
+                            </h3>
+                            <p class="text-sm text-gray-500 mt-1">Generate thumbnails during scan to prevent lag while scrolling.</p>
+                        </div>
+                        
+                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Pre-compute Thumbnails</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Highly recommended for NAS users.</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingsPrecomputeThumbs" class="sr-only peer" onchange="markSettingsUnsaved()">
+                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-arcade-cyan"></div>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-base font-medium text-white flex items-center gap-2">
                                 <span class="material-icons text-lg text-arcade-gold">tune</span>
                                 Encoding Quality
                             </h3>

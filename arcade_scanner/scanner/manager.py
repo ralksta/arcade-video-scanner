@@ -144,9 +144,16 @@ class ScannerManager:
                         if entry.imported_at == 0:
                             entry.imported_at = int(time.time())
                         
-                        # Deterministic thumb name (generated lazily on first HTTP request)
+                        # Deterministic thumb name
                         file_hash = hashlib.md5(path.encode('utf-8', 'surrogateescape')).hexdigest()
                         entry.thumb = f"thumb_{file_hash}.jpg"
+
+                        # Pre-generate thumbnail during scan if enabled
+                        if config.settings.precompute_thumbnails:
+                            thumb_path = os.path.join(config.thumb_dir, entry.thumb)
+                            if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+                                from ..core.video_processor import create_thumbnail
+                                await asyncio.to_thread(create_thumbnail, path)
 
                             
                         # Upsert AFTER populating assets

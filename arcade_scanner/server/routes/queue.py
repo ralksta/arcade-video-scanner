@@ -31,6 +31,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
+from arcade_scanner.config import config
 from arcade_scanner.database import db
 from arcade_scanner.security import sanitize_path, SecurityError
 from arcade_scanner.server.response_helpers import (
@@ -440,21 +441,76 @@ def handle_post(handler) -> bool:
 
             original_path = job["file_path"]
             orig_stem = Path(original_path).stem
+            orig_ext = Path(original_path).suffix
             orig_dir = os.path.dirname(original_path)
-            opt_path = os.path.join(orig_dir, f"{orig_stem}_opt.mp4")
 
-            content_len = int(handler.headers.get("Content-Length", 0))
-            with open(opt_path, "wb") as out:
-                remaining = content_len
-                while remaining > 0:
-                    chunk = handler.rfile.read(min(8192, remaining))
-                    if not chunk:
-                        break
-                    out.write(chunk)
-                    remaining -= len(chunk)
+            if config.settings.enable_review_mode:
+                # Review Mode: Move both files to a dedicated folder
+                review_job_dir = os.path.join(config.review_dir, f"job_{job_id}_{orig_stem}")
+                os.makedirs(review_job_dir, exist_ok=True)
+                
+                target_orig_path = os.path.join(review_job_dir, f"{orig_stem}_original{orig_ext}")
+                opt_path = os.path.join(review_job_dir, f"{orig_stem}_optimized.mp4")
+
+                # 1. Save uploaded optimized file
+                content_len = int(handler.headers.get("Content-Length", 0))
+                with open(opt_path, "wb") as out:
+                    remaining = content_len
+                    while remaining > 0:
+                        chunk = handler.rfile.read(min(8192, remaining))
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                        remaining -= len(chunk)
+
+                # 2. Move original file
+                if os.path.exists(original_path):
+                    import shutil
+                    shutil.move(original_path, target_orig_path)
+                    
+                    # 3. Update Database for original
+                    # We need to preserve metadata, so we get the old entry, update it, and upsert
+                    orig_entry = db.get(original_path)
+                    if orig_entry:
+                        old_entry_dict = orig_entry.model_dump(by_alias=True)
+                        # Remove old record (since path is PK)
+                        db.remove(original_path)
+                        
+                        # Update fields
+                        old_entry_dict["FilePath"] = target_orig_path
+                        old_entry_dict["Status"] = "REVIEW"
+                        old_entry_dict["OriginalPath"] = original_path
+                        
+                        from arcade_scanner.models.video_entry import VideoEntry
+                        db.upsert(VideoEntry(**old_entry_dict))
+
+                        # 4. Create database entry for optimized file
+                        # We use the original entry as a template for metadata
+                        opt_entry_dict = old_entry_dict.copy()
+                        opt_entry_dict["FilePath"] = opt_path
+                        opt_entry_dict["Size_MB"] = os.path.getsize(opt_path) / (1024 * 1024)
+                        opt_entry_dict["Status"] = "REVIEW"
+                        # Reset some props for the optimized version
+                        opt_entry_dict["Bitrate_Mbps"] = 0 # Will be updated by scanner/analyzed later
+                        
+                        db.upsert(VideoEntry(**opt_entry_dict))
+                else:
+                    print(f"⚠️ Original file not found at {original_path}, skipping move.")
+            else:
+                # Standard Mode: Overwrite in source directory
+                opt_path = os.path.join(orig_dir, f"{orig_stem}_opt.mp4")
+                content_len = int(handler.headers.get("Content-Length", 0))
+                with open(opt_path, "wb") as out:
+                    remaining = content_len
+                    while remaining > 0:
+                        chunk = handler.rfile.read(min(8192, remaining))
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                        remaining -= len(chunk)
 
             opt_size = os.path.getsize(opt_path)
-            orig_size = os.path.getsize(original_path) if os.path.exists(original_path) else 0
+            orig_size = os.path.getsize(original_path) if not config.settings.enable_review_mode and os.path.exists(original_path) else (os.path.getsize(target_orig_path) if config.settings.enable_review_mode and os.path.exists(target_orig_path) else 0)
             saved = orig_size - opt_size
 
             db.update_job_status(

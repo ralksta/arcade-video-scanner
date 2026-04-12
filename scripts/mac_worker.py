@@ -308,7 +308,28 @@ def _cleanup(*paths):
             pass
 
 
+def load_env(env_path=".env"):
+    """Minimal .env loader to avoid dependencies."""
+    if not os.path.exists(env_path):
+        return
+    try:
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except Exception as e:
+        print(f"⚠ Failed to load .env: {e}")
+
+
 def main():
+    # Load .env if it exists in current dir, script dir, or project root
+    load_env()
+    load_env(str(SCRIPT_DIR / ".env"))
+    load_env(str(SCRIPT_DIR.parent / ".env"))
+
     parser = argparse.ArgumentParser(
         description="Mac Encoding Worker — processes remote encoding queue jobs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -316,11 +337,24 @@ def main():
 Examples:
   python3 mac_worker.py --server http://192.168.1.100:8000 --user admin --password secret
   python3 mac_worker.py --server http://nas:8000 --poll-interval 60
+
+Environment Variables:
+  ARCADE_SERVER, ARCADE_USER, ARCADE_PASSWORD
         """
     )
-    parser.add_argument("--server", required=True, help="Arcade server URL (e.g. http://192.168.1.100:8000)")
-    parser.add_argument("--user", default="", help="Username for authentication")
-    parser.add_argument("--password", default="", help="Password for authentication")
+    
+    env_server = os.environ.get("ARCADE_SERVER")
+
+    parser.add_argument("--server", 
+                       default=env_server,
+                       required=not env_server, 
+                       help="Arcade server URL (e.g. http://192.168.1.100:8000)")
+    parser.add_argument("--user", 
+                       default=os.environ.get("ARCADE_USER", ""), 
+                       help="Username for authentication")
+    parser.add_argument("--password", 
+                       default=os.environ.get("ARCADE_PASSWORD", ""), 
+                       help="Password for authentication")
     parser.add_argument("--poll-interval", type=int, default=30, help="Seconds between polls (default: 30)")
     parser.add_argument("--work-dir", default=os.path.expanduser("~/encoding-queue"),
                        help="Temp directory for downloads (default: ~/encoding-queue)")

@@ -50,6 +50,7 @@ _COLUMNS = [
     ("thumb", "TEXT DEFAULT ''"),
     ("imported_at", "INTEGER DEFAULT 0"),
     ("mtime", "INTEGER DEFAULT 0"),
+    ("original_path", "TEXT DEFAULT ''"),
 ]
 
 
@@ -96,6 +97,12 @@ class SQLiteStore:
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_mtime ON media(mtime)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_favorite ON media(favorite)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_vaulted ON media(vaulted)")
+
+        # Migration: Add original_path to media table if it doesn't exist
+        try:
+            self._conn.execute("ALTER TABLE media ADD COLUMN original_path TEXT DEFAULT ''")
+        except Exception:
+            pass # Already exists
 
         # Encoding queue for remote optimization
         self._conn.execute("""

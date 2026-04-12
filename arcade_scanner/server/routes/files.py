@@ -299,9 +299,12 @@ def _handle_keep_optimized(handler) -> None:
         return
 
     try:
+        import shutil
+        from arcade_scanner.models.video_entry import VideoEntry # lazy
+        
         params = parse_qs(urlparse(handler.path).query)
-        original_path = params.get("original", [None])[0]
-        optimized_path = params.get("optimized", [None])[0]
+        original_path = unquote(params.get("original", [None])[0])
+        optimized_path = unquote(params.get("optimized", [None])[0])
 
         print(f"🔄 keep_optimized: original={original_path}")
         print(f"🔄 keep_optimized: optimized={optimized_path}")
@@ -311,18 +314,53 @@ def _handle_keep_optimized(handler) -> None:
             opt_abs = os.path.abspath(optimized_path)
 
             if os.path.exists(opt_abs):
-                orig_path_obj = Path(orig_abs)
-                opt_path_obj = Path(opt_abs)
-                new_path = orig_path_obj.with_suffix(opt_path_obj.suffix)
-
-                if os.path.exists(orig_abs):
-                    os.remove(orig_abs)
-
-                os.rename(opt_abs, new_path)
-
-                db.remove(opt_abs)
-                if orig_abs != str(new_path):
+                # Review Mode Check
+                entry_orig = db.get(orig_abs)
+                if entry_orig and entry_orig.status == "REVIEW" and entry_orig.original_path:
+                    # REVIEW MODE: Restoring to original path on disk
+                    final_dest = entry_orig.original_path
+                    print(f"🚀 Review Mode Keep: Moving {opt_abs} to {final_dest}")
+                    
+                    os.makedirs(os.path.dirname(final_dest), exist_ok=True)
+                    shutil.move(opt_abs, final_dest)
+                    
+                    # Cleanup review versions
+                    if os.path.exists(orig_abs):
+                        os.remove(orig_abs)
+                    
+                    # DB Update: Use optimized metadata but destination path
+                    entry_opt = db.get(opt_abs)
+                    if entry_opt:
+                        opt_dict = entry_opt.model_dump(by_alias=True)
+                        opt_dict["FilePath"] = final_dest
+                        opt_dict["Status"] = "OK"
+                        opt_dict["OriginalPath"] = None
+                        db.upsert(VideoEntry(**opt_dict))
+                    
+                    db.remove(opt_abs)
                     db.remove(orig_abs)
+                    
+                    # Cleanup empty review directory
+                    try:
+                        job_dir = os.path.dirname(orig_abs)
+                        if os.path.exists(job_dir) and not os.listdir(job_dir):
+                            os.rmdir(job_dir)
+                    except Exception as e:
+                        print(f"⚠️ Cleanup failed: {e}")
+                else:
+                    # STANDARD MODE: Legacy overwrite
+                    orig_path_obj = Path(orig_abs)
+                    opt_path_obj = Path(opt_abs)
+                    new_path = orig_path_obj.with_suffix(opt_path_obj.suffix)
+
+                    if os.path.exists(orig_abs):
+                        os.remove(orig_abs)
+
+                    os.rename(opt_abs, new_path)
+
+                    db.remove(opt_abs)
+                    if orig_abs != str(new_path):
+                        db.remove(orig_abs)
 
                 db.save()
                 _get_media_cache().invalidate()
@@ -343,23 +381,68 @@ def _handle_discard_optimized(handler) -> None:
         return
 
     try:
+        import shutil
+        from arcade_scanner.models.video_entry import VideoEntry # lazy
+        
         params = parse_qs(urlparse(handler.path).query)
-        path = params.get("path", [None])[0]
+        path = unquote(params.get("path", [None])[0])
 
         if path:
             abs_path = os.path.abspath(path)
-            if os.path.exists(abs_path):
-                os.remove(abs_path)
-                db.remove(abs_path)
-                db.save()
+            
+            # Review Mode Check: If this is an optimized file in a review folder, 
+            # we must also restore the original file.
+            entry = db.get(abs_path)
+            if entry and entry.status == "REVIEW":
+                job_dir = os.path.dirname(abs_path)
+                orig_file = None
+                # Search for the original sibling in DB
+                for v in db.get_all():
+                    if v.status == "REVIEW" and os.path.dirname(v.file_path) == job_dir and "_original" in v.file_path:
+                        orig_file = v
+                        break
+                
+                if orig_file and orig_file.original_path:
+                    print(f"⏪ Review Mode Discard: Restoring original to {orig_file.original_path}")
+                    shutil.move(orig_file.file_path, orig_file.original_path)
+                    
+                    # Restore DB entry
+                    orig_dict = orig_file.model_dump(by_alias=True)
+                    orig_dict["FilePath"] = orig_file.original_path
+                    orig_dict["Status"] = "OK"
+                    orig_dict["OriginalPath"] = None
+                    db.upsert(VideoEntry(**orig_dict))
+                    
+                    # Cleanup
+                    if os.path.exists(abs_path): os.remove(abs_path)
+                    db.remove(abs_path)
+                    db.remove(orig_file.file_path)
+                    
+                    try:
+                        if os.path.exists(job_dir) and not os.listdir(job_dir):
+                            os.rmdir(job_dir)
+                    except Exception: pass
+                else:
+                    # Just discard this file
+                    if os.path.exists(abs_path):
+                        os.remove(abs_path)
+                        db.remove(abs_path)
+            else:
+                # Standard Mode discard
+                if os.path.exists(abs_path):
+                    os.remove(abs_path)
+                    db.remove(abs_path)
+            
+            db.save()
+            _get_media_cache().invalidate()
 
-                try:
-                    current_port = handler.server.server_address[1]
-                    _get_report_debouncer().schedule(current_port)
-                except Exception as e:
-                    print(f"⚠️ Report gen scheduling failed: {e}")
+            try:
+                current_port = handler.server.server_address[1]
+                _get_report_debouncer().schedule(current_port)
+            except Exception as e:
+                print(f"⚠️ Report gen scheduling failed: {e}")
 
-                print(f"🗑️ Discarded optimized: {os.path.basename(abs_path)}")
+            print(f"🗑️ Discarded optimized/reviewed: {os.path.basename(abs_path)}")
 
         handler.send_response(204)
         handler.end_headers()
