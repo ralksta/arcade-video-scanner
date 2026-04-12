@@ -47,9 +47,10 @@ class ScannerManager:
         
         # Create semaphores bound to current event loop (fixes asyncio event loop mismatch)
         # Heavy Lane (FFprobe/FFmpeg) - CPU bound
-        self.sem_video = asyncio.Semaphore(os.cpu_count() or 4)
-        # Fast Lane (sips/Pillow) - reduced from 200 to prevent FD exhaustion with subprocess-based sips
-        self.sem_image = asyncio.Semaphore(50)
+        # Create semaphores bound to current event loop
+        # Use configured limits to prevent OOM/PID exhaustion
+        self.sem_video = asyncio.Semaphore(config.settings.max_concurrent_video_scans)
+        self.sem_image = asyncio.Semaphore(config.settings.max_concurrent_image_scans)
         try:
             from ..database.user_store import user_db
             scan_images = False
@@ -71,8 +72,50 @@ class ScannerManager:
         processed_count = 0
         last_save_time = time.time()
         
-        # Concurrency: Using self.sem_video and self.sem_image defined in __init__
-        pending_tasks = set()
+        # 2. Worker Queue Pattern
+        queue = asyncio.Queue(maxsize=100) # Buffer for discovered paths
+        workers = []
+        num_workers = config.settings.max_concurrent_video_scans + 2 # A few extra workers to manage the queue
+
+        async def _check_system_load():
+            """Simple Watchdog using load average."""
+            if not config.settings.enable_resource_watchdog:
+                return
+            
+            try:
+                # os.getloadavg() returns 1, 5, 15 min averages
+                load = os.getloadavg()[0]
+                cpu_count = os.cpu_count() or 1
+                
+                # If load is 2x CPU count, we are heavily saturated
+                if load > cpu_count * 2:
+                    if config.settings.verbose_scanning:
+                        print(f"⚠️ High system load ({load:.2f}), throttling scanner...")
+                    await asyncio.sleep(2)
+            except Exception:
+                pass
+
+        async def _worker():
+            nonlocal processed_count, last_save_time
+            while True:
+                try:
+                    item = await queue.get()
+                    if item is None: # Poison pill
+                        queue.task_done()
+                        break
+                    
+                    path, dir_changed, idx, total = item
+                    
+                    await _check_system_load()
+                    await _process_path(path, dir_changed, idx, total)
+                    
+                    processed_count += 1
+                    queue.task_done()
+                except Exception as e:
+                    print(f"❌ Worker error: {e}")
+                    queue.task_done()
+
+        # ... (we'll move _process_path to a method or keep it as helper)
 
         async def _process_path(path: str, dir_changed: bool, current_idx: int = 0, total_count: int = 0):
             # 1. Lane Selection
@@ -176,7 +219,9 @@ class ScannerManager:
                             thumb_path = os.path.join(config.thumb_dir, entry.thumb)
                             if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
                                 from ..core.video_processor import create_thumbnail
-                                await asyncio.to_thread(create_thumbnail, path)
+                                # Pass duration to avoid redundant ffprobe
+                                duration = entry.duration_sec if hasattr(entry, 'duration_sec') else None
+                                await asyncio.to_thread(create_thumbnail, path, duration)
 
                             
                         # Upsert AFTER populating assets
@@ -193,37 +238,36 @@ class ScannerManager:
                                 db.save()
                                 last_save_time = current_time
 
-        try:
-            # 2. Discovery Loop
+            # Start Workers
+            for _ in range(num_workers):
+                workers.append(asyncio.create_task(_worker()))
+
+            # 2. Discovery Loop -> Feed Queue
             print("🔍 Walking directories to count files...")
-            discovered_items = []  # List of (path, dir_changed)
+            total_discovered = 0
+            
+            # First pass: count for progress (if we want real totals, otherwise we can stream)
+            all_items = []
             async for item in fs_scanner.scan_directories(config.active_scan_targets):
                 if self._stop_event.is_set():
                     break
-                discovered_items.append(item)
-            discovered_paths = [path for path, _ in discovered_items]
-            total_discovered = len(discovered_items)
+                all_items.append(item)
+            
+            total_discovered = len(all_items)
             if total_discovered > 0:
                 print(f"📂 Found {total_discovered} files. Starting processing...")
             
-            for idx, (file_path, dir_changed) in enumerate(discovered_items, 1):
+            for idx, (file_path, dir_changed) in enumerate(all_items, 1):
                 if self._stop_event.is_set():
                     break
                 found_paths.add(file_path)
-                
-                # Spawn task
-                task = asyncio.create_task(_process_path(file_path, dir_changed, idx, total_discovered))
-                pending_tasks.add(task)
-                
-                # Moderate task list size: 500 cap reduces asyncio overhead at scale.
-                if len(pending_tasks) > 500:
-                    done, pending_tasks = await asyncio.wait(
-                        pending_tasks, timeout=0.05, return_when=asyncio.FIRST_COMPLETED
-                    )
+                await queue.put((file_path, dir_changed, idx, total_discovered))
 
-            # Wait for remaining
-            if pending_tasks:
-                await asyncio.gather(*pending_tasks)
+            # Stop Workers
+            for _ in range(num_workers):
+                await queue.put(None)
+            
+            await asyncio.gather(*workers)
 
             # 4. Prune Orphans (files deleted OR now excluded)
             if found_paths:

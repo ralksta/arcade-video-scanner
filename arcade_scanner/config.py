@@ -117,7 +117,11 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_review_dir": "Fixed location for review files. If empty, uses the default arcade_data/review.",
     "review_dir": "",
     "_comment_verbose_scanning": "Show individual file analysis logs during scan. If disabled, only shows progress summary.",
-    "verbose_scanning": False
+    "verbose_scanning": False,
+    "_comment_concurrency": "Performance Limits for small servers.",
+    "max_concurrent_video_scans": 2,
+    "max_concurrent_image_scans": 5,
+    "enable_resource_watchdog": True
 }
 
 # ==============================================================================
@@ -154,6 +158,9 @@ class AppSettings(BaseSettings):
     enable_review_mode: bool = Field(False)
     review_dir: str = Field("")
     verbose_scanning: bool = Field(False)
+    max_concurrent_video_scans: int = Field(2)
+    max_concurrent_image_scans: int = Field(5)
+    enable_resource_watchdog: bool = Field(True)
 
     model_config = ConfigDict(
         env_prefix="ARCADE_",

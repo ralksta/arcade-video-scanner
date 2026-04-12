@@ -40,7 +40,7 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
         logger.debug("get_video_metadata failed for %s: %s", filepath, e)
     return {}
 
-def create_thumbnail(video_path: str) -> str:
+def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
     # Use surrogateescape to handle Windows-originating surrogate characters in paths
     file_hash = hashlib.md5(video_path.encode('utf-8', 'surrogateescape')).hexdigest()
     thumb_name = f"thumb_{file_hash}.jpg"
@@ -64,13 +64,14 @@ def create_thumbnail(video_path: str) -> str:
                 logger.warning("Image thumbnail failed for %s: %s", video_path, e)
              return ""
 
-        # Get duration for smart seeking
-        duration = 0
-        try:
-            cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
-            duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
-        except Exception as e:
-            logger.debug("Duration probe failed for %s: %s", video_path, e)
+        # Get duration for smart seeking if not provided
+        if duration is None:
+            try:
+                cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
+                duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
+            except Exception as e:
+                logger.debug("Duration probe failed for %s: %s", video_path, e)
+                duration = 0
 
         # Smart seek: 10% into the video, max 60s
         ss = "0"
