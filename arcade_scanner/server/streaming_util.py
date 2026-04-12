@@ -32,6 +32,9 @@ def serve_file_range(handler, file_path, method="GET"):
                 return
 
             length = end - start + 1
+            if start == 0:
+                print(f"📺 Streaming: {os.path.basename(file_path)}")
+
             handler.send_response(206)
             handler.send_header("Content-type", mime_type)
             handler.send_header("Accept-Ranges", "bytes")
@@ -56,6 +59,7 @@ def serve_file_range(handler, file_path, method="GET"):
             return
 
     # No Range request
+    print(f"📺 Streaming: {os.path.basename(file_path)}")
     handler.send_response(200)
     handler.send_header("Content-type", mime_type)
     handler.send_header("Content-Length", str(file_size))
