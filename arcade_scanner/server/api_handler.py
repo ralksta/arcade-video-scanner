@@ -235,7 +235,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         # If verbose is disabled, also suppress streaming and main hits to keep terminal clean
-        if not config.verbose_scanning and path:
+        if not config.settings.verbose_scanning and path:
             if path.startswith("/stream?") or path == "/":
                 return
                 
