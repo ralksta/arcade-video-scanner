@@ -238,6 +238,7 @@ class ScannerManager:
                                 db.save()
                                 last_save_time = current_time
 
+        try:
             # Start Workers
             for _ in range(num_workers):
                 workers.append(asyncio.create_task(_worker()))
