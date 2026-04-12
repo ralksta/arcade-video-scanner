@@ -17,7 +17,7 @@ services:
       # Mount source code for development (Live Updates)
       - .:/app
       # Persistent configuration and database
-      - arcade-config:/config
+      - ./arcade_data:/config
       # Persistent thumbnails and cache
       - arcade-cache:/cache
     environment:
@@ -46,7 +46,5 @@ services:
     #           capabilities: [gpu, video]
 
 volumes:
-  arcade-config:
-    driver: local
   arcade-cache:
     driver: local

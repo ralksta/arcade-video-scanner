@@ -1,13 +1,22 @@
 {
   "scan_targets": [
-    "/Volumes/YourDisk",
-    "/mnt/media_drive"
+    "/media/YourMovies",
+    "/media/Clips"
   ],
   "exclude_paths": [
-    "/Users/username/Private",
-    "private_folder"
+    "#recycle",
+    "@eaDir"
   ],
   "disabled_defaults": [],
-  "min_size_mb": 100,
-  "bitrate_threshold_kbps": 15000
+  "min_size_mb": 1,
+  "bitrate_threshold_kbps": 10000,
+  "enable_optimizer": true,
+  "encoding_preset": "balanced",
+  "theme": "arcade",
+  "is_docker": true,
+  "precompute_thumbnails": true,
+  "enable_review_mode": true,
+  "review_dir": "",
+  "scan_images": false,
+  "min_image_size_kb": 100
 }
