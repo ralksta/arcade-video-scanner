@@ -53,7 +53,7 @@ def create_thumbnail(video_path: str) -> str:
         
         if is_image:
              vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
-             cmd = ["ffmpeg", "-i", video_path, "-vf", vf_filter, thumb_path, "-y", "-loglevel", "error"]
+             cmd = ["ffmpeg", "-i", video_path, "-threads", "1", "-strict", "unofficial", "-vf", vf_filter, thumb_path, "-y", "-loglevel", "error"]
              try:
                 # Use os.fsencode to handle surrogates safely in subprocess
                 encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
@@ -89,6 +89,8 @@ def create_thumbnail(video_path: str) -> str:
             cmd.extend([
                 "-i", video_path,
                 "-vframes", "1", "-q:v", "4",
+                "-threads", "1",
+                "-strict", "unofficial",
                 "-vf", vf_filter,
                 thumb_path, "-y", "-loglevel", "error"
             ])
