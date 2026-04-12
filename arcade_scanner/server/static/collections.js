@@ -31,100 +31,116 @@ function openCollectionModal(editId = null) {
     const modal = document.getElementById('collectionModal');
     if (!modal) return;
 
-    editingCollectionId = editId;
+    try {
+        editingCollectionId = editId;
 
-    // Reset form — null-safe with optional chaining
-    const _el = (id) => document.getElementById(id);
-    if (_el('collectionName')) _el('collectionName').value = '';
-    if (_el('collectionSearch')) _el('collectionSearch').value = '';
-    if (_el('collectionDateFilter')) _el('collectionDateFilter').value = 'all';
-    if (_el('collectionMinSize')) _el('collectionMinSize').value = '';
-    if (_el('collectionMaxSize')) _el('collectionMaxSize').value = '';
-    if (_el('collectionMinDuration')) _el('collectionMinDuration').value = '';
-    if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = '';
-    if (_el('collectionColor')) _el('collectionColor').value = '#64FFDA';
-    if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = '#64FFDA';
-    if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = 'folder_special';
+        // Reset form — null-safe with optional chaining
+        const _el = (id) => document.getElementById(id);
+        if (_el('collectionName')) _el('collectionName').value = '';
+        if (_el('collectionSearch')) _el('collectionSearch').value = '';
+        if (_el('collectionDateFilter')) _el('collectionDateFilter').value = 'all';
+        if (_el('collectionMinSize')) _el('collectionMinSize').value = '';
+        if (_el('collectionMaxSize')) _el('collectionMaxSize').value = '';
+        if (_el('collectionMinDuration')) _el('collectionMinDuration').value = '';
+        if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = '';
+        if (_el('collectionColor')) _el('collectionColor').value = '#64FFDA';
+        if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = '#64FFDA';
+        if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = 'folder_special';
 
-    // Initialize new criteria schema
-    collectionCriteriaNew = getDefaultCollectionCriteria();
+        // Initialize new criteria schema
+        collectionCriteriaNew = getDefaultCollectionCriteria();
 
-    // Also reset legacy for backward compat
-    collectionCriteria = { status: 'all', codec: 'all', tags: [], search: '' };
+        // Also reset legacy for backward compat
+        collectionCriteria = { status: 'all', codec: 'all', tags: [], search: '' };
 
-    // Update UI title
-    if (_el('collectionModalTitle')) _el('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
-    _el('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
+        // Update UI title
+        if (_el('collectionModalTitle')) _el('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
+        _el('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
 
-    // If editing, load existing data
-    if (editId) {
-        const existing = (userSettings.smart_collections || []).find(c => c.id === editId);
-        if (existing) {
-            if (_el('collectionName')) _el('collectionName').value = existing.name || '';
-            if (_el('collectionSearch')) _el('collectionSearch').value = existing.criteria?.search || '';
+        let existing = null;
+        // If editing, load existing data
+        if (editId) {
+            existing = (userSettings.smart_collections || []).find(c => c.id === editId);
+            if (!existing) {
+                console.warn(`Collection ID "${editId}" not found in current user settings. It might be a system collection or recently deleted.`);
+            }
 
-            // Populate New Fields
-            if (_el('collectionDateFilter')) _el('collectionDateFilter').value = existing.criteria?.date || 'all';
-            if (_el('collectionMinSize')) _el('collectionMinSize').value = existing.criteria?.size?.min || '';
-            if (_el('collectionMaxSize')) _el('collectionMaxSize').value = existing.criteria?.size?.max || '';
-            if (_el('collectionMinDuration')) _el('collectionMinDuration').value = existing.criteria?.duration?.min || '';
-            if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = existing.criteria?.duration?.max || '';
+            if (existing) {
+                if (_el('collectionName')) _el('collectionName').value = existing.name || '';
+                if (_el('collectionSearch')) _el('collectionSearch').value = existing.criteria?.search || '';
 
-            if (_el('collectionColor')) _el('collectionColor').value = existing.color || '#64FFDA';
-            if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
-            if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
+                // Populate New Fields
+                if (_el('collectionDateFilter')) _el('collectionDateFilter').value = existing.criteria?.date || 'all';
+                if (_el('collectionMinSize')) _el('collectionMinSize').value = existing.criteria?.size?.min || '';
+                if (_el('collectionMaxSize')) _el('collectionMaxSize').value = existing.criteria?.size?.max || '';
+                if (_el('collectionMinDuration')) _el('collectionMinDuration').value = existing.criteria?.duration?.min || '';
+                if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = existing.criteria?.duration?.max || '';
 
-            // Check if using new schema
-            if (existing.criteria?.include || existing.criteria?.exclude) {
-                collectionCriteriaNew = JSON.parse(JSON.stringify(existing.criteria));
-            } else {
-                // Convert legacy schema to new
-                collectionCriteriaNew = getDefaultCollectionCriteria();
-                if (existing.criteria?.status && existing.criteria.status !== 'all') {
-                    collectionCriteriaNew.include.status = [existing.criteria.status];
+                if (_el('collectionColor')) _el('collectionColor').value = existing.color || '#64FFDA';
+                if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
+                if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
+
+                // Check if using new schema
+                if (existing.criteria?.include || existing.criteria?.exclude) {
+                    collectionCriteriaNew = JSON.parse(JSON.stringify(existing.criteria));
+                } else {
+                    // Convert legacy schema to new
+                    collectionCriteriaNew = getDefaultCollectionCriteria();
+                    if (existing.criteria?.status && existing.criteria.status !== 'all') {
+                        collectionCriteriaNew.include.status = [existing.criteria.status];
+                    }
+                    if (existing.criteria?.codec && existing.criteria.codec !== 'all') {
+                        collectionCriteriaNew.include.codec = [existing.criteria.codec];
+                    }
+                    if (existing.criteria?.tags) {
+                        collectionCriteriaNew.include.tags = [...existing.criteria.tags];
+                    }
+                    collectionCriteriaNew.search = existing.criteria?.search || '';
+
+                    // Preserve new fields if they were mixed in
+                    if (existing.criteria?.size) collectionCriteriaNew.size = existing.criteria.size;
+                    if (existing.criteria?.date) collectionCriteriaNew.date = existing.criteria.date;
+                    if (existing.criteria?.duration) collectionCriteriaNew.duration = existing.criteria.duration;
+                    if (existing.criteria?.favorites) collectionCriteriaNew.favorites = existing.criteria.favorites;
                 }
-                if (existing.criteria?.codec && existing.criteria.codec !== 'all') {
-                    collectionCriteriaNew.include.codec = [existing.criteria.codec];
-                }
-                if (existing.criteria?.tags) {
-                    collectionCriteriaNew.include.tags = [...existing.criteria.tags];
-                }
-                collectionCriteriaNew.search = existing.criteria?.search || '';
-
-                // Preserve new fields if they were mixed in
-                if (existing.criteria?.size) collectionCriteriaNew.size = existing.criteria.size;
-                if (existing.criteria?.date) collectionCriteriaNew.date = existing.criteria.date;
-                if (existing.criteria?.duration) collectionCriteriaNew.duration = existing.criteria.duration;
-                if (existing.criteria?.favorites) collectionCriteriaNew.favorites = existing.criteria.favorites;
             }
         }
+
+        // Populate and sync category dropdown
+        if (typeof populateCategoryDropdown === 'function') {
+            populateCategoryDropdown(existing?.category || null);
+        } else {
+            console.error('Function populateCategoryDropdown not found. ensure engine.js is loaded.');
+        }
+        
+        document.getElementById('newCategoryInput')?.classList.add('hidden');
+        document.getElementById('collectionCategory')?.classList.remove('hidden');
+
+        // Sync UI with new criteria
+        syncSmartCollectionUI();
+
+        // Reset accordion sections to collapsed state
+        const propertiesPanel = document.getElementById('propertiesPanel');
+        const metadataPanel = document.getElementById('metadataPanel');
+        const propertiesChevron = document.getElementById('propertiesChevron');
+        const metadataChevron = document.getElementById('metadataChevron');
+
+        if (propertiesPanel) {
+            propertiesPanel.classList.add('hidden');
+            if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
+        }
+        if (metadataPanel) {
+            metadataPanel.classList.add('hidden');
+            if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
+        }
+
+        updateAllFilterBadges();
+        modal.classList.add('active');
+    } catch (err) {
+        console.error('Critical failure in openCollectionModal:', err);
+        // Show fallback modal or message
+        modal.classList.add('active'); // Still open it, but it might be empty
     }
-
-    // Populate and sync category dropdown
-    populateCategoryDropdown(editId ? (userSettings.smart_collections || []).find(c => c.id === editId)?.category : null);
-    document.getElementById('newCategoryInput')?.classList.add('hidden');
-    document.getElementById('collectionCategory')?.classList.remove('hidden');
-
-    // Sync UI with new criteria
-    syncSmartCollectionUI();
-
-    // Reset accordion sections to collapsed state
-    const propertiesPanel = document.getElementById('propertiesPanel');
-    const metadataPanel = document.getElementById('metadataPanel');
-    const propertiesChevron = document.getElementById('propertiesChevron');
-    const metadataChevron = document.getElementById('metadataChevron');
-
-    if (propertiesPanel) {
-        propertiesPanel.classList.add('hidden');
-        if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
-    }
-    if (metadataPanel) {
-        metadataPanel.classList.add('hidden');
-        if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
-    }
-
-    updateAllFilterBadges();
-    modal.classList.add('active');
 }
 
 /**

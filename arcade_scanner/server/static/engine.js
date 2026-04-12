@@ -837,6 +837,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         return Array.from(categories).sort();
     }
+    window.getAvailableCategories = getAvailableCategories;
 
     function populateCategoryDropdown(selectedCategory = null) {
         const select = document.getElementById('collectionCategory');
@@ -849,6 +850,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `<option value="${cat}" ${cat === selectedCategory ? 'selected' : ''}>${cat}</option>`
             ).join('');
     }
+    window.populateCategoryDropdown = populateCategoryDropdown;
 
     function handleCategoryChange(selectEl) {
         // Just track changes - saving happens in saveCollection
@@ -902,6 +904,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.userSettings.sensitive_dirs = data.sensitive_dirs || [];
                 window.userSettings.sensitive_tags = data.sensitive_tags || [];
                 window.userSettings.sensitive_collections = data.sensitive_collections || [];
+                window.userSettings.smart_collections = data.smart_collections || [];
 
                 // Apply to global ALL_VIDEOS
                 if (window.ALL_VIDEOS) {
