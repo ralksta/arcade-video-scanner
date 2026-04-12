@@ -117,7 +117,7 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_review_dir": "Fixed location for review files. If empty, uses the default arcade_data/review.",
     "review_dir": "",
     "_comment_verbose_scanning": "Show individual file analysis logs during scan. If disabled, only shows progress summary.",
-    "verbose_scanning": false
+    "verbose_scanning": False
 }
 
 # ==============================================================================
