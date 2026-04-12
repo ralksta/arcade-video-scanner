@@ -91,14 +91,6 @@ def run_scanner(args_list=None):
             results = [e.model_dump(by_alias=True) for e in db.get_all()]
             generate_html_report(results, config.report_file, server_port=port)
             
-            # DeoVR JSON Generation (if enabled)
-            if config.settings.enable_deovr:
-                from arcade_scanner.core.deovr_generator import save_deovr_library
-                deovr_path = os.path.join(config.hidden_data_dir, "deovr_library.json")
-                server_url = f"{protocol}://localhost:{port}"
-                print("🥽 Generating DeoVR library...")
-                save_deovr_library(deovr_path, db.get_all(), server_url)
-                
         except KeyboardInterrupt:
             print("\n⚠️ Scan interrupted.")
         except Exception as e:

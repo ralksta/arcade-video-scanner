@@ -46,8 +46,6 @@ async function openSettings() {
         // Encoding preset (fast / balanced / best)
         selectEncodingPreset(data.encoding_preset || 'balanced');
 
-        const deovrCheckbox = document.getElementById('settingsDeoVR');
-        if (deovrCheckbox) deovrCheckbox.checked = data.enable_deovr === true;
 
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
@@ -136,7 +134,6 @@ async function saveSettings() {
 
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
-        enable_deovr: document.getElementById('settingsDeoVR')?.checked || false,
         encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
         theme: document.getElementById('settingsTheme').value || 'arcade'
     };

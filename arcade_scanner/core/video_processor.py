@@ -26,10 +26,14 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
         filepath,
     ]
     try:
+        # Use os.fsencode for path to handle surrogates safely in subprocess
+        safe_path = os.fsencode(filepath)
+        cmd[cmd.index(filepath)] = safe_path
+        
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=10
+            cmd, capture_output=True, text=False, check=True, timeout=60
         )
-        data = json.loads(result.stdout)
+        data = json.loads(result.stdout.decode('utf-8', 'ignore'))
         if "streams" in data and len(data["streams"]) > 0:
             return data
     except Exception as e:
@@ -37,7 +41,8 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
     return {}
 
 def create_thumbnail(video_path: str) -> str:
-    file_hash = hashlib.md5(video_path.encode()).hexdigest()
+    # Use surrogateescape to handle Windows-originating surrogate characters in paths
+    file_hash = hashlib.md5(video_path.encode('utf-8', 'surrogateescape')).hexdigest()
     thumb_name = f"thumb_{file_hash}.jpg"
     thumb_path = os.path.join(config.thumb_dir, thumb_name)
     
@@ -47,14 +52,10 @@ def create_thumbnail(video_path: str) -> str:
         
         if is_image:
              vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
-             cmd = [
-                "ffmpeg", "-i", video_path,
-                "-vframes", "1", "-q:v", "4",
-                "-vf", vf_filter,
-                thumb_path, "-y", "-loglevel", "quiet"
-             ]
              try:
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                # Use os.fsencode to handle surrogates safely in subprocess
+                encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
+                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
                 if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
                     return thumb_name
              except Exception as e:
@@ -64,8 +65,8 @@ def create_thumbnail(video_path: str) -> str:
         # Get duration for smart seeking
         duration = 0
         try:
-            cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
-            duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=5).decode().strip())
+            cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
+            duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
         except Exception as e:
             logger.debug("Duration probe failed for %s: %s", video_path, e)
 
@@ -90,7 +91,9 @@ def create_thumbnail(video_path: str) -> str:
                 thumb_path, "-y", "-loglevel", "quiet"
             ])
             try:
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+                # Use os.fsencode to handle surrogates safely in subprocess
+                encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
+                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
                 return os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0
             except Exception as e:
                 logger.warning("Thumbnail extract failed at %s (scene_detect=%s) for %s: %s", seek_time, use_scene_detect, video_path, e)

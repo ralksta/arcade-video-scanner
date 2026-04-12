@@ -278,7 +278,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         known_paths = set(cache.values())
         for entry in _media_cache.get():
             if entry.file_path not in known_paths:
-                file_hash = hashlib.md5(entry.file_path.encode()).hexdigest()
+                # Use surrogateescape to handle Windows-originating surrogate characters
+                file_hash = hashlib.md5(entry.file_path.encode('utf-8', 'surrogateescape')).hexdigest()
                 t_name = f"thumb_{file_hash}.jpg"
                 cache[t_name] = entry.file_path
                 known_paths.add(entry.file_path)
@@ -320,79 +321,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(body)
                 return
 
-            # 0. DeoVR AUTO-DETECTION ENDPOINT: /deovr serves library JSON
-
-            # DeoVR browser checks for this endpoint when navigating to any site
-            if self.path == "/deovr" or self.path == "/deovr/":
-                from arcade_scanner.core.deovr_generator import generate_deovr_json
-                
-                host = self.headers.get("Host", "localhost:8000")
-                
-                # Detect protocol: Check proxy header OR native SSL socket
-                protocol = "http"
-                if self.headers.get("X-Forwarded-Proto") == "https":
-                    protocol = "https"
-                elif isinstance(self.connection, ssl.SSLSocket):
-                    protocol = "https"
-                    
-                server_url = f"{protocol}://{host}"
-                
-                all_videos = _media_cache.get()
-                # Smart collections are stored per-user, not in global config
-                admin_user = user_db.get_user("admin")
-                smart_collections = list(admin_user.data.smart_collections) if admin_user else []
-                
-                deovr_data = generate_deovr_json(all_videos, server_url, smart_collections)
-                
-                scene_count = len(deovr_data.get('scenes', []))
-                video_count = sum(len(s.get('list', [])) for s in deovr_data.get('scenes', []))
-                print(f"🥽 DeoVR endpoint accessed! Serving {scene_count} scenes ({video_count} total videos)")
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
-                return
             
-            # 1a. VR MUSEUM -> Serve VR museum HTML
-            # Normalize path to ignore query parameters for routing
-            clean_path = self.path.split('?')[0]
-
-            if clean_path == "/vr":
-                user = self.get_current_user()
-                if not user:
-                    login_path = os.path.join(os.path.dirname(__file__), "static", "login.html")
-                    if os.path.exists(login_path):
-                        self.send_response(200)
-                        self.send_header("Content-type", "text/html; charset=utf-8")
-                        with open(login_path, 'rb') as f:
-                            data = f.read()
-                            self.send_header("Content-Length", str(len(data)))
-                            self.end_headers()
-                            self.wfile.write(data)
-                        return
-                    else:
-                        self.send_error(404, "Login page not found")
-                        return
-
-                vr_path = os.path.join(os.path.dirname(__file__), "static", "vr_museum.html")
-                if os.path.exists(vr_path):
-                    self.send_response(200)
-                    self.send_header("Content-type", "text/html; charset=utf-8")
-                    with open(vr_path, 'rb') as f:
-                        data = f.read()
-                        self.send_header("Content-Length", str(len(data)))
-                        self.end_headers()
-                        self.wfile.write(data)
-                else:
-                    self.send_error(404, "VR Museum page not found")
-                return
             
-            # 1b. ROOT / INDEX -> Serve REPORT_FILE
+            # 1. ROOT / INDEX -> Serve REPORT_FILE
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates"]
+            clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
                 
                 # AUTH CHECK for Root
@@ -461,7 +394,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     if os.path.exists(file_path) and os.path.isfile(file_path):
                         self.send_response(200)
                         self.send_header("Content-type", "image/jpeg")
-                        self.send_header("Access-Control-Allow-Origin", "*")  # Allow VR headsets
+                        self.send_header("Access-Control-Allow-Origin", "*")
                         fs = os.stat(file_path)
                         self.send_header("Content-Length", str(fs.st_size))
                         self.end_headers()
@@ -570,62 +503,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error in stream endpoint: {e}")
                     self.send_error(500)
 
-            elif self.path == "/api/deovr/library.json":
-                # iOS app library endpoint (uses simplified format)
-                from arcade_scanner.core.deovr_generator import generate_ios_json
-                
-                # Get server URL from request
-                host = self.headers.get("Host", "localhost:8000")
-                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
-                server_url = f"{protocol}://{host}"
-                
-                # Generate iOS-compatible JSON
-                all_videos = _media_cache.get()
-                ios_data = generate_ios_json(all_videos, server_url)
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(ios_data).encode("utf-8"))
-            
-            elif self.path.startswith("/api/deovr/collection/"):
-                # DeoVR collection endpoint
-                from arcade_scanner.core.deovr_generator import generate_collection_deovr_json
-                
-                # Extract collection ID from path
-                collection_id = self.path.split("/api/deovr/collection/")[1].replace(".json", "")
-                
-                # Find collection in settings
-                collection = None
-                for coll in config.settings.smart_collections:
-                    if coll.get("id") == collection_id:
-                        collection = coll
-                        break
-                
-                if not collection:
-                    self.send_error(404, "Collection not found")
-                    return
-                
-                # Get server URL
-                host = self.headers.get("Host", "localhost:8000")
-                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
-                server_url = f"{protocol}://{host}"
-                
-                # Generate DeoVR JSON for collection
-                all_videos = _media_cache.get()
-                deovr_data = generate_collection_deovr_json(
-                    all_videos,
-                    collection.get("name", collection_id),
-                    collection.get("criteria", {}),
-                    server_url
-                )
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
             
             elif self.path == "/api/cache-stats":
                 # Calculate cache sizes
@@ -670,89 +547,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"setup_complete": setup_complete}).encode("utf-8"))
-            
-
-            
-            elif self.path == "/api/vr/gallery":
-                # VR Museum: Return gallery rooms structured from smart collections
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-
-                u = user_db.get_user(user_name)
-                if not u:
-                    self.send_error(401)
-                    return
-
-                from arcade_scanner.core.deovr_generator import _video_matches_criteria
-                from urllib.parse import quote as url_quote
-
-                host = self.headers.get("Host", "localhost:8000")
-                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
-                if isinstance(self.connection, ssl.SSLSocket):
-                    protocol = "https"
-                server_url = f"{protocol}://{host}"
-
-                # Get all videos
-                all_videos = _media_cache.get()
-                # Filter by user scan targets
-                user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
-                if user_targets:
-                    all_videos = [v for v in all_videos if any(
-                        os.path.abspath(v.file_path).startswith(t) for t in user_targets
-                    )]
-                elif not u.is_admin:
-                    all_videos = []
-
-                # Build rooms from smart collections
-                rooms = []
-                collections = u.data.smart_collections or []
-
-                for coll in collections:
-                    coll_name = coll.get("name", "Collection")
-                    criteria = coll.get("criteria", {})
-
-                    # Only include video collections (skip photos-only)
-                    inc_media = criteria.get("include", {}).get("media_type", [])
-                    if inc_media and "video" not in inc_media:
-                        continue
-
-                    room_videos = []
-                    for video in all_videos:
-                        # Filter by duration (min 5 minutes / 300 seconds)
-                        if not video.duration_sec or video.duration_sec < 300:
-                            continue
-                        if video.vaulted:
-                            continue
-                        if _video_matches_criteria(video, criteria):
-                            filename = video.file_path.split('/')[-1].split('\\')[-1]
-                            title = filename.rsplit('.', 1)[0] if '.' in filename else filename
-                            v_obj = {
-                                "title": title,
-                                "stream_url": f"{server_url}/stream?path={url_quote(video.file_path)}",
-                                "thumbnail": f"{server_url}/thumbnails/{video.thumb}" if video.thumb else None,
-                                "duration": int(video.duration_sec) if video.duration_sec else 0,
-                            }
-                            room_videos.append(v_obj)
-
-                    if room_videos:
-                        rooms.append({
-                            "name": coll_name,
-                            "id": coll.get("id", coll_name),
-                            "color": coll.get("color", "#d4a574"),
-                            "video_count": len(room_videos),
-                            "videos": room_videos[:14]  # Max 14 per room (4 walls)
-                        })
-
-                gallery_data = {"rooms": rooms}
-                print(f"🏛️ VR Gallery: {len(rooms)} rooms, {sum(r['video_count'] for r in rooms)} total videos")
-
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(gallery_data).encode("utf-8"))
 
             elif self.path == "/api/videos":
                 # GET: Return all videos, filtered by user's scan targets

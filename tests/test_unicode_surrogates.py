@@ -89,3 +89,35 @@ def test_encoding_queue_handles_surrogates(store):
         assert job["file_path"] == surrogate_path
     except UnicodeEncodeError as e:
         pytest.fail(f"get_next_pending failed with UnicodeEncodeError: {e}")
+
+def test_thumbnail_hashing_handles_surrogates():
+    from arcade_scanner.core.video_processor import create_thumbnail
+    from arcade_scanner.config import config
+    
+    surrogate_path = "/media_nas/Sites/h\udcf6gl.mp4"
+    
+    # Mock config.thumb_dir
+    with patch("arcade_scanner.core.video_processor.config") as mock_cfg, \
+         patch("os.path.exists", return_value=True), \
+         patch("os.path.getsize", return_value=1):
+        mock_cfg.thumb_dir = "/cache/thumbnails"
+        
+        # Should not raise UnicodeEncodeError
+        try:
+            thumb_name = create_thumbnail(surrogate_path)
+            assert thumb_name.startswith("thumb_")
+            assert thumb_name.endswith(".jpg")
+        except UnicodeEncodeError as e:
+            pytest.fail(f"create_thumbnail failed with UnicodeEncodeError: {e}")
+
+def test_vr_gallery_quoting_handles_surrogates():
+    from urllib.parse import quote as url_quote
+    
+    surrogate_path = "/media_nas/Sites/h\udcf6gl.mp4"
+    
+    # Should not raise UnicodeEncodeError
+    try:
+        quoted = url_quote(surrogate_path, errors='surrogateescape')
+        assert "%F6" in quoted  # \udcf6 encoded as %F6
+    except UnicodeEncodeError as e:
+        pytest.fail(f"url_quote failed with UnicodeEncodeError: {e}")
