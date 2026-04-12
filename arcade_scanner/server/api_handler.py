@@ -229,8 +229,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         """Override to suppress noisy requests (static files, thumbnails, polling)."""
         path = getattr(self, 'path', None)
+        
+        # Paths that are ALWAYS quiet (polling, thumbnails, static assets)
         if path and (path in self.QUIET_PATHS or path.startswith(("/thumbnails/", "/static/"))):
-            return  # Suppress logging
+            return
+
+        # If verbose is disabled, also suppress streaming and main hits to keep terminal clean
+        if not config.verbose_scanning and path:
+            if path.startswith("/stream?") or path == "/":
+                return
+                
         super().log_message(format, *args)
 
     def get_current_user(self):
