@@ -179,29 +179,27 @@ function filterAndSort(scrollToTop = false) {
 
             filteredVideos = pairs;
 
-        } else {
+            const stats = {
+                videoCount: 0,
+                imageCount: 0,
+                totalSizeMB: 0,
+                under50: 0,
+                totalBitrate: 0
+            };
+
             filteredVideos = window.ALL_VIDEOS.filter(v => {
-                // Extract common values once
-                const name = v.FilePath.split(/[\\/]/).pop().toLowerCase();
-                const codec = (v.codec || 'unknown').toLowerCase();
+                // Use pre-calculated values (set in engine.js:loadVideoData)
+                const name = v._fileNameLower || "";
+                const codec = v._codecLower || "unknown";
                 const isHidden = v.hidden || false;
-                const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
-                const folder = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
+                const folder = v._folder || "";
                 const videoTags = v.tags || [];
 
                 // --- EARLY RETURNS (fail fast) ---
+                if (activeSmartCollectionCriteria && !evaluateCollectionMatch(v, activeSmartCollectionCriteria)) return false;
+                if (safeMode && isSensitive(v)) return false;
 
-                // Smart Collection filter
-                if (activeSmartCollectionCriteria && !evaluateCollectionMatch(v, activeSmartCollectionCriteria)) {
-                    return false;
-                }
-
-                // Safe Mode filter
-                if (safeMode && isSensitive(v)) {
-                    return false;
-                }
-
-                // Workspace filter (lobby/vault/favorites)
+                // Workspace filter
                 if (workspaceMode === 'lobby' && isHidden) return false;
                 if (workspaceMode === 'vault' && !isHidden) return false;
                 if (workspaceMode === 'favorites' && !v.favorite) return false;
@@ -219,23 +217,19 @@ function filterAndSort(scrollToTop = false) {
                 if (currentCodec !== 'all') {
                     const targetCodec = currentCodec.toLowerCase();
                     if (targetCodec === 'av1') {
-                        if (!codec.includes('av1') && !codec.includes('av01')) {
-                            return false;
-                        }
+                        if (!codec.includes('av1') && !codec.includes('av01')) return false;
                     } else if (!codec.includes(targetCodec)) {
                         return false;
                     }
                 }
 
-                // Search filter
+                // Search filter (O(1) search on filename first)
                 if (searchTerm && !name.includes(searchTerm) && !v.FilePath.toLowerCase().includes(searchTerm)) {
                     return false;
                 }
 
                 // Folder filter
-                if (currentFolder !== 'all' && folder !== currentFolder) {
-                    return false;
-                }
+                if (currentFolder !== 'all' && folder !== currentFolder) return false;
 
                 // Size filter
                 if (minSizeMB !== null && v.Size_MB < minSizeMB) return false;
@@ -250,28 +244,31 @@ function filterAndSort(scrollToTop = false) {
                     if (maxAge && ageSec > maxAge) return false;
                 }
 
-                // Tag filter (with tri-state include/exclude support)
+                // Tag filter
                 if (filterUntaggedOnly) {
                     if (videoTags.length > 0) return false;
                 } else if (activeTags.length > 0) {
                     const positiveTags = activeTags.filter(t => !t.startsWith('!'));
                     const negativeTags = activeTags.filter(t => t.startsWith('!')).map(t => t.substring(1));
-
-                    // Must have ALL positive tags
-                    if (positiveTags.length > 0 && !positiveTags.every(pt => videoTags.includes(pt))) {
-                        return false;
-                    }
-                    // Must have NONE of the negative tags
-                    if (negativeTags.length > 0 && negativeTags.some(nt => videoTags.includes(nt))) {
-                        return false;
-                    }
+                    if (positiveTags.length > 0 && !positiveTags.every(pt => videoTags.includes(pt))) return false;
+                    if (negativeTags.length > 0 && negativeTags.some(nt => videoTags.includes(nt))) return false;
                 }
 
-                // Passed all filters - count and include
-                vCount++;
-                tSize += (v.Size_MB || 0);
+                // Passed all filters - count and include (Single Pass Stats)
+                const isVideo = (v.media_type || 'video') === 'video';
+                if (isVideo) {
+                    stats.videoCount++;
+                    stats.totalBitrate += (v.Bitrate_Mbps || 0);
+                    if (v.Size_MB < 50) stats.under50++;
+                } else {
+                    stats.imageCount++;
+                }
+                stats.totalSizeMB += (v.Size_MB || 0);
+                
                 return true;
             });
+
+            _updateQuickStats(stats, workspaceMode);
         }
 
         // Sort
@@ -295,7 +292,12 @@ function filterAndSort(scrollToTop = false) {
         if (sizeEl) sizeEl.innerText = formatSize(tSize);
 
         // Update Quick Stats Ribbon
-        _updateQuickStats(filteredVideos, workspaceMode);
+        if (workspaceMode !== 'optimized' && workspaceMode !== 'duplicates') {
+            // Stats are now updated during the filter loop pass
+        } else {
+            const ribbon = document.getElementById('quickStatsRibbon');
+            if (ribbon) ribbon.style.display = 'none';
+        }
 
         renderUI(true, scrollToTop);
     } catch (e) {
@@ -313,11 +315,10 @@ function filterAndSort(scrollToTop = false) {
  * @param {Array}  videos        – current filteredVideos array
  * @param {string} workspaceMode – current workspace ('lobby', 'favorites', …)
  */
-function _updateQuickStats(videos, workspaceMode) {
+function _updateQuickStats(stats, workspaceMode) {
     const ribbon = document.getElementById('quickStatsRibbon');
     if (!ribbon) return;
 
-    // Skip in Optimized-pairs mode (array items have different shape)
     if (workspaceMode === 'optimized' || workspaceMode === 'duplicates') {
         ribbon.style.display = 'none';
         return;
@@ -325,16 +326,15 @@ function _updateQuickStats(videos, workspaceMode) {
 
     ribbon.style.display = 'flex';
 
-    const total      = videos.length;
-    const videoItems = videos.filter(v => (v.media_type || 'video') === 'video');
-    const imageItems = videos.filter(v => v.media_type === 'image');
-    const totalSizeMB= videos.reduce((s, v) => s + (v.Size_MB || 0), 0);
-    const under50    = videoItems.filter(v => v.Size_MB < 50).length;
-    const pctSmall   = videoItems.length > 0 ? Math.round((under50 / videoItems.length) * 100) : 0;
-    const avgBitrate = videoItems.length > 0
-        ? (videoItems.reduce((s, v) => s + (v.Bitrate_Mbps || 0), 0) / videoItems.length).toFixed(1)
+    const videoCount = stats.videoCount;
+    const imageCount = stats.imageCount;
+    const totalSizeMB = stats.totalSizeMB;
+    const under50 = stats.under50;
+    const pctSmall = videoCount > 0 ? Math.round((under50 / videoCount) * 100) : 0;
+    const avgBitrate = videoCount > 0
+        ? (stats.totalBitrate / videoCount).toFixed(1)
         : '–';
-    const sizeLabel  = totalSizeMB >= 1024
+    const sizeLabel = totalSizeMB >= 1024
         ? (totalSizeMB / 1024).toFixed(1) + ' GB'
         : totalSizeMB.toFixed(0) + ' MB';
 

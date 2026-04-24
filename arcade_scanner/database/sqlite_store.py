@@ -81,7 +81,9 @@ class SQLiteStore:
         # Performance pragmas
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA cache_size=-8000")  # 8MB cache
+        self._conn.execute("PRAGMA cache_size=-64000")  # 64MB cache (Performance boost)
+        self._conn.execute("PRAGMA temp_store=MEMORY")
+        self._conn.execute("PRAGMA mmap_size=268435456") # 256MB mmap
 
         self._create_table()
 
@@ -97,6 +99,8 @@ class SQLiteStore:
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_mtime ON media(mtime)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_favorite ON media(favorite)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_vaulted ON media(vaulted)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_thumb ON media(thumb)")
 
         # Migration: Add original_path to media table if it doesn't exist
         try:
@@ -286,6 +290,21 @@ class SQLiteStore:
                 return None
         return None
 
+    def get_by_thumb(self, thumb_name: str) -> Optional[VideoEntry]:
+        """Fetch a single entry by thumb name."""
+        self._ensure_connection()
+        cursor = self._conn.execute(
+            "SELECT * FROM media WHERE thumb = ?", (thumb_name,)
+        )
+        row = cursor.fetchone()
+        if row:
+            try:
+                return self._row_to_entry(row)
+            except Exception as e:
+                logger.error(f"⚠️ Failed to decode DB row for thumb: {e}")
+                return None
+        return None
+
     def upsert(self, entry) -> None:
         """Insert or replace an entry. Accepts VideoEntry or MediaAsset."""
         from ..models.media_asset import MediaAsset
@@ -303,6 +322,35 @@ class SQLiteStore:
                 f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                 values,
             )
+
+    def bulk_upsert(self, entries) -> None:
+        """Insert or replace multiple entries in a single transaction."""
+        from ..models.media_asset import MediaAsset
+        if not entries:
+            return
+
+        with self._write_lock:
+            self._ensure_connection()
+            
+            placeholders = ", ".join("?" for _ in _COLUMNS)
+            col_names = ", ".join(name for name, _ in _COLUMNS)
+            
+            data = []
+            for entry in entries:
+                if isinstance(entry, MediaAsset):
+                    entry = self._asset_to_video_entry(entry)
+                data.append(self._entry_to_tuple(entry))
+
+            self._conn.execute("BEGIN")
+            try:
+                self._conn.executemany(
+                    f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
+                    data,
+                )
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
 
     def remove(self, path: str) -> None:
         """Delete an entry by file_path."""

@@ -286,23 +286,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 del cache[thumb_filename]
 
-        # Slow path: populate/refresh from DB
-        # Always re-read DB on miss so entries added after server start are found.
-        # Using a set to track known entries avoids re-hashing already cached paths.
-        known_paths = set(cache.values())
-        for entry in _media_cache.get():
-            if entry.file_path not in known_paths:
-                # Use surrogateescape to handle Windows-originating surrogate characters
-                file_hash = hashlib.md5(entry.file_path.encode('utf-8', 'surrogateescape')).hexdigest()
-                t_name = f"thumb_{file_hash}.jpg"
-                cache[t_name] = entry.file_path
-                known_paths.add(entry.file_path)
+        # Targeted lookup: Query DB by thumb name (O(1) indexed)
+        entry = db.get_by_thumb(thumb_filename)
+        if entry:
+            cache[thumb_filename] = entry.file_path
+            # Evict oldest entries when over capacity
+            while len(cache) > FinderHandler._THUMB_CACHE_MAX:
+                cache.popitem(last=False)
+            return entry.file_path
 
-        # Evict oldest entries when over capacity
-        while len(cache) > FinderHandler._THUMB_CACHE_MAX:
-            cache.popitem(last=False)
-
-        return cache.get(thumb_filename)
+        return None
 
 
     def do_GET(self):

@@ -194,9 +194,18 @@ function keepOptimized(orig, opt) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             // Remove from view
-            setTimeout(() => {
-                location.reload(); // Simplest way to refresh state
-            }, 500);
+            const card = document.querySelector(`[data-path="${orig}"]`);
+            if (card) {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    card.remove();
+                    // Update global state and header stats
+                    window.ALL_VIDEOS = window.ALL_VIDEOS.filter(v => v.FilePath !== orig && v.FilePath !== opt);
+                    updateHeaderStats();
+                    filterAndSort();
+                }, 300);
+            }
         })
         .catch(err => {
             console.error('keepOptimized error:', err);
@@ -208,9 +217,16 @@ function discardOptimized(opt) {
     if (!confirm("Delete the optimized file?")) return;
     fetch(`/api/discard_optimized?path=${opt}`)
         .then(() => {
-            setTimeout(() => {
-                location.reload();
-            }, 500);
+            const card = document.querySelector(`[data-path="${opt}"]`);
+            if (card) {
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    card.remove();
+                    window.ALL_VIDEOS = window.ALL_VIDEOS.filter(v => v.FilePath !== opt);
+                    updateHeaderStats();
+                    filterAndSort();
+                }, 300);
+            }
         });
 }
 
@@ -965,8 +981,20 @@ async function loadVideoData() {
     try {
         const res = await fetch('/api/videos');
         if (res.ok) {
-            window.ALL_VIDEOS = await res.json();
-            console.log(`✅ Loaded ${window.ALL_VIDEOS.length} videos from API`);
+            const data = await res.json();
+            
+            // Pre-calculate metadata for faster filtering/rendering
+            data.forEach(v => {
+                const path = v.FilePath;
+                const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+                v._fileName = path.substring(lastIdx + 1);
+                v._fileNameLower = v._fileName.toLowerCase();
+                v._folder = lastIdx >= 0 ? path.substring(0, lastIdx) : '';
+                v._codecLower = (v.codec || 'unknown').toLowerCase();
+            });
+
+            window.ALL_VIDEOS = data;
+            console.log(`✅ Loaded ${window.ALL_VIDEOS.length} videos from API (Pre-processed)`);
             updateHeaderStats();
         } else {
             console.error("Failed to load videos", res.status);

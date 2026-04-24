@@ -70,12 +70,12 @@ class ScannerManager:
         found_paths: Set[str] = set()
         
         processed_count = 0
-        last_save_time = time.time()
+        batch_entries = []
         
         # 2. Worker Queue Pattern
         queue = asyncio.Queue(maxsize=100) # Buffer for discovered paths
         workers = []
-        num_workers = config.settings.max_concurrent_video_scans + 2 # A few extra workers to manage the queue
+        num_workers = config.settings.max_concurrent_video_scans + 2 
 
         async def _check_system_load():
             """Simple Watchdog using load average."""
@@ -83,11 +83,8 @@ class ScannerManager:
                 return
             
             try:
-                # os.getloadavg() returns 1, 5, 15 min averages
                 load = os.getloadavg()[0]
                 cpu_count = os.cpu_count() or 1
-                
-                # If load is 2x CPU count, we are heavily saturated
                 if load > cpu_count * 2:
                     if config.settings.verbose_scanning:
                         print(f"⚠️ High system load ({load:.2f}), throttling scanner...")
@@ -95,8 +92,14 @@ class ScannerManager:
             except Exception:
                 pass
 
+        async def _flush_batch():
+            nonlocal batch_entries
+            if batch_entries:
+                await asyncio.to_thread(db.bulk_upsert, batch_entries)
+                batch_entries = []
+
         async def _worker():
-            nonlocal processed_count, last_save_time
+            nonlocal processed_count
             while True:
                 try:
                     item = await queue.get()
@@ -114,8 +117,6 @@ class ScannerManager:
                 except Exception as e:
                     print(f"❌ Worker error: {e}")
                     queue.task_done()
-
-        # ... (we'll move _process_path to a method or keep it as helper)
 
         async def _process_path(path: str, dir_changed: bool, current_idx: int = 0, total_count: int = 0):
             # 1. Lane Selection
@@ -135,15 +136,12 @@ class ScannerManager:
                 if self._stop_event.is_set():
                     return
                 
-                # Check cache state
-                cached_entry = db.get(path)
-                needs_update = False
+                # Check cache state (avoid redundant DB query if we have existing_paths)
+                cached_entry = None
+                is_known = path in existing_paths
                 
                 # Fast Path: If dir hasn't changed AND we have it in DB, we can skip os.stat
-                # This is "Ultra Fast" because it avoids the filesystem overhead.
-                if not dir_changed and cached_entry and not force_rescan:
-                    # File exists and its parent dir hasn't changed structure-wise.
-                    # We still track it as found_paths to avoid orphans.
+                if not dir_changed and is_known and not force_rescan:
                     return
 
                 # Normal Path: Directory changed or new file - we need to stat it
@@ -152,19 +150,24 @@ class ScannerManager:
                 except OSError:
                     return  # file gone
 
-                if not cached_entry:
+                needs_update = False
+                if not is_known:
                     needs_update = True
                 else:
-                    # Strict validation: mtime or size change
-                    current_size_mb = file_stat.st_size / (1024 * 1024)
-                    mtime_changed = int(file_stat.st_mtime) != cached_entry.mtime
-                    size_changed = abs(current_size_mb - cached_entry.size_mb) > 0.01
-
-                    if mtime_changed or size_changed:
+                    # We need the full entry to compare mtime/size
+                    cached_entry = db.get(path)
+                    if not cached_entry:
                         needs_update = True
-                        reason = "MTime changed" if mtime_changed else "Size changed"
-                        if config.settings.verbose_scanning:
-                            print(f"📊 {reason}: {os.path.basename(path)}")
+                    else:
+                        current_size_mb = file_stat.st_size / (1024 * 1024)
+                        mtime_changed = int(file_stat.st_mtime) != cached_entry.mtime
+                        size_changed = abs(current_size_mb - cached_entry.size_mb) > 0.01
+
+                        if mtime_changed or size_changed:
+                            needs_update = True
+                            reason = "MTime changed" if mtime_changed else "Size changed"
+                            if config.settings.verbose_scanning:
+                                print(f"📊 {reason}: {os.path.basename(path)}")
 
                 if needs_update or force_rescan:
                     progress_prefix = f"[{current_idx}/{total_count}] " if total_count > 0 else ""
@@ -172,11 +175,9 @@ class ScannerManager:
                     if progress_callback:
                         progress_callback(f"Analyzing {os.path.basename(path)}")
                     
-                    # Log based on verbose setting
                     if config.settings.verbose_scanning:
                         print(f"🔍 {progress_prefix}Analyzing: {os.path.basename(path)}")
                     elif (processed_count > 0 and processed_count % 50 == 0) or current_idx == total_count:
-                        # Only print indexing if we actually found something new/updated and processed it
                         if processed_count > 0:
                             print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
                     
@@ -189,13 +190,10 @@ class ScannerManager:
                         entry = None
                     
                     if entry:
-                        # ...
-                        # Apply business logic (Bitrate Threshold)
                         params_bitrate = config.settings.bitrate_threshold_kbps
                         if entry.bitrate_mbps * 1000 > params_bitrate and entry.status == "OK":
                             entry.status = "HIGH"
                             
-                        # Preserve user flags if existed (re-entry)
                         if cached_entry:
                             entry.favorite = cached_entry.favorite
                             entry.vaulted = cached_entry.vaulted
@@ -203,72 +201,46 @@ class ScannerManager:
                             if cached_entry.imported_at > 0:
                                 entry.imported_at = cached_entry.imported_at
                         
-                        # Populate date fields (reuse file_stat from above)
                         entry.mtime = int(file_stat.st_mtime)
-                        
-                        # If imported_at is still 0 (new file), set to now
                         if entry.imported_at == 0:
                             entry.imported_at = int(time.time())
                         
-                        # Deterministic thumb name
                         file_hash = hashlib.md5(path.encode('utf-8', 'surrogateescape')).hexdigest()
                         entry.thumb = f"thumb_{file_hash}.jpg"
 
-                        # Pre-generate thumbnail during scan if enabled
                         if config.settings.precompute_thumbnails:
                             thumb_path = os.path.join(config.thumb_dir, entry.thumb)
                             if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
                                 from ..core.video_processor import create_thumbnail
-                                # Pass duration to avoid redundant ffprobe
                                 duration = entry.duration_sec if hasattr(entry, 'duration_sec') else None
                                 await asyncio.to_thread(create_thumbnail, path, duration)
-
                             
-                        # Upsert AFTER populating assets
-                        db.upsert(entry)
-                        
-                        nonlocal last_save_time
-                        
-                        # Quick Save periodically (every 500 for speed)
-                        # Optimized to avoid quadratic write overhead:
-                        # Only save if 500 items processed AND > 60s passed
-                        if processed_count % 500 == 0:
-                            current_time = time.time()
-                            if current_time - last_save_time > 60:
-                                db.save()
-                                last_save_time = current_time
+                        # Batching for performance
+                        batch_entries.append(entry)
+                        if len(batch_entries) >= 100:
+                            await _flush_batch()
 
         try:
             # Start Workers
             for _ in range(num_workers):
                 workers.append(asyncio.create_task(_worker()))
 
-            # 2. Discovery Loop -> Feed Queue
-            print("🔍 Walking directories to count files...")
-            total_discovered = 0
-            
-            # First pass: count for progress (if we want real totals, otherwise we can stream)
-            all_items = []
-            async for item in fs_scanner.scan_directories(config.active_scan_targets):
+            # 2. Discovery Loop -> Feed Queue (Streaming for better performance)
+            idx = 0
+            async for file_path, dir_changed in fs_scanner.scan_directories(config.active_scan_targets):
                 if self._stop_event.is_set():
                     break
-                all_items.append(item)
-            
-            total_discovered = len(all_items)
-            if total_discovered > 0:
-                print(f"📂 Found {total_discovered} files. Starting processing...")
-            
-            for idx, (file_path, dir_changed) in enumerate(all_items, 1):
-                if self._stop_event.is_set():
-                    break
+                
+                idx += 1
                 found_paths.add(file_path)
-                await queue.put((file_path, dir_changed, idx, total_discovered))
+                await queue.put((file_path, dir_changed, idx, 0)) # Stream it!
 
             # Stop Workers
             for _ in range(num_workers):
                 await queue.put(None)
             
             await asyncio.gather(*workers)
+            await _flush_batch() # Final flush
 
             # 4. Prune Orphans (files deleted OR now excluded)
             if found_paths:
@@ -280,8 +252,6 @@ class ScannerManager:
                 
                 if removed_count > 0:
                     print(f"🗑 Removed {removed_count} files (deleted or now excluded).")
-
-            db.save()
             
             # Save scan timestamp for incremental scanning
             fs_scanner.save_last_scan_time()
