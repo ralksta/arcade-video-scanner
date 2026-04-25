@@ -97,7 +97,7 @@ class ScannerManager:
             if batch_entries:
                 count = len(batch_entries)
                 await asyncio.to_thread(db.bulk_upsert, batch_entries)
-                logger.info(f"✅ Saved batch of {count} videos to database.")
+                print(f"✅ Saved batch of {count} videos to database.")
                 batch_entries = []
 
         async def _worker():
