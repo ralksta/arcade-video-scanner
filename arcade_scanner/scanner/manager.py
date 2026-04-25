@@ -189,7 +189,9 @@ class ScannerManager:
                         print(f"❌ {progress_prefix}Inspect failed for {path}: {e}")
                         entry = None
                     
-                    if entry:
+                    if not entry:
+                        print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
+                    else:
                         params_bitrate = config.settings.bitrate_threshold_kbps
                         if entry.bitrate_mbps * 1000 > params_bitrate and entry.status == "OK":
                             entry.status = "HIGH"
@@ -217,7 +219,7 @@ class ScannerManager:
                             
                         # Batching for performance
                         batch_entries.append(entry)
-                        if len(batch_entries) >= 100:
+                        if len(batch_entries) >= 10:
                             await _flush_batch()
 
         try:

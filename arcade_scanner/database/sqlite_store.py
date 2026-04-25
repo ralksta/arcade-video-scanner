@@ -65,6 +65,17 @@ class SQLiteStore:
         self._conn: Optional[sqlite3.Connection] = None
         self._migrated = False
         self._write_lock = threading.Lock()  # Serialise all writes
+        self.on_change_callbacks = []
+
+    def register_on_change(self, callback):
+        self.on_change_callbacks.append(callback)
+
+    def _notify_change(self):
+        for cb in self.on_change_callbacks:
+            try:
+                cb()
+            except Exception:
+                pass
 
     def _ensure_connection(self):
         """Lazy-init the connection and create schema if needed."""
@@ -322,6 +333,7 @@ class SQLiteStore:
                 f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                 values,
             )
+            self._notify_change()
 
     def bulk_upsert(self, entries) -> None:
         """Insert or replace multiple entries in a single transaction."""
@@ -351,6 +363,7 @@ class SQLiteStore:
             except Exception:
                 self._conn.execute("ROLLBACK")
                 raise
+            self._notify_change()
 
     def remove(self, path: str) -> None:
         """Delete an entry by file_path."""
@@ -358,6 +371,7 @@ class SQLiteStore:
             self._ensure_connection()
             safe_path = self._get_safe_path(path)
             self._conn.execute("DELETE FROM media WHERE file_path = ?", (safe_path,))
+            self._notify_change()
 
     def delete_all_photos(self) -> int:
         """Delete all entries where media_type = 'image'. Returns the number of deleted rows."""

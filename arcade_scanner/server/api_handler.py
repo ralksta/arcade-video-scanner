@@ -57,6 +57,7 @@ class _MediaCache:
 
 
 _media_cache = _MediaCache()
+db.register_on_change(_media_cache.invalidate)
 
 
 class DuplicateScanManager:

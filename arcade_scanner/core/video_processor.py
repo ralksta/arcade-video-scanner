@@ -104,12 +104,14 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
                 logger.warning("Thumbnail extract failed at %s (scene_detect=%s) for %s: %s", seek_time, use_scene_detect, video_path, e)
                 return False
 
-        # Attempt 1: Smart Seek with Scene Detection
-        success = try_extract(ss, use_scene_detect=True)
+        # Attempt 1: Simple Smart Seek (Fastest)
+        success = try_extract(ss, use_scene_detect=False)
         
-        # Attempt 2: Smart Seek without Scene Detection
+        # Attempt 2: Smart Seek with Scene Detection (Optional fallback)
+        # We only do this if Attempt 1 failed or we really want fancy thumbnails
+        # For now, let's keep it simple to avoid timeouts
         if not success:
-            success = try_extract(ss, use_scene_detect=False)
+            success = try_extract(ss, use_scene_detect=True)
         
         # Attempt 3: Fallback to 0s if failed
         if not success and ss != "0":

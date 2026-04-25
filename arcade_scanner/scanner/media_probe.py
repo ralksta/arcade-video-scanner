@@ -30,7 +30,7 @@ class MediaProbe:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
             
             if process.returncode != 0:
                 return {}
@@ -59,7 +59,7 @@ class MediaProbe:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15.0)
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
             
             # Any output on stderr = decoder errors/warnings
             return bool(stderr.decode('utf-8').strip())
