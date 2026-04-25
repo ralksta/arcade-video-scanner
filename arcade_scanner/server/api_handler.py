@@ -607,6 +607,44 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(filtered_videos, default=str).encode("utf-8"))
+
+            elif self.path == "/api/debug/dump":
+                # GET: Return full system state for debugging
+                debug_info = {
+                    "config": {
+                        "active_scan_targets": config.active_scan_targets,
+                        "active_exclude_paths": config.active_exclude_paths,
+                        "hidden_data_dir": config.hidden_data_dir,
+                    },
+                    "users": [],
+                    "db_stats": {
+                        "total_count": db.count(),
+                        "samples": []
+                    }
+                }
+                
+                # Users
+                for u in user_db.get_all_users():
+                    debug_info["users"].append({
+                        "username": u.username,
+                        "is_admin": u.is_admin,
+                        "targets": u.data.scan_targets
+                    })
+                
+                # DB Samples (Top 20)
+                cursor = db._conn.execute("SELECT file_path, status, media_type FROM media LIMIT 20")
+                for row in cursor:
+                    debug_info["db_stats"]["samples"].append({
+                        "path": row[0],
+                        "status": row[1],
+                        "type": row[2]
+                    })
+                
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(debug_info, default=str).encode("utf-8"))
+
             
             elif self.path.startswith("/api/video/tags?"):
                 # GET: Return tags for a specific video
