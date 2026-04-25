@@ -107,17 +107,17 @@ def render_header(theme: BaseTheme, hostname: str, count: int, size_gb: str) -> 
         <span class="opacity-20">|</span>
         <div class="flex items-center gap-2">
             <span class="material-icons text-[14px] text-arcade-cyan">movie</span>
-            <span id="header-video-count">{count}</span> Videos
+            <span id="header-video-count">...</span> Videos
         </div>
         <span class="opacity-20" id="image-separator" style="display:none;">|</span>
         <div class="flex items-center gap-2" id="image-count-section" style="display:none;">
             <span class="material-icons text-[14px] text-purple-400">image</span>
-            <span id="header-image-count">0</span> Images
+            <span id="header-image-count">...</span> Images
         </div>
         <span class="opacity-20">|</span>
         <div class="flex items-center gap-2">
             <span class="material-icons text-[14px] text-arcade-pink">save</span>
-            <span id="header-size">{size_gb} GB</span>
+            <span id="header-size">...</span>
         </div>
         <span class="opacity-20">|</span>
         <button onclick="toggleTheme()" class="hover:bg-black/5 dark:hover:bg-white/10 p-1.5 rounded-lg transition-colors" title="Switch Theme">
