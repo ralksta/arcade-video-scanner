@@ -178,8 +178,8 @@ class ScannerManager:
                         progress_callback(f"Analyzing {os.path.basename(path)}")
                     
                     if config.settings.verbose_scanning:
-                        print(f"🔍 {progress_prefix}Analyzing: {os.path.basename(path)}")
-                    elif (processed_count > 0 and processed_count % 50 == 0) or current_idx == total_count:
+                        print(f"🔍 {progress_prefix}Analyzing (FULL PATH): {path}")
+                    elif (processed_count > 0 and processed_count % 10 == 0) or current_idx == total_count:
                         if processed_count > 0:
                             print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
                     
