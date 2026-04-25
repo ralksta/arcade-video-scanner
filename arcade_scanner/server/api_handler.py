@@ -578,14 +578,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 
                 # Filter videos
                 user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
-                filtered_videos = []
+                print(f"🔍 API Debug: User '{user_name}' targets: {user_targets}")
 
-                # If user has no targets, they see nothing (or maybe we allow strict isolation?)
-                # If user is admin? Admin typically sees all? 
-                # Request was "include and excludes already different for every user?".
-                # Implies users only see what they define.
-                
-                # Fetch once, use in both branches below
+                filtered_videos = []
                 all_entries = _media_cache.get()
 
                 # ADMIN OVERRIDE: If no targets defined, Admin sees all.
@@ -593,11 +588,20 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     filtered_videos = [e.model_dump(by_alias=True) for e in all_entries]
                 elif user_targets:
                     # Optimized: Check path BEFORE serialization
+                    match_count = 0
                     for entry in all_entries:
                         v_path = os.path.abspath(entry.file_path)
+                        is_match = any(v_path.startswith(t) for t in user_targets)
                         # Always show items in Review mode, regardless of scan targets
-                        if entry.status == "REVIEW" or any(v_path.startswith(t) for t in user_targets):
+                        if entry.status == "REVIEW" or is_match:
                              filtered_videos.append(entry.model_dump(by_alias=True))
+                             if is_match: match_count += 1
+                    
+                    if not filtered_videos and all_entries:
+                         sample = os.path.abspath(all_entries[0].file_path)
+                         print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(sample.startswith(t) for t in user_targets)})")
+                    else:
+                         print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
                 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
