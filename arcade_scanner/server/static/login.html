@@ -174,7 +174,7 @@
                 });
 
                 if (res.ok) {
-                    window.location.reload();
+                    window.location.href = '/';
                 } else if (res.status === 429) {
                     err.innerText = 'Too many attempts. Try again in 15 minutes.';
                     err.style.display = 'block';

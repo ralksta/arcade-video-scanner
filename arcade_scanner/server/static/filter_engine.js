@@ -124,6 +124,14 @@ function filterAndSort(scrollToTop = false) {
 
         let vCount = 0; let tSize = 0;
 
+        const stats = {
+            videoCount: 0,
+            imageCount: 0,
+            totalSizeMB: 0,
+            under50: 0,
+            totalBitrate: 0
+        };
+
         // Standard Filtering
         if (workspaceMode === 'optimized') {
             const pairs = [];
@@ -178,15 +186,7 @@ function filterAndSort(scrollToTop = false) {
             });
 
             filteredVideos = pairs;
-
-            const stats = {
-                videoCount: 0,
-                imageCount: 0,
-                totalSizeMB: 0,
-                under50: 0,
-                totalBitrate: 0
-            };
-
+        } else {
             filteredVideos = window.ALL_VIDEOS.filter(v => {
                 // Use pre-calculated values (set in engine.js:loadVideoData)
                 const name = v._fileNameLower || "";
@@ -265,6 +265,9 @@ function filterAndSort(scrollToTop = false) {
                 }
                 stats.totalSizeMB += (v.Size_MB || 0);
                 
+                vCount++;
+                tSize += (v.Size_MB || 0);
+
                 return true;
             });
 
@@ -339,14 +342,14 @@ function _updateQuickStats(stats, workspaceMode) {
         : totalSizeMB.toFixed(0) + ' MB';
 
     const parts = [
-        `<span class="qs-stat"><span class="qs-val">${videoItems.length}</span> Videos</span>`,
+        `<span class="qs-stat"><span class="qs-val">${videoCount}</span> Videos</span>`,
     ];
-    if (imageItems.length > 0) {
-        parts.push(`<span class="qs-stat"><span class="qs-val">${imageItems.length}</span> Images</span>`);
+    if (imageCount > 0) {
+        parts.push(`<span class="qs-stat"><span class="qs-val">${imageCount}</span> Images</span>`);
     }
     parts.push(`<span class="qs-stat"><span class="qs-val">${sizeLabel}</span> total</span>`);
 
-    if (videoItems.length > 0) {
+    if (videoCount > 0) {
         const potColor = pctSmall > 50 ? '#4ade80' : pctSmall > 20 ? '#fbbf24' : '#f87171';
         parts.push(`<span class="qs-stat" title="${under50} files under 50 MB">
             <span class="qs-val" style="color:${potColor}">${pctSmall}%</span>

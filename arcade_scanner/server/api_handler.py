@@ -419,6 +419,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # 3. STATIC ASSETS -> Catch-all for any path containing /static/
             elif "/static/" in self.path:
                 try:
+                    # If already logged in and hitting login page, redirect to root
+                    if self.path.split('?')[0].endswith("/static/login.html"):
+                        if self.get_current_user():
+                            self.send_response(302)
+                            self.send_header("Location", "/")
+                            self.end_headers()
+                            return
+
                     # Robustly extract relative path: get everything after the last "/static/"
                     # This handles paths like /static/styles.css AND /arcade_scanner/server/static/styles.css
                     rel_path = self.path.split("/static/")[-1].split('?')[0]
