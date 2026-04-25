@@ -640,6 +640,27 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         "type": row[2]
                     })
                 
+                # Mount Check
+                mount_status = {}
+                for m in ["/media", "/media_nas", "/media_ralf"]:
+                    exists = os.path.exists(m)
+                    is_dir = os.path.isdir(m)
+                    try:
+                        count = len(os.listdir(m)) if exists and is_dir else 0
+                        sample = os.listdir(m)[:3] if count > 0 else []
+                    except Exception as e:
+                        count = -1
+                        sample = [str(e)]
+                    
+                    mount_status[m] = {
+                        "exists": exists,
+                        "is_dir": is_dir,
+                        "count": count,
+                        "sample": sample
+                    }
+                
+                debug_info["mount_check"] = mount_status
+                
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
