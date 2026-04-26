@@ -49,6 +49,7 @@ class MediaProbe:
         cmd = [
             config.settings.ffmpeg_path or "ffmpeg",
             "-v", "error",
+            "-threads", "1",   # CRITICAL: Limit threads to save memory (prevent OOM 137)
             "-t", "30",        # Only probe first 30 seconds — fast even for large files
             "-i", filepath,
             "-f", "null", "-",
@@ -59,7 +60,7 @@ class MediaProbe:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=90.0)
             
             # Any output on stderr = decoder errors/warnings
             return bool(stderr.decode('utf-8').strip())

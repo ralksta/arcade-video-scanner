@@ -284,6 +284,22 @@ class SQLiteStore:
                 print(f"⚠️ Skipping corrupted DB row: {e}")
         return results
 
+    def get_all_dicts(self) -> List[dict]:
+        """Return all entries as plain dictionaries with UI aliases.
+        
+        This is much more memory efficient than get_all() for large libraries,
+        as it avoids Pydantic model overhead.
+        """
+        self._ensure_connection()
+        cursor = self._conn.execute("SELECT * FROM media")
+        results = []
+        for row in cursor:
+            try:
+                results.append(self._row_to_api_dict(row))
+            except Exception as e:
+                print(f"⚠️ Skipping corrupted DB row (dict): {e}")
+        return results
+
     def get(self, path: str) -> Optional[VideoEntry]:
         """Lookup a single entry by file_path. O(1) indexed."""
         self._ensure_connection()
@@ -430,7 +446,11 @@ class SQLiteStore:
 
     def _row_to_entry(self, row: sqlite3.Row) -> VideoEntry:
         """Convert a database row to a VideoEntry model."""
-        # Handle surrogate-escaped paths that were stored as bytes or strings
+        return VideoEntry(**self._row_to_api_dict(row))
+
+    def _row_to_api_dict(self, row: sqlite3.Row) -> dict:
+        """Convert a database row to a dictionary with UI-friendly aliases."""
+        # Handle surrogate-escaped paths
         file_path = self._decode_safe_path(row["file_path"])
 
         tags = row["tags"]
@@ -440,31 +460,31 @@ class SQLiteStore:
             except (json.JSONDecodeError, TypeError):
                 tags = []
 
-        return VideoEntry(
-            file_path=file_path,
-            size_mb=row["size_mb"] or 0.0,
-            bitrate_mbps=row["bitrate_mbps"] or 0.0,
-            status=row["status"] or "OK",
-            media_type=row["media_type"] or "video",
-            codec=row["codec"] or "unknown",
-            duration_sec=row["duration_sec"] or 0.0,
-            width=row["width"] or 0,
-            height=row["height"] or 0,
-            audio_codec=row["audio_codec"] or "unknown",
-            audio_channels=row["audio_channels"] or 0,
-            container_format=row["container_format"] or "unknown",
-            profile=row["profile"] or "",
-            level=row["level"] or 0.0,
-            pixel_format=row["pixel_format"] or "",
-            frame_rate=row["frame_rate"] or 0.0,
-            favorite=bool(row["favorite"]),
-            vaulted=bool(row["vaulted"]),
-            tags=tags if isinstance(tags, list) else [],
-            thumb=row["thumb"] or "",
-            imported_at=row["imported_at"] or 0,
-            mtime=row["mtime"] or 0,
-            original_path=row["original_path"] or "",
-        )
+        return {
+            "FilePath": file_path,
+            "Size_MB": row["size_mb"] or 0.0,
+            "Bitrate_Mbps": row["bitrate_mbps"] or 0.0,
+            "Status": row["status"] or "OK",
+            "media_type": row["media_type"] or "video",
+            "codec": row["codec"] or "unknown",
+            "Duration_Sec": row["duration_sec"] or 0.0,
+            "Width": row["width"] or 0,
+            "Height": row["height"] or 0,
+            "AudioCodec": row["audio_codec"] or "unknown",
+            "AudioChannels": row["audio_channels"] or 0,
+            "Container": row["container_format"] or "unknown",
+            "Profile": row["profile"] or "",
+            "Level": row["level"] or 0.0,
+            "PixelFormat": row["pixel_format"] or "",
+            "FrameRate": row["frame_rate"] or 0.0,
+            "favorite": bool(row["favorite"]),
+            "hidden": bool(row["vaulted"]),
+            "tags": tags if isinstance(tags, list) else [],
+            "thumb": row["thumb"] or "",
+            "imported_at": row["imported_at"] or 0,
+            "mtime": row["mtime"] or 0,
+            "OriginalPath": row["original_path"] or "",
+        }
 
     def _entry_to_tuple(self, entry: VideoEntry) -> tuple:
         """Convert a VideoEntry to a tuple matching _COLUMNS order."""

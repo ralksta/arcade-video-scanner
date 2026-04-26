@@ -75,7 +75,9 @@ class ScannerManager:
         # 2. Worker Queue Pattern
         queue = asyncio.Queue(maxsize=100) # Buffer for discovered paths
         workers = []
-        num_workers = config.settings.max_concurrent_video_scans + 2 
+        # Number of workers should match concurrency settings to avoid process pile-up
+        num_workers = config.settings.max_concurrent_video_scans
+        if num_workers < 1: num_workers = 1
 
         async def _check_system_load():
             """Simple Watchdog using load average."""
@@ -85,10 +87,10 @@ class ScannerManager:
             try:
                 load = os.getloadavg()[0]
                 cpu_count = os.cpu_count() or 1
-                if load > cpu_count * 2:
+                if load > cpu_count * 1.5:
                     if config.settings.verbose_scanning:
-                        print(f"⚠️ High system load ({load:.2f}), throttling scanner...")
-                    await asyncio.sleep(2)
+                        print(f"⚠️ High system load ({load:.2f}), throttling scanner (5s cooldown)...")
+                    await asyncio.sleep(5)
             except Exception:
                 pass
 
@@ -134,45 +136,49 @@ class ScannerManager:
             if not inspector or not sem:
                 return
 
+            # --- PRE-SCAN CACHE CHECK (Outside Semaphore) ---
+            # Fast Path: If dir hasn't changed AND we have it in DB, we can skip os.stat
+            is_known = path in existing_paths
+            if not dir_changed and is_known and not force_rescan:
+                return
+
+            # Normal Path: Directory changed or new file - we need to stat it
+            try:
+                # We do os.stat outside the semaphore to keep it free for heavy tasks
+                file_stat = await asyncio.to_thread(os.stat, path)
+            except OSError:
+                return  # file gone
+
+            needs_update = False
+            cached_entry = None
+            if not is_known:
+                needs_update = True
+            else:
+                # We need the full entry to compare mtime/size
+                # Targeted DB query is fast and doesn't need a semaphore
+                cached_entry = db.get(path)
+                if not cached_entry:
+                    needs_update = True
+                else:
+                    current_size_mb = file_stat.st_size / (1024 * 1024)
+                    mtime_changed = int(file_stat.st_mtime) != cached_entry.mtime
+                    size_changed = abs(current_size_mb - cached_entry.size_mb) > 0.01
+
+                    if mtime_changed or size_changed:
+                        needs_update = True
+                        reason = "MTime changed" if mtime_changed else "Size changed"
+                        if config.settings.verbose_scanning:
+                            print(f"📊 {reason}: {os.path.basename(path)}")
+
+            if not (needs_update or force_rescan):
+                return
+
+            # --- HEAVY TASK (Inside Semaphore) ---
             async with sem:
                 if self._stop_event.is_set():
                     return
                 
-                # Check cache state (avoid redundant DB query if we have existing_paths)
-                cached_entry = None
-                is_known = path in existing_paths
-                
-                # Fast Path: If dir hasn't changed AND we have it in DB, we can skip os.stat
-                if not dir_changed and is_known and not force_rescan:
-                    return
-
-                # Normal Path: Directory changed or new file - we need to stat it
-                try:
-                    file_stat = await asyncio.to_thread(os.stat, path)
-                except OSError:
-                    return  # file gone
-
-                needs_update = False
-                if not is_known:
-                    needs_update = True
-                else:
-                    # We need the full entry to compare mtime/size
-                    cached_entry = db.get(path)
-                    if not cached_entry:
-                        needs_update = True
-                    else:
-                        current_size_mb = file_stat.st_size / (1024 * 1024)
-                        mtime_changed = int(file_stat.st_mtime) != cached_entry.mtime
-                        size_changed = abs(current_size_mb - cached_entry.size_mb) > 0.01
-
-                        if mtime_changed or size_changed:
-                            needs_update = True
-                            reason = "MTime changed" if mtime_changed else "Size changed"
-                            if config.settings.verbose_scanning:
-                                print(f"📊 {reason}: {os.path.basename(path)}")
-
-                if needs_update or force_rescan:
-                    progress_prefix = f"[{current_idx}/{total_count}] " if total_count > 0 else ""
+                progress_prefix = f"[{current_idx}/{total_count}] " if total_count > 0 else ""
                     
                     if progress_callback:
                         progress_callback(f"Analyzing {os.path.basename(path)}")

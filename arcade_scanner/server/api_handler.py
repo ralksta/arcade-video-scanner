@@ -43,7 +43,7 @@ class _MediaCache:
             if self._data is not None and (now - self._timestamp) < self.TTL:
                 return self._data
         # Cache-Miss: außerhalb des Locks lesen um Blocking zu minimieren
-        fresh = db.get_all()
+        fresh = db.get_all_dicts()
         with self._lock:
             self._data = fresh
             self._timestamp = time.monotonic()
@@ -115,8 +115,8 @@ class ReportDebouncer:
 
     def _generate(self, port):
         try:
-            # Re-fetch results to ensure freshness
-            results = [e.model_dump(by_alias=True) for e in _media_cache.get()]
+            # Re-fetch results to ensure freshness (already dicts from cache)
+            results = _media_cache.get()
             generate_html_report(results, config.report_file, server_port=port)
             # print(f"✅ HTML Report regenerated (debounced)")
         except Exception as e:
@@ -585,20 +585,20 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                 # ADMIN OVERRIDE: If no targets defined, Admin sees all.
                 if not user_targets and u.is_admin:
-                    filtered_videos = [e.model_dump(by_alias=True) for e in all_entries]
+                    filtered_videos = all_entries
                 elif user_targets:
-                    # Optimized: Check path BEFORE serialization
+                    # Optimized: Data is already in API-friendly dict format
                     match_count = 0
                     for entry in all_entries:
-                        v_path = os.path.abspath(entry.file_path)
+                        v_path = os.path.abspath(entry["FilePath"])
                         is_match = any(v_path.startswith(t) for t in user_targets)
                         # Always show items in Review mode, regardless of scan targets
-                        if entry.status == "REVIEW" or is_match:
-                             filtered_videos.append(entry.model_dump(by_alias=True))
+                        if entry["Status"] == "REVIEW" or is_match:
+                             filtered_videos.append(entry)
                              if is_match: match_count += 1
                     
                     if not filtered_videos and all_entries:
-                         sample = os.path.abspath(all_entries[0].file_path)
+                         sample = os.path.abspath(all_entries[0]["FilePath"])
                          print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(sample.startswith(t) for t in user_targets)})")
                     else:
                          print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
