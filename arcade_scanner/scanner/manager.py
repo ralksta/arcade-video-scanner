@@ -191,10 +191,15 @@ class ScannerManager:
                 
                 # 3. Probe using Selected Inspector
                 entry: Optional[MediaAsset] = None
+                scan_start_time = time.time()
                 try:
                     entry = await inspector.inspect(path)
+                    scan_duration = time.time() - scan_start_time
+                    if config.settings.verbose_scanning:
+                        print(f"⏱️  Finished in {scan_duration:.2f}s: {os.path.basename(path)}")
                 except Exception as e:
-                    print(f"❌ {progress_prefix}Inspect failed for {path}: {e}")
+                    scan_duration = time.time() - scan_start_time
+                    print(f"❌ {progress_prefix}Inspect failed in {scan_duration:.2f}s for {path}: {e}")
                     entry = None
                 
                 if not entry:

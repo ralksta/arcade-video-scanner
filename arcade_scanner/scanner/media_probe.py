@@ -40,32 +40,7 @@ class MediaProbe:
         except Exception:
             return {}
 
-    async def _check_decoder_errors(self, filepath: str) -> bool:
-        """
-        Runs a fast decode pass via `ffmpeg -f null -` and returns True if
-        decoder errors (corrupt frames, missing references, etc.) are found.
-        Only checks the first 30 seconds to keep scan performance acceptable.
-        """
-        cmd = [
-            config.settings.ffmpeg_path or "ffmpeg",
-            "-v", "error",
-            "-threads", "1",   # CRITICAL: Limit threads to save memory (prevent OOM 137)
-            "-t", "30",        # Only probe first 30 seconds — fast even for large files
-            "-i", filepath,
-            "-f", "null", "-",
-        ]
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=90.0)
-            
-            # Any output on stderr = decoder errors/warnings
-            return bool(stderr.decode('utf-8').strip())
-        except Exception:
-            return False
+
 
     async def get_metadata(self, filepath: str) -> Optional[VideoEntry]:
         """
@@ -126,16 +101,9 @@ class MediaProbe:
 
             # Determine status (legacy logic: > threshold = HIGH)
             # We will refine this later with config injection, but for now defaults.
-            status = "OK" # Default, updated by manager logic typically
-
-            # Corruption check: decode pass to detect broken frames/streams
-            # Only run on actual video files (skip images, audio-only, etc.)
-            has_error = False
-            if video_stream:
-                has_error = await self._check_decoder_errors(filepath)
-                
-            if has_error:
-                status = "CORRUPT"
+            # We rely on ffprobe returning valid metadata as the health check.
+            # Deep decoding pass was removed to optimize scan speed.
+            status = "OK" 
             
             return VideoEntry(
                 FilePath=filepath,
