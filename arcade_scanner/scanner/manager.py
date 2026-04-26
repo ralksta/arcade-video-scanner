@@ -180,55 +180,55 @@ class ScannerManager:
                 
                 progress_prefix = f"[{current_idx}/{total_count}] " if total_count > 0 else ""
                     
-                    if progress_callback:
-                        progress_callback(f"Analyzing {os.path.basename(path)}")
-                    
-                    if config.settings.verbose_scanning:
-                        print(f"🔍 {progress_prefix}Analyzing (FULL PATH): {path}")
-                    elif (processed_count > 0 and processed_count % 10 == 0) or current_idx == total_count:
-                        if processed_count > 0:
-                            print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
-                    
-                    # 3. Probe using Selected Inspector
-                    entry: Optional[MediaAsset] = None
-                    try:
-                        entry = await inspector.inspect(path)
-                    except Exception as e:
-                        print(f"❌ {progress_prefix}Inspect failed for {path}: {e}")
-                        entry = None
-                    
-                    if not entry:
-                        print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
-                    else:
-                        params_bitrate = config.settings.bitrate_threshold_kbps
-                        if entry.bitrate_mbps * 1000 > params_bitrate and entry.status == "OK":
-                            entry.status = "HIGH"
-                            
-                        if cached_entry:
-                            entry.favorite = cached_entry.favorite
-                            entry.vaulted = cached_entry.vaulted
-                            entry.tags = cached_entry.tags
-                            if cached_entry.imported_at > 0:
-                                entry.imported_at = cached_entry.imported_at
+                if progress_callback:
+                    progress_callback(f"Analyzing {os.path.basename(path)}")
+                
+                if config.settings.verbose_scanning:
+                    print(f"🔍 {progress_prefix}Analyzing (FULL PATH): {path}")
+                elif (processed_count > 0 and processed_count % 10 == 0) or current_idx == total_count:
+                    if processed_count > 0:
+                        print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
+                
+                # 3. Probe using Selected Inspector
+                entry: Optional[MediaAsset] = None
+                try:
+                    entry = await inspector.inspect(path)
+                except Exception as e:
+                    print(f"❌ {progress_prefix}Inspect failed for {path}: {e}")
+                    entry = None
+                
+                if not entry:
+                    print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
+                else:
+                    params_bitrate = config.settings.bitrate_threshold_kbps
+                    if entry.bitrate_mbps * 1000 > params_bitrate and entry.status == "OK":
+                        entry.status = "HIGH"
                         
-                        entry.mtime = int(file_stat.st_mtime)
-                        if entry.imported_at == 0:
-                            entry.imported_at = int(time.time())
-                        
-                        file_hash = hashlib.md5(path.encode('utf-8', 'surrogateescape')).hexdigest()
-                        entry.thumb = f"thumb_{file_hash}.jpg"
+                    if cached_entry:
+                        entry.favorite = cached_entry.favorite
+                        entry.vaulted = cached_entry.vaulted
+                        entry.tags = cached_entry.tags
+                        if cached_entry.imported_at > 0:
+                            entry.imported_at = cached_entry.imported_at
+                    
+                    entry.mtime = int(file_stat.st_mtime)
+                    if entry.imported_at == 0:
+                        entry.imported_at = int(time.time())
+                    
+                    file_hash = hashlib.md5(path.encode('utf-8', 'surrogateescape')).hexdigest()
+                    entry.thumb = f"thumb_{file_hash}.jpg"
 
-                        if config.settings.precompute_thumbnails:
-                            thumb_path = os.path.join(config.thumb_dir, entry.thumb)
-                            if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
-                                from ..core.video_processor import create_thumbnail
-                                duration = entry.duration_sec if hasattr(entry, 'duration_sec') else None
-                                await asyncio.to_thread(create_thumbnail, path, duration)
-                            
-                        # Batching for performance
-                        batch_entries.append(entry)
-                        if len(batch_entries) >= 10:
-                            await _flush_batch()
+                    if config.settings.precompute_thumbnails:
+                        thumb_path = os.path.join(config.thumb_dir, entry.thumb)
+                        if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+                            from ..core.video_processor import create_thumbnail
+                            duration = entry.duration_sec if hasattr(entry, 'duration_sec') else None
+                            await asyncio.to_thread(create_thumbnail, path, duration)
+                        
+                    # Batching for performance
+                    batch_entries.append(entry)
+                    if len(batch_entries) >= 10:
+                        await _flush_batch()
 
         try:
             # Start Workers
