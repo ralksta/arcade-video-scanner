@@ -205,8 +205,12 @@ class ScannerManager:
                 if not entry:
                     print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
                 else:
-                    params_bitrate = config.settings.bitrate_threshold_kbps
-                    if entry.bitrate_mbps * 1000 > params_bitrate and entry.status == "OK":
+                    parent_dir = os.path.basename(os.path.dirname(path)).lower()
+                    is_source_dir = parent_dir in ['source', 'originals', 'raw']
+                    
+                    if is_source_dir or entry.bitrate_mbps > config.settings.source_bitrate_threshold_mbps:
+                        entry.status = "SOURCE"
+                    elif entry.bitrate_mbps * 1000 > config.settings.bitrate_threshold_kbps and entry.status == "OK":
                         entry.status = "HIGH"
                         
                     if cached_entry:

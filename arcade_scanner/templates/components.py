@@ -272,6 +272,20 @@ CINEMA_MODAL_COMPONENT = """
     
     <img id="cinemaImage" class="hidden max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg object-contain transition-all duration-500 origin-bottom" src="">
     
+    <div id="cinemaSourceMessage" class="hidden flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-2xl p-8 border border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.15)] text-center animate-glow-pulse glow-purple max-w-md w-full mx-4 z-40">
+        <span class="material-icons text-purple-400 text-6xl mb-4">movie_filter</span>
+        <h3 class="text-white text-xl font-bold tracking-widest mb-2">SOURCE MEDIA</h3>
+        <p class="text-gray-400 text-sm mb-6 leading-relaxed">This high-bitrate file exceeds streaming limits and is preserved in raw quality.</p>
+        <div class="flex gap-4 w-full">
+            <button onclick="cinemaLocate()" class="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
+                <span class="material-icons text-[18px]">folder_open</span> LOCATE
+            </button>
+            <a id="cinemaDownloadBtn" href="" download class="flex-1 py-3 px-4 bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-white border border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] rounded-xl font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
+                <span class="material-icons text-[18px]">download</span> DOWNLOAD
+            </a>
+        </div>
+    </div>
+    
     <div id="cinemaInfoPanel" class="absolute top-20 right-4 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 transform translate-x-[120%] transition-transform duration-300 z-40 text-sm text-gray-300 animate-glow-pulse glow-cyan">
         <div class="flex items-center gap-2 mb-3 text-white font-bold border-b border-white/10 pb-2">
             <span class="material-icons text-sm">info</span>
@@ -789,6 +803,9 @@ FILTER_PANEL_COMPONENT = """
                 <div class="flex flex-wrap gap-2">
                     <button class="filter-chip active" data-filter="status" data-value="all" onclick="setFilterOption('status', 'all')">
                         All
+                    </button>
+                    <button class="filter-chip" data-filter="status" data-value="SOURCE" onclick="setFilterOption('status', 'SOURCE')">
+                        Source (Raw)
                     </button>
                     <button class="filter-chip" data-filter="status" data-value="HIGH" onclick="setFilterOption('status', 'HIGH')">
                         High Bitrate

@@ -100,12 +100,13 @@ function renderFolderView(ctx, canvas, videos) {
         const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
 
         if (!folderMap.has(folder)) {
-            folderMap.set(folder, { items: [], totalSize: 0, highCount: 0, okCount: 0 });
+            folderMap.set(folder, { items: [], totalSize: 0, highCount: 0, sourceCount: 0, okCount: 0 });
         }
         const f = folderMap.get(folder);
         f.items.push(v);
         f.totalSize += v.Size_MB;
         if (v.Status === 'HIGH') f.highCount++;
+        else if (v.Status === 'SOURCE') f.sourceCount++;
         else f.okCount++;
     });
 
@@ -120,6 +121,7 @@ function renderFolderView(ctx, canvas, videos) {
             size: value.totalSize,
             count: value.items.length,
             highCount: value.highCount,
+            sourceCount: value.sourceCount,
             okCount: value.okCount
         });
     });
@@ -154,21 +156,37 @@ function renderFolderView(ctx, canvas, videos) {
         const barHeight = Math.min(8, block.height * 0.1);
         if (block.height > 30) {
             const highRatio = block.highCount / block.count;
+            const sourceRatio = block.sourceCount / block.count;
             const highWidth = block.width * highRatio;
+            const sourceWidth = block.width * sourceRatio;
 
             // Gold gradient for HIGH
-            const highGradient = ctx.createLinearGradient(block.x, block.y + block.height - barHeight, block.x + highWidth, block.y + block.height);
-            highGradient.addColorStop(0, '#E3A857');
-            highGradient.addColorStop(1, '#E0D5A3');
-            ctx.fillStyle = highGradient;
-            ctx.fillRect(block.x, block.y + block.height - barHeight, highWidth, barHeight);
+            if (highWidth > 0) {
+                const highGradient = ctx.createLinearGradient(block.x, block.y + block.height - barHeight, block.x + highWidth, block.y + block.height);
+                highGradient.addColorStop(0, '#E3A857');
+                highGradient.addColorStop(1, '#E0D5A3');
+                ctx.fillStyle = highGradient;
+                ctx.fillRect(block.x, block.y + block.height - barHeight, highWidth, barHeight);
+            }
+
+            // Purple gradient for SOURCE
+            if (sourceWidth > 0) {
+                const sourceGradient = ctx.createLinearGradient(block.x + highWidth, block.y + block.height - barHeight, block.x + highWidth + sourceWidth, block.y + block.height);
+                sourceGradient.addColorStop(0, '#A855F7');
+                sourceGradient.addColorStop(1, '#D8B4FE');
+                ctx.fillStyle = sourceGradient;
+                ctx.fillRect(block.x + highWidth, block.y + block.height - barHeight, sourceWidth, barHeight);
+            }
 
             // Olive-khaki gradient for OK
-            const okGradient = ctx.createLinearGradient(block.x + highWidth, block.y + block.height - barHeight, block.x + block.width, block.y + block.height);
-            okGradient.addColorStop(0, '#568203');
-            okGradient.addColorStop(1, '#F0E68C');
-            ctx.fillStyle = okGradient;
-            ctx.fillRect(block.x + highWidth, block.y + block.height - barHeight, block.width - highWidth, barHeight);
+            const okWidth = block.width - highWidth - sourceWidth;
+            if (okWidth > 0) {
+                const okGradient = ctx.createLinearGradient(block.x + highWidth + sourceWidth, block.y + block.height - barHeight, block.x + block.width, block.y + block.height);
+                okGradient.addColorStop(0, '#568203');
+                okGradient.addColorStop(1, '#F0E68C');
+                ctx.fillStyle = okGradient;
+                ctx.fillRect(block.x + highWidth + sourceWidth, block.y + block.height - barHeight, okWidth, barHeight);
+            }
         }
 
         // Border
@@ -273,8 +291,12 @@ function renderFileView(ctx, canvas, folderPath, videos) {
     blocks.forEach(block => {
         const video = block.video;
 
-        // Color by status - gradient for HIGH, flat for OK
-        if (video.Status === 'HIGH') {
+        if (video.Status === 'SOURCE') {
+            const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y + block.height);
+            gradient.addColorStop(0, '#A855F7'); // Purple
+            gradient.addColorStop(1, '#D8B4FE');
+            ctx.fillStyle = gradient;
+        } else if (video.Status === 'HIGH') {
             const gradient = ctx.createLinearGradient(block.x, block.y, block.x + block.width, block.y + block.height);
             gradient.addColorStop(0, '#E3A857');
             gradient.addColorStop(1, '#E0D5A3');
@@ -305,8 +327,8 @@ function renderFileView(ctx, canvas, folderPath, videos) {
 
         // Labels
         if (block.width > 80 && block.height > 50) {
-            // Use dark text on bright backgrounds (HIGH/yellow), white on dark (OK/green)
-            ctx.fillStyle = video.Status === 'HIGH' ? '#000' : '#fff';
+            // Use dark text on bright backgrounds (SOURCE/HIGH), white on dark (OK/green)
+            ctx.fillStyle = (video.Status === 'HIGH' || video.Status === 'SOURCE') ? '#000' : '#fff';
 
             // Dynamic font size based on tile dimensions - larger tiles get bigger text
             const minDim = Math.min(block.width, block.height);
@@ -329,7 +351,7 @@ function renderFileView(ctx, canvas, folderPath, videos) {
 
             ctx.fillText(displayName, centerX, centerY - titleFontSize * 0.6);
             ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
-            ctx.fillStyle = video.Status === 'HIGH' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)';
+            ctx.fillStyle = (video.Status === 'HIGH' || video.Status === 'SOURCE') ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)';
             ctx.fillText(`${video.Size_MB.toFixed(0)} MB`, centerX, centerY + subFontSize * 0.8);
         }
     });
@@ -430,7 +452,7 @@ function setupTreemapInteraction() {
                     <strong><span class="material-icons text-sm align-middle">folder</span> ${block.shortName}</strong>
                     Videos: ${block.count}<br>
                     Größe: ${sizeText}<br>
-                    HIGH: ${block.highCount} • OK: ${block.okCount}
+                    HIGH: ${block.highCount} • SRC: ${block.sourceCount} • OK: ${block.okCount}
                 `;
             } else {
                 // File tooltip with thumbnail
@@ -451,7 +473,7 @@ function setupTreemapInteraction() {
                             Größe: ${video.Size_MB.toFixed(1)} MB<br>
                             Bitrate: ${video.Bitrate_Mbps.toFixed(1)} Mbps<br>
                             Codec: ${codecLabel}<br>
-                            Status: <span style="color: ${video.Status === 'HIGH' ? '#f59e0b' : '#10b981'}">${video.Status}</span>
+                            Status: <span style="color: ${video.Status === 'SOURCE' ? '#a855f7' : (video.Status === 'HIGH' ? '#f59e0b' : '#10b981')}">${video.Status}</span>
                         </div>
                     </div>
                 `;

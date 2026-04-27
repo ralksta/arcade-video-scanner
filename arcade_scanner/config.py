@@ -94,6 +94,8 @@ DEFAULT_SETTINGS_JSON = {
     "min_image_size_kb": 100,
     "_comment_bitrate": "Mark videos above this kbps as HIGH bitrate.",
     "bitrate_threshold_kbps": 15000,
+    "_comment_source_bitrate": "Mark videos above this mbps as SOURCE (unstreamable).",
+    "source_bitrate_threshold_mbps": 100,
 
 
     "_comment_optimizer": "Master toggle for optimization features.",
@@ -141,6 +143,7 @@ class AppSettings(BaseSettings):
     min_size_mb: int = Field(100)
     min_image_size_kb: int = Field(100)
     bitrate_threshold_kbps: int = Field(15000)
+    source_bitrate_threshold_mbps: int = Field(100)
 
 
 

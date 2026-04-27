@@ -56,10 +56,33 @@ function openCinema(container) {
 
     const streamUrl = `/stream?path=` + encodeURIComponent(path);
 
-    // Check if this is an image
-    if (currentCinemaVideo && currentCinemaVideo.media_type === 'image') {
+    const sourceMsg = document.getElementById('cinemaSourceMessage');
+
+    // Reset visibility
+    video.classList.add('hidden');
+    if (image) image.classList.add('hidden');
+    if (sourceMsg) {
+        sourceMsg.classList.remove('flex');
+        sourceMsg.classList.add('hidden');
+    }
+
+    // Check if this is a source video
+    if (currentCinemaVideo && currentCinemaVideo.Status === 'SOURCE') {
+        video.pause();
+        video.src = '';
+        if (image) image.src = '';
+        
+        if (sourceMsg) {
+            sourceMsg.classList.remove('hidden');
+            sourceMsg.classList.add('flex');
+            const downloadBtn = document.getElementById('cinemaDownloadBtn');
+            if (downloadBtn) {
+                downloadBtn.href = streamUrl;
+                downloadBtn.download = fileName;
+            }
+        }
+    } else if (currentCinemaVideo && currentCinemaVideo.media_type === 'image') {
         // IMAGE MODE
-        video.classList.add('hidden');
         video.pause();
         video.src = '';
 
@@ -70,7 +93,6 @@ function openCinema(container) {
     } else {
         // VIDEO MODE
         if (image) {
-            image.classList.add('hidden');
             image.src = '';
         }
         video.classList.remove('hidden');
@@ -122,6 +144,12 @@ function closeCinema() {
     if (image) {
         image.src = '';
         image.classList.add('hidden');
+    }
+
+    const sourceMsg = document.getElementById('cinemaSourceMessage');
+    if (sourceMsg) {
+        sourceMsg.classList.remove('flex');
+        sourceMsg.classList.add('hidden');
     }
 
     currentCinemaPath = null;
@@ -373,7 +401,7 @@ function updateCinemaInfo() {
             </div>
             <div class="info-row">
                 <span class="info-label">Status</span>
-                <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
+                <span class="info-value" style="color: ${v.Status === 'SOURCE' ? '#A855F7' : (v.Status === 'HIGH' ? '#E3A857' : '#568203')}">${v.Status}</span>
             </div>
         `;
     } else {
@@ -420,7 +448,7 @@ function updateCinemaInfo() {
             </div>
             <div class="info-row">
                 <span class="info-label">Status</span>
-                <span class="info-value" style="color: ${v.Status === 'HIGH' ? '#E3A857' : '#568203'}">${v.Status}</span>
+                <span class="info-value" style="color: ${v.Status === 'SOURCE' ? '#A855F7' : (v.Status === 'HIGH' ? '#E3A857' : '#568203')}">${v.Status}</span>
             </div>
         `;
     }

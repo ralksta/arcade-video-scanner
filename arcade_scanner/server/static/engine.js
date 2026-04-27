@@ -320,7 +320,10 @@ function createVideoCard(v) {
              </div>
              
              <div class="absolute bottom-2 left-2 flex gap-1 flex-wrap pr-12 pointer-events-none">
-                 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-black/60 text-white backdrop-blur border border-white/10">${v.Status}</span>
+                 ${v.Status === 'SOURCE' 
+                    ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 backdrop-blur border border-purple-500/30">SOURCE</span>`
+                    : `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-black/60 text-white backdrop-blur border border-white/10">${v.Status}</span>`
+                 }
                  ${isHevc ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-arcade-cyan/20 text-arcade-cyan backdrop-blur border border-arcade-cyan/30">HEVC</span>' : ''}
                  ${isAv1  ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-500/25 text-violet-300 backdrop-blur border border-violet-500/40">AV1</span>' : ''}
                  ${fileName.includes('_opt.') ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400 backdrop-blur border border-green-500/30">OPT</span>' : ''}
