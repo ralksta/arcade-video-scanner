@@ -694,15 +694,28 @@ function renderSmartCollectionTagsList() {
     const container = document.getElementById('collectionTagsList');
     if (!container) return;
 
-    if (availableTags.length === 0) {
+    const includedTags = collectionCriteriaNew?.include?.tags || [];
+    const excludedTags = collectionCriteriaNew?.exclude?.tags || [];
+
+    // Finde alle verwaisten Tags, die in den Kriterien sind, aber nicht in availableTags
+    const availableNames = new Set(availableTags.map(t => t.name));
+    const orphanTags = [...new Set([...includedTags, ...excludedTags])].filter(t => !availableNames.has(t));
+
+    const allTags = [...availableTags];
+    orphanTags.forEach(t => {
+        allTags.push({
+            name: t,
+            color: '#6b7280', // Neutrales Grau
+            isOrphan: true
+        });
+    });
+
+    if (allTags.length === 0) {
         container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags created</span>';
         return;
     }
 
-    const includedTags = collectionCriteriaNew?.include?.tags || [];
-    const excludedTags = collectionCriteriaNew?.exclude?.tags || [];
-
-    container.innerHTML = availableTags.map(tag => {
+    container.innerHTML = allTags.map(tag => {
         const isIncluded = includedTags.includes(tag.name);
         const isExcluded = excludedTags.includes(tag.name);
 
@@ -711,18 +724,26 @@ function renderSmartCollectionTagsList() {
 
         if (isIncluded) {
             style = `border-color: ${tag.color}; background: ${tag.color}20;`;
+            if (tag.isOrphan) {
+                style += ' border-style: dashed;';
+            }
             classes += ' active';
         } else if (isExcluded) {
             style = `border-color: #ef4444; background: rgba(239, 68, 68, 0.15); color: #ef4444; text-decoration: line-through; opacity: 0.8;`;
+            if (tag.isOrphan) {
+                style += ' border-style: dashed;';
+            }
             classes += ' exclude';
         }
+
+        const displayName = tag.isOrphan ? `⚠️ ${tag.name} (gelöscht)` : tag.name;
 
         return `
         <button class="${classes}"
                 onclick="toggleSmartTagChip('${tag.name}')"
                 style="${style}">
             <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${isExcluded ? '#ef4444' : tag.color}"></span>
-            ${tag.name}
+            ${displayName}
         </button>
         `;
     }).join('');
