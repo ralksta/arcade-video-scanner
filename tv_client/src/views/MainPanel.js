@@ -296,7 +296,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 					<Tab title="Collections" icon="folder">
 						<div style={{display: 'flex', height: '100%', width: '100%', gap: ri.scale(24) + 'px', padding: `${ri.scale(16)}px`, overflow: 'hidden'}}>
 							{/* Linke Spalte: Ordner/Collections */}
-							<div style={{width: ri.scale(280) + 'px', flexShrink: 0, overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: ri.scale(16) + 'px', display: 'flex', flexDirection: 'column', gap: ri.scale(16) + 'px'}}>
+							<div style={{width: ri.scale(420) + 'px', flexShrink: 0, overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: ri.scale(16) + 'px', display: 'flex', flexDirection: 'column', gap: ri.scale(16) + 'px'}}>
 								{Object.keys(collectionsByCategory).length === 0 ? (
 									<div style={{color: 'gray', fontStyle: 'italic', padding: ri.scale(16) + 'px'}}>Keine Collections vorhanden</div>
 								) : (
