@@ -1,8 +1,5 @@
 // tag_manager.js - Extracted from engine.js
 
-// --- GLOBALS ---
-let availableTags = []; // Global tags storage to prevent undefined crashes
-
 // --- BATCH TAGGING (Modern Redesign) ---
 let batchTagActions = {}; // { tagName: 'add' | 'remove' | null }
 let batchTagSearchTerm = '';

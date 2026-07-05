@@ -49,7 +49,8 @@ class Store {
             case 'SET_DATE_FILTER':
                 return { ...state, filter: { ...state.filter, date: action.payload } };
             case 'SET_DB_STATS':
-                return { ...state, data: { ...state.data, availableTags: action.payload.tags } };
+                const tags = Array.isArray(action.payload) ? action.payload : (action.payload?.tags || []);
+                return { ...state, data: { ...state.data, availableTags: tags } };
             // Add other reducers as needed
             default:
                 return state;
