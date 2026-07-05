@@ -1,4 +1,4 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import ThemeDecorator from '@enact/limestone/ThemeDecorator';
 import Panels, {Panel} from '@enact/limestone/Panels';
 import VideoPlayer, {Video} from '@enact/limestone/VideoPlayer';
@@ -34,6 +34,25 @@ const App = (props) => {
 	const handleLoginSuccess = useCallback(() => {
 		setPanelIndex(0);
 	}, []);
+
+	// webOS Back-Taste (461) abfangen — verhindert App-Beenden beim VideoPlayer
+	useEffect(() => {
+		const handleBackKey = (ev) => {
+			// keyCode 461 = webOS Fernbedienung Back, 27 = ESC (Entwicklung)
+			if (ev.keyCode === 461 || ev.keyCode === 27) {
+				if (panelIndex === 1) {
+					// Im VideoPlayer → zurück zum Grid
+					ev.preventDefault();
+					ev.stopPropagation();
+					setPanelIndex(0);
+					setTimeout(() => setActiveVideo(null), 400);
+				}
+				// Bei panelIndex 0 oder 2 → normales Back (App beenden) erlaubt
+			}
+		};
+		window.addEventListener('keydown', handleBackKey, true);
+		return () => window.removeEventListener('keydown', handleBackKey, true);
+	}, [panelIndex]);
 
 	const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('arcade_session_token') : '';
 
