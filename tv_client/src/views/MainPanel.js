@@ -58,6 +58,20 @@ const matchesCollectionCriteria = (v, criteria) => {
 		if (exc.codec.includes(v.codec?.toLowerCase())) return false;
 	}
 
+	// Tags
+	if (inc.tags && inc.tags.length) {
+		const videoTags = v.tags || [];
+		if (criteria.tagLogic === 'all') {
+			if (!inc.tags.every(t => videoTags.includes(t))) return false;
+		} else {
+			if (!inc.tags.some(t => videoTags.includes(t))) return false;
+		}
+	}
+	if (exc.tags && exc.tags.length) {
+		const videoTags = v.tags || [];
+		if (exc.tags.some(t => videoTags.includes(t))) return false;
+	}
+
 	// Search
 	if (criteria.search) {
 		const q = criteria.search.toLowerCase();
@@ -138,13 +152,15 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 
 		Promise.all([videosPromise, userDataPromise])
 			.then(([videosData, userData]) => {
-				// Mapping von Favoriten und Vault-Status aus den User-Daten auf die Videos
+				// Mapping von Favoriten, Vault-Status und Tags aus den User-Daten auf die Videos
 				if (userData) {
 					const favSet = new Set(userData.favorites || []);
 					const vaultSet = new Set(userData.vaulted || []);
+					const tagMap = userData.tags || {};
 					videosData.forEach(v => {
 						v.favorite = favSet.has(v.FilePath);
 						v.hidden = vaultSet.has(v.FilePath);
+						v.tags = tagMap[v.FilePath] || [];
 					});
 				}
 
