@@ -224,8 +224,11 @@ function filterAndSort(scrollToTop = false) {
                 }
 
                 // Search filter (O(1) search on filename first)
-                if (searchTerm && !name.includes(searchTerm) && !v.FilePath.toLowerCase().includes(searchTerm)) {
-                    return false;
+                if (searchTerm) {
+                    const searchLower = searchTerm.toLowerCase();
+                    if (!name.includes(searchLower) && !v.FilePath.toLowerCase().includes(searchLower)) {
+                        return false;
+                    }
                 }
 
                 // Folder filter
