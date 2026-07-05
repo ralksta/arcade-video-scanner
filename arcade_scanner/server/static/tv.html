@@ -440,7 +440,7 @@
                 if (res.status === 401) {
                     showToast("Nicht eingeloggt! Umleitung zur Login-Seite...", 3000);
                     setTimeout(() => {
-                        window.location.href = '/static/login.html';
+                        window.location.href = '/static/login.html?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
                     }, 2000);
                     return;
                 }
