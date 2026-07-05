@@ -427,6 +427,7 @@
         
         // Player UI Timeout
         let playerUiTimeout = null;
+        let isPlayerClosing = false;
 
         // Start
         window.onload = function() {
@@ -690,8 +691,29 @@
                         updateFocus();
                     }
                     break;
+                default:
+                    // LG TV Zurück-Taste (KeyCode 461) abfangen
+                    if (e.keyCode === 461) {
+                        e.preventDefault();
+                        if (currentSection === 'grid') {
+                            currentSection = 'sidebar';
+                            updateFocus();
+                        }
+                    }
+                    break;
             }
         }
+
+        // Popstate-Listener für TV-Zurück-Taste (Verhindert Page Exit im Player)
+        window.addEventListener('popstate', function(event) {
+            if (isPlayerClosing) {
+                isPlayerClosing = false;
+                return;
+            }
+            if (currentSection === 'player') {
+                closePlayer(true);
+            }
+        });
 
         // --- PLAYER FUNCTIONS ---
         function startPlayer(video) {
@@ -699,6 +721,9 @@
             const player = document.getElementById('tv-video-element');
             
             showToast(`Lade Video: ${video._fileName}...`, 2000);
+
+            // Push History-State um die Zurück-Taste abzufangen
+            history.pushState({playerOpen: true}, null, '');
 
             // Stream URL setzen
             player.src = `/stream?path=${encodeURIComponent(video.FilePath)}`;
@@ -724,7 +749,7 @@
             };
         }
 
-        function closePlayer() {
+        function closePlayer(fromPopState = false) {
             const overlay = document.getElementById('player-overlay');
             const player = document.getElementById('tv-video-element');
             
@@ -736,12 +761,24 @@
             clearTimeout(playerUiTimeout);
             overlay.classList.remove('show-ui');
             
+            if (!fromPopState) {
+                isPlayerClosing = true;
+                history.back(); // Entfernt den künstlichen History-State
+            }
+            
             updateFocus();
         }
 
         function handlePlayerKeys(e) {
             const player = document.getElementById('tv-video-element');
             showPlayerUi(); // UI aktivieren bei Tastendruck
+
+            // LG TV Zurück-Taste (461) abfangen
+            if (e.keyCode === 461) {
+                e.preventDefault();
+                closePlayer();
+                return;
+            }
 
             switch (e.key) {
                 case 'Enter':
