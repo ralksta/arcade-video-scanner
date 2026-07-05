@@ -70,10 +70,27 @@ const matchesCollectionCriteria = (v, criteria) => {
 	return true;
 };
 
+const formatSize = (mb) => {
+	if (!mb) return '';
+	if (mb >= 1024) {
+		return `${(mb / 1024).toFixed(1)} GB`;
+	}
+	return `${mb.toFixed(0)} MB`;
+};
+
+const formatDuration = (seconds) => {
+	if (!seconds) return '';
+	const mins = Math.round(seconds / 60);
+	if (mins < 1) return `${Math.round(seconds)} Sek`;
+	return `${mins} Min`;
+};
+
 const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [allVideos, setAllVideos] = useState([]);
 	const [smartCollections, setSmartCollections] = useState([]);
+	const [recommendations, setRecommendations] = useState([]);
 	const [selectedCollectionId, setSelectedCollectionId] = useState(null);
+	const [tabIndex, setTabIndex] = useState(0);
 	const [loading, setLoading] = useState(true);
 	const [sortKey, setSortKey] = useState('newest');
 	const [filterText, setFilterText] = useState('');
@@ -108,23 +125,40 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				return data;
 			});
 
-		// User-Daten für Smart Collections abrufen
+		// User-Daten für Smart Collections und Favoriten abrufen
 		const userDataPromise = fetch('http://192.168.2.183:8000/api/user/data', { headers })
 			.then(res => {
 				if (res.ok) return res.json();
 				return null;
 			})
 			.catch(err => {
-				console.warn('Error fetching collections:', err);
+				console.warn('Error fetching collections/userdata:', err);
 				return null;
 			});
 
 		Promise.all([videosPromise, userDataPromise])
 			.then(([videosData, userData]) => {
+				// Mapping von Favoriten und Vault-Status aus den User-Daten auf die Videos
+				if (userData) {
+					const favSet = new Set(userData.favorites || []);
+					const vaultSet = new Set(userData.vaulted || []);
+					videosData.forEach(v => {
+						v.favorite = favSet.has(v.FilePath);
+						v.hidden = vaultSet.has(v.FilePath);
+					});
+				}
+
 				setAllVideos(videosData);
+
 				if (userData && userData.smart_collections) {
 					setSmartCollections(userData.smart_collections);
 				}
+
+				// Zufällige Empfehlungen generieren (nur sichtbare Videos)
+				const videoOnly = videosData.filter(v => (v.media_type || 'video') === 'video' && !v.hidden);
+				const shuffled = [...videoOnly].sort(() => 0.5 - Math.random());
+				setRecommendations(shuffled.slice(0, 5));
+
 				setLoading(false);
 			})
 			.catch(err => {
@@ -196,9 +230,14 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		if (!v) return null;
 
 		const isImage = v.media_type === 'image';
+		const sizeStr = formatSize(v.Size_MB);
+		const durationStr = formatDuration(v.Duration_Sec);
+		const resStr = v.resolution || '';
+
 		const labelText = [
-			v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : '',
-			v.resolution || ''
+			sizeStr,
+			durationStr,
+			resStr
 		].filter(Boolean).join(' | ');
 
 		return (
@@ -213,6 +252,10 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 			</ImageItem>
 		);
 	}, [onSelectVideo]);
+
+	const handleTabSelect = useCallback((ev) => {
+		setTabIndex(ev.index);
+	}, []);
 
 	const subtitle = loading
 		? 'Lade Mediathek...'
@@ -248,7 +291,85 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 			</div>
 
 			{!loading && (
-				<TabLayout>
+				<TabLayout index={tabIndex} onSelect={handleTabSelect}>
+					<Tab title="Home" icon="home">
+						<div style={{overflowY: 'auto', height: '100%', padding: `${ri.scale(16)}px ${ri.scale(24)}px`, display: 'flex', flexDirection: 'column', gap: ri.scale(32) + 'px'}}>
+							
+							{/* Begrüßung */}
+							<div>
+								<h2 style={{fontSize: ri.scale(28) + 'px', fontWeight: 'bold', color: '#ff0090'}}>Moin Ralf! ⚓</h2>
+								<p style={{color: 'gray', fontSize: ri.scale(16) + 'px'}}>Willkommen auf dem Arcade-Kutter. Hier ist deine heutige Auswahl:</p>
+							</div>
+
+							{/* Reihe 1: Favoriten */}
+							{favorites.length > 0 ? (
+								<div>
+									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#00f5e4', marginBottom: ri.scale(12) + 'px'}}>⭐ Deine Favoriten</h3>
+									<div style={{display: 'flex', gap: ri.scale(16) + 'px', overflowX: 'auto', paddingBottom: ri.scale(8) + 'px'}}>
+										{favorites.slice(0, 6).map(v => (
+											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
+												<ImageItem
+													src={`http://192.168.2.183:8000/thumbnails/${v.thumb}`}
+													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
+													onClick={() => onSelectVideo(v)}
+													wideImage
+												>
+													{v._fileName}
+												</ImageItem>
+											</div>
+										))}
+									</div>
+								</div>
+							) : (
+								<div>
+									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#00f5e4', marginBottom: ri.scale(12) + 'px'}}>⭐ Deine Favoriten</h3>
+									<p style={{color: 'gray', fontSize: ri.scale(14) + 'px', fontStyle: 'italic', paddingLeft: ri.scale(8) + 'px'}}>Noch keine Favoriten hinzugefügt. Markiere Videos in der Web-App als Favorit, um sie hier zu sehen!</p>
+								</div>
+							)}
+
+							{/* Reihe 2: Empfehlungen */}
+							{recommendations.length > 0 && (
+								<div>
+									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#f4b342', marginBottom: ri.scale(12) + 'px'}}>🎲 Zufällige Entdeckungen</h3>
+									<div style={{display: 'flex', gap: ri.scale(16) + 'px', overflowX: 'auto', paddingBottom: ri.scale(8) + 'px'}}>
+										{recommendations.map(v => (
+											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
+												<ImageItem
+													src={`http://192.168.2.183:8000/thumbnails/${v.thumb}`}
+													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
+													onClick={() => onSelectVideo(v)}
+													wideImage
+												>
+													{v._fileName}
+												</ImageItem>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+
+							{/* Reihe 3: Letzte Importe */}
+							{recent.length > 0 && (
+								<div>
+									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#8b5cf6', marginBottom: ri.scale(12) + 'px'}}>🕐 Letzte Importe</h3>
+									<div style={{display: 'flex', gap: ri.scale(16) + 'px', overflowX: 'auto', paddingBottom: ri.scale(8) + 'px'}}>
+										{recent.slice(0, 6).map(v => (
+											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
+												<ImageItem
+													src={`http://192.168.2.183:8000/thumbnails/${v.thumb}`}
+													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
+													onClick={() => onSelectVideo(v)}
+													wideImage
+												>
+													{v._fileName}
+												</ImageItem>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+						</div>
+					</Tab>
 					<Tab title="Alle Videos" icon="movies">
 						<VirtualGridList
 							dataSize={videos.length}
