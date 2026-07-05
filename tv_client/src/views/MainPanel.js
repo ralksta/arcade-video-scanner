@@ -33,13 +33,52 @@ const sortVideos = (list, sortKey) => {
 	}
 };
 
+const matchesCollectionCriteria = (v, criteria) => {
+	if (!criteria) return true;
+	const inc = criteria.include || {};
+	const exc = criteria.exclude || {};
+
+	// Status
+	if (inc.status && inc.status.length) {
+		const match = inc.status.some(s => {
+			if (s === 'optimized') return v.status === 'optimized';
+			if (s === 'pending')   return !v.status || v.status === 'pending';
+			if (s === 'favorite')  return v.favorite;
+			if (s === 'hidden')    return v.hidden;
+			return v.status === s;
+		});
+		if (!match) return false;
+	}
+
+	// Codec
+	if (inc.codec && inc.codec.length) {
+		if (!inc.codec.includes(v.codec?.toLowerCase())) return false;
+	}
+	if (exc.codec && exc.codec.length) {
+		if (exc.codec.includes(v.codec?.toLowerCase())) return false;
+	}
+
+	// Search
+	if (criteria.search) {
+		const q = criteria.search.toLowerCase();
+		if (!v.FilePath.toLowerCase().includes(q)) return false;
+	}
+
+	// Favorites
+	if (criteria.favorites === true && !v.favorite) return false;
+
+	return true;
+};
+
 const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [allVideos, setAllVideos] = useState([]);
+	const [smartCollections, setSmartCollections] = useState([]);
+	const [selectedCollectionId, setSelectedCollectionId] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [sortKey, setSortKey] = useState('newest');
 	const [filterText, setFilterText] = useState('');
 
-	// Daten laden
+	// Daten und Collections laden
 	useEffect(() => {
 		const token = localStorage.getItem('arcade_session_token');
 		const headers = {
@@ -49,9 +88,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 			headers['Authorization'] = `Bearer ${token}`;
 		}
 
-		fetch('http://192.168.2.183:8000/api/videos', {
-			headers: headers
-		})
+		// Videos abrufen
+		const videosPromise = fetch('http://192.168.2.183:8000/api/videos', { headers })
 			.then(res => {
 				if (res.status === 401) {
 					localStorage.removeItem('arcade_session_token');
@@ -62,13 +100,31 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				return res.json();
 			})
 			.then(data => {
-				// Dateinamen aufbereiten
 				data.forEach(v => {
 					const path = v.FilePath;
 					const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
 					v._fileName = path.substring(lastIdx + 1);
 				});
-				setAllVideos(data);
+				return data;
+			});
+
+		// User-Daten für Smart Collections abrufen
+		const userDataPromise = fetch('http://192.168.2.183:8000/api/user/data', { headers })
+			.then(res => {
+				if (res.ok) return res.json();
+				return null;
+			})
+			.catch(err => {
+				console.warn('Error fetching collections:', err);
+				return null;
+			});
+
+		Promise.all([videosPromise, userDataPromise])
+			.then(([videosData, userData]) => {
+				setAllVideos(videosData);
+				if (userData && userData.smart_collections) {
+					setSmartCollections(userData.smart_collections);
+				}
 				setLoading(false);
 			})
 			.catch(err => {
@@ -110,6 +166,29 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const vault = useMemo(() =>
 		filterAndSort(allVideos.filter(v => v.hidden)),
 	[allVideos, filterAndSort]);
+
+	// Aktive Collection ermitteln
+	const selectedCollection = useMemo(() => {
+		return smartCollections.find(c => c.id === selectedCollectionId);
+	}, [smartCollections, selectedCollectionId]);
+
+	// Videos der aktiven Collection filtern
+	const collectionVideos = useMemo(() => {
+		if (!selectedCollection) return [];
+		const filtered = allVideos.filter(v => matchesCollectionCriteria(v, selectedCollection.criteria));
+		return filterAndSort(filtered);
+	}, [allVideos, selectedCollection, filterAndSort]);
+
+	// Collections nach Kategorie gruppieren
+	const collectionsByCategory = useMemo(() => {
+		const groups = {};
+		smartCollections.forEach(col => {
+			const cat = col.category || 'Uncategorized';
+			if (!groups[cat]) groups[cat] = [];
+			groups[cat].push(col);
+		});
+		return groups;
+	}, [smartCollections]);
 
 	// Item Renderer Factory
 	const makeRenderer = useCallback((list) => ({index, ...itemProps}) => {
@@ -213,6 +292,64 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 							}}
 							direction="vertical"
 						/>
+					</Tab>
+					<Tab title="Collections" icon="folder">
+						<div style={{display: 'flex', height: '100%', gap: ri.scale(24) + 'px', padding: `${ri.scale(16)}px`}}>
+							{/* Linke Spalte: Ordner/Collections */}
+							<div style={{width: ri.scale(350) + 'px', overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: ri.scale(16) + 'px', display: 'flex', flexDirection: 'column', gap: ri.scale(16) + 'px'}}>
+								{Object.keys(collectionsByCategory).length === 0 ? (
+									<div style={{color: 'gray', fontStyle: 'italic', padding: ri.scale(16) + 'px'}}>Keine Collections vorhanden</div>
+								) : (
+									Object.keys(collectionsByCategory).sort().map(category => {
+										const cols = collectionsByCategory[category];
+										return (
+											<div key={category} style={{display: 'flex', flexDirection: 'column', gap: ri.scale(8) + 'px'}}>
+												<div style={{fontSize: ri.scale(14) + 'px', fontWeight: 'bold', color: '#ff0090', textTransform: 'uppercase', paddingLeft: ri.scale(8) + 'px'}}>
+													📁 {category}
+												</div>
+												{cols.map(col => (
+													<Button
+														key={col.id}
+														size="small"
+														selected={selectedCollectionId === col.id}
+														onClick={() => setSelectedCollectionId(col.id)}
+														style={{justifyContent: 'flex-start', textAlign: 'left', width: '100%'}}
+													>
+														<span style={{color: col.color || '#00f5e4', marginRight: ri.scale(8) + 'px'}}>●</span>
+														{col.name}
+													</Button>
+												))}
+											</div>
+										);
+									})
+								)}
+							</div>
+
+							{/* Rechte Spalte: Video-Grid */}
+							<div style={{flex: 1, display: 'flex', flexDirection: 'column', height: '100%'}}>
+								{selectedCollection ? (
+									collectionVideos.length === 0 ? (
+										<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'gray'}}>
+											Keine Medien in dieser Collection gefunden.
+										</div>
+									) : (
+										<VirtualGridList
+											dataSize={collectionVideos.length}
+											itemRenderer={makeRenderer(collectionVideos)}
+											itemSize={{
+												minWidth: ri.scale(600),
+												minHeight: ri.scale(450)
+											}}
+											direction="vertical"
+										/>
+									)
+								) : (
+									<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'gray'}}>
+										Bitte wähle eine Collection aus der linken Liste.
+									</div>
+								)}
+							</div>
+						</div>
 					</Tab>
 					<Tab title="Archiv" icon="files">
 						<VirtualGridList
