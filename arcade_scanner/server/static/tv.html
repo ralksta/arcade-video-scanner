@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>Arcade Scanner - TV Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #090514;
+            --sidebar-bg: #0e0922;
+            --text-main: #ffffff;
+            --text-muted: #8c86a8;
+            --neon-cyan: #00f0ff;
+            --neon-magenta: #ff007f;
+            --card-bg: #161132;
+            --focus-glow: 0 0 20px rgba(0, 240, 255, 0.6);
+            --active-glow: 0 0 15px rgba(255, 0, 127, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* --- SIDEBAR --- */
+        #sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 2px solid rgba(255, 0, 127, 0.15);
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            height: 100%;
+            z-index: 10;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+            padding-left: 10px;
+        }
+
+        .logo-area .material-icons {
+            font-size: 32px;
+            color: var(--neon-magenta);
+            text-shadow: 0 0 10px var(--neon-magenta);
+        }
+
+        .logo-title {
+            font-weight: 800;
+            font-size: 22px;
+            letter-spacing: 1px;
+            background: linear-gradient(45deg, var(--neon-magenta), var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            background-color: transparent;
+            border: 2px solid transparent;
+        }
+
+        /* D-Pad Fokuszustand */
+        .nav-item.focused {
+            color: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+            background-color: rgba(0, 240, 255, 0.08);
+            box-shadow: var(--focus-glow);
+            transform: translateX(5px);
+        }
+
+        .nav-item.active {
+            color: var(--text-main);
+            background-color: rgba(255, 0, 127, 0.1);
+            border-left: 4px solid var(--neon-magenta);
+        }
+
+        .nav-item .material-icons {
+            font-size: 22px;
+        }
+
+        /* --- CONTENT AREA --- */
+        #content-pane {
+            flex-1;
+            width: calc(100% - 280px);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 40px;
+            overflow: hidden;
+        }
+
+        .category-header {
+            margin-bottom: 25px;
+        }
+
+        .category-title {
+            font-size: 28px;
+            font-weight: 800;
+            margin: 0 0 5px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .category-count {
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        /* --- GRID --- */
+        #grid-scroll-container {
+            flex-1;
+            overflow-y: auto;
+            padding-bottom: 50px;
+            scroll-behavior: smooth;
+        }
+
+        /* Verstecke Scrollbar */
+        #grid-scroll-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        #media-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            width: 100%;
+        }
+
+        /* --- MEDIA CARD --- */
+        .media-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .media-card.focused {
+            transform: scale(1.06);
+            border-color: var(--neon-cyan);
+            box-shadow: var(--focus-glow);
+            z-index: 5;
+        }
+
+        .card-media-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            background-color: #000;
+        }
+
+        .card-thumbnail {
+            width: 100%;
+            height: 100%;
+            object-cover: cover;
+            display: block;
+        }
+
+        .card-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(9, 5, 20, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-badge.image-badge {
+            border-color: rgba(255, 0, 127, 0.4);
+            color: var(--neon-magenta);
+        }
+
+        .card-badge.video-badge {
+            border-color: rgba(0, 240, 255, 0.4);
+            color: var(--neon-cyan);
+        }
+
+        .card-details {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: linear-gradient(180deg, rgba(22, 17, 50, 0) 0%, rgba(14, 9, 34, 0.95) 100%);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* --- VIDEO PLAYER OVERLAY --- */
+        #player-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #tv-video-element {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Player Controls Overlay */
+        #player-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(14, 9, 34, 0.9);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 20px;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        #player-overlay.show-ui #player-controls {
+            opacity: 1;
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn .material-icons {
+            font-size: 32px;
+        }
+
+        .control-btn.focused {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan);
+        }
+
+        /* Info Toast */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: rgba(255, 0, 127, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 150;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 0, 127, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* No Content Placeholder */
+        .empty-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            color: var(--text-muted);
+            margin-top: 100px;
+            width: 100%;
+            grid-column: span 4;
+        }
+
+        .empty-placeholder .material-icons {
+            font-size: 64px;
+            color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+        <div class="logo-area">
+            <span class="material-icons">sports_esports</span>
+            <span class="logo-title">ArcadeScan</span>
+        </div>
+        <ul class="nav-list">
+            <li class="nav-item focusable active" data-category="all" tabindex="0">
+                <span class="material-icons">movie</span>
+                <span>Alle Videos</span>
+            </li>
+            <li class="nav-item focusable" data-category="favorites" tabindex="0">
+                <span class="material-icons">star</span>
+                <span>Favoriten</span>
+            </li>
+            <li class="nav-item focusable" data-category="recent" tabindex="0">
+                <span class="material-icons">schedule</span>
+                <span>Letzte Importe</span>
+            </li>
+            <li class="nav-item focusable" data-category="images" tabindex="0">
+                <span class="material-icons">image</span>
+                <span>Fotos / Bilder</span>
+            </li>
+            <li class="nav-item focusable" data-category="vault" tabindex="0">
+                <span class="material-icons">archive</span>
+                <span>Archiv (Vault)</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- CONTENT PANEL -->
+    <div id="content-pane">
+        <div class="category-header">
+            <h1 class="category-title" id="cat-title">Alle Videos</h1>
+            <span class="category-count" id="cat-count">Lade Mediathek...</span>
+        </div>
+
+        <div id="grid-scroll-container">
+            <div id="media-grid">
+                <!-- Dynamic cards populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- VIDEO PLAYER OVERLAY -->
+    <div id="player-overlay">
+        <video id="tv-video-element" controls-list="nodownload"></video>
+        
+        <!-- TV UI overlay for feedback -->
+        <div id="player-controls">
+            <button class="control-btn" id="btn-rewind"><span class="material-icons">replay_10</span></button>
+            <button class="control-btn" id="btn-play-pause"><span class="material-icons" id="play-pause-icon">pause</span></button>
+            <button class="control-btn" id="btn-fastforward"><span class="material-icons">forward_10</span></button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">Meldung</div>
+
+    <script>
+        // App-Zustand
+        let allVideos = [];
+        let filteredVideos = [];
+        let activeCategory = 'all';
+        
+        let currentSection = 'sidebar'; // 'sidebar', 'grid', 'player'
+        let activeSidebarIdx = 0;
+        let activeGridIdx = 0;
+        const gridCols = 4;
+        
+        // Player UI Timeout
+        let playerUiTimeout = null;
+
+        // Start
+        window.onload = function() {
+            initApp();
+        };
+
+        async function initApp() {
+            try {
+                showToast("Lade Mediathek vom Kutter...", 3000);
+                const res = await fetch('/api/videos');
+                if (res.status === 401) {
+                    showToast("Nicht eingeloggt! Umleitung zur Login-Seite...", 3000);
+                    setTimeout(() => {
+                        window.location.href = '/static/login.html';
+                    }, 2000);
+                    return;
+                }
+                if (res.ok) {
+                    allVideos = await res.json();
+                    
+                    // Pre-process filenames
+                    allVideos.forEach(v => {
+                        const path = v.FilePath;
+                        const lastIdx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+                        v._fileName = path.substring(lastIdx + 1);
+                    });
+
+                    console.log(`Loaded ${allVideos.length} items`);
+                    changeCategory(activeCategory);
+                    
+                    // Initialen Fokus setzen
+                    updateFocus();
+                } else {
+                    showToast("Fehler beim Laden. Bitte am Server einloggen!", 5000);
+                    document.getElementById('cat-count').innerText = "Verbindung fehlgeschlagen (401/404)";
+                }
+            } catch (e) {
+                console.error("Initial load error:", e);
+                showToast("Verbindung zum Server fehlgeschlagen!", 5000);
+                document.getElementById('cat-count').innerText = "Server offline?";
+            }
+
+            // Keyboard/D-Pad Event-Listener
+            document.addEventListener('keydown', handleKeyDown);
+        }
+
+        // Filtert Daten basierend auf Kategorie
+        function changeCategory(category) {
+            activeCategory = category;
+            
+            // Setze Titel
+            const titles = {
+                all: "Alle Videos",
+                favorites: "Favoriten",
+                recent: "Letzte Importe",
+                images: "Fotos & Bilder",
+                vault: "Archiv (Vault)"
+            };
+            document.getElementById('cat-title').innerText = titles[category] || "Medien";
+
+            // Filtern
+            if (category === 'all') {
+                filteredVideos = allVideos.filter(v => (v.media_type || 'video') === 'video' && !v.hidden);
+            } else if (category === 'favorites') {
+                filteredVideos = allVideos.filter(v => v.favorite && !v.hidden);
+            } else if (category === 'recent') {
+                // Letzte 24 sortiert nach Import-Index oder einfach umgedreht
+                filteredVideos = [...allVideos].filter(v => !v.hidden).reverse().slice(0, 24);
+            } else if (category === 'images') {
+                filteredVideos = allVideos.filter(v => v.media_type === 'image' && !v.hidden);
+            } else if (category === 'vault') {
+                filteredVideos = allVideos.filter(v => v.hidden);
+            }
+
+            // Zähler aktualisieren
+            document.getElementById('cat-count').innerText = `${filteredVideos.length} Medien gefunden`;
+
+            // Rendern
+            renderGrid();
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('media-grid');
+            grid.innerHTML = "";
+
+            if (filteredVideos.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-placeholder">
+                        <span class="material-icons">movie_filter</span>
+                        <span>Keine Einträge in dieser Kategorie gefunden.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredVideos.forEach((v, idx) => {
+                const card = document.createElement('div');
+                card.className = "media-card focusable-grid-item";
+                card.setAttribute('data-index', idx);
+                card.setAttribute('data-path', v.FilePath);
+                
+                const isImage = v.media_type === 'image';
+                const badgeClass = isImage ? 'image-badge' : 'video-badge';
+                const badgeText = isImage ? 'IMG' : (v.codec ? v.codec.toUpperCase() : 'VIDEO');
+                
+                // Details
+                const sizeStr = v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : '';
+                const resStr = v.resolution || '';
+
+                card.innerHTML = `
+                    <div class="card-media-wrapper">
+                        <span class="card-badge ${badgeClass}">${badgeText}</span>
+                        <img src="/thumbnails/${v.thumb}" class="card-thumbnail" loading="lazy" onerror="this.src='/static/login.html?fallback=img'">
+                    </div>
+                    <div class="card-details">
+                        <h3 class="card-title">${v._fileName}</h3>
+                        <div class="card-meta">
+                            <span>${sizeStr}</span>
+                            ${resStr ? `<span>•</span> <span>${resStr}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // --- FOCUS MANAGER (SPATIAL NAVIGATION) ---
+        function updateFocus() {
+            // Alle alten Fokus-Klassen entfernen
+            document.querySelectorAll('.focused').forEach(el => el.classList.remove('focused'));
+
+            if (currentSection === 'sidebar') {
+                const navItems = document.querySelectorAll('.nav-item');
+                if (navItems.length > 0) {
+                    navItems[activeSidebarIdx].classList.add('focused');
+                    // Automatisch Kategorie wechseln bei Fokus in Sidebar
+                    const newCat = navItems[activeSidebarIdx].getAttribute('data-category');
+                    if (newCat !== activeCategory) {
+                        // Markiere aktiv
+                        navItems.forEach(n => n.classList.remove('active'));
+                        navItems[activeSidebarIdx].classList.add('active');
+                        changeCategory(newCat);
+                    }
+                }
+            } else if (currentSection === 'grid') {
+                const gridItems = document.querySelectorAll('.media-card');
+                if (gridItems.length > 0) {
+                    // Sicherstellen, dass der Grid-Index im gültigen Bereich liegt
+                    if (activeGridIdx >= gridItems.length) {
+                        activeGridIdx = gridItems.length - 1;
+                    }
+                    if (activeGridIdx < 0) activeGridIdx = 0;
+
+                    const activeCard = gridItems[activeGridIdx];
+                    activeCard.classList.add('focused');
+                    
+                    // Weiches Scrollen des Containers
+                    activeCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            }
+        }
+
+        function handleKeyDown(e) {
+            const sidebarItems = document.querySelectorAll('.nav-item');
+            const gridItems = document.querySelectorAll('.media-card');
+
+            if (currentSection === 'player') {
+                handlePlayerKeys(e);
+                return;
+            }
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (currentSection === 'sidebar') {
+                        if (activeSidebarIdx > 0) {
+                            activeSidebarIdx--;
+                            updateFocus();
+                        }
+                    } else if (currentSection === 'grid') {
+                        if (activeGridIdx >= gridCols) {
+                            activeGridIdx -= gridCols;
+                            updateFocus();
+                        }
+                    }
+                    break;
+
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (currentSection === 'sidebar') {
+                        if (activeSidebarIdx < sidebarItems.length - 1) {
+                            activeSidebarIdx++;
+                            updateFocus();
+                        }
+                    } else if (currentSection === 'grid') {
+                        if (activeGridIdx + gridCols < gridItems.length) {
+                            activeGridIdx += gridCols;
+                            updateFocus();
+                        } else if (activeGridIdx < gridItems.length - 1) {
+                            // Wenn nicht genau ein Vielfaches übrig ist, aber wir nach unten können, springe auf das letzte Element
+                            activeGridIdx = gridItems.length - 1;
+                            updateFocus();
+                        }
+                    }
+                    break;
+
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    if (currentSection === 'grid') {
+                        if (activeGridIdx % gridCols === 0) {
+                            // Springe zurück zur Sidebar
+                            currentSection = 'sidebar';
+                            updateFocus();
+                        } else {
+                            activeGridIdx--;
+                            updateFocus();
+                        }
+                    }
+                    break;
+
+                case 'ArrowRight':
+                    e.preventDefault();
+                    if (currentSection === 'sidebar') {
+                        if (gridItems.length > 0) {
+                            currentSection = 'grid';
+                            activeGridIdx = 0;
+                            updateFocus();
+                        }
+                    } else if (currentSection === 'grid') {
+                        if (activeGridIdx % gridCols < gridCols - 1 && activeGridIdx < gridItems.length - 1) {
+                            activeGridIdx++;
+                            updateFocus();
+                        }
+                    }
+                    break;
+
+                case 'Enter':
+                    e.preventDefault();
+                    if (currentSection === 'sidebar') {
+                        // Kategorie dauerhaft auswählen
+                        const newCat = sidebarItems[activeSidebarIdx].getAttribute('data-category');
+                        changeCategory(newCat);
+                    } else if (currentSection === 'grid') {
+                        const video = filteredVideos[activeGridIdx];
+                        if (video) {
+                            if (video.media_type === 'image') {
+                                showToast("Fotos abspielen wird noch nicht unterstützt!", 3000);
+                            } else {
+                                startPlayer(video);
+                            }
+                        }
+                    }
+                    break;
+
+                case 'Escape':
+                case 'Backspace':
+                    // Wenn wir im Grid sind, springe zurück zur Sidebar
+                    if (currentSection === 'grid') {
+                        e.preventDefault();
+                        currentSection = 'sidebar';
+                        updateFocus();
+                    }
+                    break;
+            }
+        }
+
+        // --- PLAYER FUNCTIONS ---
+        function startPlayer(video) {
+            const overlay = document.getElementById('player-overlay');
+            const player = document.getElementById('tv-video-element');
+            
+            showToast(`Lade Video: ${video._fileName}...`, 2000);
+
+            // Stream URL setzen
+            player.src = `/stream?path=${encodeURIComponent(video.FilePath)}`;
+            overlay.style.display = 'flex';
+            currentSection = 'player';
+
+            // Autoplay
+            player.play().catch(e => {
+                console.error("Autoplay failed:", e);
+                showToast("Autoplay fehlgeschlagen. Drücke OK zum Abspielen.", 4000);
+            });
+
+            // UI Einblenden & Timeout setzen
+            showPlayerUi();
+
+            // Video Events
+            player.onended = function() {
+                closePlayer();
+            };
+            player.onerror = function() {
+                showToast("Streaming-Fehler! Format wird eventuell vom TV nicht unterstützt.", 5000);
+                setTimeout(closePlayer, 2000);
+            };
+        }
+
+        function closePlayer() {
+            const overlay = document.getElementById('player-overlay');
+            const player = document.getElementById('tv-video-element');
+            
+            player.pause();
+            player.src = "";
+            overlay.style.display = 'none';
+            
+            currentSection = 'grid';
+            clearTimeout(playerUiTimeout);
+            overlay.classList.remove('show-ui');
+            
+            updateFocus();
+        }
+
+        function handlePlayerKeys(e) {
+            const player = document.getElementById('tv-video-element');
+            showPlayerUi(); // UI aktivieren bei Tastendruck
+
+            switch (e.key) {
+                case 'Enter':
+                    e.preventDefault();
+                    if (player.paused) {
+                        player.play();
+                        document.getElementById('play-pause-icon').innerText = 'pause';
+                    } else {
+                        player.pause();
+                        document.getElementById('play-pause-icon').innerText = 'play_arrow';
+                    }
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    player.currentTime = Math.max(0, player.currentTime - 10);
+                    showToast("-10 Sek", 1000);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    player.currentTime = Math.min(player.duration, player.currentTime + 10);
+                    showToast("+10 Sek", 1000);
+                    break;
+                case 'Escape':
+                case 'Backspace':
+                    e.preventDefault();
+                    closePlayer();
+                    break;
+            }
+        }
+
+        function showPlayerUi() {
+            const overlay = document.getElementById('player-overlay');
+            overlay.classList.add('show-ui');
+            
+            clearTimeout(playerUiTimeout);
+            playerUiTimeout = setTimeout(() => {
+                overlay.classList.remove('show-ui');
+            }, 3000);
+        }
+
+        // --- UI UTILS ---
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.add('show');
+            
+            // Auto hide
+            setTimeout(() => {
+                if (toast.innerText === message) {
+                    toast.classList.remove('show');
+                }
+            }, duration);
+        }
+    </script>
+</body>
+</html>
