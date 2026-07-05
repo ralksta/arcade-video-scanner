@@ -8,7 +8,10 @@ import LoginPanel from '../views/LoginPanel';
 import css from './App.module.less';
 
 const App = (props) => {
-	const [panelIndex, setPanelIndex] = useState(0);
+	const existingToken = typeof window !== 'undefined' ? localStorage.getItem('arcade_session_token') : null;
+
+	// Starte direkt auf LoginPanel (index 2) wenn kein Token vorhanden
+	const [panelIndex, setPanelIndex] = useState(existingToken ? 0 : 2);
 	const [activeVideo, setActiveVideo] = useState(null);
 
 	const handleSelectVideo = useCallback((video) => {

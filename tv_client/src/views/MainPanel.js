@@ -1,14 +1,43 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import TabLayout, {Tab} from '@enact/limestone/TabLayout';
 import {VirtualGridList} from '@enact/limestone/VirtualList';
 import ImageItem from '@enact/limestone/ImageItem';
+import Button from '@enact/limestone/Button';
+import {InputField} from '@enact/limestone/Input';
 import ri from '@enact/ui/resolution';
+
+const SORT_OPTIONS = [
+	{key: 'newest', label: '🕐 Neueste'},
+	{key: 'name_az', label: '🔤 A → Z'},
+	{key: 'name_za', label: '🔤 Z → A'},
+	{key: 'size_desc', label: '📦 Größte'},
+	{key: 'size_asc', label: '📦 Kleinste'}
+];
+
+const sortVideos = (list, sortKey) => {
+	const sorted = [...list];
+	switch (sortKey) {
+		case 'name_az':
+			return sorted.sort((a, b) => (a._fileName || '').localeCompare(b._fileName || ''));
+		case 'name_za':
+			return sorted.sort((a, b) => (b._fileName || '').localeCompare(a._fileName || ''));
+		case 'size_desc':
+			return sorted.sort((a, b) => (b.Size_MB || 0) - (a.Size_MB || 0));
+		case 'size_asc':
+			return sorted.sort((a, b) => (a.Size_MB || 0) - (b.Size_MB || 0));
+		case 'newest':
+		default:
+			return sorted.reverse();
+	}
+};
 
 const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [allVideos, setAllVideos] = useState([]);
 	const [loading, setLoading] = useState(true);
+	const [sortKey, setSortKey] = useState('newest');
+	const [filterText, setFilterText] = useState('');
 
 	// Daten laden
 	useEffect(() => {
@@ -48,18 +77,45 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 			});
 	}, [onAuthFailed]);
 
-	// Filtergruppen erstellen
-	const videos = allVideos.filter(v => (v.media_type || 'video') === 'video' && !v.hidden);
-	const favorites = allVideos.filter(v => v.favorite && !v.hidden);
-	const recent = [...allVideos].filter(v => !v.hidden).reverse().slice(0, 24);
-	const images = allVideos.filter(v => v.media_type === 'image' && !v.hidden);
-	const vault = allVideos.filter(v => v.hidden);
+	const handleFilterChange = useCallback((ev) => {
+		setFilterText(ev.value || '');
+	}, []);
+
+	// Filtergruppen erstellen + sortieren
+	const filterAndSort = useCallback((list) => {
+		let result = list;
+		if (filterText.trim()) {
+			const q = filterText.trim().toLowerCase();
+			result = result.filter(v => (v._fileName || '').toLowerCase().includes(q));
+		}
+		return sortVideos(result, sortKey);
+	}, [filterText, sortKey]);
+
+	const videos = useMemo(() =>
+		filterAndSort(allVideos.filter(v => (v.media_type || 'video') === 'video' && !v.hidden)),
+	[allVideos, filterAndSort]);
+
+	const favorites = useMemo(() =>
+		filterAndSort(allVideos.filter(v => v.favorite && !v.hidden)),
+	[allVideos, filterAndSort]);
+
+	const recent = useMemo(() =>
+		filterAndSort([...allVideos].filter(v => !v.hidden).slice(-48)),
+	[allVideos, filterAndSort]);
+
+	const images = useMemo(() =>
+		filterAndSort(allVideos.filter(v => v.media_type === 'image' && !v.hidden)),
+	[allVideos, filterAndSort]);
+
+	const vault = useMemo(() =>
+		filterAndSort(allVideos.filter(v => v.hidden)),
+	[allVideos, filterAndSort]);
 
 	// Item Renderer Factory
 	const makeRenderer = useCallback((list) => ({index, ...itemProps}) => {
 		const v = list[index];
 		if (!v) return null;
-		
+
 		const isImage = v.media_type === 'image';
 		const labelText = [
 			v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : '',
@@ -79,13 +135,39 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		);
 	}, [onSelectVideo]);
 
+	const subtitle = loading
+		? 'Lade Mediathek...'
+		: filterText
+			? `${videos.length} Treffer für "${filterText}"`
+			: `${videos.length} Videos`;
+
 	return (
 		<Panel {...props}>
-			<Header 
-				title="Arcade Scanner TV" 
-				subtitle={loading ? "Lade Mediathek..." : `${videos.length} Videos geladen`}
+			<Header
+				title="Arcade Scanner TV"
+				subtitle={subtitle}
 			/>
-			
+
+			{/* Sortier- und Filterleiste */}
+			<div style={{display: 'flex', alignItems: 'center', gap: ri.scale(16) + 'px', padding: `${ri.scale(8)}px ${ri.scale(24)}px`, flexWrap: 'wrap'}}>
+				<InputField
+					placeholder="🔍 Suche nach Name..."
+					value={filterText}
+					onChange={handleFilterChange}
+					style={{minWidth: ri.scale(320) + 'px'}}
+				/>
+				{SORT_OPTIONS.map(opt => (
+					<Button
+						key={opt.key}
+						size="small"
+						selected={sortKey === opt.key}
+						onClick={() => setSortKey(opt.key)}
+					>
+						{opt.label}
+					</Button>
+				))}
+			</div>
+
 			{!loading && (
 				<TabLayout>
 					<Tab title="Alle Videos" icon="movies">
@@ -93,8 +175,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 							dataSize={videos.length}
 							itemRenderer={makeRenderer(videos)}
 							itemSize={{
-								minWidth: ri.scale(320),
-								minHeight: ri.scale(240)
+								minWidth: ri.scale(600),
+								minHeight: ri.scale(450)
 							}}
 							direction="vertical"
 						/>
@@ -104,8 +186,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 							dataSize={favorites.length}
 							itemRenderer={makeRenderer(favorites)}
 							itemSize={{
-								minWidth: ri.scale(320),
-								minHeight: ri.scale(240)
+								minWidth: ri.scale(600),
+								minHeight: ri.scale(450)
 							}}
 							direction="vertical"
 						/>
@@ -115,8 +197,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 							dataSize={recent.length}
 							itemRenderer={makeRenderer(recent)}
 							itemSize={{
-								minWidth: ri.scale(320),
-								minHeight: ri.scale(240)
+								minWidth: ri.scale(600),
+								minHeight: ri.scale(450)
 							}}
 							direction="vertical"
 						/>
@@ -126,8 +208,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 							dataSize={images.length}
 							itemRenderer={makeRenderer(images)}
 							itemSize={{
-								minWidth: ri.scale(240),
-								minHeight: ri.scale(240)
+								minWidth: ri.scale(500),
+								minHeight: ri.scale(500)
 							}}
 							direction="vertical"
 						/>
@@ -137,8 +219,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 							dataSize={vault.length}
 							itemRenderer={makeRenderer(vault)}
 							itemSize={{
-								minWidth: ri.scale(320),
-								minHeight: ri.scale(240)
+								minWidth: ri.scale(600),
+								minHeight: ri.scale(450)
 							}}
 							direction="vertical"
 						/>
