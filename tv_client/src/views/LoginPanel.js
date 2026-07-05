@@ -9,10 +9,11 @@ import BodyText from '@enact/limestone/BodyText';
 import credentials from './credentials.json';
 
 const LoginPanel = ({onLoginSuccess, ...props}) => {
+	const hasCredentials = credentials && credentials.username && credentials.password;
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState('');
-	const [loading, setLoading] = useState(false);
+	const [loading, setLoading] = useState(!!hasCredentials);
 
 	const handleUsernameChange = useCallback((ev) => {
 		setUsername(ev.value);
@@ -68,8 +69,8 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 
 	// Automatischer Login bei geladenen credentials.json
 	useEffect(() => {
-		if (credentials && credentials.username && credentials.password && !loading && !error) {
-			setLoading(true);
+		if (hasCredentials) {
+			// loading ist bereits auf true initialisiert
 			fetch('http://192.168.2.183:8000/api/login', {
 				method: 'POST',
 				headers: {
@@ -100,7 +101,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 					setLoading(false);
 				});
 		}
-	}, [onLoginSuccess]);
+	}, [onLoginSuccess, hasCredentials]);
 
 	return (
 		<Panel {...props}>
