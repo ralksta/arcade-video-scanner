@@ -39,8 +39,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 				username,
 				password,
 				remember: true
-			}),
-			credentials: 'include'
+			})
 		})
 			.then(res => {
 				if (!res.ok) {
@@ -52,8 +51,9 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 				return res.json();
 			})
 			.then(data => {
-				if (data.success) {
-					onLoginSuccess();
+				if (data.success && data.token) {
+					localStorage.setItem('arcade_session_token', data.token);
+					onLoginSuccess(data.token);
 				} else {
 					throw new Error('Login fehlgeschlagen.');
 				}

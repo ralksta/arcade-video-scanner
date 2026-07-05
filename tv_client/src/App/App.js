@@ -32,6 +32,8 @@ const App = (props) => {
 		setPanelIndex(0);
 	}, []);
 
+	const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('arcade_session_token') : '';
+
 	return (
 		<div {...props} className={css.app}>
 			<Panels index={panelIndex} noCloseButton>
@@ -44,7 +46,7 @@ const App = (props) => {
 							autoCloseTimeout={3000}
 						>
 							<Video>
-								<source src={`http://192.168.2.183:8000/stream?path=${encodeURIComponent(activeVideo.FilePath)}`} />
+								<source src={`http://192.168.2.183:8000/stream?path=${encodeURIComponent(activeVideo.FilePath)}&token=${encodeURIComponent(sessionToken || '')}`} />
 							</Video>
 						</VideoPlayer>
 					)}

@@ -264,11 +264,38 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         super().log_message(format, *args)
 
     def get_current_user(self):
-        """Returns the username from the session cookie, or None."""
+        """Returns the username from the session cookie, Authorization header, query parameter, or None."""
+        from urllib.parse import urlparse, parse_qs
+
+        # 1. Cookie prüfen
         if "Cookie" in self.headers:
             cookie = SimpleCookie(self.headers["Cookie"])
             if "session_token" in cookie:
-                return session_manager.get_username(cookie["session_token"].value)
+                user = session_manager.get_username(cookie["session_token"].value)
+                if user:
+                    return user
+
+        # 2. Authorization-Header prüfen (Bearer Token)
+        auth_header = self.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            user = session_manager.get_username(token)
+            if user:
+                return user
+
+        # 3. Query-Parameter prüfen (für Video-Streams)
+        try:
+            parsed_url = urlparse(self.path)
+            params = parse_qs(parsed_url.query)
+            token_list = params.get("token")
+            if token_list:
+                token = token_list[0]
+                user = session_manager.get_username(token)
+                if user:
+                    return user
+        except Exception:
+            pass
+
         return None
 
     # LRU thumb filename → source file path (shared across handler instances, bounded size)
@@ -877,7 +904,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             self.send_header("Set-Cookie", morsel.OutputString())
 
                         self.end_headers()
-                        self.wfile.write(json.dumps({"success": True}).encode())
+                        self.wfile.write(json.dumps({"success": True, "token": token}).encode())
                     else:
                         remaining = session_manager.record_failure(client_ip)
                         print(f"❌ Login failed for IP {client_ip} ({remaining} attempts remaining)")

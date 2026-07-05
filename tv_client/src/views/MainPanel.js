@@ -12,9 +12,20 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 
 	// Daten laden
 	useEffect(() => {
-		fetch('http://192.168.2.183:8000/api/videos', {credentials: 'include'})
+		const token = localStorage.getItem('arcade_session_token');
+		const headers = {
+			'Content-Type': 'application/json'
+		};
+		if (token) {
+			headers['Authorization'] = `Bearer ${token}`;
+		}
+
+		fetch('http://192.168.2.183:8000/api/videos', {
+			headers: headers
+		})
 			.then(res => {
 				if (res.status === 401) {
+					localStorage.removeItem('arcade_session_token');
 					if (onAuthFailed) onAuthFailed();
 					throw new Error('Unauthorized');
 				}
