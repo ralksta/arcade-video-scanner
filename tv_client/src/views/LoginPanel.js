@@ -1,10 +1,12 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import {InputField} from '@enact/limestone/Input';
 import Button from '@enact/limestone/Button';
 import Heading from '@enact/limestone/Heading';
 import BodyText from '@enact/limestone/BodyText';
+
+import credentials from './credentials.json';
 
 const LoginPanel = ({onLoginSuccess, ...props}) => {
 	const [username, setUsername] = useState('');
@@ -63,6 +65,42 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 				setLoading(false);
 			});
 	}, [username, password, onLoginSuccess]);
+
+	// Automatischer Login bei geladenen credentials.json
+	useEffect(() => {
+		if (credentials && credentials.username && credentials.password && !loading && !error) {
+			setLoading(true);
+			fetch('http://192.168.2.183:8000/api/login', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Enact-TV': 'true'
+				},
+				body: JSON.stringify({
+					username: credentials.username,
+					password: credentials.password,
+					remember: true
+				})
+			})
+				.then(res => {
+					if (!res.ok) throw new Error('Automatischer Login fehlgeschlagen.');
+					return res.json();
+				})
+				.then(data => {
+					if (data.success && data.token) {
+						localStorage.setItem('arcade_session_token', data.token);
+						onLoginSuccess(data.token);
+					} else {
+						throw new Error('Automatischer Login fehlgeschlagen.');
+					}
+				})
+				.catch(err => {
+					console.warn('Auto-login failed, falling back to manual login:', err);
+					setError('Automatischer Login fehlgeschlagen. Bitte manuell anmelden.');
+					setLoading(false);
+				});
+		}
+	}, [onLoginSuccess]);
 
 	return (
 		<Panel {...props}>

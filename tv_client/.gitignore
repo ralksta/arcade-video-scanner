@@ -10,6 +10,9 @@ coverage
 build
 dist
 
+# credentials
+src/views/credentials.json
+
 # misc
 .DS_Store
 npm-debug.log
