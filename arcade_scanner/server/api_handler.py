@@ -227,6 +227,21 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     # Suppress logging for noisy polling endpoints
     QUIET_PATHS = {"/api/duplicates/status"}
 
+    def end_headers(self):
+        origin = self.headers.get("Origin")
+        if origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Credentials", "true")
+        else:
+            self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With, X-Enact-TV")
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.end_headers()
+
     def log_message(self, format, *args):
         """Override to suppress noisy requests (static files, thumbnails, polling)."""
         try:
@@ -402,7 +417,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     if os.path.exists(file_path) and os.path.isfile(file_path):
                         self.send_response(200)
                         self.send_header("Content-type", "image/jpeg")
-                        self.send_header("Access-Control-Allow-Origin", "*")
                         fs = os.stat(file_path)
                         self.send_header("Content-Length", str(fs.st_size))
                         self.end_headers()

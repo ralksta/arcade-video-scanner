@@ -4,6 +4,7 @@ import Panels, {Panel} from '@enact/limestone/Panels';
 import VideoPlayer, {Video} from '@enact/limestone/VideoPlayer';
 
 import MainPanel from '../views/MainPanel';
+import LoginPanel from '../views/LoginPanel';
 import css from './App.module.less';
 
 const App = (props) => {
@@ -23,10 +24,18 @@ const App = (props) => {
 		}, 400);
 	}, []);
 
+	const handleAuthFailed = useCallback(() => {
+		setPanelIndex(2);
+	}, []);
+
+	const handleLoginSuccess = useCallback(() => {
+		setPanelIndex(0);
+	}, []);
+
 	return (
 		<div {...props} className={css.app}>
 			<Panels index={panelIndex} noCloseButton>
-				<MainPanel onSelectVideo={handleSelectVideo} />
+				<MainPanel onSelectVideo={handleSelectVideo} onAuthFailed={handleAuthFailed} />
 				<Panel>
 					{activeVideo && (
 						<VideoPlayer 
@@ -40,6 +49,7 @@ const App = (props) => {
 						</VideoPlayer>
 					)}
 				</Panel>
+				<LoginPanel onLoginSuccess={handleLoginSuccess} />
 			</Panels>
 		</div>
 	);

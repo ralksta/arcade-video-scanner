@@ -6,7 +6,7 @@ import {VirtualGridList} from '@enact/limestone/VirtualList';
 import ImageItem from '@enact/limestone/ImageItem';
 import ri from '@enact/ui/resolution';
 
-const MainPanel = ({onSelectVideo, ...props}) => {
+const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [allVideos, setAllVideos] = useState([]);
 	const [loading, setLoading] = useState(true);
 
@@ -14,6 +14,10 @@ const MainPanel = ({onSelectVideo, ...props}) => {
 	useEffect(() => {
 		fetch('http://192.168.2.183:8000/api/videos', {credentials: 'include'})
 			.then(res => {
+				if (res.status === 401) {
+					if (onAuthFailed) onAuthFailed();
+					throw new Error('Unauthorized');
+				}
 				if (!res.ok) throw new Error('Network error');
 				return res.json();
 			})
@@ -31,7 +35,7 @@ const MainPanel = ({onSelectVideo, ...props}) => {
 				console.error('Fetch error:', err);
 				setLoading(false);
 			});
-	}, []);
+	}, [onAuthFailed]);
 
 	// Filtergruppen erstellen
 	const videos = allVideos.filter(v => (v.media_type || 'video') === 'video' && !v.hidden);
@@ -73,7 +77,7 @@ const MainPanel = ({onSelectVideo, ...props}) => {
 			
 			{!loading && (
 				<TabLayout>
-					<Tab title="Alle Videos" icon="movie">
+					<Tab title="Alle Videos" icon="movies">
 						<VirtualGridList
 							dataSize={videos.length}
 							itemRenderer={makeRenderer(videos)}
@@ -95,7 +99,7 @@ const MainPanel = ({onSelectVideo, ...props}) => {
 							direction="vertical"
 						/>
 					</Tab>
-					<Tab title="Letzte Importe" icon="schedule">
+					<Tab title="Letzte Importe" icon="history">
 						<VirtualGridList
 							dataSize={recent.length}
 							itemRenderer={makeRenderer(recent)}
@@ -106,7 +110,7 @@ const MainPanel = ({onSelectVideo, ...props}) => {
 							direction="vertical"
 						/>
 					</Tab>
-					<Tab title="Bilder" icon="image">
+					<Tab title="Bilder" icon="picture">
 						<VirtualGridList
 							dataSize={images.length}
 							itemRenderer={makeRenderer(images)}
@@ -117,7 +121,7 @@ const MainPanel = ({onSelectVideo, ...props}) => {
 							direction="vertical"
 						/>
 					</Tab>
-					<Tab title="Archiv" icon="archive">
+					<Tab title="Archiv" icon="files">
 						<VirtualGridList
 							dataSize={vault.length}
 							itemRenderer={makeRenderer(vault)}
@@ -135,7 +139,8 @@ const MainPanel = ({onSelectVideo, ...props}) => {
 };
 
 MainPanel.propTypes = {
-	onSelectVideo: PropTypes.func.isRequired
+	onSelectVideo: PropTypes.func.isRequired,
+	onAuthFailed: PropTypes.func
 };
 
 export default MainPanel;
