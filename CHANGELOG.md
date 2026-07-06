@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed — HTTP Performance Overhaul (Viewing & Streaming)
+- **HTTP/1.1 Keep-Alive**: The server now reuses TCP connections instead of opening a new one per request. Thumbnails, static assets, API polling, and video seeking (Range requests) no longer pay a TCP/TLS handshake each time. A safety net guarantees every response either carries a `Content-Length` or closes the connection.
+- **gzip Compression**: Dashboard HTML, JS/CSS assets, and JSON API responses (`/api/videos`, settings, tags, duplicates) are gzip-compressed when the client supports it (~75-90% smaller transfers).
+- **Browser Caching**: Thumbnails are cached for 7 days (`Cache-Control: public, max-age=604800`); static assets and the dashboard revalidate via `If-Modified-Since` and get cheap `304 Not Modified` answers instead of full re-downloads.
+- **Zero-Copy Streaming**: Video streaming uses kernel `sendfile()` (with automatic fallback for SSL and 1 MB chunks instead of 64 KB), plus support for suffix ranges (`bytes=-N`) and correct clamping of over-long ranges.
+- **Connection Hygiene**: Idle keep-alive connections time out after 60s; handler threads are daemonized so open connections never block shutdown.
+
 ## [6.8.0] - 2026-01-18
 
 ### Added

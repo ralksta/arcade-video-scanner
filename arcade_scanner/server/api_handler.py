@@ -18,6 +18,7 @@ from arcade_scanner.security import session_manager
 from http.cookies import SimpleCookie
 from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.server.streaming_util import serve_file_range
+from arcade_scanner.server.response_helpers import send_json, send_bytes, send_not_modified_if_unchanged
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
@@ -224,8 +225,33 @@ def background_duplicate_scan(
 
 
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
+    # HTTP/1.1 keep-alive: thumbnails, static assets, API polling and video
+    # range requests reuse one TCP connection instead of paying a fresh
+    # TCP (+TLS) handshake per request. Correctness is guarded below:
+    # every response either carries a Content-Length or closes the connection.
+    protocol_version = "HTTP/1.1"
+
+    # Idle keep-alive connections release their handler thread after 60s
+    # (handle_one_request treats the socket timeout as Connection: close).
+    timeout = 60
+
     # Suppress logging for noisy polling endpoints
     QUIET_PATHS = {"/api/duplicates/status"}
+
+    # Statuses that carry no body — safe for keep-alive without Content-Length
+    _BODYLESS_STATUSES = {204, 304}
+
+    def send_response(self, code, message=None):
+        # Track per-response state for the keep-alive safety net in end_headers
+        self._response_started = True
+        self._response_status = code
+        self._length_header_sent = False
+        super().send_response(code, message)
+
+    def send_header(self, keyword, value):
+        if keyword.lower() in ("content-length", "transfer-encoding"):
+            self._length_header_sent = True
+        super().send_header(keyword, value)
 
     def end_headers(self):
         origin = self.headers.get("Origin")
@@ -236,10 +262,27 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With, X-Enact-TV")
+
+        # Keep-alive safety net: a body without Content-Length can only be
+        # delimited by closing the connection. POSTs also close, so a handler
+        # that didn't drain the request body can never corrupt the next
+        # request on the same connection.
+        status = getattr(self, "_response_status", None)
+        has_body = status not in self._BODYLESS_STATUSES and not (
+            status is not None and 100 <= status < 200
+        )
+        needs_close = (has_body and not getattr(self, "_length_header_sent", False)) or (
+            getattr(self, "command", None) == "POST"
+        )
+        if needs_close and not self.close_connection:
+            # send_header("Connection", "close") also sets self.close_connection
+            self.send_header("Connection", "close")
+
         super().end_headers()
 
     def do_OPTIONS(self):
         self.send_response(200)
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def log_message(self, format, *args):
@@ -342,6 +385,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
     def do_GET(self):
+        self._response_started = False
         try:
             from .routes import queue, settings, duplicates, tags, files
             if queue.handle_get(self): return
@@ -351,6 +395,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if files.handle_get(self): return
         except Exception as e:
             print(f"Module route error GET: {e}")
+            if getattr(self, "_response_started", False):
+                # Response headers may already be on the wire — a second
+                # response would corrupt a keep-alive connection.
+                self.close_connection = True
+                return
         try:
             # 0. Health check endpoint - no auth required
             if self.path == "/api/health" or self.path == "/api/health/":
@@ -396,18 +445,22 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.send_error(404, "Login page not found")
                         return
 
-                self.send_response(200)
-                self.send_header("Content-type", "text/html; charset=utf-8")
-                
                 if os.path.exists(config.report_file):
                     fs = os.stat(config.report_file)
-                    self.send_header("Content-Length", str(fs.st_size))
-                    self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
-                    # Add User Header for debug
-                    self.send_header("X-Arcade-User", user)
-                    self.end_headers()
+                    # Revalidation: the report only changes when data changes,
+                    # so most reloads are answered with an empty 304.
+                    if send_not_modified_if_unchanged(self, fs.st_mtime):
+                        return
                     with open(config.report_file, 'rb') as f:
-                        self.wfile.write(f.read())
+                        body = f.read()
+                    # gzip cuts the report (HTML + embedded media JSON) by ~80-90%
+                    send_bytes(
+                        self, body, "text/html; charset=utf-8",
+                        cache_control="no-cache",
+                        last_modified=fs.st_mtime,
+                        extra_headers={"X-Arcade-User": user},
+                        compress=True,
+                    )
                 else:
                     self.send_error(404, "Report file not found")
                 return
@@ -442,13 +495,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             create_thumbnail(source_path)
                     
                     if os.path.exists(file_path) and os.path.isfile(file_path):
-                        self.send_response(200)
-                        self.send_header("Content-type", "image/jpeg")
                         fs = os.stat(file_path)
-                        self.send_header("Content-Length", str(fs.st_size))
-                        self.end_headers()
+                        if send_not_modified_if_unchanged(self, fs.st_mtime):
+                            return
                         with open(file_path, 'rb') as f:
-                            self.wfile.write(f.read())
+                            body = f.read()
+                        # Thumb names are content-addressed per source path and
+                        # only change on --rebuild → long client-side caching.
+                        send_bytes(
+                            self, body, "image/jpeg",
+                            cache_control="public, max-age=604800",
+                            last_modified=fs.st_mtime,
+                        )
                         return
                     else:
                         self.send_error(404)
@@ -480,23 +538,32 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         return
 
                     if os.path.exists(file_path) and os.path.isfile(file_path):
-                        self.send_response(200)
-                        if file_path.lower().endswith(".css"):
-                            self.send_header("Content-type", "text/css")
-                        elif file_path.lower().endswith(".js"):
-                            self.send_header("Content-type", "application/javascript")
+                        lower = file_path.lower()
+                        if lower.endswith(".css"):
+                            content_type = "text/css"
+                        elif lower.endswith(".js"):
+                            content_type = "application/javascript"
                         else:
                             mime, _ = mimetypes.guess_type(file_path)
-                            if mime:
-                                self.send_header("Content-type", mime)
-                        
+                            content_type = mime or "application/octet-stream"
+
                         fs = os.stat(file_path)
-                        self.send_header("Content-Length", str(fs.st_size))
-                        self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
-                        self.end_headers()
-                        
+                        # no-cache = cache but revalidate: browsers get cheap
+                        # 304s over the kept-alive connection, never stale JS.
+                        if send_not_modified_if_unchanged(self, fs.st_mtime):
+                            return
+
                         with open(file_path, 'rb') as f:
-                            self.wfile.write(f.read())
+                            body = f.read()
+                        is_text = content_type.startswith("text/") or content_type in (
+                            "application/javascript", "application/json", "image/svg+xml"
+                        )
+                        send_bytes(
+                            self, body, content_type,
+                            cache_control="no-cache",
+                            last_modified=fs.st_mtime,
+                            compress=is_text,
+                        )
                         return
                     else:
                         self.send_error(404)
@@ -514,10 +581,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 
                 u = user_db.get_user(user_name)
                 if u:
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(u.data.model_dump_json().encode())
+                    send_bytes(self, u.data.model_dump_json().encode(), "application/json", compress=True)
                 else:
                      self.send_error(404, "User not found")
                 return
@@ -582,11 +646,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "thumbnails_mb": round(thumb_size, 2),
                     "total_mb": round(total_size, 2)
                 }
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(stats).encode("utf-8"))
+
+                send_json(self, stats)
             
             # --- TAG SYSTEM ENDPOINTS ---
             # --- TAG SYSTEM ENDPOINTS ---
@@ -599,11 +660,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 
                 u = user_db.get_user(user_name)
                 setup_complete = getattr(u.data, 'setup_complete', True) if u else True
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"setup_complete": setup_complete}).encode("utf-8"))
+
+                send_json(self, {"setup_complete": setup_complete})
 
             elif self.path == "/api/videos":
                 # GET: Return all videos, filtered by user's scan targets
@@ -644,10 +702,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     else:
                          print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
                 
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(filtered_videos, default=str).encode("utf-8"))
+                # send_json gzips the (potentially multi-MB) library dump
+                send_json(self, filtered_videos)
 
             elif self.path == "/api/debug/dump":
                 # GET: Return full system state for debugging
@@ -701,11 +757,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     }
                 
                 debug_info["mount_check"] = mount_status
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(debug_info, default=str).encode("utf-8"))
+
+                send_json(self, debug_info)
 
             
             elif self.path.startswith("/api/video/tags?"):
@@ -727,11 +780,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 tags = []
                 if u and abs_path in u.data.tags:
                     tags = u.data.tags[abs_path]
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"tags": tags}).encode("utf-8"))
+
+                send_json(self, {"tags": tags})
             
             # Unreachable block removed
 
@@ -745,10 +795,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     worker_id = params.get("worker_id", [socket.gethostname()])[0]
                     job = db.get_next_pending(worker_id=worker_id)
                     if job:
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps(job).encode())
+                        send_json(self, job)
                     else:
                         self.send_response(204)
                         self.end_headers()
@@ -761,10 +808,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     params = parse_qs(urlparse(self.path).query)
                     job_id = int(params.get("job_id", [0])[0])
                     cancelled = db.is_job_cancelled(job_id) if job_id else False
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"cancelled": cancelled}).encode())
+                    send_json(self, {"cancelled": cancelled})
                 except Exception as e:
                     self.send_error(500, str(e))
 
@@ -838,6 +882,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
     def do_POST(self):
+        self._response_started = False
         try:
             from .routes import queue, settings, duplicates, tags
             if queue.handle_post(self): return
@@ -846,6 +891,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if tags.handle_post(self): return
         except Exception as e:
             print(f"Module route error POST: {e}")
+            if getattr(self, "_response_started", False):
+                self.close_connection = True
+                return
         print(f"DEBUG: POST Request received for path: {self.path}", flush=True)
 
         try:

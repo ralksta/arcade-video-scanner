@@ -1,6 +1,8 @@
 import json
 import os
 
+from arcade_scanner.server.response_helpers import send_json
+
 def _get_deps():
     from arcade_scanner.server.api_handler import (
         _dup_mgr, db, user_db, MAX_REQUEST_SIZE, 
@@ -13,10 +15,7 @@ def handle_get(handler) -> bool:
     path = handler.path
     if path == "/api/duplicates/status":
         _dup_mgr, _, _, _, _, _, _ = _get_deps()
-        handler.send_response(200)
-        handler.send_header("Content-Type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps(_dup_mgr.get_state()).encode("utf-8"))
+        send_json(handler, _dup_mgr.get_state())
         return True
 
     if path == "/api/duplicates" or path == "/api/duplicates/":
@@ -43,10 +42,7 @@ def handle_get(handler) -> bool:
                 },
                 "groups": groups_data
             }
-            handler.send_response(200)
-            handler.send_header("Content-Type", "application/json")
-            handler.end_headers()
-            handler.wfile.write(json.dumps(response).encode("utf-8"))
+            send_json(handler, response)
         except Exception as e:
             print(f"❌ Error returning duplicates: {e}")
             handler.send_error(500, str(e))

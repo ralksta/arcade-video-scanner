@@ -19,7 +19,10 @@ def start_server(use_ssl=False):
     # Allow address reuse to prevent "Address already in use" errors if the script is restarted quickly
     server = socketserver.ThreadingTCPServer(("", PORT), FinderHandler, bind_and_activate=False)
     server.allow_reuse_address = True
-    
+    # Keep-alive connections hold their handler thread until idle timeout —
+    # daemon threads so open connections never block process shutdown.
+    server.daemon_threads = True
+
     try:
         server.server_bind()
         server.server_activate()
@@ -29,6 +32,7 @@ def start_server(use_ssl=False):
         new_port = find_free_port(PORT + 1)
         print(f"Attempting fallback to port {new_port}...")
         server = socketserver.ThreadingTCPServer(("", new_port), FinderHandler)
+        server.daemon_threads = True
         PORT_ACTUAL = new_port
     else:
         PORT_ACTUAL = PORT

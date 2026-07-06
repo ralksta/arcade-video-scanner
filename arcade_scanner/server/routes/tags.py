@@ -2,6 +2,8 @@ import json
 import os
 from urllib.parse import urlparse, parse_qs
 
+from arcade_scanner.server.response_helpers import send_json
+
 def _get_deps():
     from arcade_scanner.server.api_handler import user_db, MAX_REQUEST_SIZE
     return user_db, MAX_REQUEST_SIZE
@@ -33,10 +35,7 @@ def handle_get(handler) -> bool:
                      user_db.add_user(u)
                      print(f"🏷️ Deleted tag for user {user_name}: {tag_name}")
                 
-                 handler.send_response(200)
-                 handler.send_header("Content-Type", "application/json")
-                 handler.end_headers()
-                 handler.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+                 send_json(handler, {"success": True})
                  return True
             else:
                 handler.send_error(400, "Missing name for delete")
@@ -44,11 +43,8 @@ def handle_get(handler) -> bool:
 
         u = user_db.get_user(user_name)
         tags = u.data.available_tags if u else []
-        
-        handler.send_response(200)
-        handler.send_header("Content-Type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps(tags).encode("utf-8"))
+
+        send_json(handler, tags)
         return True
         
     return False

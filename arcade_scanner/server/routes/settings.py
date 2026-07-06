@@ -16,6 +16,8 @@ from __future__ import annotations
 import json
 import os
 
+from arcade_scanner.server.response_helpers import send_json
+
 
 # ---------------------------------------------------------------------------
 # Lazy singletons (imported inside functions to avoid circular imports)
@@ -69,10 +71,7 @@ def handle_get_settings(handler) -> None:
     # Docker detection
     settings_dump["is_docker"] = bool(os.getenv("CONFIG_DIR"))
 
-    handler.send_response(200)
-    handler.send_header("Content-type", "application/json")
-    handler.end_headers()
-    handler.wfile.write(json.dumps(settings_dump, default=str).encode())
+    send_json(handler, settings_dump)
 
 
 # ---------------------------------------------------------------------------
@@ -223,10 +222,7 @@ def handle_get_setup_directories(handler) -> None:
     except Exception as e:
         print(f"⚠️ Error scanning /media: {e}")
 
-    handler.send_response(200)
-    handler.send_header("Content-Type", "application/json")
-    handler.end_headers()
-    handler.wfile.write(json.dumps({"directories": directories}).encode())
+    send_json(handler, {"directories": directories})
 
 
 # ---------------------------------------------------------------------------
@@ -245,10 +241,7 @@ def handle_get_setup_status(handler) -> None:
     u = user_db.get_user(user_name)
     setup_complete = getattr(u.data, "setup_complete", True) if u else True
 
-    handler.send_response(200)
-    handler.send_header("Content-Type", "application/json")
-    handler.end_headers()
-    handler.wfile.write(json.dumps({"setup_complete": setup_complete}).encode())
+    send_json(handler, {"setup_complete": setup_complete})
 
 
 # ---------------------------------------------------------------------------
