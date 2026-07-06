@@ -44,7 +44,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # --- CONFIGURATION ---
 MIN_SAVINGS = 20.0
 MIN_QUALITY = 0.960
-SAMPLE_DURATION = 5
+SAMPLE_DURATION = 3
 DEFAULT_MIN_SIZE_MB = 0  # No minimum file size – process all files
 
 
@@ -580,10 +580,15 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     elif audio_mode == 'standard':
         # Standard AAC re-encode without normalization (flat)
         cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000'])
+    elif audio_mode == 'moderate':
+        # Moderate: gentle normalization to -19 LUFS – midpoint between original and enhanced
+        # -19 LUFS avoids the "too loud" feeling while still cleaning up dynamics
+        audio_filters = 'aformat=channel_layouts=stereo,highpass=f=100,agate=threshold=-55dB:range=0.05:ratio=2,loudnorm=I=-19:TP=-1.5:LRA=11'
+        cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-af', audio_filters])
     else:
         # Enhanced: Normalize channel layout → High-pass → Gate → Loudnorm
         # aformat=stereo: converts mono/5.1/any source to stereo before processing
-        # -16 LUFS = YouTube/Twitch/streaming target (was -20 which is broadcast/radio)
+        # -16 LUFS = YouTube/Twitch/streaming target
         audio_filters = 'aformat=channel_layouts=stereo,highpass=f=100,agate=threshold=-55dB:range=0.05:ratio=2,loudnorm=I=-16:TP=-1.5:LRA=11'
         cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-af', audio_filters])
 
@@ -1288,7 +1293,6 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
         if ssim < SSIM_MIN:
             print(f" {R}   -> Quality too low. Aborting.{NC}")
-            if staging.exists(): staging.unlink()
 
             # Rescue best acceptable result found in previous passes
             if linear_best_acceptable and linear_best_acceptable_path and linear_best_acceptable_path.exists():
@@ -1316,6 +1320,36 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                     notify_server(port, input_path)
                 return (True, _ba_saved_bytes)
 
+            # Interactive rescue: if running in a terminal and the user set a
+            # manual Q, ask if they want to keep the result anyway.
+            if q_override is not None and staging.exists() and sys.stdin.isatty():
+                saved_bytes_preview = size_to_compare - staging.stat().st_size
+                saved_pct_preview   = saved_bytes_preview * 100 / size_to_compare if size_to_compare else 0
+                print(f" {Y}   -> Trotzdem behalten? "
+                      f"(Saved: {saved_pct_preview:.1f}%, SSIM: {ssim:.4f}) [j/N]: {NC}", end='', flush=True)
+                try:
+                    answer = input().strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    answer = ''
+                if answer in ('j', 'y'):
+                    staging.rename(output_path)
+                    _cleanup_staging()
+                    file_time = time.time() - file_start_time
+                    print(f" {Y}>>> Ergebnis übernommen (manuell bestätigt). "
+                          f"Saved: {saved_bytes_preview*100/size_to_compare:.1f}% | SSIM: {ssim:.4f}{NC}")
+                    batch_stats['success'] += 1
+                    last_encode_result['filename'] = input_path.name
+                    last_encode_result['status']   = 'success'
+                    last_encode_result['quality']  = quality
+                    last_encode_result['ssim']     = ssim
+                    last_encode_result['saved_pct']   = saved_pct_preview
+                    last_encode_result['saved_bytes'] = saved_bytes_preview
+                    last_encode_result['duration'] = file_time
+                    last_encode_result['reason']   = 'kept_by_user'
+                    if port:
+                        notify_server(port, input_path)
+                    return (True, saved_bytes_preview)
+            if staging.exists(): staging.unlink()
             _cleanup_staging()
             batch_stats['failed'] += 1
             file_time = time.time() - file_start_time
@@ -1462,8 +1496,8 @@ def main():
                         help=f'Skip files smaller than N MB (default: {DEFAULT_MIN_SIZE_MB})')
     parser.add_argument('--copy-audio', action='store_true',
                         help='Copy audio without re-encoding (faster, preserves original audio)')
-    parser.add_argument('--audio-mode', choices=['enhanced', 'standard'], default='enhanced',
-                        help='Audio processing mode (default: enhanced)')
+    parser.add_argument('--audio-mode', choices=['enhanced', 'moderate', 'standard'], default='moderate',
+                        help='Audio processing mode: moderate (default, -19 LUFS), enhanced (-16 LUFS), standard (no normalization)')
     parser.add_argument('--ss', type=str, help='Start time (e.g. 00:00:10 or 10)')
     parser.add_argument('--to', type=str, help='End time (e.g. 00:00:20 or 20)')
     parser.add_argument('--video-mode', choices=['compress', 'copy'], default='compress',
@@ -1505,10 +1539,16 @@ def main():
     profile = apply_encoding_preset(profile, preset)
     preset_labels = {'fast': '⚡ Fast', 'balanced': '⚖️  Balanced', 'best': '🏆 Best'}
     print(f"{BG}VIDEO OPTIMIZER V2.1{NC} - {G}{profile['name']}{NC} | Preset: {preset_labels.get(preset, preset)}")
+    audio_mode_labels = {
+        'moderate': 'Moderate (-19 LUFS, Mittelweg)',
+        'enhanced': 'Enhanced (-16 LUFS, laut/Streaming)',
+        'standard': 'Standard (keine Normalisierung)',
+    }
     if args.copy_audio:
         print(f"{Y}Audio: Copy (passthrough){NC}")
     elif args.audio_mode:
-        print(f"{Y}Audio Mode: {args.audio_mode}{NC}")
+        label = audio_mode_labels.get(args.audio_mode, args.audio_mode)
+        print(f"{Y}Audio Mode: {label}{NC}")
 
     if args.video_mode == 'copy':
         print(f"{Y}Video Mode: Copy (Passthrough){NC}")
