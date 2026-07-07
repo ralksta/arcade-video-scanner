@@ -37,6 +37,21 @@ except ImportError:
     BITRATE_ANALYZER_AVAILABLE = False
     HW_DETECT_AVAILABLE = False
 
+# Pure helper logic (history seeding, HDR detection, scheduling, ...)
+# Lives in a sibling module so it stays unit-testable without ffmpeg.
+try:
+    _script_dir = str(Path(__file__).resolve().parent)
+    if _script_dir not in sys.path:
+        sys.path.insert(0, _script_dir)
+    from optimizer_utils import (
+        append_encode_history,
+        suggest_q_from_history,
+        nearest_quality_index,
+    )
+    OPTIMIZER_UTILS_AVAILABLE = True
+except ImportError:
+    OPTIMIZER_UTILS_AVAILABLE = False
+
 # Logs directory
 LOG_DIR = Path.home() / ".arcade-scanner" / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -273,7 +288,9 @@ last_encode_result = {
     'saved_pct': None,
     'saved_bytes': None,
     'duration': 0,
-    'reason': None
+    'reason': None,
+    'height': None,       # source height (for encode history bucketing)
+    'source_kbps': None,  # source avg bitrate (for encode history bucketing)
 }
 
 
@@ -664,7 +681,10 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     if not info or info['duration'] <= 0:
         batch_stats['failed'] += 1
         return (False, 0)
-    
+
+    last_encode_result['height'] = info['height']
+    last_encode_result['source_kbps'] = (size_before * 8) / (info['duration'] * 1000)
+
     # --- BITRATE ANALYSIS for maxrate caps ---
     maxrate_kbps = None
     bufsize_kbps = None
@@ -1081,8 +1101,24 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         def _staging_path(q):
             return output_path.with_name(f"{output_path.stem}._staging_q{q}{output_path.suffix}")
 
+        # History seed: bias the FIRST probe toward the median winning Q of
+        # past encodes with the same encoder / resolution / bitrate class.
+        # Only the first iteration is biased — the search stays correct.
+        first_mid = None
+        if OPTIMIZER_UTILS_AVAILABLE and profile.get('_encoder_key'):
+            _suggested_q = suggest_q_from_history(
+                profile['_encoder_key'], info['height'],
+                last_encode_result['source_kbps'] or 0.0)
+            if _suggested_q is not None:
+                first_mid = nearest_quality_index(quality_values, _suggested_q)
+                print(f"{Y}History Seed:{NC} starting at Q={quality_values[first_mid]} (median of past encodes)")
+
         while low <= high:
-            mid = (low + high) // 2
+            if first_mid is not None and low <= first_mid <= high:
+                mid = first_mid
+            else:
+                mid = (low + high) // 2
+            first_mid = None
             quality = quality_values[mid]
             staging = _staging_path(quality)
             pass_bitrate = bitrate_values[mid] if bitrate_values and mid < len(bitrate_values) else None
@@ -1537,6 +1573,7 @@ def main():
     # Apply user-selected encoding preset (fast / balanced / best)
     preset = getattr(args, 'preset', 'balanced')
     profile = apply_encoding_preset(profile, preset)
+    profile['_encoder_key'] = encoder_key  # for encode-history bucketing
     preset_labels = {'fast': '⚡ Fast', 'balanced': '⚖️  Balanced', 'best': '🏆 Best'}
     print(f"{BG}VIDEO OPTIMIZER V2.1{NC} - {G}{profile['name']}{NC} | Preset: {preset_labels.get(preset, preset)}")
     audio_mode_labels = {
@@ -1599,6 +1636,22 @@ def main():
                 duration=last_encode_result['duration'],
                 reason=last_encode_result['reason']
             )
+
+            # Feed the encode history so future runs start at a better Q
+            if (OPTIMIZER_UTILS_AVAILABLE
+                    and last_encode_result['status'] == 'success'
+                    and last_encode_result.get('quality') is not None):
+                append_encode_history({
+                    'ts': datetime.now().isoformat(timespec='seconds'),
+                    'file': last_encode_result['filename'],
+                    'encoder': encoder_key,
+                    'codec': profile.get('codec'),
+                    'height': last_encode_result.get('height'),
+                    'source_kbps': last_encode_result.get('source_kbps'),
+                    'q': last_encode_result['quality'],
+                    'ssim': last_encode_result['ssim'],
+                    'saved_pct': last_encode_result['saved_pct'],
+                })
 
     # Print batch summary if multiple files
     if len(files) > 1:
