@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import re
 import statistics
+from datetime import datetime, time as dtime
 from pathlib import Path
 
 DEFAULT_HISTORY_PATH = Path.home() / ".arcade-scanner" / "logs" / "encode_history.jsonl"
@@ -84,6 +85,36 @@ def narrow_quality_window(n_values: int, predicted_idx: int, radius: int = 1) ->
     lo = max(0, predicted_idx - radius)
     hi = min(n_values - 1, predicted_idx + radius)
     return (lo, hi)
+
+
+# ---------------------------------------------------------------------------
+# Worker scheduling / battery awareness
+# ---------------------------------------------------------------------------
+
+def parse_schedule(spec: str) -> tuple[dtime, dtime] | None:
+    """Parse "HH:MM-HH:MM" into a (start, end) time window. None if invalid."""
+    try:
+        start_s, end_s = spec.strip().split("-")
+        sh, sm = (int(x) for x in start_s.split(":"))
+        eh, em = (int(x) for x in end_s.split(":"))
+        return (dtime(sh, sm), dtime(eh, em))
+    except (ValueError, AttributeError):
+        return None
+
+
+def is_within_schedule(window: tuple[dtime, dtime], now: dtime | None = None) -> bool:
+    """True if `now` falls inside the window; handles overnight wrap (22:00-06:00)."""
+    if now is None:
+        now = datetime.now().time()
+    start, end = window
+    if start <= end:
+        return start <= now <= end
+    return now >= start or now <= end
+
+
+def battery_from_pmset(output: str) -> bool:
+    """True if macOS `pmset -g batt` output indicates battery power."""
+    return "Battery Power" in output
 
 
 # ---------------------------------------------------------------------------

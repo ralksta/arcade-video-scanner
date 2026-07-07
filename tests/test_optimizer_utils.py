@@ -6,6 +6,7 @@ logic behind the video optimizer: encode history Q seeding, HDR detection,
 loudnorm filter building, scene-window selection, and worker scheduling.
 """
 import sys
+from datetime import time as dtime
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
@@ -24,6 +25,9 @@ from optimizer_utils import (  # noqa: E402
     build_audio_filter_chain,
     select_top_windows,
     narrow_quality_window,
+    parse_schedule,
+    is_within_schedule,
+    battery_from_pmset,
 )
 
 
@@ -230,3 +234,36 @@ class TestNarrowWindow:
 
     def test_single_value(self):
         assert narrow_quality_window(1, 0, radius=1) == (0, 0)
+
+
+class TestSchedule:
+    def test_parse_valid(self):
+        assert parse_schedule("01:00-08:30") == (dtime(1, 0), dtime(8, 30))
+
+    def test_parse_invalid(self):
+        assert parse_schedule("nonsense") is None
+        assert parse_schedule("25:00-08:00") is None
+        assert parse_schedule("") is None
+
+    def test_within_normal_window(self):
+        win = (dtime(9, 0), dtime(17, 0))
+        assert is_within_schedule(win, now=dtime(12, 0)) is True
+        assert is_within_schedule(win, now=dtime(8, 59)) is False
+        assert is_within_schedule(win, now=dtime(17, 1)) is False
+
+    def test_overnight_window_wraps(self):
+        win = (dtime(22, 0), dtime(6, 0))
+        assert is_within_schedule(win, now=dtime(23, 30)) is True
+        assert is_within_schedule(win, now=dtime(3, 0)) is True
+        assert is_within_schedule(win, now=dtime(12, 0)) is False
+
+
+class TestBattery:
+    def test_battery_power_detected(self):
+        assert battery_from_pmset("Now drawing from 'Battery Power'\n -InternalBattery-0") is True
+
+    def test_ac_power_not_battery(self):
+        assert battery_from_pmset("Now drawing from 'AC Power'\n -InternalBattery-0") is False
+
+    def test_garbage_defaults_to_false(self):
+        assert battery_from_pmset("") is False
