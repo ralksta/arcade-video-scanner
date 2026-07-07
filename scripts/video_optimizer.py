@@ -51,6 +51,7 @@ try:
         apply_hdr_adjustments,
         parse_loudnorm_json,
         build_audio_filter_chain,
+        select_top_windows,
     )
     OPTIMIZER_UTILS_AVAILABLE = True
 except ImportError:
@@ -542,6 +543,39 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     sys.stdout.write(f"\r\033[2K {G}{encoder}{NC} [{arrow}{spaces}] {BG}{int(percent)}%{NC} | {speed} | {bitrate} | {elapsed_str} / {eta_str}")
     sys.stdout.flush()
 
+def analyze_packet_hotspots(input_path, bucket_len: float = 5.0) -> dict:
+    """Sum video packet bytes per bucket_len-second bucket (no decode, fast).
+
+    Used to place SSIM sample windows on the highest-bitrate (= most complex)
+    parts of the video. Returns {} on any error → caller falls back to fixed
+    percentage sample points.
+    """
+    cmd = [
+        'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+        '-show_entries', 'packet=pts_time,size',
+        '-of', 'csv=p=0', str(input_path)
+    ]
+    buckets: dict = {}
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        assert process.stdout is not None
+        for line in process.stdout:
+            parts = line.strip().split(',')
+            if len(parts) < 2:
+                continue
+            try:
+                pts = float(parts[0])
+                size = int(parts[1])
+            except ValueError:
+                continue  # pts_time can be 'N/A'
+            bucket = int(pts / bucket_len)
+            buckets[bucket] = buckets.get(bucket, 0) + size
+        process.wait(timeout=120)
+    except (subprocess.SubprocessError, OSError, ValueError):
+        return {}
+    return buckets
+
+
 def measure_loudness(input_path, audio_mode):
     """First loudnorm pass: measure the source loudness (audio-only, fast).
 
@@ -832,6 +866,18 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     if (video_mode == 'compress' and not copy_audio and not is_trim
             and audio_mode in ('moderate', 'enhanced')):
         loudnorm_measured = measure_loudness(input_path, audio_mode)
+
+    # --- SCENE-AWARE SSIM SAMPLE POINTS (computed once, reused every pass) ---
+    # Sample where the bitrate is highest — that's where artifacts show first.
+    dur_for_samples = trim_duration if is_trim else info['duration']
+    _max_sample_start = max(0.0, dur_for_samples - SAMPLE_DURATION - 0.5)
+    if OPTIMIZER_UTILS_AVAILABLE and not is_trim and video_mode == 'compress':
+        sample_starts = select_top_windows(
+            analyze_packet_hotspots(input_path), dur_for_samples,
+            n=3, window=SAMPLE_DURATION)
+        print(f"{Y}Sample Windows:{NC} " + ", ".join(format_time(s) for s in sample_starts) + " (bitrate hotspots)")
+    else:
+        sample_starts = sorted({min(dur_for_samples * p, _max_sample_start) for p in (0.25, 0.50, 0.75)})
 
     start_q, end_q, step = profile['quality_range']
 
@@ -1127,14 +1173,9 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 if effective_out != output_path and effective_out.exists(): effective_out.unlink()
                 return (False, size_after, 0.0, 'poor_savings')
 
-            # Quality verification: single ffmpeg pass over 3 segments (25 / 50 / 75 %)
-            # concat-based comparison → natural mean, no skew from fades like min() had
-            dur_for_samples = trim_duration if is_trim else info['duration']
-            raw_pts = [dur_for_samples * p for p in (0.25, 0.50, 0.75)]
-            opt_starts = [
-                max(0.0, min(s, dur_for_samples - SAMPLE_DURATION - 0.5))
-                for s in raw_pts
-            ]
+            # Quality verification: single ffmpeg pass over the pre-computed
+            # sample windows (scene-aware hotspots, or 25/50/75% fallback)
+            opt_starts = sample_starts
             orig_starts = [start_offset + s for s in opt_starts]
 
             ssim = get_multi_ssim(

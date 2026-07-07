@@ -173,3 +173,39 @@ def build_audio_filter_chain(audio_mode: str, measured: dict | None = None) -> s
                    f":measured_LRA={vals['input_lra']}:measured_thresh={vals['input_thresh']}"
                    f":offset={vals['target_offset']}:linear=true")
     return f"{AUDIO_PRE_CHAIN},{ln}"
+
+
+# ---------------------------------------------------------------------------
+# Scene-aware SSIM sample selection
+# ---------------------------------------------------------------------------
+
+def select_top_windows(bucket_bytes: dict[int, int], duration: float, n: int = 3,
+                       window: float = 3.0, bucket_len: float = 5.0) -> list[float]:
+    """Pick the highest-bitrate bucket in each of n equal regions of the video.
+
+    High packet density = high motion/complexity = where compression artifacts
+    live. Fixed 25/50/75%% points can land on static menus and overestimate
+    quality. Falls back to those percentages when no packet data exists.
+    Returns sorted, de-duplicated window start times clamped into the video.
+    """
+    max_start = max(0.0, duration - window - 0.5)
+
+    def _fallback() -> list[float]:
+        return sorted({min(duration * p, max_start) for p in (0.25, 0.50, 0.75)})[:n]
+
+    if not bucket_bytes or duration <= 0:
+        return _fallback()
+
+    region_len = duration / n
+    starts: set = set()
+    for r in range(n):
+        lo_t, hi_t = r * region_len, (r + 1) * region_len
+        lo_b = int(lo_t / bucket_len)
+        hi_b = max(lo_b + 1, int(hi_t / bucket_len))
+        candidates = {b: sz for b, sz in bucket_bytes.items() if lo_b <= b < hi_b}
+        if candidates:
+            best_bucket = max(candidates, key=candidates.get)
+            starts.add(max(0.0, min(best_bucket * bucket_len, max_start)))
+        else:
+            starts.add(max(0.0, min(lo_t + region_len / 2, max_start)))
+    return sorted(starts)[:n]

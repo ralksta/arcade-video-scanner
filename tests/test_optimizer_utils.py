@@ -22,6 +22,7 @@ from optimizer_utils import (  # noqa: E402
     apply_hdr_adjustments,
     parse_loudnorm_json,
     build_audio_filter_chain,
+    select_top_windows,
 )
 
 
@@ -186,3 +187,33 @@ class TestLoudnorm:
 
     def test_standard_mode_returns_none(self):
         assert build_audio_filter_chain("standard") is None
+
+
+class TestSceneWindows:
+    def test_picks_heaviest_bucket_per_third(self):
+        # 300s video, 5s buckets: heavy spots at 10s, 150s, 250s
+        buckets = {i: 100 for i in range(60)}
+        buckets[2] = 9000    # 10-15s (first third)
+        buckets[30] = 8000   # 150-155s (second third)
+        buckets[50] = 7000   # 250-255s (last third)
+        starts = select_top_windows(buckets, 300.0, n=3, window=3.0, bucket_len=5.0)
+        assert starts == [10.0, 150.0, 250.0]
+
+    def test_empty_buckets_fall_back_to_percentages(self):
+        starts = select_top_windows({}, 100.0, n=3, window=3.0)
+        assert starts == [25.0, 50.0, 75.0]
+
+    def test_starts_clamped_inside_duration(self):
+        buckets = {19: 9999}  # 95-100s of a 100s video
+        starts = select_top_windows(buckets, 100.0, n=3, window=3.0, bucket_len=5.0)
+        for s in starts:
+            assert 0.0 <= s <= 100.0 - 3.0 - 0.5
+
+    def test_returns_sorted_unique(self):
+        buckets = {0: 500, 1: 400, 2: 300}
+        starts = select_top_windows(buckets, 15.0, n=3, window=3.0, bucket_len=5.0)
+        assert starts == sorted(starts)
+        assert len(set(starts)) == len(starts)
+
+    def test_zero_duration_falls_back(self):
+        assert select_top_windows({0: 100}, 0.0, n=3, window=3.0) == [0.0]
