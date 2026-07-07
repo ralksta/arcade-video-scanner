@@ -57,3 +57,6 @@ video_dashboard.html
 screenlog.0
 backups/
 docker-compose.yml_back*
+
+# Local docker compose overrides (user-specific paths, never commit)
+docker-compose.override.yml
