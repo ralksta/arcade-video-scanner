@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed — Video Optimizer V2.5
+- **Sample-Clip Pre-Search**: The quality binary search now runs on a ~24s stream-copied probe clip first, then narrows the full-encode search to predicted ±1 — typically 1-2 full passes instead of 3-4 (files ≥ 120s; `--no-presearch` to disable).
+- **Encode History Seeding**: Successful encodes are logged to `encode_history.jsonl`; future runs start the search at the median winning Q for the same encoder/resolution/bitrate class.
+- **HDR/10-bit Safety**: HDR and 10-bit sources are detected; VideoToolbox/NVENC/x265 encode main10 with BT.2020/PQ/HLG color passthrough, other encoders skip the file instead of mistagging it as BT.709 (previously colors washed out).
+- **Two-Pass Loudnorm**: Audio loudness is measured once per file and normalized in transparent linear mode instead of pumping-prone dynamic mode (moderate/enhanced audio modes).
+- **Scene-Aware SSIM Sampling**: Quality checks sample the highest-bitrate parts of the video (packet analysis) instead of fixed 25/50/75% points.
+- **Output Integrity Verification**: Every optimized file must pass a duration check and a full error-strict decode before it replaces anything — truncated or corrupt encodes are discarded automatically.
+- **Worker Scheduling**: `mac_worker.py` gains `--schedule "01:00-08:00"` (overnight windows supported) and `--pause-on-battery`.
+- **Fixed**: `get_video_info()` never populated width/height/codec (missing `codec_type` in the ffprobe query) — now returns real stream metadata.
+
 ### Changed — HTTP Performance Overhaul (Viewing & Streaming)
 - **HTTP/1.1 Keep-Alive**: The server now reuses TCP connections instead of opening a new one per request. Thumbnails, static assets, API polling, and video seeking (Range requests) no longer pay a TCP/TLS handshake each time. A safety net guarantees every response either carries a `Content-Length` or closes the connection.
 - **gzip Compression**: Dashboard HTML, JS/CSS assets, and JSON API responses (`/api/videos`, settings, tags, duplicates) are gzip-compressed when the client supports it (~75-90% smaller transfers).

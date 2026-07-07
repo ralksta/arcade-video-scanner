@@ -51,6 +51,9 @@ KNOWN_EXTERNAL_IDS = {
     "statusSelect", "codecSelect", "sortSelect",
     # Count/Size stats ribbon
     "count-total", "size-total",
+    # Sidebar-Nav Counts — per f-string in ui_components.py render_navigation()
+    # erzeugt: id="count-{id_val.replace('m-', '')}" → statisch nicht matchbar
+    "count-duplicates",
     # View Toggle Button (Dashboard-Topbar)
     "toggleView", "saveViewBtn", "showHiddenToggle",
     # Treemap Canvas (in components)
@@ -238,6 +241,9 @@ class TestCssVariableContracts:
             # safe-area (iOS)
             "safe-area-inset-top", "safe-area-inset-bottom",
             "safe-area-inset-left", "safe-area-inset-right",
+            # Theme-Variablen — zur Laufzeit via render_theme_css() (templates/theme.py)
+            # in den <head> injiziert, wie die arcade-* Tokens oben
+            "surface-glass", "text-main", "text-muted",
         }
 
         missing = used - defined - KNOWN_EXTERNALS

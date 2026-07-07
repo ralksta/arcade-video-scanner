@@ -130,6 +130,8 @@ The tool includes a specialized cross-platform video optimizer (`scripts/video_o
   - **Software Fallback**: CPU encoding if no hardware is found.
 - **AV1 Encoding Support** *(Experimental, FFmpeg 8.1+)*: Requires Apple M3/M4 or NVIDIA RTX 40xx. Falls back to HEVC automatically.
 - **Intelligent Transcoding**: Binary search finds optimal quality in O(log n) passes. Savings are checked *before* SSIM — passes with < 10% savings are skipped immediately.
+- **Sample-Clip Pre-Search** *(V2.5)*: Quality is probed on a ~24s sample clip first, narrowing the full-encode search to 1-2 passes. Past encodes seed the starting quality per encoder/resolution/bitrate class.
+- **Safe by Default** *(V2.5)*: HDR/10-bit sources get main10 color passthrough (or are skipped, never mistagged); every output must pass a full decode-verify before it replaces the original.
 - **Batch Processing**: Select multiple videos in the dashboard to queue them up.
 
 ### Codec Selection

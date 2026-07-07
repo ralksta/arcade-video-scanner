@@ -356,4 +356,82 @@ Examples:
 
 ---
 
-*Last updated: v7.0.1 — Linear Search fallback tracking (best_acceptable rescue on SSIM abort)*
+## V2.5 Improvements (July 2026)
+
+Pure helper logic for all of the following lives in `scripts/optimizer_utils.py`
+(no ffmpeg/subprocess — unit-tested in `tests/test_optimizer_utils.py`); the
+ffmpeg-invoking wrappers stay in `video_optimizer.py` (integration tests in
+`tests/test_optimizer_ffmpeg.py`, skipped when ffmpeg is missing). Every
+feature degrades gracefully to the previous behavior on any failure.
+
+### Sample-Clip Pre-Search
+
+The old binary search encoded the **entire file** once per pass. Now, for
+files ≥ `PRESEARCH_MIN_DURATION` (120s), three scene-aware segments are
+stream-copied (keyframe-aligned, ~1s) into a ~24s probe clip and the Q binary
+search runs on the probe first. The full-encode search is then narrowed to
+predicted ±1 quality level — typically 1–2 real passes instead of 3–4.
+Disable with `--no-presearch`.
+
+### Encode History Q Seeding
+
+Every successful encode appends a JSONL record to
+`~/.arcade-scanner/logs/encode_history.jsonl`:
+`{ts, file, encoder, codec, height, source_kbps, q, ssim, saved_pct}`.
+With ≥ 3 samples in the same (encoder, resolution class, bitrate class)
+bucket, the binary search biases its **first probe** to the median winning Q.
+
+### Scene-Aware SSIM Sampling
+
+SSIM windows used to sit at fixed 25/50/75% — which can land on static menus.
+`analyze_packet_hotspots()` sums video packet bytes per 5s bucket (ffprobe,
+no decode) and `select_top_windows()` places one window on the highest-bitrate
+bucket in each third of the video. Falls back to percentages for trims/errors.
+
+### HDR / 10-bit Safety
+
+`get_video_info()` now returns `pix_fmt`, `color_transfer`, `color_primaries`.
+Sources detected as HDR/10-bit (`is_hdr_or_10bit`):
+
+| Encoder | Behavior |
+|:---|:---|
+| `hevc_videotoolbox` | main10 + `p010le`, BT.2020/PQ/HLG tags passed through |
+| `hevc_nvenc` | main10 + `p010le`, tags passed through |
+| `libx265` | main10 + `yuv420p10le`, tags passed through |
+| all others | **file skipped** with a clear reason (never mistag as BT.709) |
+
+Copy mode no longer stamps any color metadata.
+
+### Two-Pass Linear Loudnorm
+
+`measure_loudness()` runs one audio-only null pass per file (same pre-chain
+as the encode), and all encode passes use `loudnorm=...:measured_*:linear=true`
+— transparent normalization without dynamic-mode pumping. Skipped for trims
+and silent/unmeasurable audio (dynamic fallback).
+
+### Output Integrity Verification
+
+Before any staging file replaces the original (`promote_staging()`, all five
+promote sites), it must pass `verify_output_integrity()`: ffprobe duration
+match (±1.5s) plus a full error-strict video decode (`ffmpeg -xerror -f null`).
+Catches truncated moov atoms and encoder/driver corruption that 3-window SSIM
+sampling can miss.
+
+### Worker Scheduling (mac_worker.py)
+
+```bash
+python3 scripts/mac_worker.py --server http://nas:8000 \
+    --schedule "01:00-08:00" \   # only work in this window (overnight OK)
+    --pause-on-battery           # pause while unplugged (pmset -g batt)
+```
+
+### New Constants
+
+| Constant | Default | Purpose |
+|:---|:---|:---|
+| `PRESEARCH_MIN_DURATION` | `120.0` | Minimum duration for pre-search |
+| `PRESEARCH_SEGMENT_SEC` | `8.0` | Length of each probe segment |
+
+---
+
+*Last updated: V2.5 — pre-search, history seeding, HDR safety, two-pass loudnorm, scene-aware sampling, integrity verification, worker scheduling*

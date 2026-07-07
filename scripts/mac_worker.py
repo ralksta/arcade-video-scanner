@@ -29,6 +29,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from optimizer_utils import parse_schedule, is_within_schedule, battery_from_pmset  # noqa: E402
+
 # Color codes
 G = "\033[92m"
 Y = "\033[93m"
@@ -38,6 +40,26 @@ NC = "\033[0m"
 B = "\033[1m"
 
 _shutdown = False
+
+
+def is_on_battery() -> bool:
+    """True when a macOS machine is running on battery power (else False)."""
+    if sys.platform != "darwin":
+        return False
+    try:
+        import subprocess
+        r = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=5)
+        return battery_from_pmset(r.stdout)
+    except Exception:
+        return False
+
+
+def _sleep_interruptible(seconds: int) -> None:
+    """Sleep in 1s steps so Ctrl-C / SIGTERM shutdown stays responsive."""
+    for _ in range(seconds):
+        if _shutdown:
+            break
+        time.sleep(1)
 
 
 def signal_handler(_sig, _frame):
@@ -358,8 +380,19 @@ Environment Variables:
     parser.add_argument("--poll-interval", type=int, default=30, help="Seconds between polls (default: 30)")
     parser.add_argument("--work-dir", default=os.path.expanduser("~/encoding-queue"),
                        help="Temp directory for downloads (default: ~/encoding-queue)")
+    parser.add_argument("--schedule", default=None,
+                       help='Only work within this time window, e.g. "01:00-08:00" (overnight windows OK)')
+    parser.add_argument("--pause-on-battery", action="store_true",
+                       help="Pause polling while the machine runs on battery power (macOS)")
 
     args = parser.parse_args()
+
+    schedule_window = None
+    if args.schedule:
+        schedule_window = parse_schedule(args.schedule)
+        if schedule_window is None:
+            print(f'{R}Invalid --schedule "{args.schedule}" — expected HH:MM-HH:MM{NC}')
+            sys.exit(2)
 
     # Ensure work dir exists
     os.makedirs(args.work_dir, exist_ok=True)
@@ -371,6 +404,10 @@ Environment Variables:
     print(f"  Worker:    {socket.gethostname()}")
     print(f"  Work Dir:  {args.work_dir}")
     print(f"  Poll:      every {args.poll_interval}s")
+    if schedule_window:
+        print(f"  Schedule:  {args.schedule}")
+    if args.pause_on_battery:
+        print(f"  Battery:   pause when unplugged")
     print()
 
     # Auth
@@ -379,16 +416,22 @@ Environment Variables:
     # Main loop
     print(f"{C}Polling for jobs...{NC}")
     while not _shutdown:
+        if schedule_window and not is_within_schedule(schedule_window):
+            print(f"{Y}⏸  Outside schedule window ({args.schedule}) — sleeping...{NC}", end="\r")
+            _sleep_interruptible(args.poll_interval)
+            continue
+        if args.pause_on_battery and is_on_battery():
+            print(f"{Y}🔋 On battery power — paused...{NC}", end="\r")
+            _sleep_interruptible(args.poll_interval)
+            continue
+
         job = client.poll_next_job()
 
         if job:
             process_job(client, job, args.work_dir)
         else:
             # Wait before polling again
-            for _ in range(args.poll_interval):
-                if _shutdown:
-                    break
-                time.sleep(1)
+            _sleep_interruptible(args.poll_interval)
 
     print(f"{G}Worker stopped.{NC}")
 
