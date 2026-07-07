@@ -49,6 +49,8 @@ try:
         nearest_quality_index,
         is_hdr_or_10bit,
         apply_hdr_adjustments,
+        parse_loudnorm_json,
+        build_audio_filter_chain,
     )
     OPTIMIZER_UTILS_AVAILABLE = True
 except ImportError:
@@ -540,7 +542,36 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     sys.stdout.write(f"\r\033[2K {G}{encoder}{NC} [{arrow}{spaces}] {BG}{int(percent)}%{NC} | {speed} | {bitrate} | {elapsed_str} / {eta_str}")
     sys.stdout.flush()
 
-def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress', maxrate_kbps=None, bufsize_kbps=None, target_bitrate_kbps=None, color_args=None):
+def measure_loudness(input_path, audio_mode):
+    """First loudnorm pass: measure the source loudness (audio-only, fast).
+
+    The measurement is reused across all encode passes of this file, enabling
+    linear (transparent) normalization instead of dynamic mode. Returns the
+    measurement dict or None (caller falls back to single-pass dynamic).
+    """
+    if not OPTIMIZER_UTILS_AVAILABLE:
+        return None
+    chain = build_audio_filter_chain(audio_mode)
+    if chain is None:
+        return None
+    cmd = [
+        'ffmpeg', '-hide_banner', '-nostats',
+        '-i', str(input_path), '-map', '0:a:0',
+        '-af', f'{chain}:print_format=json',
+        '-f', 'null', '-'
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+        measured = parse_loudnorm_json(result.stderr)
+        if measured and measured.get('input_i') not in (None, '-inf'):
+            print(f"{Y}Audio Analysis:{NC} measured {measured['input_i']} LUFS → linear loudnorm")
+            return measured
+    except (subprocess.SubprocessError, OSError):
+        pass
+    return None
+
+
+def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress', maxrate_kbps=None, bufsize_kbps=None, target_bitrate_kbps=None, color_args=None, loudnorm_measured=None):
     """Build the ffmpeg command based on encoder profile.
 
     Args:
@@ -598,22 +629,25 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
                 cmd.extend(['-bufsize', f'{int(maxrate_kbps * 2)}k'])
     
     # Audio settings
+    # moderate = -19 LUFS (gentle midpoint), enhanced = -16 LUFS (streaming target).
+    # With a loudness measurement (two-pass), loudnorm runs in linear mode.
     if copy_audio:
         cmd.extend(['-c:a', 'copy'])
-    elif audio_mode == 'standard':
-        # Standard AAC re-encode without normalization (flat)
-        cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000'])
-    elif audio_mode == 'moderate':
-        # Moderate: gentle normalization to -19 LUFS – midpoint between original and enhanced
-        # -19 LUFS avoids the "too loud" feeling while still cleaning up dynamics
-        audio_filters = 'aformat=channel_layouts=stereo,highpass=f=100,agate=threshold=-55dB:range=0.05:ratio=2,loudnorm=I=-19:TP=-1.5:LRA=11'
-        cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-af', audio_filters])
     else:
-        # Enhanced: Normalize channel layout → High-pass → Gate → Loudnorm
-        # aformat=stereo: converts mono/5.1/any source to stereo before processing
-        # -16 LUFS = YouTube/Twitch/streaming target
-        audio_filters = 'aformat=channel_layouts=stereo,highpass=f=100,agate=threshold=-55dB:range=0.05:ratio=2,loudnorm=I=-16:TP=-1.5:LRA=11'
-        cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-af', audio_filters])
+        if OPTIMIZER_UTILS_AVAILABLE:
+            audio_filters = build_audio_filter_chain(audio_mode, measured=loudnorm_measured)
+        elif audio_mode == 'standard':
+            audio_filters = None
+        else:
+            target_i = -19 if audio_mode == 'moderate' else -16
+            audio_filters = ('aformat=channel_layouts=stereo,highpass=f=100,'
+                             'agate=threshold=-55dB:range=0.05:ratio=2,'
+                             f'loudnorm=I={target_i}:TP=-1.5:LRA=11')
+        if audio_filters:
+            cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-af', audio_filters])
+        else:
+            # Standard AAC re-encode without normalization (flat)
+            cmd.extend(['-c:a', 'aac', '-b:a', '192k', '-ar', '48000'])
 
     codec_name = profile.get('codec', '')
     is_av1 = 'av1' in codec_name
@@ -792,6 +826,13 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             else:
                 print(f"{Y}Maxrate OK:{NC} {maxrate_kbps:.0f}k ≤ target ceiling {target_maxrate:.0f}k")
 
+    # --- TWO-PASS LOUDNORM: measure once per file, reuse across all passes ---
+    # (Trims skip this: the measurement window would differ from the encode.)
+    loudnorm_measured = None
+    if (video_mode == 'compress' and not copy_audio and not is_trim
+            and audio_mode in ('moderate', 'enhanced')):
+        loudnorm_measured = measure_loudness(input_path, audio_mode)
+
     start_q, end_q, step = profile['quality_range']
 
     # Build list of quality values for binary search
@@ -952,7 +993,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         maxrate_info = f" (maxrate={maxrate_kbps:.0f}k{br_info})" if maxrate_kbps else (f" (target={target_bitrate_kbps:.0f}k)" if target_bitrate_kbps else "")
         print(f"{G}Pass:{NC} Q={quality_val}{maxrate_info}")
 
-        cmd = build_ffmpeg_command(input_path, effective_out, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress', maxrate_kbps=maxrate_kbps, bufsize_kbps=bufsize_kbps, target_bitrate_kbps=target_bitrate_kbps, color_args=profile.get('color_args'))
+        cmd = build_ffmpeg_command(input_path, effective_out, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress', maxrate_kbps=maxrate_kbps, bufsize_kbps=bufsize_kbps, target_bitrate_kbps=target_bitrate_kbps, color_args=profile.get('color_args'), loudnorm_measured=loudnorm_measured)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}

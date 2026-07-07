@@ -20,6 +20,8 @@ from optimizer_utils import (  # noqa: E402
     nearest_quality_index,
     is_hdr_or_10bit,
     apply_hdr_adjustments,
+    parse_loudnorm_json,
+    build_audio_filter_chain,
 )
 
 
@@ -131,3 +133,56 @@ class TestHdr:
     def test_unsupported_encoder_returns_none(self):
         profile = {"codec": "hevc_qsv", "encoder_args": [], "video_filter": "format=yuv420p"}
         assert apply_hdr_adjustments(profile, HDR10) is None
+
+
+LOUDNORM_STDERR = """
+[Parsed_loudnorm_3 @ 0x600002]
+{
+\t"input_i" : "-23.61",
+\t"input_tp" : "-6.53",
+\t"input_lra" : "5.90",
+\t"input_thresh" : "-33.79",
+\t"output_i" : "-19.02",
+\t"output_tp" : "-2.03",
+\t"output_lra" : "5.10",
+\t"output_thresh" : "-29.13",
+\t"normalization_type" : "dynamic",
+\t"target_offset" : "0.02"
+}
+"""
+
+
+class TestLoudnorm:
+    def test_parse_extracts_measurements(self):
+        m = parse_loudnorm_json(LOUDNORM_STDERR)
+        assert m["input_i"] == "-23.61"
+        assert m["target_offset"] == "0.02"
+
+    def test_parse_garbage_returns_none(self):
+        assert parse_loudnorm_json("no json here") is None
+
+    def test_dynamic_chain_without_measurement(self):
+        chain = build_audio_filter_chain("moderate")
+        assert "loudnorm=I=-19:TP=-1.5:LRA=11" in chain
+        assert "measured_I" not in chain
+        assert chain.startswith("aformat=channel_layouts=stereo")
+
+    def test_linear_chain_with_measurement(self):
+        m = parse_loudnorm_json(LOUDNORM_STDERR)
+        chain = build_audio_filter_chain("enhanced", measured=m)
+        assert "loudnorm=I=-16" in chain
+        assert "measured_I=-23.61" in chain
+        assert "measured_TP=-6.53" in chain
+        assert "measured_LRA=5.90" in chain
+        assert "measured_thresh=-33.79" in chain
+        assert "offset=0.02" in chain
+        assert "linear=true" in chain
+
+    def test_silent_audio_falls_back_to_dynamic(self):
+        m = {"input_i": "-inf", "input_tp": "-inf",
+             "input_lra": "0.00", "input_thresh": "-inf", "target_offset": "0.00"}
+        chain = build_audio_filter_chain("moderate", measured=m)
+        assert "measured_I" not in chain
+
+    def test_standard_mode_returns_none(self):
+        assert build_audio_filter_chain("standard") is None

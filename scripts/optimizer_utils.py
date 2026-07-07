@@ -6,6 +6,7 @@ by video_optimizer.py, mac_worker.py and the test suite alike.
 from __future__ import annotations
 
 import json
+import re
 import statistics
 from pathlib import Path
 
@@ -128,3 +129,47 @@ def apply_hdr_adjustments(profile: dict, info: dict) -> dict | None:
         "-color_trc", trc,
     ]
     return adj
+
+
+# ---------------------------------------------------------------------------
+# Two-pass loudnorm
+# ---------------------------------------------------------------------------
+
+LOUDNORM_TARGETS = {"moderate": -19, "enhanced": -16}
+
+# Pre-chain must be identical between measurement and encode pass so the
+# loudnorm measurement reflects the gated/filtered signal it will normalize.
+AUDIO_PRE_CHAIN = ("aformat=channel_layouts=stereo,highpass=f=100,"
+                   "agate=threshold=-55dB:range=0.05:ratio=2")
+
+
+def parse_loudnorm_json(stderr_text: str) -> dict | None:
+    """Extract the loudnorm measurement JSON block from ffmpeg stderr."""
+    matches = re.findall(r"\{[^{}]*\"input_i\"[^{}]*\}", stderr_text, re.DOTALL)
+    if not matches:
+        return None
+    try:
+        return json.loads(matches[-1])
+    except json.JSONDecodeError:
+        return None
+
+
+def build_audio_filter_chain(audio_mode: str, measured: dict | None = None) -> str | None:
+    """Audio filter chain for the given mode; None = no filtering (plain AAC).
+
+    With a valid measurement, loudnorm runs in linear (transparent) mode
+    instead of the pumping-prone dynamic mode.
+    """
+    target_i = LOUDNORM_TARGETS.get(audio_mode)
+    if target_i is None:
+        return None
+    ln = f"loudnorm=I={target_i}:TP=-1.5:LRA=11"
+    if measured:
+        keys = ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")
+        vals = {k: str(measured.get(k, "")) for k in keys}
+        usable = all(vals[k] not in ("", "-inf", "inf", "nan", "None") for k in keys)
+        if usable:
+            ln += (f":measured_I={vals['input_i']}:measured_TP={vals['input_tp']}"
+                   f":measured_LRA={vals['input_lra']}:measured_thresh={vals['input_thresh']}"
+                   f":offset={vals['target_offset']}:linear=true")
+    return f"{AUDIO_PRE_CHAIN},{ln}"
