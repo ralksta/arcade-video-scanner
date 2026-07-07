@@ -43,8 +43,15 @@ async function openSettings() {
         const imageScanCheckbox = document.getElementById('settingsScanImages');
         if (imageScanCheckbox) imageScanCheckbox.checked = data.enable_image_scanning === true;
 
-        const deovrCheckbox = document.getElementById('settingsDeoVR');
-        if (deovrCheckbox) deovrCheckbox.checked = data.enable_deovr === true;
+        // Encoding preset (fast / balanced / best)
+        selectEncodingPreset(data.encoding_preset || 'balanced');
+
+        const precomputeThumbsCheckbox = document.getElementById('settingsPrecomputeThumbs');
+        if (precomputeThumbsCheckbox) precomputeThumbsCheckbox.checked = data.precompute_thumbnails !== false;
+
+        const verboseScanningCheckbox = document.getElementById('settingsVerboseScanning');
+        if (verboseScanningCheckbox) verboseScanningCheckbox.checked = data.verbose_scanning === true;
+
 
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
@@ -133,8 +140,10 @@ async function saveSettings() {
 
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
-        enable_deovr: document.getElementById('settingsDeoVR')?.checked || false,
-        theme: document.getElementById('settingsTheme').value || 'arcade'
+        encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
+        theme: document.getElementById('settingsTheme').value || 'arcade',
+        precompute_thumbnails: document.getElementById('settingsPrecomputeThumbs')?.checked ?? true,
+        verbose_scanning: document.getElementById('settingsVerboseScanning')?.checked || false
     };
 
     try {
@@ -441,42 +450,6 @@ function markSettingsSaved() {
         indicator.className = 'save-indicator saved';
         indicator.innerHTML = '<span class="material-icons">check_circle</span><span>All changes saved</span>';
     }
-}
-
-// ============================================================================
-// GENERAL TOAST NOTIFICATION
-// ============================================================================
-
-/**
- * Show a toast notification message
- * @param {string} message - Message to display
- * @param {string} [type='info'] - Toast type ('info', 'success', 'error')
- */
-function showToast(message, type = 'info') {
-    // Remove existing toast if any
-    const existingToast = document.querySelector('.settings-toast');
-    if (existingToast) {
-        existingToast.remove();
-    }
-
-    // Create toast
-    const toast = document.createElement('div');
-    toast.className = `settings-toast toast-${type}`;
-    toast.innerHTML = `
-        <span class="material-icons">${type === 'success' ? 'check_circle' : 'info'}</span>
-        <span>${message}</span>
-    `;
-
-    document.body.appendChild(toast);
-
-    // Trigger animation
-    setTimeout(() => toast.classList.add('show'), 10);
-
-    // Remove after 2 seconds
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
 }
 
 // ============================================================================
@@ -854,8 +827,8 @@ window.markSettingsUnsaved = markSettingsUnsaved;
 window.markSettingsSaving = markSettingsSaving;
 window.markSettingsSaved = markSettingsSaved;
 
-// Toast
-window.showToast = showToast;
+
+// Toast is defined in utils.js — do not re-export here.
 
 // Hidden path modal
 window.showHiddenPathModal = showHiddenPathModal;
@@ -1024,4 +997,16 @@ async function confirmRemovePhotos(removeFromDb) {
 
 window.onIncludePhotosChange = onIncludePhotosChange;
 window.confirmRemovePhotos = confirmRemovePhotos;
+
+// Encoding quality preset selection
+function selectEncodingPreset(value) {
+    const presets = ['fast', 'balanced', 'best'];
+    presets.forEach(p => {
+        const btn = document.querySelector(`.encoding-preset-btn[data-value="${p}"]`);
+        if (btn) btn.classList.toggle('active', p === value);
+    });
+    const hidden = document.getElementById('settingsEncodingPreset');
+    if (hidden) hidden.value = value;
+}
+window.selectEncodingPreset = selectEncodingPreset;
 

@@ -50,6 +50,7 @@ _COLUMNS = [
     ("thumb", "TEXT DEFAULT ''"),
     ("imported_at", "INTEGER DEFAULT 0"),
     ("mtime", "INTEGER DEFAULT 0"),
+    ("original_path", "TEXT DEFAULT ''"),
 ]
 
 
@@ -64,6 +65,17 @@ class SQLiteStore:
         self._conn: Optional[sqlite3.Connection] = None
         self._migrated = False
         self._write_lock = threading.Lock()  # Serialise all writes
+        self.on_change_callbacks = []
+
+    def register_on_change(self, callback):
+        self.on_change_callbacks.append(callback)
+
+    def _notify_change(self):
+        for cb in self.on_change_callbacks:
+            try:
+                cb()
+            except Exception:
+                pass
 
     def _ensure_connection(self):
         """Lazy-init the connection and create schema if needed."""
@@ -80,7 +92,9 @@ class SQLiteStore:
         # Performance pragmas
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA cache_size=-8000")  # 8MB cache
+        self._conn.execute("PRAGMA cache_size=-64000")  # 64MB cache (Performance boost)
+        self._conn.execute("PRAGMA temp_store=MEMORY")
+        self._conn.execute("PRAGMA mmap_size=268435456") # 256MB mmap
 
         self._create_table()
 
@@ -96,6 +110,14 @@ class SQLiteStore:
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_mtime ON media(mtime)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_favorite ON media(favorite)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_vaulted ON media(vaulted)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_thumb ON media(thumb)")
+
+        # Migration: Add original_path to media table if it doesn't exist
+        try:
+            self._conn.execute("ALTER TABLE media ADD COLUMN original_path TEXT DEFAULT ''")
+        except Exception:
+            pass # Already exists
 
         # Encoding queue for remote optimization
         self._conn.execute("""
@@ -128,16 +150,17 @@ class SQLiteStore:
         self._ensure_connection()
 
         # Check for existing pending/active job for this file
+        safe_path = self._get_safe_path(file_path)
         cursor = self._conn.execute(
             "SELECT id FROM encoding_queue WHERE file_path = ? AND status IN ('pending', 'downloading', 'encoding', 'uploading')",
-            (file_path,)
+            (safe_path,)
         )
         if cursor.fetchone():
             return None  # Already queued
 
         self._conn.execute(
             "INSERT INTO encoding_queue (file_path, status, size_bytes, target_codec, created_at) VALUES (?, 'pending', ?, ?, ?)",
-            (file_path, size_bytes, target_codec, int(time.time()))
+            (safe_path, size_bytes, target_codec, int(time.time()))
         )
         cursor = self._conn.execute("SELECT last_insert_rowid()")
         return cursor.fetchone()[0]
@@ -161,7 +184,7 @@ class SQLiteStore:
         )
         return {
             "id": job_id,
-            "file_path": row["file_path"],
+            "file_path": self._decode_safe_path(row["file_path"]),
             "size_bytes": row["size_bytes"],
             "target_codec": row["target_codec"] or "hevc",
         }
@@ -261,17 +284,51 @@ class SQLiteStore:
                 print(f"⚠️ Skipping corrupted DB row: {e}")
         return results
 
+    def get_all_dicts(self) -> List[dict]:
+        """Return all entries as plain dictionaries with UI aliases.
+        
+        This is much more memory efficient than get_all() for large libraries,
+        as it avoids Pydantic model overhead.
+        """
+        self._ensure_connection()
+        cursor = self._conn.execute("SELECT * FROM media")
+        results = []
+        for row in cursor:
+            try:
+                results.append(self._row_to_api_dict(row))
+            except Exception as e:
+                print(f"⚠️ Skipping corrupted DB row (dict): {e}")
+        return results
+
     def get(self, path: str) -> Optional[VideoEntry]:
         """Lookup a single entry by file_path. O(1) indexed."""
         self._ensure_connection()
+        # Handle surrogate-escaped paths by using hybrid str/bytes for SQLite
+        safe_path = self._get_safe_path(path)
         cursor = self._conn.execute(
-            "SELECT * FROM media WHERE file_path = ?", (path,)
+            "SELECT * FROM media WHERE file_path = ?", (safe_path,)
         )
         row = cursor.fetchone()
         if row:
             try:
                 return self._row_to_entry(row)
-            except Exception:
+            except Exception as e:
+                logger.error(f"⚠️ Failed to decode DB row: {e}")
+                return None
+        return None
+
+    def get_by_thumb(self, thumb_name: str) -> Optional[VideoEntry]:
+        """Fetch a single entry by thumb name."""
+        self._ensure_connection()
+        cursor = self._conn.execute(
+            "SELECT * FROM media WHERE thumb = ?", (thumb_name,)
+        )
+        row = cursor.fetchone()
+        if row:
+            try:
+                return self._row_to_entry(row)
+            except Exception as e:
+                logger.error(f"⚠️ Failed to decode DB row for thumb: {e}")
                 return None
         return None
 
@@ -292,12 +349,45 @@ class SQLiteStore:
                 f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                 values,
             )
+            self._notify_change()
+
+    def bulk_upsert(self, entries) -> None:
+        """Insert or replace multiple entries in a single transaction."""
+        from ..models.media_asset import MediaAsset
+        if not entries:
+            return
+
+        with self._write_lock:
+            self._ensure_connection()
+            
+            placeholders = ", ".join("?" for _ in _COLUMNS)
+            col_names = ", ".join(name for name, _ in _COLUMNS)
+            
+            data = []
+            for entry in entries:
+                if isinstance(entry, MediaAsset):
+                    entry = self._asset_to_video_entry(entry)
+                data.append(self._entry_to_tuple(entry))
+
+            self._conn.execute("BEGIN")
+            try:
+                self._conn.executemany(
+                    f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
+                    data,
+                )
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
+            self._notify_change()
 
     def remove(self, path: str) -> None:
         """Delete an entry by file_path."""
         with self._write_lock:
             self._ensure_connection()
-            self._conn.execute("DELETE FROM media WHERE file_path = ?", (path,))
+            safe_path = self._get_safe_path(path)
+            self._conn.execute("DELETE FROM media WHERE file_path = ?", (safe_path,))
+            self._notify_change()
 
     def delete_all_photos(self) -> int:
         """Delete all entries where media_type = 'image'. Returns the number of deleted rows."""
@@ -356,6 +446,13 @@ class SQLiteStore:
 
     def _row_to_entry(self, row: sqlite3.Row) -> VideoEntry:
         """Convert a database row to a VideoEntry model."""
+        return VideoEntry(**self._row_to_api_dict(row))
+
+    def _row_to_api_dict(self, row: sqlite3.Row) -> dict:
+        """Convert a database row to a dictionary with UI-friendly aliases."""
+        # Handle surrogate-escaped paths
+        file_path = self._decode_safe_path(row["file_path"])
+
         tags = row["tags"]
         if isinstance(tags, str):
             try:
@@ -363,36 +460,40 @@ class SQLiteStore:
             except (json.JSONDecodeError, TypeError):
                 tags = []
 
-        return VideoEntry(
-            file_path=row["file_path"],
-            size_mb=row["size_mb"] or 0.0,
-            bitrate_mbps=row["bitrate_mbps"] or 0.0,
-            status=row["status"] or "OK",
-            media_type=row["media_type"] or "video",
-            codec=row["codec"] or "unknown",
-            duration_sec=row["duration_sec"] or 0.0,
-            width=row["width"] or 0,
-            height=row["height"] or 0,
-            audio_codec=row["audio_codec"] or "unknown",
-            audio_channels=row["audio_channels"] or 0,
-            container_format=row["container_format"] or "unknown",
-            profile=row["profile"] or "",
-            level=row["level"] or 0.0,
-            pixel_format=row["pixel_format"] or "",
-            frame_rate=row["frame_rate"] or 0.0,
-            favorite=bool(row["favorite"]),
-            vaulted=bool(row["vaulted"]),
-            tags=tags if isinstance(tags, list) else [],
-            thumb=row["thumb"] or "",
-            imported_at=row["imported_at"] or 0,
-            mtime=row["mtime"] or 0,
-        )
+        return {
+            "FilePath": file_path,
+            "Size_MB": row["size_mb"] or 0.0,
+            "Bitrate_Mbps": row["bitrate_mbps"] or 0.0,
+            "Status": row["status"] or "OK",
+            "media_type": row["media_type"] or "video",
+            "codec": row["codec"] or "unknown",
+            "Duration_Sec": row["duration_sec"] or 0.0,
+            "Width": row["width"] or 0,
+            "Height": row["height"] or 0,
+            "AudioCodec": row["audio_codec"] or "unknown",
+            "AudioChannels": row["audio_channels"] or 0,
+            "Container": row["container_format"] or "unknown",
+            "Profile": row["profile"] or "",
+            "Level": row["level"] or 0.0,
+            "PixelFormat": row["pixel_format"] or "",
+            "FrameRate": row["frame_rate"] or 0.0,
+            "favorite": bool(row["favorite"]),
+            "hidden": bool(row["vaulted"]),
+            "tags": tags if isinstance(tags, list) else [],
+            "thumb": row["thumb"] or "",
+            "imported_at": row["imported_at"] or 0,
+            "mtime": row["mtime"] or 0,
+            "OriginalPath": row["original_path"] or "",
+        }
 
     def _entry_to_tuple(self, entry: VideoEntry) -> tuple:
         """Convert a VideoEntry to a tuple matching _COLUMNS order."""
+        # Handle surrogate-escaped paths by using hybrid str/bytes for SQLite
+        file_path = self._get_safe_path(entry.file_path)
+
         tags = json.dumps(entry.tags) if entry.tags else "[]"
         return (
-            entry.file_path,
+            file_path,
             entry.size_mb,
             entry.bitrate_mbps,
             entry.status,
@@ -414,6 +515,7 @@ class SQLiteStore:
             entry.thumb or "",
             entry.imported_at or 0,
             entry.mtime or 0,
+            entry.original_path or "",
         )
 
     def _asset_to_video_entry(self, entry) -> VideoEntry:
@@ -441,6 +543,7 @@ class SQLiteStore:
             thumb=entry.thumb,
             imported_at=entry.imported_at,
             mtime=entry.mtime,
+            original_path=entry.original_path,
         )
 
     def _migrate_from_json(self):
@@ -499,6 +602,26 @@ class SQLiteStore:
 
         except Exception as e:
             print(f"❌ Migration failed: {e}")
+
+
+    def _get_safe_path(self, path: str):
+        """
+        Return a representation of the path safe for SQLite TEXT columns.
+        Uses str for valid UTF-8 (best for affinity/matching) and bytes for surrogates.
+        """
+        if not isinstance(path, str):
+            return path
+        try:
+            path.encode('utf-8', 'strict')
+            return path
+        except UnicodeEncodeError:
+            return path.encode('utf-8', 'surrogateescape')
+
+    def _decode_safe_path(self, db_path) -> str:
+        """Decode a path from the DB (could be str or bytes)."""
+        if isinstance(db_path, bytes):
+            return db_path.decode('utf-8', 'surrogateescape')
+        return str(db_path)
 
 
 # Singleton instance

@@ -31,99 +31,116 @@ function openCollectionModal(editId = null) {
     const modal = document.getElementById('collectionModal');
     if (!modal) return;
 
-    editingCollectionId = editId;
+    try {
+        editingCollectionId = editId;
 
-    // Reset form
-    document.getElementById('collectionName').value = '';
-    document.getElementById('collectionSearch').value = '';
-    document.getElementById('collectionDateFilter').value = 'all';
-    document.getElementById('collectionMinSize').value = '';
-    document.getElementById('collectionMaxSize').value = '';
-    document.getElementById('collectionMinDuration').value = '';
-    document.getElementById('collectionMaxDuration').value = '';
-    document.getElementById('collectionColor').value = '#64FFDA';
-    document.getElementById('collectionColorBtn').style.backgroundColor = '#64FFDA';
-    document.getElementById('selectedCollectionIcon').innerText = 'folder_special';
+        // Reset form — null-safe with optional chaining
+        const _el = (id) => document.getElementById(id);
+        if (_el('collectionName')) _el('collectionName').value = '';
+        if (_el('collectionSearch')) _el('collectionSearch').value = '';
+        if (_el('collectionDateFilter')) _el('collectionDateFilter').value = 'all';
+        if (_el('collectionMinSize')) _el('collectionMinSize').value = '';
+        if (_el('collectionMaxSize')) _el('collectionMaxSize').value = '';
+        if (_el('collectionMinDuration')) _el('collectionMinDuration').value = '';
+        if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = '';
+        if (_el('collectionColor')) _el('collectionColor').value = '#64FFDA';
+        if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = '#64FFDA';
+        if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = 'folder_special';
 
-    // Initialize new criteria schema
-    collectionCriteriaNew = getDefaultCollectionCriteria();
+        // Initialize new criteria schema
+        collectionCriteriaNew = getDefaultCollectionCriteria();
 
-    // Also reset legacy for backward compat
-    collectionCriteria = { status: 'all', codec: 'all', tags: [], search: '' };
+        // Also reset legacy for backward compat
+        collectionCriteria = { status: 'all', codec: 'all', tags: [], search: '' };
 
-    // Update UI title
-    document.getElementById('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
-    document.getElementById('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
+        // Update UI title
+        if (_el('collectionModalTitle')) _el('collectionModalTitle').innerText = editId ? 'Edit Collection' : 'Smart Collection';
+        _el('deleteCollectionBtn')?.classList.toggle('hidden', !editId);
 
-    // If editing, load existing data
-    if (editId) {
-        const existing = (userSettings.smart_collections || []).find(c => c.id === editId);
-        if (existing) {
-            document.getElementById('collectionName').value = existing.name || '';
-            document.getElementById('collectionSearch').value = existing.criteria?.search || '';
+        let existing = null;
+        // If editing, load existing data
+        if (editId) {
+            existing = (userSettings.smart_collections || []).find(c => c.id === editId);
+            if (!existing) {
+                console.warn(`Collection ID "${editId}" not found in current user settings. It might be a system collection or recently deleted.`);
+            }
 
-            // Populate New Fields
-            document.getElementById('collectionDateFilter').value = existing.criteria?.date || 'all';
-            document.getElementById('collectionMinSize').value = existing.criteria?.size?.min || '';
-            document.getElementById('collectionMaxSize').value = existing.criteria?.size?.max || '';
-            document.getElementById('collectionMinDuration').value = existing.criteria?.duration?.min || '';
-            document.getElementById('collectionMaxDuration').value = existing.criteria?.duration?.max || '';
+            if (existing) {
+                if (_el('collectionName')) _el('collectionName').value = existing.name || '';
+                if (_el('collectionSearch')) _el('collectionSearch').value = existing.criteria?.search || '';
 
-            document.getElementById('collectionColor').value = existing.color || '#64FFDA';
-            document.getElementById('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
-            document.getElementById('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
+                // Populate New Fields
+                if (_el('collectionDateFilter')) _el('collectionDateFilter').value = existing.criteria?.date || 'all';
+                if (_el('collectionMinSize')) _el('collectionMinSize').value = existing.criteria?.size?.min || '';
+                if (_el('collectionMaxSize')) _el('collectionMaxSize').value = existing.criteria?.size?.max || '';
+                if (_el('collectionMinDuration')) _el('collectionMinDuration').value = existing.criteria?.duration?.min || '';
+                if (_el('collectionMaxDuration')) _el('collectionMaxDuration').value = existing.criteria?.duration?.max || '';
 
-            // Check if using new schema
-            if (existing.criteria?.include || existing.criteria?.exclude) {
-                collectionCriteriaNew = JSON.parse(JSON.stringify(existing.criteria));
-            } else {
-                // Convert legacy schema to new
-                collectionCriteriaNew = getDefaultCollectionCriteria();
-                if (existing.criteria?.status && existing.criteria.status !== 'all') {
-                    collectionCriteriaNew.include.status = [existing.criteria.status];
+                if (_el('collectionColor')) _el('collectionColor').value = existing.color || '#64FFDA';
+                if (_el('collectionColorBtn')) _el('collectionColorBtn').style.backgroundColor = existing.color || '#64FFDA';
+                if (_el('selectedCollectionIcon')) _el('selectedCollectionIcon').innerText = existing.icon || 'folder_special';
+
+                // Check if using new schema
+                if (existing.criteria?.include || existing.criteria?.exclude) {
+                    collectionCriteriaNew = JSON.parse(JSON.stringify(existing.criteria));
+                } else {
+                    // Convert legacy schema to new
+                    collectionCriteriaNew = getDefaultCollectionCriteria();
+                    if (existing.criteria?.status && existing.criteria.status !== 'all') {
+                        collectionCriteriaNew.include.status = [existing.criteria.status];
+                    }
+                    if (existing.criteria?.codec && existing.criteria.codec !== 'all') {
+                        collectionCriteriaNew.include.codec = [existing.criteria.codec];
+                    }
+                    if (existing.criteria?.tags) {
+                        collectionCriteriaNew.include.tags = [...existing.criteria.tags];
+                    }
+                    collectionCriteriaNew.search = existing.criteria?.search || '';
+
+                    // Preserve new fields if they were mixed in
+                    if (existing.criteria?.size) collectionCriteriaNew.size = existing.criteria.size;
+                    if (existing.criteria?.date) collectionCriteriaNew.date = existing.criteria.date;
+                    if (existing.criteria?.duration) collectionCriteriaNew.duration = existing.criteria.duration;
+                    if (existing.criteria?.favorites) collectionCriteriaNew.favorites = existing.criteria.favorites;
                 }
-                if (existing.criteria?.codec && existing.criteria.codec !== 'all') {
-                    collectionCriteriaNew.include.codec = [existing.criteria.codec];
-                }
-                if (existing.criteria?.tags) {
-                    collectionCriteriaNew.include.tags = [...existing.criteria.tags];
-                }
-                collectionCriteriaNew.search = existing.criteria?.search || '';
-
-                // Preserve new fields if they were mixed in
-                if (existing.criteria?.size) collectionCriteriaNew.size = existing.criteria.size;
-                if (existing.criteria?.date) collectionCriteriaNew.date = existing.criteria.date;
-                if (existing.criteria?.duration) collectionCriteriaNew.duration = existing.criteria.duration;
-                if (existing.criteria?.favorites) collectionCriteriaNew.favorites = existing.criteria.favorites;
             }
         }
+
+        // Populate and sync category dropdown
+        if (typeof populateCategoryDropdown === 'function') {
+            populateCategoryDropdown(existing?.category || null);
+        } else {
+            console.error('Function populateCategoryDropdown not found. ensure engine.js is loaded.');
+        }
+        
+        document.getElementById('newCategoryInput')?.classList.add('hidden');
+        document.getElementById('collectionCategory')?.classList.remove('hidden');
+
+        // Sync UI with new criteria
+        syncSmartCollectionUI();
+
+        // Reset accordion sections to collapsed state
+        const propertiesPanel = document.getElementById('propertiesPanel');
+        const metadataPanel = document.getElementById('metadataPanel');
+        const propertiesChevron = document.getElementById('propertiesChevron');
+        const metadataChevron = document.getElementById('metadataChevron');
+
+        if (propertiesPanel) {
+            propertiesPanel.classList.add('hidden');
+            if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
+        }
+        if (metadataPanel) {
+            metadataPanel.classList.add('hidden');
+            if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
+        }
+
+        updateAllFilterBadges();
+        modal.classList.add('active');
+    } catch (err) {
+        console.error('Critical failure in openCollectionModal:', err);
+        // Show fallback modal or message
+        modal.classList.add('active'); // Still open it, but it might be empty
     }
-
-    // Populate and sync category dropdown
-    populateCategoryDropdown(editId ? (userSettings.smart_collections || []).find(c => c.id === editId)?.category : null);
-    document.getElementById('newCategoryInput')?.classList.add('hidden');
-    document.getElementById('collectionCategory')?.classList.remove('hidden');
-
-    // Sync UI with new criteria
-    syncSmartCollectionUI();
-
-    // Reset accordion sections to collapsed state
-    const propertiesPanel = document.getElementById('propertiesPanel');
-    const metadataPanel = document.getElementById('metadataPanel');
-    const propertiesChevron = document.getElementById('propertiesChevron');
-    const metadataChevron = document.getElementById('metadataChevron');
-
-    if (propertiesPanel) {
-        propertiesPanel.classList.add('hidden');
-        if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
-    }
-    if (metadataPanel) {
-        metadataPanel.classList.add('hidden');
-        if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
-    }
-
-    updateAllFilterBadges();
-    modal.classList.add('active');
 }
 
 /**
@@ -261,7 +278,8 @@ function toggleCollectionIconPicker() {
 }
 
 function selectCollectionIcon(icon) {
-    document.getElementById('selectedCollectionIcon').innerText = icon;
+    const iconEl = document.getElementById('selectedCollectionIcon');
+    if (iconEl) iconEl.innerText = icon;
     document.getElementById('collectionIconPicker')?.classList.add('hidden');
 }
 
@@ -271,8 +289,10 @@ function toggleCollectionColorPicker() {
 }
 
 function selectCollectionColor(color) {
-    document.getElementById('collectionColor').value = color;
-    document.getElementById('collectionColorBtn').style.backgroundColor = color;
+    const colorInput = document.getElementById('collectionColor');
+    const colorBtn = document.getElementById('collectionColorBtn');
+    if (colorInput) colorInput.value = color;
+    if (colorBtn) colorBtn.style.backgroundColor = color;
     document.getElementById('collectionColorPicker')?.classList.add('hidden');
 }
 
@@ -282,21 +302,22 @@ function selectCollectionColor(color) {
  * Save the current collection (create or update)
  */
 function saveCollection() {
-    const name = document.getElementById('collectionName').value.trim();
+    const _el = (id) => document.getElementById(id);
+    const name = (_el('collectionName')?.value || '').trim();
     if (!name) {
         alert('Please enter a collection name');
         return;
     }
 
-    const icon = document.getElementById('selectedCollectionIcon').innerText;
-    const color = document.getElementById('collectionColor').value;
-    const search = document.getElementById('collectionSearch').value.trim();
+    const icon = _el('selectedCollectionIcon')?.innerText || 'folder_special';
+    const color = _el('collectionColor')?.value || '#64FFDA';
+    const search = (_el('collectionSearch')?.value || '').trim();
 
-    const dateVal = document.getElementById('collectionDateFilter').value;
-    const sizeMin = document.getElementById('collectionMinSize').value;
-    const sizeMax = document.getElementById('collectionMaxSize').value;
-    const durMin = document.getElementById('collectionMinDuration').value;
-    const durMax = document.getElementById('collectionMaxDuration').value;
+    const dateVal = _el('collectionDateFilter')?.value || 'all';
+    const sizeMin = _el('collectionMinSize')?.value || '';
+    const sizeMax = _el('collectionMaxSize')?.value || '';
+    const durMin = _el('collectionMinDuration')?.value || '';
+    const durMax = _el('collectionMaxDuration')?.value || '';
 
     if (collectionCriteriaNew) {
         collectionCriteriaNew.search = search;
@@ -673,15 +694,28 @@ function renderSmartCollectionTagsList() {
     const container = document.getElementById('collectionTagsList');
     if (!container) return;
 
-    if (availableTags.length === 0) {
+    const includedTags = collectionCriteriaNew?.include?.tags || [];
+    const excludedTags = collectionCriteriaNew?.exclude?.tags || [];
+
+    // Finde alle verwaisten Tags, die in den Kriterien sind, aber nicht in availableTags
+    const availableNames = new Set(availableTags.map(t => t.name));
+    const orphanTags = [...new Set([...includedTags, ...excludedTags])].filter(t => !availableNames.has(t));
+
+    const allTags = [...availableTags];
+    orphanTags.forEach(t => {
+        allTags.push({
+            name: t,
+            color: '#6b7280', // Neutrales Grau
+            isOrphan: true
+        });
+    });
+
+    if (allTags.length === 0) {
         container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags created</span>';
         return;
     }
 
-    const includedTags = collectionCriteriaNew?.include?.tags || [];
-    const excludedTags = collectionCriteriaNew?.exclude?.tags || [];
-
-    container.innerHTML = availableTags.map(tag => {
+    container.innerHTML = allTags.map(tag => {
         const isIncluded = includedTags.includes(tag.name);
         const isExcluded = excludedTags.includes(tag.name);
 
@@ -690,18 +724,26 @@ function renderSmartCollectionTagsList() {
 
         if (isIncluded) {
             style = `border-color: ${tag.color}; background: ${tag.color}20;`;
+            if (tag.isOrphan) {
+                style += ' border-style: dashed;';
+            }
             classes += ' active';
         } else if (isExcluded) {
             style = `border-color: #ef4444; background: rgba(239, 68, 68, 0.15); color: #ef4444; text-decoration: line-through; opacity: 0.8;`;
+            if (tag.isOrphan) {
+                style += ' border-style: dashed;';
+            }
             classes += ' exclude';
         }
+
+        const displayName = tag.isOrphan ? `⚠️ ${tag.name} (gelöscht)` : tag.name;
 
         return `
         <button class="${classes}"
                 onclick="toggleSmartTagChip('${tag.name}')"
                 style="${style}">
             <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${isExcluded ? '#ef4444' : tag.color}"></span>
-            ${tag.name}
+            ${displayName}
         </button>
         `;
     }).join('');
@@ -1083,13 +1125,14 @@ function applyCollection(collectionId) {
     activeSmartCollectionCriteria = criteria;
     activeCollectionId = collectionId;
 
-    // Sync search UI
+    // Sync search UI — null-safe (mobileSearchInput may not exist on all layouts)
+    const mobileSearchEl = document.getElementById('mobileSearchInput');
     if (criteria.search) {
         searchTerm = criteria.search;
-        document.getElementById('mobileSearchInput').value = searchTerm;
+        if (mobileSearchEl) mobileSearchEl.value = searchTerm;
     } else {
         searchTerm = '';
-        document.getElementById('mobileSearchInput').value = '';
+        if (mobileSearchEl) mobileSearchEl.value = '';
     }
 
     filterAndSort(true);

@@ -1,0 +1,10 @@
+{
+  "id": "com.arcade.scanner.tv",
+  "version": "1.0.0",
+  "vendor": "Antigravity",
+  "type": "web",
+  "main": "index.html",
+  "title": "Arcade Scanner",
+  "icon": "icon.png",
+  "largeIcon": "icon.png"
+}

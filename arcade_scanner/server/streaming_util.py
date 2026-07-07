@@ -1,7 +1,87 @@
 import mimetypes
 import os
 import re
-import shutil
+
+# 1 MB chunks: fewer syscalls / wfile.write round-trips than the old 64 KB
+# when the kernel sendfile fast path is unavailable (e.g. SSL sockets on
+# platforms without kTLS).
+CHUNK_SIZE = 1024 * 1024
+
+# Matches "bytes=start-end", "bytes=start-" and the suffix form "bytes=-N"
+_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)$")
+
+
+def parse_range_header(range_header, file_size):
+    """Parse an HTTP Range header into an inclusive (start, end) byte tuple.
+
+    Returns:
+        (start, end) on success,
+        None if the header is absent/malformed (caller should serve 200),
+        "unsatisfiable" if the requested range lies outside the file (416).
+    """
+    if not range_header:
+        return None
+    match = _RANGE_RE.match(range_header.strip())
+    if not match:
+        return None
+
+    start_s, end_s = match.groups()
+    if start_s == "" and end_s == "":
+        return None
+
+    if start_s == "":
+        # Suffix range: last N bytes (e.g. "bytes=-500")
+        suffix_len = int(end_s)
+        if suffix_len == 0:
+            return "unsatisfiable"
+        start = max(0, file_size - suffix_len)
+        end = file_size - 1
+    else:
+        start = int(start_s)
+        # Clamp open-ended and over-long ranges to the actual file size,
+        # otherwise the announced Content-Length would exceed the bytes sent
+        # and a keep-alive client would hang waiting for the rest.
+        end = int(end_s) if end_s else file_size - 1
+        end = min(end, file_size - 1)
+
+    if start >= file_size or start > end:
+        return "unsatisfiable"
+    return (start, end)
+
+
+def _send_file_slice(handler, file_path, start, length):
+    """Send `length` bytes of `file_path` starting at `start` to the client.
+
+    Uses zero-copy socket.sendfile() when available (plain sockets get kernel
+    sendfile; SSL sockets fall back to an internal send() loop). Falls back to
+    a chunked read/write loop for exotic handler objects (e.g. tests).
+    On a broken client connection the connection is flagged for close so a
+    keep-alive session is never reused in a corrupted state.
+    """
+    with open(file_path, "rb") as f:
+        sendfile = getattr(getattr(handler, "connection", None), "sendfile", None)
+        if sendfile is not None:
+            try:
+                handler.wfile.flush()
+                sendfile(f, offset=start, count=length)
+            except (ConnectionResetError, BrokenPipeError, OSError, ValueError):
+                # Partial send state is unknown — never reuse this connection.
+                handler.close_connection = True
+            return
+
+        f.seek(start)
+        remaining = length
+        while remaining > 0:
+            data = f.read(min(remaining, CHUNK_SIZE))
+            if not data:
+                break
+            try:
+                handler.wfile.write(data)
+            except (ConnectionResetError, BrokenPipeError):
+                handler.close_connection = True
+                break
+            remaining -= len(data)
+
 
 def serve_file_range(handler, file_path, method="GET"):
     """
@@ -12,58 +92,46 @@ def serve_file_range(handler, file_path, method="GET"):
         handler.send_error(404)
         return
 
-    file_size = os.path.getsize(file_path)
+    stat = os.stat(file_path)
+    file_size = stat.st_size
     mime_type, _ = mimetypes.guess_type(file_path)
     if not mime_type:
         mime_type = "video/mp4"
 
-    range_header = handler.headers.get("Range")
-    
-    if range_header:
-        match = re.match(r"bytes=(\d+)-(\d+)?", range_header)
-        if match:
-            start = int(match.group(1))
-            end = match.group(2)
-            end = int(end) if end else file_size - 1
-            
-            if start >= file_size:
-                handler.send_response(416)
-                handler.end_headers()
-                return
+    byte_range = parse_range_header(handler.headers.get("Range"), file_size)
 
-            length = end - start + 1
-            handler.send_response(206)
-            handler.send_header("Content-type", mime_type)
-            handler.send_header("Accept-Ranges", "bytes")
-            handler.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
-            handler.send_header("Content-Length", str(length))
-            handler.end_headers()
+    if byte_range == "unsatisfiable":
+        handler.send_response(416)
+        handler.send_header("Content-Range", f"bytes */{file_size}")
+        handler.send_header("Content-Length", "0")
+        handler.end_headers()
+        return
 
-            if method == "GET":
-                with open(file_path, "rb") as f:
-                    f.seek(start)
-                    remaining = length
-                    while remaining > 0:
-                        chunk_size = min(remaining, 65536)
-                        data = f.read(chunk_size)
-                        if not data:
-                            break
-                        try:
-                            handler.wfile.write(data)
-                        except (ConnectionResetError, BrokenPipeError):
-                            break
-                        remaining -= len(data)
-            return
+    if byte_range is not None:
+        start, end = byte_range
+        length = end - start + 1
+        if start == 0:
+            print(f"📺 Streaming: {os.path.basename(file_path)}")
+
+        handler.send_response(206)
+        handler.send_header("Content-type", mime_type)
+        handler.send_header("Accept-Ranges", "bytes")
+        handler.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
+        handler.send_header("Content-Length", str(length))
+        handler.send_header("Last-Modified", handler.date_time_string(stat.st_mtime))
+        handler.end_headers()
+
+        if method == "GET":
+            _send_file_slice(handler, file_path, start, length)
+        return
 
     # No Range request
+    print(f"📺 Streaming: {os.path.basename(file_path)}")
     handler.send_response(200)
     handler.send_header("Content-type", mime_type)
     handler.send_header("Content-Length", str(file_size))
     handler.send_header("Accept-Ranges", "bytes")
+    handler.send_header("Last-Modified", handler.date_time_string(stat.st_mtime))
     handler.end_headers()
     if method == "GET":
-        with open(file_path, "rb") as f:
-            try:
-                shutil.copyfileobj(f, handler.wfile)
-            except (ConnectionResetError, BrokenPipeError):
-                pass
+        _send_file_slice(handler, file_path, 0, file_size)

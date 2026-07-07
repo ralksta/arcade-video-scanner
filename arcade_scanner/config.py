@@ -43,6 +43,7 @@ CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "video_cache.json")
 REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
 SETTINGS_FILE = os.path.join(HIDDEN_DATA_DIR, "settings.json")
 DUPLICATES_CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "duplicates_cache.json")
+REVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "review")
 STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # Security Constants
@@ -93,6 +94,8 @@ DEFAULT_SETTINGS_JSON = {
     "min_image_size_kb": 100,
     "_comment_bitrate": "Mark videos above this kbps as HIGH bitrate.",
     "bitrate_threshold_kbps": 15000,
+    "_comment_source_bitrate": "Mark videos above this mbps as SOURCE (unstreamable).",
+    "source_bitrate_threshold_mbps": 100,
 
 
     "_comment_optimizer": "Master toggle for optimization features.",
@@ -107,10 +110,20 @@ DEFAULT_SETTINGS_JSON = {
     "sensitive_tags": ["nsfw", "adult", "18+"],
     "_comment_sensitive_collections": "List of collection names to be hidden in safe mode.",
     "sensitive_collections": [],
-    "_comment_deovr": "Generate DeoVR-compatible JSON for VR headset viewing.",
-    "enable_deovr": False,
     "_comment_image_scanning": "Include image files in the scanning process.",
-    "enable_image_scanning": False
+    "enable_image_scanning": False,
+    "_comment_encoding_preset": "Encoding speed/quality trade-off: fast (ultrafast), balanced (medium), best (slow).",
+    "encoding_preset": "balanced",
+    "_comment_precompute_thumbnails": "Generate thumbnails immediately during scan (prevents performance lag during scrolling).",
+    "precompute_thumbnails": True,
+    "_comment_review_dir": "Fixed location for review files. If empty, uses the default arcade_data/review.",
+    "review_dir": "",
+    "_comment_verbose_scanning": "Show individual file analysis logs during scan. If disabled, only shows progress summary.",
+    "verbose_scanning": False,
+    "_comment_concurrency": "Performance Limits for small servers.",
+    "max_concurrent_video_scans": 2,
+    "max_concurrent_image_scans": 5,
+    "enable_resource_watchdog": True
 }
 
 # ==============================================================================
@@ -130,14 +143,27 @@ class AppSettings(BaseSettings):
     min_size_mb: int = Field(100)
     min_image_size_kb: int = Field(100)
     bitrate_threshold_kbps: int = Field(15000)
+    source_bitrate_threshold_mbps: int = Field(100)
 
 
 
     enable_optimizer: bool = Field(True)
+    encoding_preset: str = Field("balanced")  # fast | balanced | best
 
     theme: str = Field("arcade")
-    enable_deovr: bool = Field(False)
     enable_image_scanning: bool = Field(False)
+    ffmpeg_path: str = Field("")
+    ffprobe_path: str = Field("")
+    is_docker: bool = Field(False)
+    first_run_completed: bool = Field(False)
+    scan_images: bool = Field(False)
+    precompute_thumbnails: bool = Field(True)
+    enable_review_mode: bool = Field(False)
+    review_dir: str = Field("")
+    verbose_scanning: bool = Field(False)
+    max_concurrent_video_scans: int = Field(2)
+    max_concurrent_image_scans: int = Field(5)
+    enable_resource_watchdog: bool = Field(True)
 
     model_config = ConfigDict(
         env_prefix="ARCADE_",
@@ -154,7 +180,7 @@ class ConfigManager:
         self.settings = self._load_settings()
 
     def _ensure_directories(self):
-        for d in [HIDDEN_DATA_DIR, THUMB_DIR]:
+        for d in [HIDDEN_DATA_DIR, THUMB_DIR, REVIEW_DIR]:
             if not os.path.exists(d):
                 os.makedirs(d)
 
@@ -310,6 +336,13 @@ class ConfigManager:
     @property
     def hidden_data_dir(self) -> str:
         return HIDDEN_DATA_DIR
+
+    @property
+    def review_dir(self) -> str:
+        # User dynamic setting overrides the default constant
+        if self.settings.review_dir:
+            return self.settings.review_dir
+        return REVIEW_DIR
 
 # Global Instance
 config = ConfigManager()

@@ -1,0 +1,48 @@
+{
+	"name": "tv_client",
+	"version": "1.0.0",
+	"description": "A general template for an Enact Limestone application.",
+	"author": "",
+	"main": "src/index.js",
+	"scripts": {
+		"prebuild": "node prebuild.js",
+		"serve": "npm run prebuild && enact serve",
+		"pack": "npm run prebuild && enact pack",
+		"pack-p": "npm run prebuild && enact pack -p",
+		"watch": "npm run prebuild && enact pack --watch",
+		"clean": "enact clean",
+		"lint": "enact lint .",
+		"license": "enact license",
+		"test": "enact test",
+		"test-watch": "enact test --watch"
+	},
+	"license": "UNLICENSED",
+	"private": true,
+	"repository": "",
+	"enact": {
+		"theme": "limestone"
+	},
+	"eslintConfig": {
+		"extends": "enact-proxy"
+	},
+	"eslintIgnore": [
+		"node_modules/*",
+		"build/*",
+		"dist/*"
+	],
+	"dependencies": {
+		"@enact/core": "^5.5.1",
+		"@enact/i18n": "^5.5.1",
+		"@enact/limestone": "^1.10.1",
+		"@enact/spotlight": "^5.5.1",
+		"@enact/ui": "^5.5.1",
+		"ilib": "^14.22.0",
+		"prop-types": "^15.8.1",
+		"react": "^19.2.6",
+		"react-dom": "^19.2.6",
+		"web-vitals": "^5.2.0"
+	},
+	"devDependencies": {
+		"eslint-config-enact-proxy": "^1.0.9"
+	}
+}

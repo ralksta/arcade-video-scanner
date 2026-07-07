@@ -16,6 +16,8 @@ from __future__ import annotations
 import json
 import os
 
+from arcade_scanner.server.response_helpers import send_json
+
 
 # ---------------------------------------------------------------------------
 # Lazy singletons (imported inside functions to avoid circular imports)
@@ -69,10 +71,7 @@ def handle_get_settings(handler) -> None:
     # Docker detection
     settings_dump["is_docker"] = bool(os.getenv("CONFIG_DIR"))
 
-    handler.send_response(200)
-    handler.send_header("Content-type", "application/json")
-    handler.end_headers()
-    handler.wfile.write(json.dumps(settings_dump, default=str).encode())
+    send_json(handler, settings_dump)
 
 
 # ---------------------------------------------------------------------------
@@ -223,10 +222,7 @@ def handle_get_setup_directories(handler) -> None:
     except Exception as e:
         print(f"⚠️ Error scanning /media: {e}")
 
-    handler.send_response(200)
-    handler.send_header("Content-Type", "application/json")
-    handler.end_headers()
-    handler.wfile.write(json.dumps({"directories": directories}).encode())
+    send_json(handler, {"directories": directories})
 
 
 # ---------------------------------------------------------------------------
@@ -245,10 +241,7 @@ def handle_get_setup_status(handler) -> None:
     u = user_db.get_user(user_name)
     setup_complete = getattr(u.data, "setup_complete", True) if u else True
 
-    handler.send_response(200)
-    handler.send_header("Content-Type", "application/json")
-    handler.end_headers()
-    handler.wfile.write(json.dumps({"setup_complete": setup_complete}).encode())
+    send_json(handler, {"setup_complete": setup_complete})
 
 
 # ---------------------------------------------------------------------------
@@ -370,3 +363,48 @@ def handle_post_remove_photos(handler) -> None:
     except Exception as e:
         print(f"❌ remove-photos error: {e}")
         handler.send_error(500, str(e))
+
+# ---------------------------------------------------------------------------
+# Router interface — called by api_handler.py
+# ---------------------------------------------------------------------------
+
+def handle_get(handler) -> bool:
+    """Dispatch GET requests for /api/settings and /api/setup/* endpoints."""
+    path = handler.path.split("?")[0]
+
+    if path == "/api/settings":
+        handle_get_settings(handler)
+        return True
+
+    if path == "/api/setup/directories":
+        handle_get_setup_directories(handler)
+        return True
+
+    if path == "/api/setup/status":
+        handle_get_setup_status(handler)
+        return True
+
+    return False
+
+
+def handle_post(handler) -> bool:
+    """Dispatch POST requests for /api/settings and /api/setup/* endpoints."""
+    path = handler.path.split("?")[0]
+
+    if path == "/api/settings":
+        handle_post_settings(handler)
+        return True
+
+    if path == "/api/setup/complete":
+        handle_post_setup_complete(handler)
+        return True
+
+    if path == "/api/restore":
+        handle_post_restore(handler)
+        return True
+
+    if path == "/api/settings/remove-photos":
+        handle_post_remove_photos(handler)
+        return True
+
+    return False

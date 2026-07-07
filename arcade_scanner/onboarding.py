@@ -429,7 +429,7 @@ def apply_configuration(config: dict):
     Apply the wizard configuration to settings and user database.
     """
     import json
-    from arcade_scanner.config import config as app_config, SETTINGS_FILE
+    from arcade_scanner.config import SETTINGS_FILE
     
     # 1. Update settings.json
     settings_data = {}

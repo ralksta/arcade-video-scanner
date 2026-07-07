@@ -17,7 +17,7 @@ services:
       # Mount source code for development (Live Updates)
       - .:/app
       # Persistent configuration and database
-      - arcade-config:/config
+      - ./arcade_data:/config
       # Persistent thumbnails and cache
       - arcade-cache:/cache
     environment:
@@ -27,8 +27,15 @@ services:
       - PGID=1000
       # Uncomment for GPU support (NVIDIA only)
       # - NVIDIA_VISIBLE_DEVICES=all
-    command: ["python", "-m", "arcade_scanner.main", "--skip-setup", "--ssl"]
+    command: ["python", "-m", "arcade_scanner.main", "--skip-setup"]
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 2048M
+        reservations:
+          memory: 256M
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()" ]
       interval: 30s
@@ -46,7 +53,5 @@ services:
     #           capabilities: [gpu, video]
 
 volumes:
-  arcade-config:
-    driver: local
   arcade-cache:
     driver: local

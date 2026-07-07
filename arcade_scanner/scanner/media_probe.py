@@ -1,56 +1,56 @@
 import json
-import subprocess
 import asyncio
-from concurrent.futures import ProcessPoolExecutor
 from typing import Dict, Any, Optional
-import signal
 from ..models.video_entry import VideoEntry
-
-def _init_worker():
-    """Ignore SIGINT in worker processes so main process handles shutdown."""
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-def _run_ffprobe(filepath: str) -> Dict[str, Any]:
-    """
-    Sync function to run FFprobe.
-    Executed in a separate process to avoid GIL blocking.
-    """
-    cmd = [
-        "ffprobe",
-        "-v", "error",
-        "-show_entries", "stream=index,codec_type,codec_name,width,height,profile,level,pix_fmt,channels,avg_frame_rate:format=duration,bit_rate,size,format_name",
-        "-of", "json",
-        filepath,
-    ]
-    try:
-        # Reduced timeout to avoid hanging processes
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=10
-        )
-        data = json.loads(result.stdout)
-        return data
-    except Exception:
-        return {}
+from ..config import config
 
 class MediaProbe:
     """
     Asynchronous wrapper for media analysis tools (FFmpeg/FFprobe).
     """
     def __init__(self, max_workers: int = 4):
-        self.executor = ProcessPoolExecutor(max_workers=max_workers, initializer=_init_worker)
+        # max_workers is kept for backwards compatibility but not used,
+        # concurrency is handled by ScannerManager's Semaphores.
+        pass
+
+    async def _run_ffprobe(self, filepath: str) -> Dict[str, Any]:
+        """
+        Async function to run FFprobe.
+        """
+        cmd = [
+            config.settings.ffprobe_path or "ffprobe",
+            "-v", "error",
+            "-show_entries", "stream=index,codec_type,codec_name,width,height,profile,level,pix_fmt,channels,avg_frame_rate:format=duration,bit_rate,size,format_name",
+            "-of", "json",
+            filepath,
+        ]
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=20.0)
+            
+            if process.returncode != 0:
+                return {}
+                
+            data = json.loads(stdout.decode('utf-8'))
+            return data
+        except Exception:
+            return {}
+
+
 
     async def get_metadata(self, filepath: str) -> Optional[VideoEntry]:
         """
         Extracts metadata and returns a populated VideoEntry (or None if failed).
         """
-        loop = asyncio.get_event_loop()
         try:
-            # Offload subprocess call to process pool
-            raw_data = await loop.run_in_executor(self.executor, _run_ffprobe, filepath)
+            raw_data = await self._run_ffprobe(filepath)
             
             if not raw_data or "streams" not in raw_data or not raw_data["streams"]:
                 return None
-
             # Find video and audio streams
             video_stream = next((s for s in raw_data["streams"] if s.get("codec_type") == "video"), {})
             audio_stream = next((s for s in raw_data["streams"] if s.get("codec_type") == "audio"), {})
@@ -101,7 +101,9 @@ class MediaProbe:
 
             # Determine status (legacy logic: > threshold = HIGH)
             # We will refine this later with config injection, but for now defaults.
-            status = "OK" # Default, updated by manager logic typically
+            # We rely on ffprobe returning valid metadata as the health check.
+            # Deep decoding pass was removed to optimize scan speed.
+            status = "OK" 
             
             return VideoEntry(
                 FilePath=filepath,
@@ -126,7 +128,8 @@ class MediaProbe:
             return None
 
     def shutdown(self):
-        self.executor.shutdown(wait=True)
+        # Kept for compatibility but no longer needed
+        pass
 
 # Singleton instance removed to avoid multiprocessing side-effects.
 # Instantiate MediaProbe explicitly or via ScannerManager.

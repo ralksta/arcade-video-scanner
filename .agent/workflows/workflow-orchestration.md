@@ -40,6 +40,23 @@ Ask yourself: "Would a staff engineer approve this?"
 
 Run tests, check logs, demonstrate correctness
 
+## 7. Mandatory Test Execution — ALWAYS
+**After EVERY code change, no exceptions:**
+
+```bash
+cd /Users/ralfo/git/arcade-video-scanner && python3 -m pytest tests/ -v --tb=short
+```
+
+This covers:
+- JS syntax validity for all static/*.js files
+- JS module completeness (disk ↔ dashboard_template.py)
+- Generated HTML correctness (timestamps, script load order, globals)
+- Python backend contracts (routes, DB, scanner)
+
+**Do NOT declare a task done if any test is red.**
+If a test fails after your change: fix it first, then continue.
+This is non-negotiable — it's how the JS refactor bugs were caught.
+
 ## 5. Demand Elegance (Balanced)
 For non-trivial changes: pause and ask "is there a more elegant way?"
 

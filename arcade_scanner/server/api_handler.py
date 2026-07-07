@@ -18,6 +18,7 @@ from arcade_scanner.security import session_manager
 from http.cookies import SimpleCookie
 from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.server.streaming_util import serve_file_range
+from arcade_scanner.server.response_helpers import send_json, send_bytes, send_not_modified_if_unchanged
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
@@ -43,7 +44,7 @@ class _MediaCache:
             if self._data is not None and (now - self._timestamp) < self.TTL:
                 return self._data
         # Cache-Miss: außerhalb des Locks lesen um Blocking zu minimieren
-        fresh = db.get_all()
+        fresh = db.get_all_dicts()
         with self._lock:
             self._data = fresh
             self._timestamp = time.monotonic()
@@ -57,6 +58,7 @@ class _MediaCache:
 
 
 _media_cache = _MediaCache()
+db.register_on_change(_media_cache.invalidate)
 
 
 class DuplicateScanManager:
@@ -114,8 +116,8 @@ class ReportDebouncer:
 
     def _generate(self, port):
         try:
-            # Re-fetch results to ensure freshness
-            results = [e.model_dump(by_alias=True) for e in _media_cache.get()]
+            # Re-fetch results to ensure freshness (already dicts from cache)
+            results = _media_cache.get()
             generate_html_report(results, config.report_file, server_port=port)
             # print(f"✅ HTML Report regenerated (debounced)")
         except Exception as e:
@@ -223,22 +225,120 @@ def background_duplicate_scan(
 
 
 class FinderHandler(http.server.SimpleHTTPRequestHandler):
+    # HTTP/1.1 keep-alive: thumbnails, static assets, API polling and video
+    # range requests reuse one TCP connection instead of paying a fresh
+    # TCP (+TLS) handshake per request. Correctness is guarded below:
+    # every response either carries a Content-Length or closes the connection.
+    protocol_version = "HTTP/1.1"
+
+    # Idle keep-alive connections release their handler thread after 60s
+    # (handle_one_request treats the socket timeout as Connection: close).
+    timeout = 60
+
     # Suppress logging for noisy polling endpoints
     QUIET_PATHS = {"/api/duplicates/status"}
 
+    # Statuses that carry no body — safe for keep-alive without Content-Length
+    _BODYLESS_STATUSES = {204, 304}
+
+    def send_response(self, code, message=None):
+        # Track per-response state for the keep-alive safety net in end_headers
+        self._response_started = True
+        self._response_status = code
+        self._length_header_sent = False
+        super().send_response(code, message)
+
+    def send_header(self, keyword, value):
+        if keyword.lower() in ("content-length", "transfer-encoding"):
+            self._length_header_sent = True
+        super().send_header(keyword, value)
+
+    def end_headers(self):
+        origin = self.headers.get("Origin")
+        if origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Credentials", "true")
+        else:
+            self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With, X-Enact-TV")
+
+        # Keep-alive safety net: a body without Content-Length can only be
+        # delimited by closing the connection. POSTs also close, so a handler
+        # that didn't drain the request body can never corrupt the next
+        # request on the same connection.
+        status = getattr(self, "_response_status", None)
+        has_body = status not in self._BODYLESS_STATUSES and not (
+            status is not None and 100 <= status < 200
+        )
+        needs_close = (has_body and not getattr(self, "_length_header_sent", False)) or (
+            getattr(self, "command", None) == "POST"
+        )
+        if needs_close and not self.close_connection:
+            # send_header("Connection", "close") also sets self.close_connection
+            self.send_header("Connection", "close")
+
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def log_message(self, format, *args):
         """Override to suppress noisy requests (static files, thumbnails, polling)."""
-        path = getattr(self, 'path', None)
-        if path and (path in self.QUIET_PATHS or path.startswith(("/thumbnails/", "/static/"))):
-            return  # Suppress logging
+        try:
+            path = getattr(self, 'path', None)
+            
+            # Paths that are ALWAYS quiet (polling, thumbnails, static assets)
+            if path and (path in self.QUIET_PATHS or path.startswith(("/thumbnails/", "/static/"))):
+                return
+
+            # If verbose is disabled, also suppress streaming and main hits to keep terminal clean
+            # Use getattr for safety during early initialization or reload
+            verbose = getattr(getattr(config, 'settings', None), 'verbose_scanning', False)
+            if not verbose and path:
+                if path.startswith("/stream?") or path == "/":
+                    return
+        except Exception:
+            # Never let logging crash the request
+            pass
+            
         super().log_message(format, *args)
 
     def get_current_user(self):
-        """Returns the username from the session cookie, or None."""
+        """Returns the username from the session cookie, Authorization header, query parameter, or None."""
+        from urllib.parse import urlparse, parse_qs
+
+        # 1. Cookie prüfen
         if "Cookie" in self.headers:
             cookie = SimpleCookie(self.headers["Cookie"])
             if "session_token" in cookie:
-                return session_manager.get_username(cookie["session_token"].value)
+                user = session_manager.get_username(cookie["session_token"].value)
+                if user:
+                    return user
+
+        # 2. Authorization-Header prüfen (Bearer Token)
+        auth_header = self.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            user = session_manager.get_username(token)
+            if user:
+                return user
+
+        # 3. Query-Parameter prüfen (für Video-Streams)
+        try:
+            parsed_url = urlparse(self.path)
+            params = parse_qs(parsed_url.query)
+            token_list = params.get("token")
+            if token_list:
+                token = token_list[0]
+                user = session_manager.get_username(token)
+                if user:
+                    return user
+        except Exception:
+            pass
+
         return None
 
     # LRU thumb filename → source file path (shared across handler instances, bounded size)
@@ -272,25 +372,34 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 del cache[thumb_filename]
 
-        # Slow path: populate/refresh from DB
-        # Always re-read DB on miss so entries added after server start are found.
-        # Using a set to track known entries avoids re-hashing already cached paths.
-        known_paths = set(cache.values())
-        for entry in _media_cache.get():
-            if entry.file_path not in known_paths:
-                file_hash = hashlib.md5(entry.file_path.encode()).hexdigest()
-                t_name = f"thumb_{file_hash}.jpg"
-                cache[t_name] = entry.file_path
-                known_paths.add(entry.file_path)
+        # Targeted lookup: Query DB by thumb name (O(1) indexed)
+        entry = db.get_by_thumb(thumb_filename)
+        if entry:
+            cache[thumb_filename] = entry.file_path
+            # Evict oldest entries when over capacity
+            while len(cache) > FinderHandler._THUMB_CACHE_MAX:
+                cache.popitem(last=False)
+            return entry.file_path
 
-        # Evict oldest entries when over capacity
-        while len(cache) > FinderHandler._THUMB_CACHE_MAX:
-            cache.popitem(last=False)
-
-        return cache.get(thumb_filename)
+        return None
 
 
     def do_GET(self):
+        self._response_started = False
+        try:
+            from .routes import queue, settings, duplicates, tags, files
+            if queue.handle_get(self): return
+            if settings.handle_get(self): return
+            if duplicates.handle_get(self): return
+            if tags.handle_get(self): return
+            if files.handle_get(self): return
+        except Exception as e:
+            print(f"Module route error GET: {e}")
+            if getattr(self, "_response_started", False):
+                # Response headers may already be on the wire — a second
+                # response would corrupt a keep-alive connection.
+                self.close_connection = True
+                return
         try:
             # 0. Health check endpoint - no auth required
             if self.path == "/api/health" or self.path == "/api/health/":
@@ -311,79 +420,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(body)
                 return
 
-            # 0. DeoVR AUTO-DETECTION ENDPOINT: /deovr serves library JSON
-
-            # DeoVR browser checks for this endpoint when navigating to any site
-            if self.path == "/deovr" or self.path == "/deovr/":
-                from arcade_scanner.core.deovr_generator import generate_deovr_json
-                
-                host = self.headers.get("Host", "localhost:8000")
-                
-                # Detect protocol: Check proxy header OR native SSL socket
-                protocol = "http"
-                if self.headers.get("X-Forwarded-Proto") == "https":
-                    protocol = "https"
-                elif isinstance(self.connection, ssl.SSLSocket):
-                    protocol = "https"
-                    
-                server_url = f"{protocol}://{host}"
-                
-                all_videos = _media_cache.get()
-                # Smart collections are stored per-user, not in global config
-                admin_user = user_db.get_user("admin")
-                smart_collections = list(admin_user.data.smart_collections) if admin_user else []
-                
-                deovr_data = generate_deovr_json(all_videos, server_url, smart_collections)
-                
-                scene_count = len(deovr_data.get('scenes', []))
-                video_count = sum(len(s.get('list', [])) for s in deovr_data.get('scenes', []))
-                print(f"🥽 DeoVR endpoint accessed! Serving {scene_count} scenes ({video_count} total videos)")
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
-                return
             
-            # 1a. VR MUSEUM -> Serve VR museum HTML
-            # Normalize path to ignore query parameters for routing
-            clean_path = self.path.split('?')[0]
-
-            if clean_path == "/vr":
-                user = self.get_current_user()
-                if not user:
-                    login_path = os.path.join(os.path.dirname(__file__), "static", "login.html")
-                    if os.path.exists(login_path):
-                        self.send_response(200)
-                        self.send_header("Content-type", "text/html; charset=utf-8")
-                        with open(login_path, 'rb') as f:
-                            data = f.read()
-                            self.send_header("Content-Length", str(len(data)))
-                            self.end_headers()
-                            self.wfile.write(data)
-                        return
-                    else:
-                        self.send_error(404, "Login page not found")
-                        return
-
-                vr_path = os.path.join(os.path.dirname(__file__), "static", "vr_museum.html")
-                if os.path.exists(vr_path):
-                    self.send_response(200)
-                    self.send_header("Content-type", "text/html; charset=utf-8")
-                    with open(vr_path, 'rb') as f:
-                        data = f.read()
-                        self.send_header("Content-Length", str(len(data)))
-                        self.end_headers()
-                        self.wfile.write(data)
-                else:
-                    self.send_error(404, "VR Museum page not found")
-                return
             
-            # 1b. ROOT / INDEX -> Serve REPORT_FILE
+            # 1. ROOT / INDEX -> Serve REPORT_FILE
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates"]
+            clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
                 
                 # AUTH CHECK for Root
@@ -404,18 +445,22 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.send_error(404, "Login page not found")
                         return
 
-                self.send_response(200)
-                self.send_header("Content-type", "text/html; charset=utf-8")
-                
                 if os.path.exists(config.report_file):
                     fs = os.stat(config.report_file)
-                    self.send_header("Content-Length", str(fs.st_size))
-                    self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
-                    # Add User Header for debug
-                    self.send_header("X-Arcade-User", user)
-                    self.end_headers()
+                    # Revalidation: the report only changes when data changes,
+                    # so most reloads are answered with an empty 304.
+                    if send_not_modified_if_unchanged(self, fs.st_mtime):
+                        return
                     with open(config.report_file, 'rb') as f:
-                        self.wfile.write(f.read())
+                        body = f.read()
+                    # gzip cuts the report (HTML + embedded media JSON) by ~80-90%
+                    send_bytes(
+                        self, body, "text/html; charset=utf-8",
+                        cache_control="no-cache",
+                        last_modified=fs.st_mtime,
+                        extra_headers={"X-Arcade-User": user},
+                        compress=True,
+                    )
                 else:
                     self.send_error(404, "Report file not found")
                 return
@@ -450,14 +495,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             create_thumbnail(source_path)
                     
                     if os.path.exists(file_path) and os.path.isfile(file_path):
-                        self.send_response(200)
-                        self.send_header("Content-type", "image/jpeg")
-                        self.send_header("Access-Control-Allow-Origin", "*")  # Allow VR headsets
                         fs = os.stat(file_path)
-                        self.send_header("Content-Length", str(fs.st_size))
-                        self.end_headers()
+                        if send_not_modified_if_unchanged(self, fs.st_mtime):
+                            return
                         with open(file_path, 'rb') as f:
-                            self.wfile.write(f.read())
+                            body = f.read()
+                        # Thumb names are content-addressed per source path and
+                        # only change on --rebuild → long client-side caching.
+                        send_bytes(
+                            self, body, "image/jpeg",
+                            cache_control="public, max-age=604800",
+                            last_modified=fs.st_mtime,
+                        )
                         return
                     else:
                         self.send_error(404)
@@ -470,6 +519,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # 3. STATIC ASSETS -> Catch-all for any path containing /static/
             elif "/static/" in self.path:
                 try:
+                    # If already logged in and hitting login page, redirect to root
+                    if self.path.split('?')[0].endswith("/static/login.html"):
+                        if self.get_current_user():
+                            self.send_response(302)
+                            self.send_header("Location", "/")
+                            self.end_headers()
+                            return
+
                     # Robustly extract relative path: get everything after the last "/static/"
                     # This handles paths like /static/styles.css AND /arcade_scanner/server/static/styles.css
                     rel_path = self.path.split("/static/")[-1].split('?')[0]
@@ -481,23 +538,32 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         return
 
                     if os.path.exists(file_path) and os.path.isfile(file_path):
-                        self.send_response(200)
-                        if file_path.lower().endswith(".css"):
-                            self.send_header("Content-type", "text/css")
-                        elif file_path.lower().endswith(".js"):
-                            self.send_header("Content-type", "application/javascript")
+                        lower = file_path.lower()
+                        if lower.endswith(".css"):
+                            content_type = "text/css"
+                        elif lower.endswith(".js"):
+                            content_type = "application/javascript"
                         else:
                             mime, _ = mimetypes.guess_type(file_path)
-                            if mime:
-                                self.send_header("Content-type", mime)
-                        
+                            content_type = mime or "application/octet-stream"
+
                         fs = os.stat(file_path)
-                        self.send_header("Content-Length", str(fs.st_size))
-                        self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
-                        self.end_headers()
-                        
+                        # no-cache = cache but revalidate: browsers get cheap
+                        # 304s over the kept-alive connection, never stale JS.
+                        if send_not_modified_if_unchanged(self, fs.st_mtime):
+                            return
+
                         with open(file_path, 'rb') as f:
-                            self.wfile.write(f.read())
+                            body = f.read()
+                        is_text = content_type.startswith("text/") or content_type in (
+                            "application/javascript", "application/json", "image/svg+xml"
+                        )
+                        send_bytes(
+                            self, body, content_type,
+                            cache_control="no-cache",
+                            last_modified=fs.st_mtime,
+                            compress=is_text,
+                        )
                         return
                     else:
                         self.send_error(404)
@@ -515,555 +581,21 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 
                 u = user_db.get_user(user_name)
                 if u:
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(u.data.model_dump_json().encode())
+                    send_bytes(self, u.data.model_dump_json().encode(), "application/json", compress=True)
                 else:
                      self.send_error(404, "User not found")
                 return
-            
-            elif self.path.startswith("/reveal?"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    file_path = params.get("path", [None])[0]
-                    if not file_path:
-                         self.send_error(400, "Missing path parameter")
-                         return
-                         
-                    print(f"🔍 Reveal requested for: {file_path}")
 
-                    # Check if file is in a hidden folder (starts with .)
-                    abs_path = os.path.abspath(file_path)
-                    is_hidden = any(part.startswith('.') for part in Path(abs_path).parts if part != '/')
-
-                    if is_hidden:
-                        # File exists in hidden folder - return helpful response instead of blocking
-                        print(f"📁 File in hidden folder: {abs_path}")
-                        self.send_response(200)
-                        self.send_header('Content-Type', 'application/json')
-                        self.end_headers()
-                        response = json.dumps({
-                            "status": "hidden_folder",
-                            "path": abs_path,
-                            "message": "This file is located in a hidden system folder"
-                        })
-                        self.wfile.write(response.encode())
-                        return
-
-                    # Security Fix C-3: Validate path is within allowed directories
-                    if not is_path_allowed(file_path):
-                        print(f"🚨 Unauthorized reveal attempt blocked: {file_path}")
-                        self.send_error(403, "Forbidden - Path not in scan directories")
-                        return
-
-                    if not os.path.exists(file_path):
-                        print(f"❌ Error: File does not exist: {file_path}")
-                        self.send_error(404, "File not found")
-                        return
-
-                    if IS_WIN:
-                        subprocess.run(["explorer", "/select,", os.path.normpath(file_path)])
-                    elif sys.platform == "darwin":
-                        print(f"🚀 Running: open -R '{file_path}'")
-                        result = subprocess.run(["open", "-R", file_path], capture_output=True, text=True)
-                        if result.returncode != 0:
-                            print(f"❌ Error revealing file: {result.stderr}")
-                        else:
-                            print("✅ Reveal command successful")
-                    else:
-                        # Linux / Other: Open parent directory since standard reveal is non-standard
-                        parent_dir = os.path.dirname(file_path)
-                        print(f"🚀 Running: xdg-open '{parent_dir}'")
-                        subprocess.run(["xdg-open", parent_dir])
-
-                    self.send_response(204)
-                    self.end_headers()
-                except SecurityError as e:
-                    print(f"🚨 Security violation: {e}")
-                    self.send_error(403, "Forbidden")
-                except Exception as e:
-                    print(f"❌ Critical error in reveal endpoint: {e}")
-                    self.send_error(500, str(e))
-            elif self.path.startswith("/api/mark_optimized?"):
-                params = parse_qs(urlparse(self.path).query)
-                path = params.get("path", [None])[0]
-                if path:
-                    abs_path = os.path.abspath(path)
-                    
-                    # Use new DB layer
-                    entry = db.get(abs_path)
-                    if entry:
-                        entry.status = "OK"
-                    else:
-                        # Create new if missing
-                        size_mb = 0
-                        try:
-                            if os.path.exists(abs_path):
-                                size_mb = os.path.getsize(abs_path) / (1024 * 1024)
-                        except OSError as e:
-                            print(f"⚠️ Could not stat file {abs_path}: {e}")
-                        from arcade_scanner.models.video_entry import VideoEntry
-                        entry = VideoEntry(
-                            FilePath=abs_path,
-                            Size_MB=size_mb,
-                            Status="OK"
-                        )
-                    db.upsert(entry)
-                    db.save()
-                    _media_cache.invalidate()  # Entry geändert → Cache leeren
-                    
-                    # Regenerate HTML report so refresh works
-                    try:
-                        current_port = self.server.server_address[1]
-                        report_debouncer.schedule(current_port)
-                        print(f"✅ Marked as optimized and report update scheduled: {os.path.basename(abs_path)}")
-                    except Exception as e:
-                        print(f"⚠️ Cache updated but report scheduling failed: {e}")
-
-                self.send_response(204)
-                self.end_headers()
-
-            elif self.path.startswith("/compress?"):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    file_path = params.get("path", [None])[0]
-                    
-                    if not file_path:
-                         print("❌ No path provided for compression")
-                         self.send_error(400, "Missing path parameter")
-                         return
-                    
-                    # Security Fix C-1: Sanitize and validate path
-                    try:
-                        file_path = sanitize_path(file_path)
-                    except (SecurityError, ValueError) as e:
-                        print(f"🚨 Security violation in compress: {e}")
-                        self.send_error(403, "Forbidden - Invalid path")
-                        return
-
-                    audio_mode = params.get("audio", ["enhanced"])[0]
-                    video_mode = params.get("video", ["compress"])[0]
-                    q_val = params.get("q", [None])[0]
-                    ss = params.get("ss", [None])[0]  # Trim start time
-                    to = params.get("to", [None])[0]  # Trim end time
-                    
-                    # Validate audio_mode (whitelist)
-                    if audio_mode not in ["enhanced", "standard"]:
-                        print(f"🚨 Invalid audio mode: {audio_mode}")
-                        self.send_error(400, "Invalid audio mode")
-                        return
-                        
-                    # Validate video_mode
-                    if video_mode not in ["compress", "copy"]:
-                        print(f"🚨 Invalid video mode: {video_mode}")
-                        self.send_error(400, "Invalid video mode")
-                        return
-                    
-                    # Get current running port
-                    current_port = self.server.server_address[1]
-                    print(f"🔌 Current Server Port: {current_port}")
-                    print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Q: {q_val} | Trim: {ss}-{to}")
-                    
-                    # Build command as list (NEVER use shell=True!)
-                    cmd_parts = [sys.executable, config.optimizer_path, file_path,
-                                 "--port", str(current_port),
-                                 "--audio-mode", audio_mode,
-                                 "--video-mode", video_mode]
-                    
-                    if ss: 
-                        cmd_parts.extend(["--ss", ss])
-                    if to:
-                        cmd_parts.extend(["--to", to])
-                    if q_val:
-                         cmd_parts.extend(["--q", q_val])
-                    
-                    if IS_WIN:
-                        # Windows: Launch in new console WITHOUT shell=True
-                        print(f"🚀 Launching Optimizer (Win): {' '.join(cmd_parts)}")
-                        subprocess.Popen(
-                            cmd_parts,
-                            creationflags=subprocess.CREATE_NEW_CONSOLE
-                        )
-                    else:
-                        # macOS: Use shlex.quote() for safe AppleScript string building
-                        safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
-                        print(f"🚀 Launching Optimizer (Mac): {safe_cmd}")
-                        # Open a NEW Terminal window (not just a tab) and bring it to front
-                        applescript = (
-                            'tell application "Terminal"\n'
-                            '    activate\n'
-                            f'    do script "{safe_cmd}"\n'
-                            'end tell'
-                        )
-                        subprocess.run(["osascript", "-e", applescript])
-                        
-                    self.send_response(204)
-                    self.end_headers()
-                except SecurityError as e:
-                    print(f"🚨 Security violation: {e}")
-                    self.send_error(403, "Forbidden")
-                except ValueError as e:
-                    print(f"❌ Validation error: {e}")
-                    self.send_error(400, str(e))
-                except Exception as e:
-                    print(f"❌ Error in compress endpoint: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/keep_optimized?"):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    original_path = params.get("original", [None])[0]
-                    optimized_path = params.get("optimized", [None])[0]
-
-                    print(f"🔄 keep_optimized: original={original_path}")
-                    print(f"🔄 keep_optimized: optimized={optimized_path}")
-
-                    if original_path and optimized_path:
-                        orig_abs = os.path.abspath(original_path)
-                        opt_abs = os.path.abspath(optimized_path)
-
-                        print(f"🔄 keep_optimized: orig_abs={orig_abs} exists={os.path.exists(orig_abs)}")
-                        print(f"🔄 keep_optimized: opt_abs={opt_abs} exists={os.path.exists(opt_abs)}")
-                        
-                        if os.path.exists(opt_abs):
-                            # Move opt to original (replace)
-                            # We might want to handle extension changes if they differ, 
-                            # but "overwrite" usually implies keeping the original filename?
-                            # Actually, if we convert mkv -> mp4, "Keep" should probably keep the mp4 extension.
-                            # But for now, let's assume we replace the content of the original if same ext, 
-                            # or replace the file entirely if diff ext.
-                            
-                            # Safest: Remove original, move optimized to original name?
-                            # Wait, if we change ext, we should probably rename to original_stem.new_ext
-                            # But then we have a dangling original entry in cache.
-                            # Let's simple Rename optimized -> original_path (this forces original extension if we are not careful)
-                            
-                            # Better approach for mixed extensions:
-                            # 1. Delete original file.
-                            # 2. Rename optimized file to original_stem + optimized_ext.
-                            # 3. BUT user expects "Replace". If I have movie.mkv and movie_opt.mp4.
-                            #    If I keep opt, I expect movie.mp4? Or movie.mkv (container swap)?
-                            #    FFmpeg optimization usually keeps container or standardizes to mp4.
-                            #    Let's go with: Rename optimized to (original_dir / original_stem . optimized_ext).
-                            
-                            # However, to keep it simple and robust matching the user's "overwrite" mental model:
-                            # If we just replace the original file, we preserve the original entry in the DB/Cache key?
-                            # No, cache key is path.
-                            
-                            # Let's strictly follow: REPLACE original with optimized.
-                            # If extensions differ, we delete original, and rename optimized to original's stem + opt's extension.
-                            
-                            orig_path_obj = Path(orig_abs)
-                            opt_path_obj = Path(opt_abs)
-                            
-                            new_path = orig_path_obj.with_suffix(opt_path_obj.suffix)
-                            
-                            # Delete original
-                            if os.path.exists(orig_abs):
-                                os.remove(orig_abs)
-                            
-                            # Rename optimized to new path
-                            os.rename(opt_abs, new_path)
-                            
-                            # Update Cache
-                            
-                            # Remove optimized entry
-                            db.remove(opt_abs)
-                                
-                            # Remove old original entry if path changed (ext changed)
-                            if orig_abs != str(new_path):
-                                db.remove(orig_abs)
-                                
-                            db.save()
-                            _media_cache.invalidate()  # Einträge entfernt → Cache leeren
-                            
-                        else:
-                            print(f"❌ Optimized file not found: {opt_abs}")
-                        
-                    self.send_response(204)
-                    self.end_headers()
-                except Exception as e:
-                    print(f"❌ Error in keep_optimized: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/discard_optimized?"):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    path = params.get("path", [None])[0]
-                    
-                    if path:
-                        abs_path = os.path.abspath(path)
-                        if os.path.exists(abs_path):
-                            os.remove(abs_path)
-                            db.remove(abs_path)
-                            db.save()
-                                
-                            # Regenerate Report
-                            try:
-                                current_port = self.server.server_address[1]
-                                report_debouncer.schedule(current_port)
-                            except Exception as e:
-                                print(f"⚠️ Report gen scheduling failed: {e}")
-                                
-                            print(f"🗑️ Discarded optimized: {os.path.basename(abs_path)}")
-                            
-                    self.send_response(204)
-                    self.end_headers()
-                except Exception as e:
-                    print(f"❌ Error in discard_optimized: {e}")
-                    self.send_error(500, str(e))
-
-            # --- RESCAN ---
-            elif self.path == "/api/rescan":
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-
-                print("🔄 Scan requested via API...")
-                try:
-                    # asyncio.run() creates a new event loop; safe to call from this
-                    # worker thread since SimpleHTTPServer runs each request in its own thread.
-                    import asyncio
-                    mgr = get_scanner_manager()
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        new_count = loop.run_until_complete(mgr.run_scan())
-                    finally:
-                        loop.close()
-                        asyncio.set_event_loop(None)
-
-                    # Generate Report
-                    port = self.server.server_address[1]
-                    results = [e.model_dump(by_alias=True) for e in _media_cache.get()]
-                    _media_cache.invalidate()  # Neue Scan-Ergebnisse sofort sichtbar
-                    generate_html_report(results, config.report_file, server_port=port)
-
-                    self.send_response(200)
-                    self.send_header("Content-type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "complete", "count": new_count}).encode())
-                    print("✅ Rescan complete.")
-
-                except Exception as e:
-                    print(f"❌ Rescan failed: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path == "/api/backup":
-                try:
-                    # Security Fix: Ensure only authenticated/local users (implicitly local)
-                    user_name = self.get_current_user()
-                    if not user_name:
-                        self.send_error(401, "Unauthorized")
-                        return
-
-                    print("💾 Backup requested...")
-                    
-                    # Force save first to ensure latest memory state is on disk?
-                    # config.save({}) # No-op save to flush? No, config.save updates logic.
-                    # Just read the file.
-                    
-                    if os.path.exists(SETTINGS_FILE):
-                        with open(SETTINGS_FILE, 'rb') as f:
-                            data = f.read()
-                            
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.send_header("Content-Disposition", 'attachment; filename="arcade_settings_backup.json"')
-                        self.end_headers()
-                        self.wfile.write(data)
-                        print("✅ Backup sent.")
-                    else:
-                        self.send_error(404, "Settings file not found")
-                        
-                except Exception as e:
-                    print(f"❌ Backup failed: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/batch_compress?paths="):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-
-                try:
-                    # Use ||| as separator to avoid issues with commas in filenames
-                    paths = unquote(self.path.split("paths=")[1]).split("|||")
-                    current_port = self.server.server_address[1]
-                    
-                    # Validate all paths first
-                    validated_paths = []
-                    for p in paths:
-                        try:
-                            validated_path = sanitize_path(p)
-                            if os.path.exists(validated_path):
-                                validated_paths.append(validated_path)
-                            else:
-                                print(f"⚠️ Skipping non-existent file: {validated_path}")
-                        except (SecurityError, ValueError) as e:
-                            print(f"🚨 Skipping invalid path in batch: {p} - {e}")
-                            continue
-                    
-                    if not validated_paths:
-                        print("❌ No valid files to process in batch")
-                        self.send_response(204)
-                        self.end_headers()
-                        return
-                    
-                    # Build batch controller command
-                    batch_controller_path = os.path.join(
-                        os.path.dirname(config.optimizer_path), 
-                        "batch_controller.py"
-                    )
-                    
-                    # Comma-separate paths for the controller
-                    files_arg = ",".join(validated_paths)
-                    
-                    cmd_parts = [
-                        sys.executable,
-                        batch_controller_path,
-                        f"--files={files_arg}",
-                        f"--port={current_port}"
-                    ]
-                    
-                    if IS_WIN:
-                        # Windows: Launch in new console
-                        subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)
-                    else:
-                        # macOS: Single terminal window
-                        safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
-                        print(f"🚀 Launching Batch Controller: {len(validated_paths)} files")
-                        # Escape backslashes and quotes for AppleScript string
-                        escaped_cmd = safe_cmd.replace('\\', '\\\\').replace('"', '\\"')
-                        applescript = f'tell application "Terminal" to do script "{escaped_cmd}"'
-                        subprocess.run(["osascript", "-e", applescript])
-                    
-                    self.send_response(204)
-                    self.end_headers()
-                except Exception as e:
-                    print(f"❌ Error in batch_compress: {e}")
-                    self.send_error(500)
-            elif self.path.startswith("/hide?"):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-                
-                params = parse_qs(urlparse(self.path).query)
-                path = params.get("path", [None])[0]
-                state = params.get("state", ["true"])[0].lower() == "true"
-                
-                if path:
-                    abs_path = os.path.abspath(path)
-                    u = user_db.get_user(user_name)
-                    if u:
-                        if state:
-                            if abs_path not in u.data.vaulted:
-                                u.data.vaulted.append(abs_path)
-                        else:
-                            if abs_path in u.data.vaulted:
-                                u.data.vaulted.remove(abs_path)
-                        user_db.add_user(u)
-                        print(f"Updated vault state for {user_name}: {os.path.basename(abs_path)} -> hidden={state}")
-                    
-                self.send_response(204)
-                self.end_headers()
-            elif self.path.startswith("/batch_hide?paths="):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-                    
-                paths_str = unquote(self.path.split("paths=")[1])
-                paths_list = paths_str.split("&state=")[0].split(",")
-                state = "state=false" not in self.path
-                
-                u = user_db.get_user(user_name)
-                if u:
-                    updated_count = 0
-                    for p in paths_list:
-                        abs_p = os.path.abspath(p)
-                        if state:
-                            if abs_p not in u.data.vaulted:
-                                u.data.vaulted.append(abs_p)
-                                updated_count += 1
-                        else:
-                            if abs_p in u.data.vaulted:
-                                u.data.vaulted.remove(abs_p)
-                                updated_count += 1
-                    user_db.add_user(u)
-                    print(f"Batch updated vault state for {user_name} ({updated_count} files) -> hidden={state}")
-                self.send_response(204)
-                self.end_headers()
-            elif self.path.startswith("/favorite?"):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-                    
-                params = parse_qs(urlparse(self.path).query)
-                path = params.get("path", [None])[0]
-                state = params.get("state", ["true"])[0].lower() == "true"
-                if path:
-                    abs_path = os.path.abspath(path)
-                    u = user_db.get_user(user_name)
-                    if u:
-                        if state:
-                            if abs_path not in u.data.favorites:
-                                u.data.favorites.append(abs_path)
-                        else:
-                            if abs_path in u.data.favorites:
-                                u.data.favorites.remove(abs_path)
-                        user_db.add_user(u)
-                        print(f"Updated favorite state for {user_name}: {os.path.basename(abs_path)} -> favorite={state}")
-                        
-                self.send_response(204)
-                self.end_headers()
-            elif self.path.startswith("/batch_favorite?"):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-                
-                params = parse_qs(urlparse(self.path).query)
-                paths = params.get("paths", [""])[0].split(",")
-                state = params.get("state", ["true"])[0].lower() == "true"
-                
-                u = user_db.get_user(user_name)
-                if u:
-                    updated_count = 0
-                    for p in paths:
-                        if p:
-                            abs_path = os.path.abspath(p)
-                            if state:
-                                if abs_path not in u.data.favorites:
-                                    u.data.favorites.append(abs_path)
-                                    updated_count += 1
-                            else:
-                                if abs_path in u.data.favorites:
-                                    u.data.favorites.remove(abs_path)
-                                    updated_count += 1
-                    user_db.add_user(u)
-                    print(f"Batch updated favorite state for {user_name} ({updated_count} files) -> favorite={state}")
-                self.send_response(204)
-                self.end_headers()
+            # Routes below are handled by routes/files.py (registered above in the
+            # module dispatcher). The following elif chain is legacy code kept for
+            # reference during the transition phase. It is unreachable because
+            # files.handle_get() returns True for all these paths.
+            #
+            # Paths migrated to routes/files.py:
+            #   /reveal?         /api/mark_optimized?   /compress?
+            #   /api/keep_optimized?  /api/discard_optimized?
+            #   /api/rescan      /api/backup
+            #   /batch_compress?  /hide?  /batch_hide?  /favorite?  /batch_favorite?
             elif self.path.startswith("/stream?"):
                 try:
                     params = parse_qs(urlparse(self.path).query)
@@ -1092,103 +624,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error in stream endpoint: {e}")
                     self.send_error(500)
 
-            elif self.path == "/api/settings":
-
-                # GET Settings
-                # Interceptor: Inject user-specific smart_collections into the response
-                settings_dump = config.settings.model_dump()
-                
-                user_name = self.get_current_user()
-                if user_name:
-                    u = user_db.get_user(user_name)
-                    if u:
-                        settings_dump["smart_collections"] = u.data.smart_collections
-                        settings_dump["scan_targets"] = u.data.scan_targets
-                        settings_dump["exclude_paths"] = u.data.exclude_paths
-                        settings_dump["available_tags"] = u.data.available_tags
-                        
-                        # Inject User-Specific Settings (Override Global)
-                        settings_dump["enable_image_scanning"] = getattr(u.data, 'scan_images', False)
-                        settings_dump["sensitive_dirs"] = u.data.sensitive_dirs
-                        settings_dump["sensitive_tags"] = u.data.sensitive_tags
-                        settings_dump["sensitive_collections"] = u.data.sensitive_collections
-                    else:
-                        settings_dump["smart_collections"] = []
-                        settings_dump["scan_targets"] = []
-                        settings_dump["exclude_paths"] = []
-                        settings_dump["available_tags"] = []
-                        settings_dump["enable_image_scanning"] = False
-                else:
-                    settings_dump["smart_collections"] = []
-                    settings_dump["scan_targets"] = []
-                    settings_dump["exclude_paths"] = []
-                    settings_dump["available_tags"] = []
-
-                # Add Docker detection
-                settings_dump["is_docker"] = bool(os.getenv("CONFIG_DIR"))
-
-                self.send_response(200)
-                self.send_header("Content-type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(settings_dump, default=str).encode())
-                return
-            
-            elif self.path == "/api/deovr/library.json":
-                # iOS app library endpoint (uses simplified format)
-                from arcade_scanner.core.deovr_generator import generate_ios_json
-                
-                # Get server URL from request
-                host = self.headers.get("Host", "localhost:8000")
-                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
-                server_url = f"{protocol}://{host}"
-                
-                # Generate iOS-compatible JSON
-                all_videos = _media_cache.get()
-                ios_data = generate_ios_json(all_videos, server_url)
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(ios_data).encode("utf-8"))
-            
-            elif self.path.startswith("/api/deovr/collection/"):
-                # DeoVR collection endpoint
-                from arcade_scanner.core.deovr_generator import generate_collection_deovr_json
-                
-                # Extract collection ID from path
-                collection_id = self.path.split("/api/deovr/collection/")[1].replace(".json", "")
-                
-                # Find collection in settings
-                collection = None
-                for coll in config.settings.smart_collections:
-                    if coll.get("id") == collection_id:
-                        collection = coll
-                        break
-                
-                if not collection:
-                    self.send_error(404, "Collection not found")
-                    return
-                
-                # Get server URL
-                host = self.headers.get("Host", "localhost:8000")
-                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
-                server_url = f"{protocol}://{host}"
-                
-                # Generate DeoVR JSON for collection
-                all_videos = _media_cache.get()
-                deovr_data = generate_collection_deovr_json(
-                    all_videos,
-                    collection.get("name", collection_id),
-                    collection.get("criteria", {}),
-                    server_url
-                )
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(deovr_data).encode("utf-8"))
             
             elif self.path == "/api/cache-stats":
                 # Calculate cache sizes
@@ -1211,116 +646,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     "thumbnails_mb": round(thumb_size, 2),
                     "total_mb": round(total_size, 2)
                 }
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(stats).encode("utf-8"))
+
+                send_json(self, stats)
             
             # --- TAG SYSTEM ENDPOINTS ---
             # --- TAG SYSTEM ENDPOINTS ---
-            elif self.path.startswith("/api/tags"):
-                # GET: Return all available tags OR handle delete action
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-                
-                params = parse_qs(urlparse(self.path).query)
-                action = params.get("action", [None])[0]
-
-                # HANDLE DELETE ACTION
-                if action == "delete":
-                    tag_name = params.get("name", [None])[0]
-                    if tag_name:
-                         u = user_db.get_user(user_name)
-                         if u:
-                             current_tags = list(u.data.available_tags)
-                             updated_tags = [t for t in current_tags if t.get("name") != tag_name]
-                             u.data.available_tags = updated_tags
-                             
-                             # Remove this tag from user's videos
-                             for path, tags in u.data.tags.items():
-                                 if tag_name in tags:
-                                     u.data.tags[path] = [t for t in tags if t != tag_name]
-                             
-                             user_db.add_user(u)
-                             print(f"🏷️ Deleted tag for user {user_name}: {tag_name}")
-                        
-                         self.send_response(200)
-                         self.send_header("Content-Type", "application/json")
-                         self.end_headers()
-                         self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
-                         return
-                    else:
-                        self.send_error(400, "Missing name for delete")
-                        return
-
-                # DEFAULT: RETURN ALL TAGS
-                u = user_db.get_user(user_name)
-                tags = u.data.available_tags if u else []
-                
-                # print(f"DEBUG: GET /api/tags returning: {tags}", flush=True)
-
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(tags).encode("utf-8"))
-            
-            elif self.path == "/api/setup/directories":
-                # GET: List available directories in /media for setup wizard
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-
-                directories = []
-                media_root = "/media"
-                
-                try:
-                    if os.path.exists(media_root) and os.path.isdir(media_root):
-                        # Add root /media directory
-                        try:
-                            total_size = sum(os.path.getsize(os.path.join(media_root, f)) 
-                                           for f in os.listdir(media_root) if os.path.isfile(os.path.join(media_root, f)))
-                            file_count = sum(1 for f in os.listdir(media_root) if os.path.isfile(os.path.join(media_root, f)))
-                            
-                            directories.append({
-                                "path": media_root,
-                                "size_bytes": total_size,
-                                "file_count": file_count,
-                                "is_root": True
-                            })
-                        except PermissionError:
-                            pass
-                        
-                        # Add immediate subdirectories
-                        for item in os.listdir(media_root):
-                            item_path = os.path.join(media_root, item)
-                            if os.path.isdir(item_path):
-                                try:
-                                    total_size = sum(os.path.getsize(os.path.join(dp, f)) 
-                                                   for dp, dn, filenames in os.walk(item_path) 
-                                                   for f in filenames)
-                                    file_count = sum(len(filenames) for dp, dn, filenames in os.walk(item_path))
-                                    
-                                    directories.append({
-                                        "path": item_path,
-                                        "name": item,
-                                        "size_bytes": total_size,
-                                        "file_count": file_count,
-                                        "is_root": False
-                                    })
-                                except (PermissionError, OSError):
-                                    pass
-                except Exception as e:
-                    print(f"⚠️ Error scanning /media: {e}")
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"directories": directories}).encode("utf-8"))
-            
             elif self.path == "/api/setup/status":
                 # GET: Check if setup is complete
                 user_name = self.get_current_user()
@@ -1330,94 +660,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 
                 u = user_db.get_user(user_name)
                 setup_complete = getattr(u.data, 'setup_complete', True) if u else True
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"setup_complete": setup_complete}).encode("utf-8"))
-            
 
-            
-            elif self.path == "/api/vr/gallery":
-                # VR Museum: Return gallery rooms structured from smart collections
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-
-                u = user_db.get_user(user_name)
-                if not u:
-                    self.send_error(401)
-                    return
-
-                from arcade_scanner.core.deovr_generator import _video_matches_criteria
-                from urllib.parse import quote as url_quote
-
-                host = self.headers.get("Host", "localhost:8000")
-                protocol = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
-                if isinstance(self.connection, ssl.SSLSocket):
-                    protocol = "https"
-                server_url = f"{protocol}://{host}"
-
-                # Get all videos
-                all_videos = _media_cache.get()
-                # Filter by user scan targets
-                user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
-                if user_targets:
-                    all_videos = [v for v in all_videos if any(
-                        os.path.abspath(v.file_path).startswith(t) for t in user_targets
-                    )]
-                elif not u.is_admin:
-                    all_videos = []
-
-                # Build rooms from smart collections
-                rooms = []
-                collections = u.data.smart_collections or []
-
-                for coll in collections:
-                    coll_name = coll.get("name", "Collection")
-                    criteria = coll.get("criteria", {})
-
-                    # Only include video collections (skip photos-only)
-                    inc_media = criteria.get("include", {}).get("media_type", [])
-                    if inc_media and "video" not in inc_media:
-                        continue
-
-                    room_videos = []
-                    for video in all_videos:
-                        # Filter by duration (min 5 minutes / 300 seconds)
-                        if not video.duration_sec or video.duration_sec < 300:
-                            continue
-                        if video.vaulted:
-                            continue
-                        if _video_matches_criteria(video, criteria):
-                            filename = video.file_path.split('/')[-1].split('\\')[-1]
-                            title = filename.rsplit('.', 1)[0] if '.' in filename else filename
-                            v_obj = {
-                                "title": title,
-                                "stream_url": f"{server_url}/stream?path={url_quote(video.file_path)}",
-                                "thumbnail": f"{server_url}/thumbnails/{video.thumb}" if video.thumb else None,
-                                "duration": int(video.duration_sec) if video.duration_sec else 0,
-                            }
-                            room_videos.append(v_obj)
-
-                    if room_videos:
-                        rooms.append({
-                            "name": coll_name,
-                            "id": coll.get("id", coll_name),
-                            "color": coll.get("color", "#d4a574"),
-                            "video_count": len(room_videos),
-                            "videos": room_videos[:14]  # Max 14 per room (4 walls)
-                        })
-
-                gallery_data = {"rooms": rooms}
-                print(f"🏛️ VR Gallery: {len(rooms)} rooms, {sum(r['video_count'] for r in rooms)} total videos")
-
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(json.dumps(gallery_data).encode("utf-8"))
+                send_json(self, {"setup_complete": setup_complete})
 
             elif self.path == "/api/videos":
                 # GET: Return all videos, filtered by user's scan targets
@@ -1433,30 +677,89 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 
                 # Filter videos
                 user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
-                filtered_videos = []
+                print(f"🔍 API Debug: User '{user_name}' targets: {user_targets}")
 
-                # If user has no targets, they see nothing (or maybe we allow strict isolation?)
-                # If user is admin? Admin typically sees all? 
-                # Request was "include and excludes already different for every user?".
-                # Implies users only see what they define.
-                
-                # Fetch once, use in both branches below
+                filtered_videos = []
                 all_entries = _media_cache.get()
 
                 # ADMIN OVERRIDE: If no targets defined, Admin sees all.
                 if not user_targets and u.is_admin:
-                    filtered_videos = [e.model_dump(by_alias=True) for e in all_entries]
+                    filtered_videos = all_entries
                 elif user_targets:
-                    # Optimized: Check path BEFORE serialization
+                    # Optimized: Data is already in API-friendly dict format
+                    match_count = 0
                     for entry in all_entries:
-                        v_path = os.path.abspath(entry.file_path)
-                        if any(v_path.startswith(t) for t in user_targets):
-                             filtered_videos.append(entry.model_dump(by_alias=True))
+                        v_path = os.path.abspath(entry["FilePath"])
+                        is_match = any(v_path.startswith(t) for t in user_targets)
+                        # Always show items in Review mode, regardless of scan targets
+                        if entry["Status"] == "REVIEW" or is_match:
+                             filtered_videos.append(entry)
+                             if is_match: match_count += 1
+                    
+                    if not filtered_videos and all_entries:
+                         sample = os.path.abspath(all_entries[0]["FilePath"])
+                         print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(sample.startswith(t) for t in user_targets)})")
+                    else:
+                         print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
                 
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(filtered_videos, default=str).encode("utf-8"))
+                # send_json gzips the (potentially multi-MB) library dump
+                send_json(self, filtered_videos)
+
+            elif self.path == "/api/debug/dump":
+                # GET: Return full system state for debugging
+                debug_info = {
+                    "config": {
+                        "active_scan_targets": config.active_scan_targets,
+                        "active_exclude_paths": config.active_exclude_paths,
+                        "hidden_data_dir": config.hidden_data_dir,
+                    },
+                    "users": [],
+                    "db_stats": {
+                        "total_count": db.count(),
+                        "samples": []
+                    }
+                }
+                
+                # Users
+                for u in user_db.get_all_users():
+                    debug_info["users"].append({
+                        "username": u.username,
+                        "is_admin": u.is_admin,
+                        "targets": u.data.scan_targets
+                    })
+                
+                # DB Samples (Top 20)
+                cursor = db._conn.execute("SELECT file_path, status, media_type FROM media LIMIT 20")
+                for row in cursor:
+                    debug_info["db_stats"]["samples"].append({
+                        "path": row[0],
+                        "status": row[1],
+                        "type": row[2]
+                    })
+                
+                # Mount Check
+                mount_status = {}
+                for m in ["/media", "/media_nas", "/media_ralf"]:
+                    exists = os.path.exists(m)
+                    is_dir = os.path.isdir(m)
+                    try:
+                        count = len(os.listdir(m)) if exists and is_dir else 0
+                        sample = os.listdir(m)[:3] if count > 0 else []
+                    except Exception as e:
+                        count = -1
+                        sample = [str(e)]
+                    
+                    mount_status[m] = {
+                        "exists": exists,
+                        "is_dir": is_dir,
+                        "count": count,
+                        "sample": sample
+                    }
+                
+                debug_info["mount_check"] = mount_status
+
+                send_json(self, debug_info)
+
             
             elif self.path.startswith("/api/video/tags?"):
                 # GET: Return tags for a specific video
@@ -1477,11 +780,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 tags = []
                 if u and abs_path in u.data.tags:
                     tags = u.data.tags[abs_path]
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"tags": tags}).encode("utf-8"))
+
+                send_json(self, {"tags": tags})
             
             # Unreachable block removed
 
@@ -1489,116 +789,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # ================================================================
             # DUPLICATE DETECTION API
             # ================================================================
-            elif self.path == "/api/duplicates/status":
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(_dup_mgr.get_state()).encode("utf-8"))
-                return
-
-            elif self.path == "/api/duplicates" or self.path == "/api/duplicates/":
-                # GET: Return cached duplicate results
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-                
-                try:
-                    # Return cached results or empty list if not run yet
-                    cache = _dup_mgr.cache
-                    groups_data = cache if cache is not None else []
-                    
-                    # Calculate summary stats
-                    total_groups = len(groups_data)
-                    total_videos = sum(1 for g in groups_data if g.get("media_type") == "video")
-                    total_images = sum(1 for g in groups_data if g.get("media_type") == "image")
-                    potential_savings = sum(g.get("potential_savings_mb", 0) for g in groups_data)
-                    
-                    response = {
-                        "summary": {
-                            "total_groups": total_groups,
-                            "video_groups": total_videos,
-                            "image_groups": total_images,
-                            "potential_savings_mb": potential_savings,
-                            "scan_run": cache is not None
-                        },
-                        "groups": groups_data
-                    }
-                    
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(response).encode("utf-8"))
-                    
-                except Exception as e:
-                    print(f"❌ Error returning duplicates: {e}")
-                    self.send_error(500, str(e))
-            
-            elif self.path.startswith("/download_gif?"):
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-                
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    filename = params.get("file", [None])[0]
-                    if not filename:
-                        self.send_error(400, "Missing file parameter")
-                        return
-                    
-                    # Security: Validate filename (no path traversal)
-                    if "/" in filename or "\\" in filename or ".." in filename:
-                        self.send_error(403, "Invalid filename")
-                        return
-                    
-                    gif_export_dir = os.path.join(tempfile.gettempdir(), "arcade_gif_exports")
-                    file_path = os.path.join(gif_export_dir, filename)
-                    
-                    if not os.path.exists(file_path):
-                        self.send_error(404, "GIF file not found or still processing")
-                        return
-                    
-                    # Serve the file
-                    self.send_response(200)
-                    self.send_header("Content-Type", "image/gif")
-                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-                    
-                    file_size = os.path.getsize(file_path)
-                    self.send_header("Content-Length", str(file_size))
-                    self.end_headers()
-                    
-                    with open(file_path, 'rb') as f:
-                        self.wfile.write(f.read())
-                    
-                    print(f"📥 Downloaded GIF: {filename} ({file_size / (1024*1024):.1f} MB)")
-                    
-                except Exception as e:
-                    print(f"❌ Error downloading GIF: {e}")
-                    self.send_error(500, str(e))
-            
-            # --- ENCODING QUEUE GET ENDPOINTS ---
-            elif self.path == "/api/queue/status":
-                try:
-                    jobs = db.get_queue_status()
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(jobs).encode())
-                except Exception as e:
-                    print(f"❌ Error in queue/status: {e}")
-                    self.send_error(500, str(e))
-
             elif self.path.startswith("/api/queue/next"):
                 try:
                     params = parse_qs(urlparse(self.path).query)
                     worker_id = params.get("worker_id", [socket.gethostname()])[0]
                     job = db.get_next_pending(worker_id=worker_id)
                     if job:
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps(job).encode())
+                        send_json(self, job)
                     else:
                         self.send_response(204)
                         self.end_headers()
@@ -1611,10 +808,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     params = parse_qs(urlparse(self.path).query)
                     job_id = int(params.get("job_id", [0])[0])
                     cancelled = db.is_job_cancelled(job_id) if job_id else False
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"cancelled": cancelled}).encode())
+                    send_json(self, {"cancelled": cancelled})
                 except Exception as e:
                     self.send_error(500, str(e))
 
@@ -1688,6 +882,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
     def do_POST(self):
+        self._response_started = False
+        try:
+            from .routes import queue, settings, duplicates, tags
+            if queue.handle_post(self): return
+            if settings.handle_post(self): return
+            if duplicates.handle_post(self): return
+            if tags.handle_post(self): return
+        except Exception as e:
+            print(f"Module route error POST: {e}")
+            if getattr(self, "_response_started", False):
+                self.close_connection = True
+                return
         print(f"DEBUG: POST Request received for path: {self.path}", flush=True)
 
         try:
@@ -1746,7 +952,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                             self.send_header("Set-Cookie", morsel.OutputString())
 
                         self.end_headers()
-                        self.wfile.write(json.dumps({"success": True}).encode())
+                        self.wfile.write(json.dumps({"success": True, "token": token}).encode())
                     else:
                         remaining = session_manager.record_failure(client_ip)
                         print(f"❌ Login failed for IP {client_ip} ({remaining} attempts remaining)")
@@ -1778,718 +984,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 handle_post_remove_photos(self)
                 return
 
-            if self.path == "/api/settings":
-                try:
-                    # Security Fix H-2: DoS Protection - Limit request size
-                    content_length = int(self.headers.get("Content-Length", 0))
-                    if content_length > MAX_REQUEST_SIZE:
-                        self.send_error(413, "Request payload too large")
-                        return
-
-                    post_body = self.rfile.read(content_length)
-                    new_settings = json.loads(post_body)
-                    
-                    # Interceptor: Extract smart_collections for user_db
-                    # Interceptor: Extract smart_collections for user_db
-                    user_collections = new_settings.pop("smart_collections", None)
-                    user_targets = new_settings.pop("scan_targets", None)
-                    user_excludes = new_settings.pop("exclude_paths", None)
-                    user_tags = new_settings.pop("available_tags", None)
-                    
-                    # New User-Specific Settings
-                    # Fix: Frontend sends 'enable_image_scanning', map to 'scan_images'
-                    user_scan_images = new_settings.pop("scan_images", None)
-                    if user_scan_images is None:
-                        user_scan_images = new_settings.pop("enable_image_scanning", None)
-                        
-                    user_sensitive_dirs = new_settings.pop("sensitive_dirs", None)
-                    user_sensitive_tags = new_settings.pop("sensitive_tags", None)
-                    user_sensitive_collections = new_settings.pop("sensitive_collections", None)
-                    
-                    if config.save(new_settings):
-                        # Save user collections if present
-                        user_name = self.get_current_user()
-                        if user_name:
-                            u = user_db.get_user(user_name)
-                            if u:
-                                modified = False
-                                if user_collections is not None:
-                                    u.data.smart_collections = user_collections
-                                    modified = True
-                                if user_targets is not None:
-                                    u.data.scan_targets = user_targets
-                                    modified = True
-                                if user_excludes is not None:
-                                    u.data.exclude_paths = user_excludes
-                                    modified = True
-                                if user_tags is not None:
-                                    u.data.available_tags = user_tags
-                                    modified = True
-                                
-                                if user_scan_images is not None:
-                                    u.data.scan_images = user_scan_images
-                                    modified = True
-                                    
-                                if user_sensitive_dirs is not None:
-                                    u.data.sensitive_dirs = user_sensitive_dirs
-                                    modified = True
-                                if user_sensitive_tags is not None:
-                                    u.data.sensitive_tags = user_sensitive_tags
-                                    modified = True
-                                if user_sensitive_collections is not None:
-                                    u.data.sensitive_collections = user_sensitive_collections
-                                    modified = True
-                                
-                                if modified:
-                                    user_db.add_user(u)
-
-                        # Regenerate HTML report to bake in new settings (Theme, etc.)
-                        try:
-                            current_port = config.PORT if hasattr(config, 'PORT') else 8000
-                            report_debouncer.schedule(current_port)
-                            print("✅ HTML Report scheduled for regeneration with new settings")
-                        except Exception as e:
-                            print(f"⚠️ Settings saved but report gen scheduling failed: {e}")
-
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
-                    else:
-                        self.send_error(500, "Failed to save settings")
-                except Exception as e:
-                    print(f"Error saving settings: {e}")
-                    self.send_error(500)
-                return
-            
-            elif self.path == "/api/setup/complete":
-                # POST: Complete first-run setup wizard
-                try:
-                    content_len = int(self.headers.get('Content-Length', 0))
-                    post_body = self.rfile.read(content_len)
-                    payload = json.loads(post_body)
-                    
-                    user_name = self.get_current_user()
-                    if not user_name:
-                        self.send_error(401)
-                        return
-                    
-                    u = user_db.get_user(user_name)
-                    if not u:
-                        self.send_error(401)
-                        return
-                    
-                    # Extract configuration
-                    scan_targets = payload.get("scan_targets", [])
-                    scan_images = payload.get("scan_images", False)
-                    
-                    # Validate
-                    if not scan_targets:
-                        self.send_error(400, "At least one scan target required")
-                        return
-                    
-                    # Save configuration
-                    u.data.scan_targets = scan_targets
-                    u.data.scan_images = scan_images
-                    u.data.setup_complete = True
-                    user_db.add_user(u)
-                    
-                    print(f"✅ Setup completed for {user_name}: {scan_targets}")
-                    
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
-                except Exception as e:
-                    print(f"Error completing setup: {e}")
-                    self.send_error(500)
-                return
-            
-            elif self.path == "/api/restore":
-                try:
-                    content_length = int(self.headers.get("Content-Length", 0))
-                    
-                    if content_length > MAX_REQUEST_SIZE:
-                        self.send_error(413, "Request Entity Too Large")
-                        return
-
-                    body = self.rfile.read(content_length).decode('utf-8')
-                    try:
-                        # Expecting pure JSON body (client parses file and sends JSON)
-                        new_settings = json.loads(body)
-                    except json.JSONDecodeError:
-                        self.send_error(400, "Invalid JSON format")
-                        return
-                    
-                    print("♻️ Restoring settings from backup...")
-                    
-                    if config.save(new_settings):
-                        print("✅ Settings restored successfully.")
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": True}).encode())
-                    else:
-                        print("❌ Failed to save restored settings.")
-                        self.send_error(500, "Failed to save settings")
-                        
-                except Exception as e:
-                    print(f"❌ Restore exception: {e}")
-                    self.send_error(500, str(e))
-            
-            # --- TAG SYSTEM POST ENDPOINTS ---
-            elif self.path == "/api/tags":
-                # POST: Create a new tag
-                try:
-                    content_length = int(self.headers.get("Content-Length", 0))
-                    if content_length > MAX_REQUEST_SIZE:
-                        self.send_error(413, "Request Entity Too Large")
-                        return
-                    if content_length == 0:
-                        self.send_error(400, "Empty request body")
-                        return
-                    
-                    body = self.rfile.read(content_length).decode("utf-8")
-                    data = json.loads(body)
-                    
-                    tag_name = data.get("name", "").strip()
-                    tag_color = data.get("color", "#00ffd0")  # Default cyan
-                    
-                    if not tag_name:
-                        self.send_error(400, "Tag name is required")
-                        return
-                    
-                    # Auth Check
-                    user_name = self.get_current_user()
-                    if not user_name:
-                        self.send_error(401, "Unauthorized")
-                        return
-
-                    u = user_db.get_user(user_name)
-                    if not u:
-                        self.send_error(404, "User not found")
-                        return
-
-                    # Check if tag already exists
-                    current_tags = u.data.available_tags
-                    existing_names = [t.get("name", "").lower() for t in current_tags]
-                    
-                    if tag_name.lower() in existing_names:
-                        self.send_error(409, "Tag already exists")
-                        return
-                    
-                    # Add new tag
-                    new_tag = {"name": tag_name, "color": tag_color}
-                    u.data.available_tags.append(new_tag)
-                    user_db.add_user(u)
-                    
-                    print(f"🏷️ Created tag: {tag_name} ({tag_color})")
-                    self.send_response(201)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(new_tag).encode("utf-8"))
-                    
-                except json.JSONDecodeError:
-                    self.send_error(400, "Invalid JSON")
-                except Exception as e:
-                    print(f"❌ Error creating tag: {e}")
-                    self.send_error(500, str(e))
-            
-            elif self.path.startswith("/api/video/tags"):
-                # POST: Set tags for a video
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401)
-                    return
-                
-                try:
-                    content_length = int(self.headers.get("Content-Length", 0))
-                    if content_length > MAX_REQUEST_SIZE:
-                        self.send_error(413, "Request Entity Too Large")
-                        return
-                    
-                    body = self.rfile.read(content_length).decode("utf-8")
-                    data = json.loads(body)
-                    
-                    video_path = data.get("path")
-                    tags = data.get("tags", [])
-                    
-                    if not video_path:
-                         self.send_error(400, "Path required")
-                         return
-
-                    abs_path = os.path.abspath(video_path)
-                    u = user_db.get_user(user_name)
-                    if u:
-                        u.data.tags[abs_path] = tags
-                        user_db.add_user(u)
-                        print(f"Updated tags for {user_name} on {os.path.basename(abs_path)}: {tags}")
-                    
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True, "tags": tags}).encode("utf-8"))
-                except Exception as e:
-                    print(f"Error setting tags: {e}")
-                    self.send_error(500, str(e))
-            
-            elif self.path == "/api/tags/update":
-                try:
-                    user_name = self.get_current_user()
-                    if not user_name:
-                        self.send_error(401)
-                        return
-                        
-                    data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-                    tag_name = data.get("name")
-                    new_shortcut = data.get("shortcut")
-                    
-                    if not tag_name:
-                        self.send_error(400, "Missing tag name")
-                        return
-                    
-                    u = user_db.get_user(user_name)
-                    if not u:
-                        self.send_error(404, "User not found")
-                        return
-                    
-                    # Find and update the tag
-                    tag_found = False
-                    for tag in u.data.available_tags:
-                        if tag.get("name") == tag_name:
-                            tag["shortcut"] = new_shortcut
-                            tag_found = True
-                            break
-                    
-                    if not tag_found:
-                        self.send_error(404, "Tag not found")
-                        return
-                    
-                    user_db.add_user(u)
-                    
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
-                except Exception as e:
-                    print(f"Error updating tag: {e}")
-                    self.send_error(500, str(e))
-            
             # ================================================================
             # DUPLICATE DETECTION - DELETE FILES
             # ================================================================
-            elif self.path == "/api/duplicates/scan":
-                # POST: Start duplicate scan (supports batch_offset for pagination)
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-
-                if _dup_mgr.get_state()["is_running"]:
-                    self.send_error(409, "Scan already in progress")
-                    return
-
-                # Parse optional batch_offset from request body
-                batch_offset = 0
-                content_length = int(self.headers.get("Content-Length", 0))
-                if content_length > 0 and content_length <= MAX_REQUEST_SIZE:
-                    try:
-                        body = self.rfile.read(content_length).decode("utf-8")
-                        data = json.loads(body)
-                        batch_offset = int(data.get("batch_offset", 0))
-                    except (ValueError, json.JSONDecodeError) as e:
-                        print(f"⚠️ Could not parse duplicate scan body: {e}")
-                        pass  # Default to 0 if parsing fails
-
-                # Get user's scan targets for filtering
-                u = user_db.get_user(user_name)
-                user_targets = None
-                if u and u.data.scan_targets:
-                    user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
-
-                # Start background thread with user's scan targets and batch offset
-                import threading
-                t = threading.Thread(target=background_duplicate_scan, args=(user_targets, batch_offset))
-                t.daemon = True
-                t.start()
-                
-                self.send_response(202)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "started", "batch_offset": batch_offset}).encode("utf-8"))
-
-            elif self.path == "/api/duplicates/delete":
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-                
-                try:
-                    content_length = int(self.headers.get("Content-Length", 0))
-                    if content_length > MAX_REQUEST_SIZE:
-                        self.send_error(413, "Request too large")
-                        return
-                    
-                    body = self.rfile.read(content_length).decode("utf-8")
-                    data = json.loads(body)
-                    
-                    paths_to_delete = data.get("paths", [])
-                    
-                    if not paths_to_delete:
-                        self.send_error(400, "No paths provided")
-                        return
-                    
-                    deleted = []
-                    failed = []
-                    total_freed_mb = 0.0
-                    
-                    for path in paths_to_delete:
-                        try:
-                            abs_path = os.path.abspath(path)
-                            
-                            # Security check
-                            if not is_path_allowed(abs_path):
-                                failed.append({"path": path, "error": "Path not allowed"})
-                                continue
-                            
-                            if os.path.exists(abs_path):
-                                # Get size before deletion
-                                size_mb = os.path.getsize(abs_path) / (1024 * 1024)
-                                
-                                # Delete file
-                                os.remove(abs_path)
-                                
-                                # Remove from database
-                                db.remove(abs_path)
-                                
-                                deleted.append(abs_path)
-                                total_freed_mb += size_mb
-                                print(f"🗑️ Deleted duplicate: {os.path.basename(abs_path)} ({size_mb:.1f} MB)")
-                            else:
-                                failed.append({"path": path, "error": "File not found"})
-                                
-                        except Exception as e:
-                            failed.append({"path": path, "error": str(e)})
-                    
-                    # Save database changes
-                    if deleted:
-                        db.save()
-                    
-                    response = {
-                        "success": True,
-                        "deleted": deleted,
-                        "failed": failed,
-                        "freed_mb": round(total_freed_mb, 2),
-                        "freed_gb": round(total_freed_mb / 1024, 2),
-                    }
-                    
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(response).encode("utf-8"))
-                    print(f"✅ Deleted {len(deleted)} duplicates, freed {total_freed_mb:.1f} MB")
-                    
-                except json.JSONDecodeError:
-                    self.send_error(400, "Invalid JSON")
-                except Exception as e:
-                    print(f"❌ Error deleting duplicates: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path == "/api/bulk_delete":
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-                
-                try:
-                    content_length = int(self.headers.get("Content-Length", 0))
-                    if content_length > MAX_REQUEST_SIZE:
-                        self.send_error(413, "Request too large")
-                        return
-                    
-                    body = self.rfile.read(content_length).decode("utf-8")
-                    data = json.loads(body)
-                    
-                    paths_to_delete = data.get("paths", [])
-                    
-                    if not paths_to_delete:
-                        self.send_error(400, "No paths provided")
-                        return
-                    
-                    deleted = []
-                    failed = []
-                    
-                    for path in paths_to_delete:
-                        try:
-                            abs_path = os.path.abspath(path)
-                            
-                            # Security check
-                            if not is_path_allowed(abs_path):
-                                failed.append({"path": path, "error": "Path not allowed"})
-                                continue
-                            
-                            if os.path.exists(abs_path):
-                                # Delete file
-                                os.remove(abs_path)
-                                
-                                # Remove from database
-                                db.remove(abs_path)
-                                
-                                deleted.append(abs_path)
-                                print(f"🗑️ Bulk Deleted: {os.path.basename(abs_path)}")
-                            else:
-                                # Even if file is missing, make sure it's gone from DB
-                                db.remove(abs_path)
-                                failed.append({"path": path, "error": "File not found"})
-                                
-                        except Exception as e:
-                            failed.append({"path": path, "error": str(e)})
-                    
-                    # Save database changes
-                    if deleted:
-                        db.save()
-                    
-                    response = {
-                        "success": True,
-                        "deleted": deleted,
-                        "failed": failed
-                    }
-                    
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(response).encode("utf-8"))
-                    print(f"✅ Bulk Deleted {len(deleted)} files")
-                    
-                except json.JSONDecodeError:
-                    self.send_error(400, "Invalid JSON")
-                except Exception as e:
-                    print(f"❌ Error in bulk delete: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path == "/api/duplicates/clear":
-                # Clear duplicate cache and force rescan
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-
-                clear_duplicate_cache()
-
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "cleared"}).encode("utf-8"))
-
             # ================================================================
             # GIF EXPORT
             # ================================================================
-            elif self.path == "/api/export/gif":
-                user_name = self.get_current_user()
-                if not user_name:
-                    self.send_error(401, "Unauthorized")
-                    return
-                
-                try:
-                    content_length = int(self.headers.get("Content-Length", 0))
-                    if content_length > MAX_REQUEST_SIZE:
-                        self.send_error(413, "Request Entity Too Large")
-                        return
-                    
-                    body = self.rfile.read(content_length).decode("utf-8")
-                    data = json.loads(body)
-                    
-                    video_path = data.get("path")
-                    preset = data.get("preset", "720p")
-                    fps = data.get("fps", 15)
-                    quality = data.get("quality", 80)
-                    start_time = data.get("start_time")  # Optional trim start
-                    end_time = data.get("end_time")      # Optional trim end
-                    
-                    if not video_path:
-                        self.send_error(400, "Missing video path")
-                        return
-                    
-                    # Security: Validate path
-                    try:
-                        video_path = sanitize_path(video_path)
-                    except (SecurityError, ValueError) as e:
-                        print(f"🚨 Security violation in GIF export: {e}")
-                        self.send_error(403, "Forbidden - Invalid path")
-                        return
-                    
-                    if not os.path.exists(video_path):
-                        self.send_error(404, "Video file not found")
-                        return
-                    
-                    # Get video info from database
-                    video_entry = db.get(os.path.abspath(video_path))
-                    if not video_entry:
-                        self.send_error(404, "Video not in database")
-                        return
-                    
-                    # Determine output dimensions based on preset
-                    presets = {
-                        "original": (video_entry.width or 1920, video_entry.height or 1080),
-                        "1080p": (1920, 1080),
-                        "720p": (1280, 720),
-                        "480p": (854, 480),
-                        "360p": (640, 360),
-                    }
-                    
-                    width, height = presets.get(preset, presets["720p"])
-                    
-                    # Calculate duration for size estimation
-                    duration = video_entry.duration_sec or 10
-                    if start_time is not None and end_time is not None:
-                        duration = max(0.1, end_time - start_time)
-                    elif start_time is not None:
-                        duration = max(0.1, duration - start_time)
-                    elif end_time is not None:
-                        duration = min(duration, end_time)
-                    
-                    estimated_size_mb = (width * height * fps * duration * (quality / 100) * 0.3) / (1024 * 1024)
-                    
-                    # Generate output filename
-                    base_name = os.path.splitext(os.path.basename(video_path))[0]
-                    output_filename = f"{base_name}_{preset}_{fps}fps.gif"
-                    
-                    # Create temp directory for GIF exports
-                    gif_export_dir = os.path.join(tempfile.gettempdir(), "arcade_gif_exports")
-                    os.makedirs(gif_export_dir, exist_ok=True)
-                    
-                    output_path = os.path.join(gif_export_dir, output_filename)
-                    
-                    # Generate unique job ID
-                    import uuid
-                    job_id = str(uuid.uuid4())[:8]
-                    
-                    # Start async conversion
-                    import threading
-                    
-                    def convert_to_gif():
-                        try:
-                            print(f"🎞️ Starting GIF conversion: {output_filename}", flush=True)
-                            
-                            # Build FFmpeg input args with optional trim
-                            input_args = ["ffmpeg", "-y"]
-                            
-                            # Add trim parameters if specified
-                            if start_time is not None:
-                                input_args.extend(["-ss", str(start_time)])
-                            if end_time is not None:
-                                input_args.extend(["-to", str(end_time)])
-                            
-                            input_args.extend(["-i", video_path])
-                            
-                            # Step 1: Generate palette
-                            palette_path = os.path.join(gif_export_dir, f"palette_{job_id}.png")
-                            palette_cmd = input_args + [
-                                "-vf", f"fps={fps},scale={width}:{height}:flags=lanczos,palettegen=stats_mode=diff",
-                                palette_path
-                            ]
-                            
-                            print(f"🎨 Generating palette...", flush=True)
-                            result = subprocess.run(palette_cmd, capture_output=True, text=True)
-                            if result.returncode != 0:
-                                print(f"❌ Palette generation failed: {result.stderr}", flush=True)
-                                return
-                            
-                            # Step 2: Generate GIF with palette
-                            bayer_scale = int((quality / 100) * 5)  # 0-5 scale
-                            
-                            gif_input_args = ["ffmpeg", "-y"]
-                            if start_time is not None:
-                                gif_input_args.extend(["-ss", str(start_time)])
-                            if end_time is not None:
-                                gif_input_args.extend(["-to", str(end_time)])
-                            
-                            gif_cmd = gif_input_args + [
-                                "-i", video_path,
-                                "-i", palette_path,
-                                "-lavfi", f"fps={fps},scale={width}:{height}:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale={bayer_scale}",
-                                "-loop", "0",  # Loop forever
-                                output_path
-                            ]
-                            
-                            print(f"🎬 Creating GIF...", flush=True)
-                            result = subprocess.run(gif_cmd, capture_output=True, text=True)
-                            if result.returncode != 0:
-                                print(f"❌ GIF conversion failed: {result.stderr}", flush=True)
-                                return
-                            
-                            # Cleanup palette
-                            if os.path.exists(palette_path):
-                                os.remove(palette_path)
-                            
-                            actual_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-                            print(f"✅ GIF created: {output_filename} ({actual_size_mb:.1f} MB)", flush=True)
-                            
-                        except Exception as e:
-                            print(f"❌ Error in GIF conversion: {e}", flush=True)
-                            import traceback
-                            traceback.print_exc()
-                    
-                    # Start conversion in background
-                    thread = threading.Thread(target=convert_to_gif, daemon=True)
-                    thread.start()
-                    
-                    # Return response immediately
-                    response = {
-                        "status": "processing",
-                        "job_id": job_id,
-                        "output_filename": output_filename,
-                        "output_path": output_path,
-                        "estimated_size_mb": round(estimated_size_mb, 2),
-                        "download_url": f"/download_gif?file={output_filename}"
-                    }
-                    
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps(response).encode("utf-8"))
-                    
-                except json.JSONDecodeError:
-                    self.send_error(400, "Invalid JSON")
-                except Exception as e:
-                    print(f"❌ Error in GIF export: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    self.send_error(500, str(e))
-
-            # --- ENCODING QUEUE POST ENDPOINTS ---
-            elif self.path == "/api/queue/add":
-                try:
-                    content_len = int(self.headers.get('Content-Length', 0))
-                    post_body = self.rfile.read(content_len)
-                    data = json.loads(post_body)
-                    file_path = data.get("file_path", "")
-
-                    if not file_path:
-                        self.send_error(400, "Missing file_path")
-                        return
-
-                    # Get file size
-                    size_bytes = 0
-                    if os.path.exists(file_path):
-                        size_bytes = os.path.getsize(file_path)
-
-                    job_id = db.queue_encode(file_path, size_bytes)
-                    if job_id:
-                        print(f"📋 Queued for remote encoding: {os.path.basename(file_path)} (job {job_id})")
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": True, "job_id": job_id}).encode())
-                    else:
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": False, "error": "Already queued"}).encode())
-                except Exception as e:
-                    print(f"❌ Error in queue/add: {e}")
-                    self.send_error(500, str(e))
-
             elif self.path == "/api/queue/cancel":
                 try:
                     content_len = int(self.headers.get('Content-Length', 0))

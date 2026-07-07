@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arcade Scanner Redirect</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            background-color: #120c1f;
+            color: #ff007f;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-size: 24px;
+        }
+    </style>
+    <script>
+        window.onload = function() {
+            // Redirect to the D-pad optimized TV dashboard on the server
+            window.location.replace("http://192.168.2.183:8000/static/tv.html");
+        };
+    </script>
+</head>
+<body>
+    <div>Schippere zum TV Dashboard...</div>
+</body>
+</html>

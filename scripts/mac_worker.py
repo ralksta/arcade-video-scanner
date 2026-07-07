@@ -29,6 +29,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from optimizer_utils import parse_schedule, is_within_schedule, battery_from_pmset  # noqa: E402
+
 # Color codes
 G = "\033[92m"
 Y = "\033[93m"
@@ -40,7 +42,27 @@ B = "\033[1m"
 _shutdown = False
 
 
-def signal_handler(sig, frame):
+def is_on_battery() -> bool:
+    """True when a macOS machine is running on battery power (else False)."""
+    if sys.platform != "darwin":
+        return False
+    try:
+        import subprocess
+        r = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=5)
+        return battery_from_pmset(r.stdout)
+    except Exception:
+        return False
+
+
+def _sleep_interruptible(seconds: int) -> None:
+    """Sleep in 1s steps so Ctrl-C / SIGTERM shutdown stays responsive."""
+    for _ in range(seconds):
+        if _shutdown:
+            break
+        time.sleep(1)
+
+
+def signal_handler(_sig, _frame):
     global _shutdown
     print(f"\n{Y}⏹ Shutting down gracefully...{NC}")
     _shutdown = True
@@ -226,7 +248,7 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
         # AV1 codec override: map hardware encoder → AV1 variant
         if target_codec == "av1":
             av1_map = {
-                "videotoolbox": "av1_videotoolbox",
+                "videotoolbox": "av1_software",
                 "nvenc": "av1_nvenc",
             }
             av1_key = av1_map.get(encoder_key)
@@ -308,7 +330,28 @@ def _cleanup(*paths):
             pass
 
 
+def load_env(env_path=".env"):
+    """Minimal .env loader to avoid dependencies."""
+    if not os.path.exists(env_path):
+        return
+    try:
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except Exception as e:
+        print(f"⚠ Failed to load .env: {e}")
+
+
 def main():
+    # Load .env if it exists in current dir, script dir, or project root
+    load_env()
+    load_env(str(SCRIPT_DIR / ".env"))
+    load_env(str(SCRIPT_DIR.parent / ".env"))
+
     parser = argparse.ArgumentParser(
         description="Mac Encoding Worker — processes remote encoding queue jobs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -316,16 +359,40 @@ def main():
 Examples:
   python3 mac_worker.py --server http://192.168.1.100:8000 --user admin --password secret
   python3 mac_worker.py --server http://nas:8000 --poll-interval 60
+
+Environment Variables:
+  ARCADE_SERVER, ARCADE_USER, ARCADE_PASSWORD
         """
     )
-    parser.add_argument("--server", required=True, help="Arcade server URL (e.g. http://192.168.1.100:8000)")
-    parser.add_argument("--user", default="", help="Username for authentication")
-    parser.add_argument("--password", default="", help="Password for authentication")
+    
+    env_server = os.environ.get("ARCADE_SERVER")
+
+    parser.add_argument("--server", 
+                       default=env_server,
+                       required=not env_server, 
+                       help="Arcade server URL (e.g. http://192.168.1.100:8000)")
+    parser.add_argument("--user", 
+                       default=os.environ.get("ARCADE_USER", ""), 
+                       help="Username for authentication")
+    parser.add_argument("--password", 
+                       default=os.environ.get("ARCADE_PASSWORD", ""), 
+                       help="Password for authentication")
     parser.add_argument("--poll-interval", type=int, default=30, help="Seconds between polls (default: 30)")
     parser.add_argument("--work-dir", default=os.path.expanduser("~/encoding-queue"),
                        help="Temp directory for downloads (default: ~/encoding-queue)")
+    parser.add_argument("--schedule", default=None,
+                       help='Only work within this time window, e.g. "01:00-08:00" (overnight windows OK)')
+    parser.add_argument("--pause-on-battery", action="store_true",
+                       help="Pause polling while the machine runs on battery power (macOS)")
 
     args = parser.parse_args()
+
+    schedule_window = None
+    if args.schedule:
+        schedule_window = parse_schedule(args.schedule)
+        if schedule_window is None:
+            print(f'{R}Invalid --schedule "{args.schedule}" — expected HH:MM-HH:MM{NC}')
+            sys.exit(2)
 
     # Ensure work dir exists
     os.makedirs(args.work_dir, exist_ok=True)
@@ -337,6 +404,10 @@ Examples:
     print(f"  Worker:    {socket.gethostname()}")
     print(f"  Work Dir:  {args.work_dir}")
     print(f"  Poll:      every {args.poll_interval}s")
+    if schedule_window:
+        print(f"  Schedule:  {args.schedule}")
+    if args.pause_on_battery:
+        print(f"  Battery:   pause when unplugged")
     print()
 
     # Auth
@@ -345,16 +416,22 @@ Examples:
     # Main loop
     print(f"{C}Polling for jobs...{NC}")
     while not _shutdown:
+        if schedule_window and not is_within_schedule(schedule_window):
+            print(f"{Y}⏸  Outside schedule window ({args.schedule}) — sleeping...{NC}", end="\r")
+            _sleep_interruptible(args.poll_interval)
+            continue
+        if args.pause_on_battery and is_on_battery():
+            print(f"{Y}🔋 On battery power — paused...{NC}", end="\r")
+            _sleep_interruptible(args.poll_interval)
+            continue
+
         job = client.poll_next_job()
 
         if job:
             process_job(client, job, args.work_dir)
         else:
             # Wait before polling again
-            for _ in range(args.poll_interval):
-                if _shutdown:
-                    break
-                time.sleep(1)
+            _sleep_interruptible(args.poll_interval)
 
     print(f"{G}Worker stopped.{NC}")
 

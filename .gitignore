@@ -23,12 +23,11 @@ venv/
 server_log.txt
 status.txt
 
-# Debug/Development files
+# Debug/Development files (ad-hoc scripts, NOT the tests/ suite)
 debug_*.py
 check_*.py
 verify_*.py
-*_test.py
-test_*.py
+# Note: tests/test_*.py are intentionally tracked — see tests/ directory
 
 # Temporary files
 *.tmp

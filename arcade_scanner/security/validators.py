@@ -145,6 +145,10 @@ def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool
         parts = Path(abs_path).parts
         for part in parts:
             if part.startswith('.') and not (IS_WIN and len(part) <= 3 and ':' in part):
+                # We allow specifically the '.review' folder which is used for hardware Review Mode
+                if part == ".review":
+                    continue
+                    
                 print(f"⚠️ Hidden path rejected: {abs_path}")
                 return False
         

@@ -174,7 +174,9 @@
                 });
 
                 if (res.ok) {
-                    window.location.reload();
+                    const params = new URLSearchParams(window.location.search);
+                    const dest = params.get('redirect') || '/';
+                    window.location.href = dest;
                 } else if (res.status === 429) {
                     err.innerText = 'Too many attempts. Try again in 15 minutes.';
                     err.style.display = 'block';

@@ -8,7 +8,7 @@ from arcade_scanner.database import db, user_db
 from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.server.web_server import start_server
-from arcade_scanner.core.maintenance import purge_media, cleanup_orphans, purge_broken_media, purge_thumbnails
+from arcade_scanner.core.maintenance import purge_media, purge_broken_media, purge_thumbnails
 
 def run_scanner(args_list=None):
     parser = argparse.ArgumentParser(description="Arcade Media Scanner 6.3")
@@ -18,7 +18,7 @@ def run_scanner(args_list=None):
     parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
     parser.add_argument("--ssl", action="store_true", help="Enable HTTPS mode with self-signed certificate.")
     parser.add_argument("--skip-setup", action="store_true", help="Skip the first-run setup wizard.")
-    args, unknown = parser.parse_known_args(args_list)
+    args, _ = parser.parse_known_args(args_list)
 
     # 0. First-Run Setup Wizard
     if not args.skip_setup:
@@ -91,14 +91,6 @@ def run_scanner(args_list=None):
             results = [e.model_dump(by_alias=True) for e in db.get_all()]
             generate_html_report(results, config.report_file, server_port=port)
             
-            # DeoVR JSON Generation (if enabled)
-            if config.settings.enable_deovr:
-                from arcade_scanner.core.deovr_generator import save_deovr_library
-                deovr_path = os.path.join(config.hidden_data_dir, "deovr_library.json")
-                server_url = f"{protocol}://localhost:{port}"
-                print("🥽 Generating DeoVR library...")
-                save_deovr_library(deovr_path, db.get_all(), server_url)
-                
         except KeyboardInterrupt:
             print("\n⚠️ Scan interrupted.")
         except Exception as e:
