@@ -23,6 +23,7 @@ from optimizer_utils import (  # noqa: E402
     parse_loudnorm_json,
     build_audio_filter_chain,
     select_top_windows,
+    narrow_quality_window,
 )
 
 
@@ -217,3 +218,15 @@ class TestSceneWindows:
 
     def test_zero_duration_falls_back(self):
         assert select_top_windows({0: 100}, 0.0, n=3, window=3.0) == [0.0]
+
+
+class TestNarrowWindow:
+    def test_center(self):
+        assert narrow_quality_window(6, 3, radius=1) == (2, 4)
+
+    def test_clamped_at_edges(self):
+        assert narrow_quality_window(6, 0, radius=1) == (0, 1)
+        assert narrow_quality_window(6, 5, radius=1) == (4, 5)
+
+    def test_single_value(self):
+        assert narrow_quality_window(1, 0, radius=1) == (0, 0)

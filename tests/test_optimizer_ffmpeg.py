@@ -72,3 +72,35 @@ class TestVerifyIntegrity:
         out = tmp_path / "final.mp4"
         assert promote_staging(staging, out, expected_duration=2.0) is False
         assert not out.exists() and not staging.exists()
+
+
+@pytest.fixture(scope="module")
+def long_clip(tmp_path_factory):
+    """30s synthetic clip for probe extraction."""
+    path = tmp_path_factory.mktemp("clips") / "long.mp4"
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=duration=30:size=320x240:rate=24",
+         "-c:v", "libx264", "-preset", "ultrafast", "-g", "24", str(path)],
+        check=True, capture_output=True,
+    )
+    return path
+
+
+class TestProbeExtraction:
+    def test_probe_is_short_and_valid(self, long_clip, tmp_path):
+        from video_optimizer import extract_probe_clip, get_video_info
+        probe = extract_probe_clip(long_clip, [2.0, 12.0, 22.0], segment_sec=4.0, work_dir=tmp_path)
+        assert probe is not None and probe.exists()
+        info = get_video_info(probe)
+        assert 6.0 <= info["duration"] <= 18.0  # ~3x4s, keyframe-aligned slack
+
+    def test_probe_segments_cleaned_up(self, long_clip, tmp_path):
+        from video_optimizer import extract_probe_clip
+        extract_probe_clip(long_clip, [2.0, 12.0, 22.0], segment_sec=4.0, work_dir=tmp_path)
+        leftovers = list(tmp_path.glob("_probe_seg*")) + list(tmp_path.glob("_probe_list*"))
+        assert leftovers == []
+
+    def test_missing_input_returns_none(self, tmp_path):
+        from video_optimizer import extract_probe_clip
+        probe = extract_probe_clip(tmp_path / "nope.mp4", [1.0], segment_sec=4.0, work_dir=tmp_path)
+        assert probe is None

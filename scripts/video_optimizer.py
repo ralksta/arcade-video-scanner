@@ -52,6 +52,7 @@ try:
         parse_loudnorm_json,
         build_audio_filter_chain,
         select_top_windows,
+        narrow_quality_window,
     )
     OPTIMIZER_UTILS_AVAILABLE = True
 except ImportError:
@@ -67,6 +68,10 @@ MIN_QUALITY = 0.960
 SAMPLE_DURATION = 3
 DEFAULT_MIN_SIZE_MB = 0  # No minimum file size – process all files
 
+
+# --- PRE-SEARCH (sample-clip quality probing) ---
+PRESEARCH_MIN_DURATION = 120.0  # Files shorter than this search directly (samples too coarse)
+PRESEARCH_SEGMENT_SEC = 8.0     # Length of each stream-copied probe segment
 
 # --- SSIM / SAVINGS THRESHOLDS ---
 SSIM_MIN = 0.940           # Hard lower bound – reject anything below this
@@ -766,7 +771,118 @@ def enqueue_output(out, q):
         q.put(line)
     out.close()
 
-def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress', q_override=None):
+
+def extract_probe_clip(input_path, sample_starts, segment_sec, work_dir):
+    """Stream-copy N short segments into one probe clip (keyframe-aligned, fast).
+
+    No re-encode — extraction of a ~24s probe from a multi-GB file takes
+    around a second. Returns the probe path or None on any failure.
+    """
+    work_dir = Path(work_dir)
+    segments = []
+    try:
+        for i, start in enumerate(sample_starts):
+            seg = work_dir / f"_probe_seg{i}.mp4"
+            r = subprocess.run(
+                ['ffmpeg', '-y', '-ss', f'{start:.3f}', '-i', str(input_path),
+                 '-t', f'{segment_sec:.3f}', '-c', 'copy', '-avoid_negative_ts', 'make_zero',
+                 '-loglevel', 'error', str(seg)],
+                capture_output=True, timeout=120,
+            )
+            if r.returncode != 0 or not seg.exists() or seg.stat().st_size == 0:
+                return None
+            segments.append(seg)
+        concat_list = work_dir / "_probe_list.txt"
+        concat_list.write_text("".join(f"file '{s.as_posix()}'\n" for s in segments))
+        probe = work_dir / "_probe.mp4"
+        r = subprocess.run(
+            ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(concat_list),
+             '-c', 'copy', '-loglevel', 'error', str(probe)],
+            capture_output=True, timeout=120,
+        )
+        if r.returncode != 0 or not probe.exists() or probe.stat().st_size == 0:
+            return None
+        return probe
+    except (subprocess.SubprocessError, OSError) as e:
+        print(f"{Y}Pre-search probe extraction failed: {e}{NC}")
+        return None
+    finally:
+        for s in segments:
+            try:
+                s.unlink()
+            except OSError:
+                pass
+        try:
+            (work_dir / "_probe_list.txt").unlink()
+        except OSError:
+            pass
+
+
+def estimate_optimal_q(input_path, profile, quality_values, bitrate_values,
+                       sample_starts, audio_mode, work_dir):
+    """Binary-search Q on a short probe clip instead of the full file.
+
+    Full-file binary search encodes the whole video per pass; probing on a
+    ~24s clip finds the right neighborhood in seconds. Returns the most-
+    compressed Q whose probe encode passes SSIM_MIN while actually shrinking,
+    or None (probe failure / nothing passed) — caller runs the normal search.
+    """
+    probe = extract_probe_clip(input_path, sample_starts, PRESEARCH_SEGMENT_SEC, work_dir)
+    if probe is None:
+        return None
+    try:
+        probe_info = get_video_info(probe)
+        if not probe_info or probe_info['duration'] <= 0:
+            return None
+        probe_dur = probe_info['duration']
+        probe_size = probe.stat().st_size
+        max_s = max(0.0, probe_dur - SAMPLE_DURATION - 0.5)
+        probe_ssim_starts = sorted({min(probe_dur * p, max_s) for p in (0.15, 0.50, 0.85)})
+
+        best_q = None
+        low, high = 0, len(quality_values) - 1
+        print(f"{Y}Pre-Search:{NC} probing quality on a {probe_dur:.0f}s sample clip...")
+        while low <= high:
+            mid = (low + high) // 2
+            q = quality_values[mid]
+            out = Path(work_dir) / f"_probe_q{q}.mp4"
+            cmd = build_ffmpeg_command(
+                probe, out, profile, q, copy_audio=True, audio_mode=audio_mode,
+                video_mode='compress',
+                target_bitrate_kbps=bitrate_values[mid] if mid < len(bitrate_values) else None,
+                color_args=profile.get('color_args'),
+            )
+            r = subprocess.run(cmd, capture_output=True, timeout=600)
+            if r.returncode != 0 or not out.exists() or out.stat().st_size == 0:
+                return None  # encoder trouble -> let the real search handle it
+            ssim = get_multi_ssim(probe, out, probe_ssim_starts, probe_ssim_starts, SAMPLE_DURATION)
+            ratio = out.stat().st_size / probe_size if probe_size else 1.0
+            print(f" {Y}   probe Q={q}: SSIM {ssim:.4f}, size ×{ratio:.2f}{NC}")
+            try:
+                out.unlink()
+            except OSError:
+                pass
+            if ssim >= SSIM_MIN and ratio < 1.0:
+                best_q = q          # passes -> try more compression
+                low = mid + 1
+            else:
+                high = mid - 1      # fails -> need better quality
+        return best_q
+    except (subprocess.SubprocessError, OSError) as e:
+        print(f"{Y}Pre-search aborted: {e}{NC}")
+        return None
+    finally:
+        try:
+            probe.unlink()
+        except OSError:
+            pass
+        for f in Path(work_dir).glob("_probe_q*.mp4"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress', q_override=None, presearch=True):
     """Process a single video file. Returns (success, bytes_saved)."""
     input_path = Path(input_path)
     is_trim = ss is not None or to is not None
@@ -1269,6 +1385,21 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         # Each pass encodes to a unique staging file; the best is renamed at the end.
         # No re-encode needed – we reuse the cached staging file directly.
         low, high = 0, len(quality_values) - 1
+
+        # --- PRE-SEARCH: probe Q on a short sample clip, then narrow the ---
+        # --- full-encode search to predicted ±1 (usually 1-2 real passes) ---
+        if (presearch and OPTIMIZER_UTILS_AVAILABLE and not is_trim
+                and info['duration'] >= PRESEARCH_MIN_DURATION):
+            predicted_q = estimate_optimal_q(
+                input_path, profile, quality_values, bitrate_values,
+                sample_starts, audio_mode, input_path.parent)
+            if predicted_q is not None:
+                idx = nearest_quality_index(quality_values, predicted_q)
+                low, high = narrow_quality_window(len(quality_values), idx, radius=1)
+                print(f"{BG}Pre-Search Result:{NC} Q={predicted_q} → full search narrowed to "
+                      f"[{quality_values[low]}..{quality_values[high]}]")
+            else:
+                print(f"{Y}Pre-Search inconclusive — running full binary search.{NC}")
         best_result = None       # (quality, size_after, ssim, saved_bytes, saved_pct)
         best_acceptable = None   # Backup: best result with acceptable SSIM even if savings not met
         best_candidate_path: 'Path | None' = None       # staging file for best_result
@@ -1723,6 +1854,8 @@ def main():
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     parser.add_argument('--preset', choices=['fast', 'balanced', 'best'], default='balanced',
                         help='Encoding quality preset: fast (speed), balanced (default), best (quality/size)')
+    parser.add_argument('--no-presearch', action='store_true',
+                        help='Skip the sample-clip quality pre-search (always run the full binary search)')
     args = parser.parse_args()
 
     if args.port:
@@ -1801,7 +1934,8 @@ def main():
             ss=args.ss, 
             to=args.to,
             video_mode=args.video_mode,
-            q_override=args.q
+            q_override=args.q,
+            presearch=not args.no_presearch
         )
         
         # Write to encode log (for both batch controller and single-file calls)

@@ -79,6 +79,13 @@ def nearest_quality_index(quality_values: list[int], q: int) -> int:
     return min(range(len(quality_values)), key=lambda i: abs(quality_values[i] - q))
 
 
+def narrow_quality_window(n_values: int, predicted_idx: int, radius: int = 1) -> tuple[int, int]:
+    """Clamped (low, high) index window around a pre-search prediction."""
+    lo = max(0, predicted_idx - radius)
+    hi = min(n_values - 1, predicted_idx + radius)
+    return (lo, hi)
+
+
 # ---------------------------------------------------------------------------
 # HDR / 10-bit safety
 # ---------------------------------------------------------------------------
