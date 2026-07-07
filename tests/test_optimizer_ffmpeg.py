@@ -36,6 +36,30 @@ def tiny_clip(tmp_path_factory):
     return path
 
 
+class TestGetVideoInfo:
+    def test_returns_real_stream_fields(self, tiny_clip):
+        # Regression: codec_type must be in -show_entries or the video-stream
+        # lookup silently fails and width/height/pix_fmt are always empty.
+        from video_optimizer import get_video_info
+        info = get_video_info(tiny_clip)
+        assert info["width"] == 320
+        assert info["height"] == 240
+        assert info["codec"] == "h264"
+        assert info["pix_fmt"] != ""
+
+    def test_10bit_clip_detected_as_hdr(self, tmp_path):
+        from video_optimizer import get_video_info
+        from optimizer_utils import is_hdr_or_10bit
+        clip = tmp_path / "ten_bit.mp4"
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=duration=1:size=320x240:rate=24",
+             "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p10le", str(clip)],
+            check=True, capture_output=True,
+        )
+        info = get_video_info(clip)
+        assert is_hdr_or_10bit(info) is True
+
+
 class TestVerifyIntegrity:
     def test_valid_file_passes(self, tiny_clip):
         from video_optimizer import verify_output_integrity

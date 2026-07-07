@@ -347,7 +347,7 @@ def get_video_info(file_path: Path) -> Optional[Dict[str, Any]]:
     """Get video duration and stream info using ffprobe."""
     cmd = [
         'ffprobe', '-v', 'error',
-        '-show_entries', 'format=duration:stream=width,height,codec_name,r_frame_rate,pix_fmt,color_transfer,color_primaries',
+        '-show_entries', 'format=duration:stream=codec_type,width,height,codec_name,r_frame_rate,pix_fmt,color_transfer,color_primaries',
         '-of', 'json', str(file_path)
     ]
     try:
