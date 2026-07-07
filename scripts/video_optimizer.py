@@ -377,6 +377,57 @@ def get_video_info(file_path: Path) -> Optional[Dict[str, Any]]:
         print(f"{R}Error probing {file_path}: {e}{NC}")
         return None
 
+def verify_output_integrity(path: Path, expected_duration: float, tolerance: float = 1.5) -> Tuple[bool, str]:
+    """Cheap insurance before the atomic replace: correct duration + clean decode.
+
+    Protects against truncated moov atoms and encoder/driver hiccups that SSIM
+    sampling can miss (it only looks at 3 short windows).
+    """
+    try:
+        probe = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+             '-of', 'default=noprint_wrappers=1:nokey=1', str(path)],
+            capture_output=True, text=True, timeout=60,
+        )
+        out_duration = float(probe.stdout.strip())
+    except (subprocess.SubprocessError, ValueError, OSError) as e:
+        return (False, f"ffprobe failed: {e}")
+    if expected_duration > 0 and abs(out_duration - expected_duration) > tolerance:
+        return (False, f"duration mismatch: {out_duration:.1f}s vs expected {expected_duration:.1f}s")
+    try:
+        decode = subprocess.run(
+            ['ffmpeg', '-v', 'error', '-xerror', '-i', str(path),
+             '-an', '-sn', '-f', 'null', '-'],
+            capture_output=True, text=True, timeout=1800,
+        )
+    except (subprocess.SubprocessError, OSError) as e:
+        return (False, f"decode check failed to run: {e}")
+    if decode.returncode != 0:
+        return (False, f"decode errors: {decode.stderr.strip()[:200]}")
+    return (True, "ok")
+
+
+def promote_staging(staging: Path, output_path: Path, expected_duration: float) -> bool:
+    """Verify a staging file end-to-end, then atomically promote it.
+
+    Returns False (staging deleted) if the file fails integrity checks —
+    the original must never be replaced by a corrupt encode.
+    """
+    print(f" {Y}-> Verifying output integrity...{NC}", end='', flush=True)
+    ok, reason = verify_output_integrity(staging, expected_duration)
+    if not ok:
+        print(f"\r\033[2K {R}-> Output failed integrity check: {reason}. Discarding.{NC}")
+        try:
+            if staging.exists():
+                staging.unlink()
+        except OSError:
+            pass
+        return False
+    print(f"\r\033[2K {G}-> Integrity verified.{NC}")
+    staging.rename(output_path)
+    return True
+
+
 def parse_time_to_seconds(time_str: Optional[str]) -> float:
     """Convert time string (HH:MM:SS or SS) to seconds."""
     if not time_str:
@@ -867,6 +918,9 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             and audio_mode in ('moderate', 'enhanced')):
         loudnorm_measured = measure_loudness(input_path, audio_mode)
 
+    # Duration the finished output must have (integrity check before replace)
+    expected_out_duration = trim_duration if is_trim else info['duration']
+
     # --- SCENE-AWARE SSIM SAMPLE POINTS (computed once, reused every pass) ---
     # Sample where the bitrate is highest — that's where artifacts show first.
     dur_for_samples = trim_duration if is_trim else info['duration']
@@ -1030,6 +1084,17 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 f.unlink()
             except OSError:
                 pass
+
+    # Shared failure path when a finished encode fails the integrity check
+    def _fail_integrity():
+        _cleanup_staging()
+        batch_stats['failed'] += 1
+        last_encode_result['filename'] = input_path.name
+        last_encode_result['status'] = 'failed'
+        last_encode_result['reason'] = 'Output failed integrity verification'
+        last_encode_result['duration'] = time.time() - file_start_time
+        print(f" {R}>>> FAILED: output failed integrity verification{NC}")
+        return (False, 0)
 
     # Helper function to run a single encode pass
     def run_encode_pass(quality_val, out_path=None, target_bitrate_kbps=None):
@@ -1348,7 +1413,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 print(f"\n{BG}>>> Finalizing: re-using cached encode Q={quality}{NC}")
 
             # Promote staging file to final output path (no re-encode!)
-            final_path.rename(output_path)
+            if not promote_staging(final_path, output_path, expected_out_duration):
+                return _fail_integrity()
 
             # Clean up any remaining staging files
             _cleanup_staging()
@@ -1445,7 +1511,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             if linear_best_acceptable and linear_best_acceptable_path and linear_best_acceptable_path.exists():
                 _ba_quality, _ba_size, _ba_ssim, _ba_saved_pct = linear_best_acceptable
                 _ba_saved_bytes = size_to_compare - _ba_size
-                linear_best_acceptable_path.rename(output_path)
+                if not promote_staging(linear_best_acceptable_path, output_path, expected_out_duration):
+                    return _fail_integrity()
                 _cleanup_staging()
                 file_time = time.time() - file_start_time
                 print(f" {Y}   -> Using best acceptable result: Q={_ba_quality} | "
@@ -1479,7 +1546,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 except (EOFError, KeyboardInterrupt):
                     answer = ''
                 if answer in ('j', 'y'):
-                    staging.rename(output_path)
+                    if not promote_staging(staging, output_path, expected_out_duration):
+                        return _fail_integrity()
                     _cleanup_staging()
                     file_time = time.time() - file_start_time
                     print(f" {Y}>>> Ergebnis übernommen (manuell bestätigt). "
@@ -1517,7 +1585,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             # Discard any previously saved fallback
             if linear_best_acceptable_path and linear_best_acceptable_path.exists():
                 linear_best_acceptable_path.unlink()
-            staging.rename(output_path)
+            if not promote_staging(staging, output_path, expected_out_duration):
+                return _fail_integrity()
             _cleanup_staging()
             file_time = time.time() - file_start_time
             print(f" {BG}>>> SUCCESS! {format_size(saved_bytes)} ({saved_bytes*100/size_to_compare:.1f}%) saved in {format_time(file_time)}.{NC}")
@@ -1556,7 +1625,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     if linear_best_acceptable and linear_best_acceptable_path and linear_best_acceptable_path.exists():
         _ba_quality, _ba_size, _ba_ssim, _ba_saved_pct = linear_best_acceptable
         _ba_saved_bytes = size_to_compare - _ba_size
-        linear_best_acceptable_path.rename(output_path)
+        if not promote_staging(linear_best_acceptable_path, output_path, expected_out_duration):
+            return _fail_integrity()
         _cleanup_staging()
         file_time = time.time() - file_start_time
         print(f" {Y}   -> Using best acceptable result: Q={_ba_quality} | "
