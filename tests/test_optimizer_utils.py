@@ -18,6 +18,8 @@ from optimizer_utils import (  # noqa: E402
     append_encode_history,
     suggest_q_from_history,
     nearest_quality_index,
+    is_hdr_or_10bit,
+    apply_hdr_adjustments,
 )
 
 
@@ -75,3 +77,57 @@ class TestHistory:
     def test_nearest_quality_index(self):
         assert nearest_quality_index([75, 65, 55, 45], 58) == 2
         assert nearest_quality_index([24, 28, 32, 36, 40, 44], 30) == 1
+
+
+SDR = {"pix_fmt": "yuv420p", "color_transfer": "bt709", "color_primaries": "bt709"}
+HDR10 = {"pix_fmt": "yuv420p10le", "color_transfer": "smpte2084", "color_primaries": "bt2020"}
+HLG = {"pix_fmt": "yuv420p10le", "color_transfer": "arib-std-b67", "color_primaries": "bt2020"}
+
+
+class TestHdr:
+    def test_sdr_not_flagged(self):
+        assert is_hdr_or_10bit(SDR) is False
+
+    def test_hdr10_and_hlg_flagged(self):
+        assert is_hdr_or_10bit(HDR10) is True
+        assert is_hdr_or_10bit(HLG) is True
+
+    def test_10bit_sdr_flagged(self):
+        assert is_hdr_or_10bit({**SDR, "pix_fmt": "yuv420p10le"}) is True
+
+    def test_missing_fields_not_flagged(self):
+        assert is_hdr_or_10bit({}) is False
+
+    def test_videotoolbox_gets_main10_p010(self):
+        profile = {"codec": "hevc_videotoolbox",
+                   "encoder_args": ["-profile:v", "main", "-allow_sw", "0"],
+                   "video_filter": "format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2"}
+        adj = apply_hdr_adjustments(profile, HDR10)
+        assert adj is not None
+        assert "main10" in adj["encoder_args"]
+        assert "main" not in [a for a in adj["encoder_args"] if a == "main"]
+        assert "p010le" in adj["video_filter"]
+        assert "-color_trc" in adj["color_args"]
+        assert "smpte2084" in adj["color_args"]
+        assert "bt2020" in " ".join(adj["color_args"])
+
+    def test_hlg_transfer_passes_through(self):
+        profile = {"codec": "libx265",
+                   "encoder_args": ["-preset", "medium"],
+                   "video_filter": "format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2"}
+        adj = apply_hdr_adjustments(profile, HLG)
+        assert adj is not None
+        assert "arib-std-b67" in adj["color_args"]
+        assert "yuv420p10le" in adj["video_filter"]
+        assert "main10" in adj["encoder_args"]
+
+    def test_original_profile_not_mutated(self):
+        profile = {"codec": "hevc_videotoolbox",
+                   "encoder_args": ["-profile:v", "main"],
+                   "video_filter": "format=yuv420p,scale=trunc(iw/2)*2:trunc(ih/2)*2"}
+        apply_hdr_adjustments(profile, HDR10)
+        assert profile["encoder_args"] == ["-profile:v", "main"]
+
+    def test_unsupported_encoder_returns_none(self):
+        profile = {"codec": "hevc_qsv", "encoder_args": [], "video_filter": "format=yuv420p"}
+        assert apply_hdr_adjustments(profile, HDR10) is None

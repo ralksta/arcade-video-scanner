@@ -47,6 +47,8 @@ try:
         append_encode_history,
         suggest_q_from_history,
         nearest_quality_index,
+        is_hdr_or_10bit,
+        apply_hdr_adjustments,
     )
     OPTIMIZER_UTILS_AVAILABLE = True
 except ImportError:
@@ -337,7 +339,7 @@ def get_video_info(file_path: Path) -> Optional[Dict[str, Any]]:
     """Get video duration and stream info using ffprobe."""
     cmd = [
         'ffprobe', '-v', 'error',
-        '-show_entries', 'format=duration:stream=width,height,codec_name,r_frame_rate',
+        '-show_entries', 'format=duration:stream=width,height,codec_name,r_frame_rate,pix_fmt,color_transfer,color_primaries',
         '-of', 'json', str(file_path)
     ]
     try:
@@ -363,7 +365,10 @@ def get_video_info(file_path: Path) -> Optional[Dict[str, Any]]:
             'width': width,
             'height': height,
             'codec': codec,
-            'fps': int(fps_val + 0.5)
+            'fps': int(fps_val + 0.5),
+            'pix_fmt': video_stream.get('pix_fmt', ''),
+            'color_transfer': video_stream.get('color_transfer', ''),
+            'color_primaries': video_stream.get('color_primaries', ''),
         }
     except (subprocess.CalledProcessError, json.JSONDecodeError, ValueError, OSError) as e:
         print(f"{R}Error probing {file_path}: {e}{NC}")
@@ -535,9 +540,9 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     sys.stdout.write(f"\r\033[2K {G}{encoder}{NC} [{arrow}{spaces}] {BG}{int(percent)}%{NC} | {speed} | {bitrate} | {elapsed_str} / {eta_str}")
     sys.stdout.flush()
 
-def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress', maxrate_kbps=None, bufsize_kbps=None, target_bitrate_kbps=None):
+def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_audio=False, audio_mode='enhanced', ss=None, to=None, video_mode='compress', maxrate_kbps=None, bufsize_kbps=None, target_bitrate_kbps=None, color_args=None):
     """Build the ffmpeg command based on encoder profile.
-    
+
     Args:
         maxrate_kbps: Optional peak bitrate cap (from bitrate analyzer) to prevent exceeding source
         bufsize_kbps: Optional buffer size for VBR smoothing
@@ -545,6 +550,7 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
             When set, this is the primary size control mechanism. Use this to force
             the encoder to target a specific average bitrate so output file size is predictable.
             Without this, quality-mode VBR (-q:v) can produce arbitrary bitrates.
+        color_args: Optional color metadata args (HDR passthrough). Default: BT.709 trio.
     """
     cmd = ['ffmpeg', '-y']
     
@@ -611,22 +617,28 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
 
     codec_name = profile.get('codec', '')
     is_av1 = 'av1' in codec_name
-    
+
     tag = 'av01' if is_av1 else 'hvc1'
 
     cmd.extend([
         '-tag:v', tag,
         '-movflags', '+faststart+delay_moov',  # delay_moov: prevents partial/corrupt moov on aborted encodes
         '-fps_mode', 'vfr',                    # Preserve source timestamps; no dup/drop (any VFR source)
-        # Explicit BT.709 color metadata - ensures correct rendering in browsers/players
-        '-colorspace', 'bt709',
-        '-color_primaries', 'bt709',
-        '-color_trc', 'bt709',
+    ])
+    if video_mode != 'copy':
+        # Explicit color metadata - ensures correct rendering in browsers/players.
+        # Default BT.709 (SDR); HDR sources pass their BT.2020/PQ/HLG tags through.
+        cmd.extend(color_args or [
+            '-colorspace', 'bt709',
+            '-color_primaries', 'bt709',
+            '-color_trc', 'bt709',
+        ])
+    cmd.extend([
         '-progress', 'pipe:1',
         '-loglevel', 'error',
         str(output_path)
     ])
-    
+
     return cmd
 
 def enqueue_output(out, q):
@@ -684,6 +696,23 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
     last_encode_result['height'] = info['height']
     last_encode_result['source_kbps'] = (size_before * 8) / (info['duration'] * 1000)
+
+    # --- HDR / 10-BIT SAFETY ---
+    # Stamping BT.709 tags onto BT.2020/PQ content washes out colors. Encode
+    # 10-bit with passthrough tags where the encoder supports it, skip otherwise.
+    if OPTIMIZER_UTILS_AVAILABLE and video_mode == 'compress' and is_hdr_or_10bit(info):
+        hdr_profile = apply_hdr_adjustments(profile, info)
+        if hdr_profile is None:
+            reason = f"HDR/10-bit source not supported by {profile.get('codec', '?')} — kept original"
+            print(f"{Y}Skipping:{NC} {input_path.name} ({reason})")
+            batch_stats['skipped'] += 1
+            last_encode_result['filename'] = input_path.name
+            last_encode_result['status'] = 'skipped'
+            last_encode_result['reason'] = reason
+            last_encode_result['duration'] = 0
+            return (False, 0)
+        profile = hdr_profile
+        print(f"{Y}HDR/10-bit source:{NC} main10 encode with color passthrough ({info.get('color_transfer') or '10-bit SDR'})")
 
     # --- BITRATE ANALYSIS for maxrate caps ---
     maxrate_kbps = None
@@ -923,7 +952,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         maxrate_info = f" (maxrate={maxrate_kbps:.0f}k{br_info})" if maxrate_kbps else (f" (target={target_bitrate_kbps:.0f}k)" if target_bitrate_kbps else "")
         print(f"{G}Pass:{NC} Q={quality_val}{maxrate_info}")
 
-        cmd = build_ffmpeg_command(input_path, effective_out, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress', maxrate_kbps=maxrate_kbps, bufsize_kbps=bufsize_kbps, target_bitrate_kbps=target_bitrate_kbps)
+        cmd = build_ffmpeg_command(input_path, effective_out, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress', maxrate_kbps=maxrate_kbps, bufsize_kbps=bufsize_kbps, target_bitrate_kbps=target_bitrate_kbps, color_args=profile.get('color_args'))
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}

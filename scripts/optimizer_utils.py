@@ -76,3 +76,55 @@ def suggest_q_from_history(encoder_key: str, height: int, source_kbps: float,
 
 def nearest_quality_index(quality_values: list[int], q: int) -> int:
     return min(range(len(quality_values)), key=lambda i: abs(quality_values[i] - q))
+
+
+# ---------------------------------------------------------------------------
+# HDR / 10-bit safety
+# ---------------------------------------------------------------------------
+
+_HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}  # PQ (HDR10), HLG
+
+# Per-codec 10-bit adjustments; codecs not listed cannot safely encode HDR here.
+_HDR_CAPABLE = {
+    "hevc_videotoolbox": {"profile": "main10", "pix_fmt": "p010le"},
+    "hevc_nvenc":        {"profile": "main10", "pix_fmt": "p010le"},
+    "libx265":           {"profile": "main10", "pix_fmt": "yuv420p10le"},
+}
+
+
+def is_hdr_or_10bit(info: dict) -> bool:
+    pix = str(info.get("pix_fmt") or "")
+    if "10" in pix or "12" in pix:
+        return True
+    if str(info.get("color_transfer") or "") in _HDR_TRANSFERS:
+        return True
+    return str(info.get("color_primaries") or "") == "bt2020"
+
+
+def apply_hdr_adjustments(profile: dict, info: dict) -> dict | None:
+    """Return a profile copy adjusted for a 10-bit/HDR source, or None if the
+    encoder can't do it safely (caller should skip the file instead of
+    silently mistagging BT.2020/PQ content as BT.709)."""
+    caps = _HDR_CAPABLE.get(profile.get("codec", ""))
+    if not caps:
+        return None
+    adj = dict(profile)
+    args = list(profile.get("encoder_args", []))
+    if "-profile:v" in args:
+        args[args.index("-profile:v") + 1] = caps["profile"]
+    else:
+        args.extend(["-profile:v", caps["profile"]])
+    adj["encoder_args"] = args
+    # 8-bit surface format in the filter chain -> 10-bit
+    vf = profile.get("video_filter", "")
+    for fmt8 in ("yuv420p", "nv12"):
+        vf = vf.replace(f"format={fmt8}", f"format={caps['pix_fmt']}")
+    adj["video_filter"] = vf
+    # Pass source color metadata through instead of stamping bt709
+    trc = str(info.get("color_transfer") or "smpte2084")
+    adj["color_args"] = [
+        "-colorspace", "bt2020nc",
+        "-color_primaries", "bt2020",
+        "-color_trc", trc,
+    ]
+    return adj
