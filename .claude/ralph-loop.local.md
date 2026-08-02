@@ -1,6 +1,6 @@
 ---
 active: true
-iteration: 2
+iteration: 3
 session_id: a5652d48-1179-4473-8c32-931e25781e14
 max_iterations: 40
 completion_promise: "Branch triage and coverage sweep are complete with a green test suite"
