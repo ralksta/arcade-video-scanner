@@ -68,6 +68,21 @@ class ScannerManager:
         db.load()
         existing_paths = {entry.file_path for entry in db.get_all()}
         found_paths: Set[str] = set()
+
+        # Snapshot the targets once: the orphan cleanup below decides whether it
+        # is looking at a complete picture, and that answer has to be about the
+        # same list the walk actually used.
+        scan_targets = list(config.active_scan_targets)
+        unavailable_targets = [
+            t for t in scan_targets
+            if not os.path.exists(os.path.abspath(os.path.expanduser(t)))
+        ]
+        if unavailable_targets:
+            print(f"⚠️ {len(unavailable_targets)} scan target(s) unavailable: {unavailable_targets}")
+
+        # Cleared when the discovery loop is cut short, so the cleanup can tell
+        # "this file is gone" apart from "we never got that far".
+        discovery_complete = True
         
         processed_count = 0
         batch_entries = []
@@ -246,10 +261,11 @@ class ScannerManager:
 
             # 2. Discovery Loop -> Feed Queue (Streaming for better performance)
             idx = 0
-            async for file_path, dir_changed in fs_scanner.scan_directories(config.active_scan_targets):
+            async for file_path, dir_changed in fs_scanner.scan_directories(scan_targets):
                 if self._stop_event.is_set():
+                    discovery_complete = False
                     break
-                
+
                 idx += 1
                 found_paths.add(file_path)
                 await queue.put((file_path, dir_changed, idx, 0)) # Stream it!
@@ -262,13 +278,22 @@ class ScannerManager:
             await _flush_batch() # Final flush
 
             # 4. Prune Orphans (files deleted OR now excluded)
-            if found_paths:
+            # Only ever on a complete pass. Anything the walk did not reach looks
+            # identical to a deleted file from here, and these rows carry user
+            # state — favorites, tags, vault flags — that no rescan can restore.
+            # A stopped scan or an unmounted drive must therefore prune nothing.
+            if not discovery_complete:
+                print("⏸ Scan stopped early — skipping orphan cleanup to protect existing entries.")
+            elif unavailable_targets:
+                print(f"⏸ {len(unavailable_targets)} scan target(s) unavailable — "
+                      "skipping orphan cleanup to protect existing entries.")
+            elif found_paths:
                 orphans = existing_paths - found_paths
                 removed_count = 0
                 for orphan in orphans:
                     db.remove(orphan)
                     removed_count += 1
-                
+
                 if removed_count > 0:
                     print(f"🗑 Removed {removed_count} files (deleted or now excluded).")
             
