@@ -33,7 +33,7 @@ from urllib.parse import urlparse, parse_qs
 
 from arcade_scanner.config import config
 from arcade_scanner.database import db
-from arcade_scanner.security import sanitize_path, SecurityError
+from arcade_scanner.security import sanitize_path, is_path_allowed, SecurityError
 from arcade_scanner.server.response_helpers import (
     send_json,
     require_auth,
@@ -198,6 +198,9 @@ def handle_get(handler) -> bool:
 
     # GET /api/queue/status
     if path == "/api/queue/status":
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             jobs = db.get_queue_status()
             send_json(handler, jobs)
@@ -208,6 +211,9 @@ def handle_get(handler) -> bool:
 
     # GET /api/queue/next
     if path.startswith("/api/queue/next"):
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             params = parse_qs(urlparse(path).query)
             worker_id = params.get("worker_id", [socket.gethostname()])[0]
@@ -224,6 +230,9 @@ def handle_get(handler) -> bool:
 
     # GET /api/queue/check?job_id=...
     if path.startswith("/api/queue/check?"):
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             params = parse_qs(urlparse(path).query)
             job_id = int(params.get("job_id", [0])[0])
@@ -235,6 +244,9 @@ def handle_get(handler) -> bool:
 
     # GET /api/queue/download?job_id=...
     if path.startswith("/api/queue/download?"):
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             params = parse_qs(urlparse(path).query)
             job_id = int(params.get("job_id", [0])[0])
@@ -387,12 +399,22 @@ def handle_post(handler) -> bool:
 
     # POST /api/queue/add
     if path == "/api/queue/add":
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             content_len = int(handler.headers.get("Content-Length", 0))
             data = json.loads(handler.rfile.read(content_len))
             file_path = data.get("file_path", "")
             if not file_path:
                 handler.send_error(400, "Missing file_path")
+                return True
+            # Only library files may be queued: the job's path is what
+            # /api/queue/download later streams and /api/queue/upload writes
+            # back, so an unchecked path here reaches straight into the host.
+            if not is_path_allowed(file_path):
+                print(f"🚨 Rejected queue/add outside scan directories: {file_path}")
+                handler.send_error(403, "Forbidden - Path not in scan directories")
                 return True
             target_codec = data.get("codec", "hevc")
             if target_codec not in ("hevc", "av1"):
@@ -411,6 +433,9 @@ def handle_post(handler) -> bool:
 
     # POST /api/queue/cancel
     if path == "/api/queue/cancel":
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             content_len = int(handler.headers.get("Content-Length", 0))
             data = json.loads(handler.rfile.read(content_len))
@@ -427,6 +452,9 @@ def handle_post(handler) -> bool:
 
     # POST /api/queue/upload?job_id=...
     if path.startswith("/api/queue/upload?"):
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             params = parse_qs(urlparse(path).query)
             job_id = int(params.get("job_id", [0])[0])
@@ -547,6 +575,9 @@ def handle_post(handler) -> bool:
 
     # POST /api/queue/complete
     if path == "/api/queue/complete":
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
         try:
             content_len = int(handler.headers.get("Content-Length", 0))
             data = json.loads(handler.rfile.read(content_len))

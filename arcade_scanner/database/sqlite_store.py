@@ -64,7 +64,12 @@ class SQLiteStore:
         self.db_file = os.path.join(config.hidden_data_dir, "media_library.db")
         self._conn: Optional[sqlite3.Connection] = None
         self._migrated = False
-        self._write_lock = threading.Lock()  # Serialise all writes
+        # Serialises writes, and every read on the encoding-queue path: the
+        # single sqlite3 connection is shared across server threads
+        # (check_same_thread=False), and concurrent use of one connection raises
+        # "bad parameter or other API misuse". Reentrant because _notify_change
+        # runs inside the lock and a callback may re-enter the store.
+        self._write_lock = threading.RLock()
         self.on_change_callbacks = []
 
     def register_on_change(self, callback):
@@ -149,45 +154,58 @@ class SQLiteStore:
         """Add a file to the encoding queue. Returns job ID or None if already pending."""
         self._ensure_connection()
 
-        # Check for existing pending/active job for this file
         safe_path = self._get_safe_path(file_path)
-        cursor = self._conn.execute(
-            "SELECT id FROM encoding_queue WHERE file_path = ? AND status IN ('pending', 'downloading', 'encoding', 'uploading')",
-            (safe_path,)
-        )
-        if cursor.fetchone():
-            return None  # Already queued
+        # Check-then-insert must hold the lock, or two callers both find no
+        # pending job and both insert one for the same file.
+        with self._write_lock:
+            cursor = self._conn.execute(
+                "SELECT id FROM encoding_queue WHERE file_path = ? AND status IN ('pending', 'downloading', 'encoding', 'uploading')",
+                (safe_path,)
+            )
+            if cursor.fetchone():
+                return None  # Already queued
 
-        self._conn.execute(
-            "INSERT INTO encoding_queue (file_path, status, size_bytes, target_codec, created_at) VALUES (?, 'pending', ?, ?, ?)",
-            (safe_path, size_bytes, target_codec, int(time.time()))
-        )
-        cursor = self._conn.execute("SELECT last_insert_rowid()")
-        return cursor.fetchone()[0]
+            self._conn.execute(
+                "INSERT INTO encoding_queue (file_path, status, size_bytes, target_codec, created_at) VALUES (?, 'pending', ?, ?, ?)",
+                (safe_path, size_bytes, target_codec, int(time.time()))
+            )
+            cursor = self._conn.execute("SELECT last_insert_rowid()")
+            return cursor.fetchone()[0]
 
     def get_next_pending(self, worker_id: str = "") -> Optional[dict]:
-        """Atomically claim the oldest pending job. Returns job dict or None."""
+        """Atomically claim the oldest pending job. Returns job dict or None.
+
+        The claim is a compare-and-swap: the UPDATE only fires while the row is
+        still 'pending', and a row count of 0 means another worker won the race,
+        so this caller must look for a different job rather than return one it
+        does not own. Without that check two workers encode the same file and
+        race on the same output path.
+        """
         self._ensure_connection()
 
-        # Atomic claim: update first pending row
-        cursor = self._conn.execute(
-            "SELECT id, file_path, size_bytes, target_codec FROM encoding_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
-        )
-        row = cursor.fetchone()
-        if not row:
-            return None
+        with self._write_lock:
+            while True:
+                cursor = self._conn.execute(
+                    "SELECT id, file_path, size_bytes, target_codec FROM encoding_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
 
-        job_id = row["id"]
-        self._conn.execute(
-            "UPDATE encoding_queue SET status = 'downloading', started_at = ?, worker_id = ? WHERE id = ? AND status = 'pending'",
-            (int(time.time()), worker_id, job_id)
-        )
-        return {
-            "id": job_id,
-            "file_path": self._decode_safe_path(row["file_path"]),
-            "size_bytes": row["size_bytes"],
-            "target_codec": row["target_codec"] or "hevc",
-        }
+                job_id = row["id"]
+                cursor = self._conn.execute(
+                    "UPDATE encoding_queue SET status = 'downloading', started_at = ?, worker_id = ? WHERE id = ? AND status = 'pending'",
+                    (int(time.time()), worker_id, job_id)
+                )
+                if cursor.rowcount == 0:
+                    continue  # Someone else claimed it first — try the next one.
+
+                return {
+                    "id": job_id,
+                    "file_path": self._decode_safe_path(row["file_path"]),
+                    "size_bytes": row["size_bytes"],
+                    "target_codec": row["target_codec"] or "hevc",
+                }
 
     def update_job_status(self, job_id: int, status: str, **kwargs) -> None:
         """Update a job's status and optional fields (result_message, saved_bytes, completed_at)."""
@@ -206,29 +224,35 @@ class SQLiteStore:
                 vals.append(kwargs[key])
 
         vals.append(job_id)
-        self._conn.execute(
-            f"UPDATE encoding_queue SET {', '.join(sets)} WHERE id = ?",
-            tuple(vals)
-        )
+        with self._write_lock:
+            self._conn.execute(
+                f"UPDATE encoding_queue SET {', '.join(sets)} WHERE id = ?",
+                tuple(vals)
+            )
 
     def get_queue_status(self, limit: int = 20) -> List[dict]:
         """Return active + recent jobs for the UI."""
         self._ensure_connection()
-        cursor = self._conn.execute(
-            """SELECT id, file_path, status, size_bytes, created_at, started_at,
-                      completed_at, worker_id, result_message, saved_bytes
-               FROM encoding_queue
-               ORDER BY
-                   CASE WHEN status IN ('pending','downloading','encoding','uploading') THEN 0 ELSE 1 END,
-                   created_at DESC
-               LIMIT ?""",
-            (limit,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        with self._write_lock:
+            cursor = self._conn.execute(
+                """SELECT id, file_path, status, size_bytes, created_at, started_at,
+                          completed_at, worker_id, result_message, saved_bytes
+                   FROM encoding_queue
+                   ORDER BY
+                       CASE WHEN status IN ('pending','downloading','encoding','uploading') THEN 0 ELSE 1 END,
+                       created_at DESC
+                   LIMIT ?""",
+                (limit,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def cancel_job(self, job_id: int) -> bool:
         """Cancel a pending or active job. Returns True if cancelled."""
         self._ensure_connection()
+        with self._write_lock:
+            return self._cancel_job_locked(job_id)
+
+    def _cancel_job_locked(self, job_id: int) -> bool:
         # Delete if still pending
         cursor = self._conn.execute(
             "DELETE FROM encoding_queue WHERE id = ? AND status = 'pending'",
@@ -247,9 +271,10 @@ class SQLiteStore:
     def is_job_cancelled(self, job_id: int) -> bool:
         """Check if a job has been cancelled (worker polls this)."""
         self._ensure_connection()
-        row = self._conn.execute(
-            "SELECT status FROM encoding_queue WHERE id = ?", (job_id,)
-        ).fetchone()
+        with self._write_lock:
+            row = self._conn.execute(
+                "SELECT status FROM encoding_queue WHERE id = ?", (job_id,)
+            ).fetchone()
         return row is not None and row[0] == 'cancelled'
 
     # ------------------------------------------------------------------
@@ -429,13 +454,14 @@ class SQLiteStore:
         """Delete completed/failed/cancelled jobs older than N days. Returns number of deleted rows."""
         self._ensure_connection()
         cutoff = int(time.time()) - (older_than_days * 86400)
-        cursor = self._conn.execute(
-            "DELETE FROM encoding_queue "
-            "WHERE status IN ('done', 'failed', 'cancelled') "
-            "  AND completed_at > 0 AND completed_at < ?",
-            (cutoff,),
-        )
-        deleted = cursor.rowcount
+        with self._write_lock:
+            cursor = self._conn.execute(
+                "DELETE FROM encoding_queue "
+                "WHERE status IN ('done', 'failed', 'cancelled') "
+                "  AND completed_at > 0 AND completed_at < ?",
+                (cutoff,),
+            )
+            deleted = cursor.rowcount
         if deleted > 0:
             logger.info("Cleaned up %d old encoding_queue jobs (>%dd)", deleted, older_than_days)
         return deleted

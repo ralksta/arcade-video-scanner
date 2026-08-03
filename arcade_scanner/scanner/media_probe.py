@@ -4,6 +4,26 @@ from typing import Dict, Any, Optional
 from ..models.video_entry import VideoEntry
 from ..config import config
 
+def _as_float(value, default: float = 0.0) -> float:
+    """Parse an ffprobe number, tolerating the "N/A" it emits for unknowns."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_int(value, default: int = 0) -> int:
+    """Integer counterpart to _as_float; also accepts "1920.0" style values."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        pass
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
 class MediaProbe:
     """
     Asynchronous wrapper for media analysis tools (FFmpeg/FFprobe).
@@ -24,6 +44,7 @@ class MediaProbe:
             "-of", "json",
             filepath,
         ]
+        process = None
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -31,13 +52,22 @@ class MediaProbe:
                 stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=20.0)
-            
+
             if process.returncode != 0:
                 return {}
-                
+
             data = json.loads(stdout.decode('utf-8'))
             return data
         except Exception:
+            # A timeout only cancels communicate() — ffprobe itself keeps
+            # running. Reap it, or a library with a few unreadable files leaves
+            # one stray process behind per probe.
+            if process is not None and process.returncode is None:
+                try:
+                    process.kill()
+                    await process.wait()
+                except Exception:
+                    pass
             return {}
 
 
@@ -57,44 +87,36 @@ class MediaProbe:
             
             fmt = raw_data.get("format", {})
 
-            # Safe extraction with defaults
-            size_mb = float(fmt.get("size", 0)) / (1024 * 1024)
-            duration = float(fmt.get("duration", 0))
-            bitrate_bps = float(fmt.get("bit_rate", 0))
-            
+            # Safe extraction with defaults. ffprobe writes "N/A" for values it
+            # cannot determine; a single such field must zero itself, not cost
+            # the whole file — get_metadata returning None means the video never
+            # reaches the library at all.
+            size_mb = _as_float(fmt.get("size", 0)) / (1024 * 1024)
+            duration = _as_float(fmt.get("duration", 0))
+            bitrate_bps = _as_float(fmt.get("bit_rate", 0))
+
             # Video Details
-            width = int(video_stream.get("width", 0))
-            height = int(video_stream.get("height", 0))
+            width = _as_int(video_stream.get("width", 0))
+            height = _as_int(video_stream.get("height", 0))
             video_codec = video_stream.get("codec_name", "unknown")
             profile = video_stream.get("profile", "")
             pixel_format = video_stream.get("pix_fmt", "")
-            
+
             # Level can be numeric or string, handle gracefully
-            level_raw = video_stream.get("level", 0)
-            try:
-                level = float(level_raw)
-            except:
-                level = 0.0
-            
+            level = _as_float(video_stream.get("level", 0))
+
             # Frame Rate
-            fps_str = video_stream.get("avg_frame_rate", "0/0")
-            fps = 0.0
+            fps_str = str(video_stream.get("avg_frame_rate", "0/0"))
             if "/" in fps_str:
-                try:
-                    num, den = fps_str.split("/")
-                    if float(den) > 0:
-                        fps = float(num) / float(den)
-                except:
-                    pass
+                numerator, _, denominator = fps_str.partition("/")
+                den = _as_float(denominator)
+                fps = _as_float(numerator) / den if den > 0 else 0.0
             else:
-                try:
-                    fps = float(fps_str)
-                except:
-                    pass
+                fps = _as_float(fps_str)
 
             # Audio Details
             audio_codec = audio_stream.get("codec_name", "unknown")
-            audio_channels = int(audio_stream.get("channels", 0))
+            audio_channels = _as_int(audio_stream.get("channels", 0))
             
             # Container
             container = fmt.get("format_name", "unknown")
@@ -123,8 +145,7 @@ class MediaProbe:
                 FrameRate=round(fps, 2)
             )
             
-        except Exception as e:
-            # print(f"Probe failed for {filepath}: {e}")
+        except Exception:
             return None
 
     def shutdown(self):

@@ -3,16 +3,11 @@ Tests for arcade_scanner.database.sqlite_store
 Focus: indexes created, write-lock thread safety, cleanup_old_jobs TTL,
        upsert/remove round-trip.
 """
-import os
-import sqlite3
 import threading
 import time
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers & minimal mocks so we can import SQLiteStore without a real config
@@ -67,8 +62,17 @@ class TestSchema:
 
 class TestWriteLock:
     def test_write_lock_exists(self, store):
-        import threading
-        assert isinstance(store._write_lock, threading.Lock)
+        """A reentrant lock guards the shared connection.
+
+        Reentrancy matters: _notify_change fires inside the lock, so a callback
+        that re-enters the store would deadlock on a plain Lock.
+        """
+        assert isinstance(store._write_lock, type(threading.RLock()))
+
+        # Reentrant in practice, not just by type.
+        with store._write_lock:
+            with store._write_lock:
+                pass
 
     def test_concurrent_upserts_do_not_raise(self, store, tmp_path):
         """Multiple threads writing simultaneously should not corrupt the DB."""
@@ -180,3 +184,107 @@ class TestGetPage:
         self._insert_entries(store, 5)
         page = store.get_page(page=99, page_size=10)
         assert page == []
+
+
+# ---------------------------------------------------------------------------
+# Encoding queue claim semantics
+#
+# get_next_pending is documented as "Atomically claim the oldest pending job".
+# The server is a ThreadingTCPServer and scripts/mac_worker.py polls the queue,
+# so several workers can claim concurrently. A job handed to two workers means
+# the same file gets encoded twice, with both encodes racing on one output path.
+# ---------------------------------------------------------------------------
+
+class TestQueueClaimIsExclusive:
+    def test_single_job_goes_to_exactly_one_caller(self, store):
+        """With one pending job and many concurrent callers, only one wins."""
+        rounds = 40
+        n_threads = 8
+        double_claims = []
+
+        for round_nr in range(rounds):
+            store._conn.execute("DELETE FROM encoding_queue")
+            store.queue_encode(f"/fake/clip_{round_nr}.mp4", size_bytes=1234)
+
+            barrier = threading.Barrier(n_threads)
+            claims = []
+            claims_lock = threading.Lock()
+
+            def claim():
+                barrier.wait()  # maximise overlap on the select/update window
+                job = store.get_next_pending(worker_id=f"w{threading.get_ident()}")
+                if job is not None:
+                    with claims_lock:
+                        claims.append(job["id"])
+
+            threads = [threading.Thread(target=claim) for _ in range(n_threads)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            if len(claims) > 1:
+                double_claims.append((round_nr, claims))
+
+        assert not double_claims, (
+            f"{len(double_claims)}/{rounds} rounds handed one job to multiple "
+            f"workers, e.g. {double_claims[0]}"
+        )
+
+    def test_every_job_is_claimed_exactly_once(self, store):
+        """Draining a full queue from several threads yields no duplicates."""
+        n_jobs = 60
+        n_threads = 8
+
+        store._conn.execute("DELETE FROM encoding_queue")
+        for i in range(n_jobs):
+            store.queue_encode(f"/fake/bulk_{i}.mp4", size_bytes=i)
+
+        claims = []
+        claims_lock = threading.Lock()
+        barrier = threading.Barrier(n_threads)
+
+        def drain():
+            barrier.wait()
+            while True:
+                job = store.get_next_pending(worker_id="bulk")
+                if job is None:
+                    return
+                with claims_lock:
+                    claims.append(job["id"])
+
+        threads = [threading.Thread(target=drain) for _ in range(n_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        duplicates = [job_id for job_id in set(claims) if claims.count(job_id) > 1]
+        assert not duplicates, f"jobs claimed more than once: {duplicates}"
+        assert len(claims) == n_jobs, f"claimed {len(claims)} of {n_jobs} jobs"
+
+    def test_claimed_job_is_marked_downloading(self, store):
+        """A successful claim moves the row out of 'pending'."""
+        store._conn.execute("DELETE FROM encoding_queue")
+        store.queue_encode("/fake/single.mp4")
+
+        job = store.get_next_pending(worker_id="worker-a")
+        assert job is not None
+
+        row = store._conn.execute(
+            "SELECT status, worker_id FROM encoding_queue WHERE id = ?", (job["id"],)
+        ).fetchone()
+        assert row["status"] == "downloading"
+        assert row["worker_id"] == "worker-a"
+
+        assert store.get_next_pending(worker_id="worker-b") is None
+
+    def test_queue_encode_rejects_duplicate_pending_file(self, store):
+        """The same file is not queued twice while a job for it is active."""
+        store._conn.execute("DELETE FROM encoding_queue")
+
+        first = store.queue_encode("/fake/dupe.mp4")
+        second = store.queue_encode("/fake/dupe.mp4")
+
+        assert first is not None
+        assert second is None

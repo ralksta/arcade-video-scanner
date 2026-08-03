@@ -48,3 +48,15 @@ verify_*.py
 # Generated HTML report (user-specific)
 video_dashboard.html
 *.egg-info/
+
+# macOS AppleDouble / sync artifacts
+._*
+.DS_Store
+
+# Local runtime / backup junk
+screenlog.0
+backups/
+docker-compose.yml_back*
+
+# Local docker compose overrides (user-specific paths, never commit)
+docker-compose.override.yml

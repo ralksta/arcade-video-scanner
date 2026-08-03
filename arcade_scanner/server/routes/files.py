@@ -109,7 +109,12 @@ def handle_get(handler) -> bool:
 # ---------------------------------------------------------------------------
 
 def _handle_reveal(handler) -> None:
-    from arcade_scanner.server.response_helpers import require_auth  # noqa: PLC0415
+    # do_GET dispatches into this module without an auth gate of its own
+    # (api_handler.py:391-395), so the session check has to happen here — this
+    # endpoint shells out to open/explorer/xdg-open on the host.
+    if not handler.get_current_user():
+        handler.send_error(401, "Unauthorized")
+        return
 
     try:
         params = parse_qs(urlparse(handler.path).query)
@@ -172,13 +177,25 @@ def _handle_reveal(handler) -> None:
 
 
 def _handle_mark_optimized(handler) -> None:
-    import json
     from arcade_scanner.models.video_entry import VideoEntry  # lazy
+
+    # Writes to the media database, so it needs the same session check every
+    # other handler in this module performs.
+    if not handler.get_current_user():
+        handler.send_error(401, "Unauthorized")
+        return
 
     params = parse_qs(urlparse(handler.path).query)
     path = params.get("path", [None])[0]
     if path:
         abs_path = os.path.abspath(path)
+
+        # Only library files belong in the database — without this, any path
+        # handed to the endpoint becomes an entry.
+        if not is_path_allowed(abs_path):
+            print(f"🚨 Rejected mark_optimized outside scan directories: {abs_path}")
+            handler.send_error(403, "Forbidden - Path not in scan directories")
+            return
 
         entry = db.get(abs_path)
         if entry:
