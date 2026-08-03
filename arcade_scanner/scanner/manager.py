@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import os
+import threading
 import time
 from typing import Callable, Optional, List, Set
 
@@ -23,7 +24,12 @@ class ScannerManager:
     """
     def __init__(self):
         self.is_scanning = False
-        self._stop_event = asyncio.Event()
+        # A threading.Event, not an asyncio one: main.py runs the scan inside a
+        # daemon thread with its own event loop, so stop() is always called from
+        # a different thread than the scan. asyncio.Event.set() is not
+        # thread-safe. Nothing awaits this flag — it is only polled with
+        # is_set() — so a threading.Event is a drop-in and actually correct.
+        self._stop_event = threading.Event()
         self.probe = MediaProbe() # Own the probe (ProcessPool)
         self.video_inspector = VideoInspector(self.probe)
         self.image_inspector = ImageInspector()
