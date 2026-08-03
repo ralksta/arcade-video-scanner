@@ -1,10 +1,10 @@
 """
 SQLite-backed Media Store.
 
-Drop-in replacement for JSONStore with identical interface:
+Replaced the original full-file JSON store; the interface is unchanged:
     load(), save(), get_all(), get(path), upsert(entry), remove(path)
 
-Benefits over JSONStore:
+Benefits over the JSON format:
     - Instant row-level reads/writes (no full-file serialization)
     - O(1) indexed lookups by file_path
     - ACID guarantees for concurrent access
@@ -296,7 +296,7 @@ class SQLiteStore:
         return row is not None and row[0] == 'cancelled'
 
     # ------------------------------------------------------------------
-    # Public interface (matches JSONStore exactly)
+    # Public interface (unchanged from the original JSON store)
     # ------------------------------------------------------------------
 
     def load(self) -> None:
