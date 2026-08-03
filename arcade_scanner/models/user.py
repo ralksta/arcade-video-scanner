@@ -46,7 +46,6 @@ DEFAULT_SMART_COLLECTIONS = [
         "id": "col_apps_large_files",
         "name": "Large Files (>1GB)",
         "icon": "sd_storage",
-        "color": "#eab308", # Gold/Yellow - wait, user asked for Red. Let's stick to user request Red? User said "Large Files (Red)".
         "color": "#ef4444", # Red
         "category": "Library Overview",
         "criteria": {**_default_criteria(), "size": {"min": 1000, "max": None}}
