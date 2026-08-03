@@ -1,5 +1,7 @@
 import os
 import asyncio
+import concurrent.futures
+import threading
 import time
 import json
 from typing import List, AsyncIterator, Set
@@ -72,28 +74,60 @@ class AsyncFileSystem:
             # The walker thread blocks on put() when full → natural backpressure.
             queue: asyncio.Queue = asyncio.Queue(maxsize=500)
 
-            asyncio.create_task(self._walker_worker(abs_target, queue))
+            # Lets the walker thread find out that nobody is draining any more.
+            # Without it, a consumer that stops early (ScannerManager breaks out
+            # of this loop when its stop event fires) leaves the walker blocked
+            # on a full queue, holding its executor thread until the event loop
+            # dies — one lost worker per abandoned scan.
+            cancel = threading.Event()
+            walker = asyncio.create_task(
+                self._walker_worker(abs_target, queue, cancel)
+            )
 
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                yield item
-        
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    yield item
+            finally:
+                cancel.set()
+                walker.cancel()
+
+
         if self._skipped_dirs > 0:
             print(f"\n⚡ Skipped {self._skipped_dirs} unchanged directories (incremental scan)")
 
-    async def _walker_worker(self, root_dir: str, queue: asyncio.Queue) -> None:
+    async def _walker_worker(self, root_dir: str, queue: asyncio.Queue,
+                             cancel: threading.Event) -> None:
         """
         Worker that runs in a thread.
         Uses a bounded queue to prevent memory explosion with 50K+ files.
         Blocking put() inside a thread + run_in_executor provides natural backpressure.
+
+        `cancel` is set when the consumer stops reading; the walker checks it
+        while waiting on the queue so an abandoned scan gives its thread back.
         """
         loop = asyncio.get_event_loop()
+
+        def put_blocking(payload) -> bool:
+            """Hand one item to the queue. Returns False if the scan was abandoned."""
+            future = asyncio.run_coroutine_threadsafe(queue.put(payload), loop)
+            while True:
+                if cancel.is_set():
+                    future.cancel()
+                    return False
+                try:
+                    future.result(timeout=0.2)
+                    return True
+                except concurrent.futures.TimeoutError:
+                    continue  # Queue still full — re-check cancel, then keep waiting.
 
         def sync_walk():
             try:
                 for root, dirs, files in os.walk(root_dir):
+                    if cancel.is_set():
+                        return
                     abs_root = os.path.abspath(root)
 
                     # 1. Skip root if it matches any exclusion (O(n_excludes))
@@ -125,14 +159,17 @@ class AsyncFileSystem:
                         if dir_changed and not self._is_valid_size(full_path):
                             continue
                         # Blocking put provides natural backpressure on the bounded queue
-                        asyncio.run_coroutine_threadsafe(
-                            queue.put((full_path, dir_changed)), loop
-                        ).result()
+                        if not put_blocking((full_path, dir_changed)):
+                            return
             except Exception as e:
                 print(f"❌ Error walking {root_dir}: {e}")
 
         await loop.run_in_executor(None, sync_walk)
-        await queue.put(None)
+
+        # Skip the sentinel on an abandoned scan: nobody is reading, and the
+        # queue may be full, so this put would block forever.
+        if not cancel.is_set():
+            await queue.put(None)
 
     def _is_excluded(self, parent: str, dirname: str) -> bool:
         """Check if a subdirectory should be pruned (O(1) set lookup)."""

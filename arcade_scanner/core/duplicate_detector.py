@@ -4,7 +4,7 @@ Finds duplicate videos and images in the media library.
 """
 import os
 import hashlib
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Set, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
 
@@ -73,6 +73,79 @@ class DuplicateGroup:
             "recommended_keep": self.recommended_keep,
             "potential_savings_mb": self.potential_savings_mb,
         }
+
+
+if hasattr(int, "bit_count"):  # Python 3.10+
+    _popcount = int.bit_count
+else:  # pyproject declares requires-python >=3.8
+    def _popcount(value: int) -> int:
+        return bin(value).count("1")
+
+
+def _hamming(a: int, b: int) -> int:
+    """Bit distance between two hashes held as plain ints.
+
+    Equivalent to `imagehash.ImageHash.__sub__` but ~15x faster: that operator
+    goes through numpy, which dominates the near-miss pass when there are
+    hundreds of thousands of candidate comparisons.
+    """
+    return _popcount(a ^ b)
+
+
+class _BandedHashIndex:
+    """Candidate index for near-duplicate perceptual hashes (Hamming distance).
+
+    Splits each hash into `threshold + 1` contiguous bands and indexes every
+    band separately. Two hashes at distance <= threshold differ in at most
+    `threshold` bits, so those bits can touch at most `threshold` bands --
+    leaving at least one band identical. Looking a hash up in all of its own
+    bands therefore returns every true match (pigeonhole principle), with no
+    false negatives, while comparing only a small candidate set.
+
+    This replaces bucketing by a fixed hash *prefix*, which missed any pair
+    whose differing bits happened to fall inside that prefix.
+    """
+
+    __slots__ = ("_bands", "_bits", "_n_bands", "_exhaustive", "_all")
+
+    # Never go below this many bands: wider bands are more selective, so small
+    # thresholds still get few false candidates.
+    MIN_BANDS = 8
+
+    def __init__(self, bits: int, threshold: int):
+        self._bits = bits
+        # threshold + 1 bands is the minimum that guarantees one intact band.
+        self._n_bands = max(self.MIN_BANDS, threshold + 1)
+        # Degenerate case: more bands than bits leaves nothing to index on.
+        self._exhaustive = self._n_bands > bits
+        self._bands: List[Dict[int, List[int]]] = [
+            defaultdict(list) for _ in range(self._n_bands)
+        ]
+        self._all: List[int] = []
+
+    def _band_values(self, value: int):
+        """Yield (band_number, band_value) for each band of a hash integer."""
+        for k in range(self._n_bands):
+            start = k * self._bits // self._n_bands
+            end = (k + 1) * self._bits // self._n_bands
+            yield k, (value >> start) & ((1 << (end - start)) - 1)
+
+    def add(self, idx: int, value: int) -> None:
+        self._all.append(idx)
+        if self._exhaustive:
+            return
+        for k, band_value in self._band_values(value):
+            self._bands[k][band_value].append(idx)
+
+    def candidates(self, value: int) -> Set[int]:
+        """Indices that may be within the threshold. A superset, never a subset."""
+        if self._exhaustive:
+            return set(self._all)
+
+        found: Set[int] = set()
+        for k, band_value in self._band_values(value):
+            found.update(self._bands[k].get(band_value, ()))
+        return found
 
 
 class DuplicateDetector:
@@ -581,49 +654,50 @@ class DuplicateDetector:
                 for img in imgs:
                     used_paths.add(img.file_path)
         
-        # Phase 3: Near-miss detection using prefix bucketing
-        # Group remaining (ungrouped) images by hash prefix for candidate selection
-        # A 16-char hex hash = 64 bits. 4-char prefix = 16 bits → similar images share prefixes
-        if threshold > 0:
-            remaining = [(h, p, img) for h, p, img in hash_data if img.file_path not in used_paths]
-            
-            if remaining and progress_callback:
+        # Phase 3: Near-miss detection via banded candidate index
+        # A previous version bucketed by the first 4 hex chars and only compared
+        # within a bucket, on the assumption that differing prefixes implied a
+        # distance above the threshold. That is false: two hashes one bit apart
+        # land in different buckets whenever that bit falls in the leading 16,
+        # and were never compared. Banding indexes every part of the hash, so
+        # recall no longer depends on *where* the images differ.
+        remaining = [
+            (h, p, img) for h, p, img in hash_data if img.file_path not in used_paths
+        ] if threshold > 0 else []
+
+        if remaining:
+            if progress_callback:
                 progress_callback(f"Checking {len(remaining)} images for near-matches...", 95)
-            
-            # Build prefix buckets (use multiple prefix lengths for broader coverage)
-            prefix_buckets: Dict[str, List[int]] = defaultdict(list)
+
+            # A hex phash is 4 bits per character (16 chars = the usual 64 bits).
+            index = _BandedHashIndex(bits=len(remaining[0][0]) * 4, threshold=threshold)
+            values = []
             for idx, (hash_str, phash, img) in enumerate(remaining):
-                # Use first 4 chars as bucket key — images with different prefixes
-                # have hash distance > 16 bits, so can't match at threshold ≤ 5
-                prefix_buckets[hash_str[:4]].append(idx)
-            
+                value = int(hash_str, 16)
+                values.append(value)
+                index.add(idx, value)
+
             used_remaining = set()
-            for bucket_indices in prefix_buckets.values():
-                if len(bucket_indices) < 2:
+            for i, (h_i, p_i, img_i) in enumerate(remaining):
+                if i in used_remaining:
                     continue
-                
-                # Only compare within bucket (small groups)
-                for i_pos, i in enumerate(bucket_indices):
-                    if i in used_remaining:
+
+                similar = [img_i]
+                used_remaining.add(i)
+
+                # Sorted for deterministic grouping across runs.
+                for j in sorted(index.candidates(values[i])):
+                    if j == i or j in used_remaining:
                         continue
-                    
-                    h_i, p_i, img_i = remaining[i]
-                    similar = [img_i]
-                    used_remaining.add(i)
-                    
-                    for j in bucket_indices[i_pos + 1:]:
-                        if j in used_remaining:
-                            continue
-                        h_j, p_j, img_j = remaining[j]
-                        diff = p_i - p_j
-                        if diff <= threshold:
-                            similar.append(img_j)
-                            used_remaining.add(j)
-                    
-                    if len(similar) > 1:
-                        group = self._create_image_group(similar, match_type="hash")
-                        groups.append(group)
-        
+                    # Banding only narrows the field; the real distance decides.
+                    if _hamming(values[i], values[j]) <= threshold:
+                        similar.append(remaining[j][2])
+                        used_remaining.add(j)
+
+                if len(similar) > 1:
+                    group = self._create_image_group(similar, match_type="hash")
+                    groups.append(group)
+
         return groups
     
     def _create_image_group(self, images: List, match_type: str) -> DuplicateGroup:
