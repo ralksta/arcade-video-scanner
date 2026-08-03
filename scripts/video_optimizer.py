@@ -1994,7 +1994,7 @@ def main():
     try:
         import winsound
         winsound.MessageBeep()
-    except:
+    except Exception:
         pass
 
 def notify_server(port, file_path):

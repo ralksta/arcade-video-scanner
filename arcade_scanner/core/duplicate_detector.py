@@ -412,7 +412,7 @@ class DuplicateDetector:
             # Cleanup
             try:
                 os.remove(temp_path)
-            except:
+            except Exception:
                 pass
 
             return hash_str
@@ -440,7 +440,7 @@ class DuplicateDetector:
                 try:
                     phash_obj = imagehash.hex_to_hash(hash_str)
                     hash_data.append((f, phash_obj))
-                except:
+                except Exception:
                     pass
 
         # Group by similar hashes

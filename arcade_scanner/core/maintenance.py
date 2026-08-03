@@ -85,7 +85,7 @@ def purge_broken_media():
                         try:
                             os.remove(file_path)
                             removed_count += 1
-                        except:
+                        except Exception:
                             pass
     if removed_count > 0:
         print(f"🧹 Cleaned up {removed_count} failed media generation(s)")
