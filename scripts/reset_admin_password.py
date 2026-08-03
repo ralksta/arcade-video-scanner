@@ -11,11 +11,11 @@ from arcade_scanner.models.user import User
 
 def reset_password(username="admin", new_password="admin"):
     print(f"🔧 Resetting password for '{username}'...")
-    
+
     # Reload from disk to be sure
     # user_db.load() # user_db is a singleton, might need forcing?
     # Actually, verify if user_db is loaded.
-    
+
     user = user_db.get_user(username)
     if not user:
         print(f"❌ User '{username}' not found. Creating it.")
@@ -33,7 +33,7 @@ def reset_password(username="admin", new_password="admin"):
         pwd_hash = user_db.hash_password(new_password, salt)
         user.password_hash = binascii.hexlify(pwd_hash).decode('ascii')
         user.salt = binascii.hexlify(salt).decode('ascii')
-    
+
     user_db.add_user(user)
     print(f"✅ Password for '{username}' set to '{new_password}'")
 

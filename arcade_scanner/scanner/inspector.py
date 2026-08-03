@@ -6,7 +6,7 @@ class MediaInspector(Protocol):
     Protocol for media analysis tools.
     Implementations (VideoInspector, ImageInspector) must provide this interface.
     """
-    
+
     def can_handle(self, filepath: str) -> bool:
         """Return True if this inspector can process the file."""
         ...

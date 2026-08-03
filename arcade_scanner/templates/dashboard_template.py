@@ -31,7 +31,7 @@ from arcade_scanner.templates.components import (
 
 def generate_html_report(results, report_file, server_port=8000):
     total_mb = sum(r["Size_MB"] for r in results)
-    
+
     # Aggregate Folder Data
     folders_data = {}
     for r in results:
@@ -40,10 +40,10 @@ def generate_html_report(results, report_file, server_port=8000):
             folders_data[fdir] = {"count": 0, "size_mb": 0}
         folders_data[fdir]["count"] += 1
         folders_data[fdir]["size_mb"] += r["Size_MB"]
-    
+
     # Prepare JSON Data
     folders_json = json.dumps(folders_data)
-    
+
     # Strip user-specific data from static dump for multi-user support
     # (The frontend will hydrate this via /api/user/data)
     clean_results = []
@@ -56,17 +56,17 @@ def generate_html_report(results, report_file, server_port=8000):
         r_clean["hidden"] = False # aliased from vaulted
         r_clean["tags"] = []
         clean_results.append(r_clean)
-        
+
     user_settings_json = json.dumps(config.settings.model_dump())
-    
+
     # Logic for enabled state: Must be installed AND enabled in settings
     opt_avail_str = 'true' if config.optimizer_available else 'false'
     opt_enabled_str = 'true' if (config.optimizer_available and config.settings.enable_optimizer) else 'false'
-    
+
     # Determine Active Theme
     active_theme_name = config.settings.theme
     active_theme = THEMES.get(active_theme_name, THEMES['arcade'])
-    
+
     # 1. Prepare Header (Themed)
     header_html = render_header(
         active_theme,
@@ -74,7 +74,7 @@ def generate_html_report(results, report_file, server_port=8000):
         count=len(results),
         size_gb=f"{total_mb/1024:.1f}"
     )
-    
+
     # 2. Prepare Cinema Modal (Conditional Optimize Button)
     opt_btn_html = ""
     if config.optimizer_available and config.settings.enable_optimizer:
@@ -91,11 +91,11 @@ def generate_html_report(results, report_file, server_port=8000):
         """
 
     cinema_modal_html = CINEMA_MODAL_COMPONENT.format(opt_btn=opt_btn_html)
-    
+
     # 3. Assemble Main Content
     # Render Navigation using Theme
     nav_html = render_navigation(active_theme)
-    
+
     main_body_html = f"""
     {nav_html}
 
@@ -172,7 +172,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <!-- Hidden frame for form submissions if needed -->
     <iframe name='h_frame' style='display:none;'></iframe>
     """
-    
+
     # 4. Prepare Scripts
     scripts_html = f"""
         window.SERVER_PORT = {server_port};
@@ -182,13 +182,13 @@ def generate_html_report(results, report_file, server_port=8000):
         window.OPTIMIZER_AVAILABLE = {opt_avail_str};
         window.ENABLE_OPTIMIZER = {opt_enabled_str};
     """
-    
+
     full_scripts_block = f"""
     <script>
     {scripts_html}
     </script>
     """
-    
+
     external_scripts = f"""
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -217,7 +217,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/collections.js?v={int(time.time())}"></script>
     <script src="/static/context_menu.js?v={int(time.time())}"></script>
     """
-    
+
     # Combine content using Theme-aware Base Layout
     final_html = render_base_layout(
         active_theme,

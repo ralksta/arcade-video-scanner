@@ -364,18 +364,18 @@ Environment Variables:
   ARCADE_SERVER, ARCADE_USER, ARCADE_PASSWORD
         """
     )
-    
+
     env_server = os.environ.get("ARCADE_SERVER")
 
-    parser.add_argument("--server", 
+    parser.add_argument("--server",
                        default=env_server,
-                       required=not env_server, 
+                       required=not env_server,
                        help="Arcade server URL (e.g. http://192.168.1.100:8000)")
-    parser.add_argument("--user", 
-                       default=os.environ.get("ARCADE_USER", ""), 
+    parser.add_argument("--user",
+                       default=os.environ.get("ARCADE_USER", ""),
                        help="Username for authentication")
-    parser.add_argument("--password", 
-                       default=os.environ.get("ARCADE_PASSWORD", ""), 
+    parser.add_argument("--password",
+                       default=os.environ.get("ARCADE_PASSWORD", ""),
                        help="Password for authentication")
     parser.add_argument("--poll-interval", type=int, default=30, help="Seconds between polls (default: 30)")
     parser.add_argument("--work-dir", default=os.path.expanduser("~/encoding-queue"),

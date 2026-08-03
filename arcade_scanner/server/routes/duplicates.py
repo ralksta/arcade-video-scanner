@@ -5,7 +5,7 @@ from arcade_scanner.server.response_helpers import send_json
 
 def _get_deps():
     from arcade_scanner.server.api_handler import (
-        _dup_mgr, db, user_db, MAX_REQUEST_SIZE, 
+        _dup_mgr, db, user_db, MAX_REQUEST_SIZE,
         background_duplicate_scan, clear_duplicate_cache
     )
     from arcade_scanner.security import is_path_allowed
@@ -31,7 +31,7 @@ def handle_get(handler) -> bool:
             total_videos = sum(1 for g in groups_data if g.get("media_type") == "video")
             total_images = sum(1 for g in groups_data if g.get("media_type") == "image")
             potential_savings = sum(g.get("potential_savings_mb", 0) for g in groups_data)
-            
+
             response = {
                 "summary": {
                     "total_groups": total_groups,
@@ -47,7 +47,7 @@ def handle_get(handler) -> bool:
             print(f"❌ Error returning duplicates: {e}")
             handler.send_error(500, str(e))
         return True
-    
+
     return False
 
 def handle_post(handler) -> bool:
@@ -73,7 +73,7 @@ def handle_post(handler) -> bool:
                 batch_offset = int(data.get("batch_offset", 0))
             except (ValueError, json.JSONDecodeError) as e:
                 print(f"⚠️ Could not parse duplicate scan body: {e}")
-                pass 
+                pass
 
         u = user_db.get_user(user_name)
         user_targets = None
@@ -84,7 +84,7 @@ def handle_post(handler) -> bool:
         t = threading.Thread(target=background_duplicate_scan, args=(user_targets, batch_offset))
         t.daemon = True
         t.start()
-        
+
         handler.send_response(202)
         handler.send_header("Content-Type", "application/json")
         handler.end_headers()
@@ -102,19 +102,19 @@ def handle_post(handler) -> bool:
             if content_length > MAX_REQUEST_SIZE:
                 handler.send_error(413, "Request too large")
                 return True
-            
+
             body = handler.rfile.read(content_length).decode("utf-8")
             data = json.loads(body)
             paths_to_delete = data.get("paths", [])
-            
+
             if not paths_to_delete:
                 handler.send_error(400, "No paths provided")
                 return True
-            
+
             deleted = []
             failed = []
             total_freed_mb = 0.0
-            
+
             for p in paths_to_delete:
                 try:
                     abs_path = os.path.abspath(p)
@@ -132,10 +132,10 @@ def handle_post(handler) -> bool:
                         failed.append({"path": p, "error": "File not found"})
                 except Exception as e:
                     failed.append({"path": p, "error": str(e)})
-            
+
             if deleted:
                 db.save()
-            
+
             response = {
                 "success": True,
                 "deleted": deleted,
@@ -169,14 +169,14 @@ def handle_post(handler) -> bool:
             body = handler.rfile.read(content_length).decode("utf-8")
             data = json.loads(body)
             paths_to_delete = data.get("paths", [])
-            
+
             if not paths_to_delete:
                 handler.send_error(400, "No paths provided")
                 return True
-            
+
             deleted = []
             failed = []
-            
+
             for p in paths_to_delete:
                 try:
                     abs_path = os.path.abspath(p)
@@ -193,7 +193,7 @@ def handle_post(handler) -> bool:
                         failed.append({"path": p, "error": "File not found"})
                 except Exception as e:
                     failed.append({"path": p, "error": str(e)})
-            
+
             if deleted:
                 db.save()
             response = {"success": True, "deleted": deleted, "failed": failed}

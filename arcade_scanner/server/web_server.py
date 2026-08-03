@@ -36,14 +36,14 @@ def start_server(use_ssl=False):
         PORT_ACTUAL = new_port
     else:
         PORT_ACTUAL = PORT
-    
+
     # SSL Configuration
     if use_ssl:
         import ssl
         import subprocess
-        
+
         cert_file = os.path.join(config.hidden_data_dir, "server.pem")
-        
+
         # Generate self-signed cert if missing
         if not os.path.exists(cert_file):
             print("🔒 Generating self-signed SSL certificate...")
@@ -60,16 +60,16 @@ def start_server(use_ssl=False):
                 print("   Make sure 'openssl' is installed and in your PATH.")
                 print("   Falling back to HTTP.")
                 use_ssl = False
-        
+
         if use_ssl and os.path.exists(cert_file):
             print("🔒 SSL Enabled")
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             context.load_cert_chain(certfile=cert_file)
             server.socket = context.wrap_socket(server.socket, server_side=True)
-    
+
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
-    
+
     protocol = "https" if use_ssl else "http"
     print(f"Server started on port {PORT_ACTUAL} ({protocol})")
     return server, PORT_ACTUAL

@@ -313,7 +313,7 @@ def detect_encoder() -> str:
         if encoder == 'libx265':
             print(f"{R}No hardware encoder detected. Using software encoder (slower).{NC}")
         return encoder
-        
+
     # --- FALLBACK if running completely isolated ---
     if sys.platform == 'darwin':
         return 'videotoolbox'
@@ -586,15 +586,15 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
 
     arrow = '█' * int(percent/100 * bar_length)
     spaces = '░' * (bar_length - len(arrow))
-    
+
     if current > 0 and elapsed > 0:
         eta = (elapsed / current) * (total - current)
     else:
         eta = -1
-    
+
     elapsed_str = format_time(elapsed)
     eta_str = format_time(eta)
-    
+
     # \r = go to line start, \033[2K = erase entire line → no resize artefacts
     sys.stdout.write(f"\r\033[2K {G}{encoder}{NC} [{arrow}{spaces}] {BG}{int(percent)}%{NC} | {speed} | {bitrate} | {elapsed_str} / {eta_str}")
     sys.stdout.flush()
@@ -674,11 +674,11 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
         color_args: Optional color metadata args (HDR passthrough). Default: BT.709 trio.
     """
     cmd = ['ffmpeg', '-y']
-    
+
     # Trim input if needed (fast seek)
     if ss: cmd.extend(['-ss', str(ss)])
     if to: cmd.extend(['-to', str(to)])
-    
+
     if video_mode == 'copy':
         # Passthrough video
         cmd.extend(['-i', str(input_path)])
@@ -687,7 +687,7 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
         # Re-encode video
         cmd.extend(profile['hwaccel_input'])
         cmd.extend(['-i', str(input_path)])
-        
+
         # Map video codec
         cmd.extend(['-c:v', profile['codec']])
         cmd.extend(profile['encoder_args'])
@@ -704,12 +704,12 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
             cmd.extend([profile['quality_flag'], str(quality_value)])
 
         cmd.extend(['-vf', profile['video_filter']])
-        
+
         # Bitrate-controlled VBR: -b:v sets the average target, -maxrate caps the peak.
         # This is the PRIMARY size control mechanism when target_bitrate_kbps is set.
         if target_bitrate_kbps and target_bitrate_kbps > 0 and not is_svtav1:
             cmd.extend(['-b:v', f'{int(target_bitrate_kbps)}k'])
-        
+
         # Peak limiter: caps instantaneous bitrate spikes above the target average.
         if maxrate_kbps and maxrate_kbps > 0:
             cmd.extend(['-maxrate', f'{int(maxrate_kbps)}k'])
@@ -717,7 +717,7 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
                 cmd.extend(['-bufsize', f'{int(bufsize_kbps)}k'])
             else:
                 cmd.extend(['-bufsize', f'{int(maxrate_kbps * 2)}k'])
-    
+
     # Audio settings
     # moderate = -19 LUFS (gentle midpoint), enhanced = -16 LUFS (streaming target).
     # With a loudness measurement (two-pass), loudnorm runs in linear mode.
@@ -886,7 +886,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     """Process a single video file. Returns (success, bytes_saved)."""
     input_path = Path(input_path)
     is_trim = ss is not None or to is not None
-    
+
     if not input_path.exists():
         return (False, 0)
 
@@ -910,7 +910,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         output_path = input_path.parent / f"{input_path.stem}_opt.mp4"
     else:
         output_path = input_path.parent / f"{input_path.stem}_opt.mp4"
-        
+
         # Skip if output already exists (Skip check if trimming)
         if output_path.exists():
             print(f"{Y}Skipping:{NC} {input_path.name} (_opt.mp4 already exists)")
@@ -920,7 +920,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             last_encode_result['reason'] = 'Output file already exists'
             last_encode_result['duration'] = 0
             return (False, 0)
-    
+
     size_before = input_path.stat().st_size
     size_mb = size_before / (1024 * 1024)
 
@@ -963,29 +963,29 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                     bufsize_kbps = maxrate_kbps * 2.0
                 else:
                     bufsize_kbps = maxrate_kbps * 1.5
-                
+
                 print(f"{Y}Bitrate Analysis:{NC} Source avg={bitrate_profile.avg_bitrate_kbps:.0f}kbps, max={bitrate_profile.max_bitrate_kbps:.0f}kbps, VBR={bitrate_profile.is_variable_bitrate}")
                 print(f"{Y}Maxrate Cap:{NC} {maxrate_kbps:.0f}kbps (ensures output ≤ source)")
         except Exception as e:
             print(f"{Y}⚠️ Bitrate analysis skipped:{NC} {e}")
-    
+
     # Calculate Trim Duration and Projected Size
     trim_start_sec = parse_time_to_seconds(ss)
     trim_end_sec = parse_time_to_seconds(to)
-    
+
     start_offset = trim_start_sec # Original starts at this offset
-    
+
     if trim_end_sec > 0:
         trim_duration = trim_end_sec - trim_start_sec
     else:
         trim_duration = info['duration'] - trim_start_sec
-        
+
     if trim_duration <= 0:
         trim_duration = info['duration'] # Fallback
-    
+
     # Prorate original size for fair comparison
     projected_original_size = size_before * (trim_duration / info['duration']) if info['duration'] > 0 else size_before
-    
+
     # Skip small files (UNLESS trimming - user intent overrides size check usually, but let's keep it sane)
     # If projected size is tiny, maybe skip? But for explicit trim, we usually want it done.
     if not is_trim and size_mb < min_size_mb:
@@ -996,7 +996,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         last_encode_result['reason'] = f'File too small ({size_mb:.1f} MB < {min_size_mb} MB)'
         last_encode_result['duration'] = 0
         return (False, 0)
-    
+
     print(f"\n{G}Target:{NC} {input_path.name} ({format_size(size_before)})")
     if is_trim:
         print(f" {Y}Trim Segment:{NC} {format_time(trim_start_sec)} - {format_time(trim_start_sec + trim_duration)} (Dur: {format_time(trim_duration)})")
@@ -1004,7 +1004,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         size_to_compare = projected_original_size
     else:
         size_to_compare = size_before
-        
+
     print("-" * 52)
 
     # --- Cap maxrate to target bitrate if source is higher ---
@@ -1106,29 +1106,29 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             return q <= end_q
         else:
             return q >= end_q
-    
+
     # Video Copy Mode Bypass
     if video_mode == 'copy':
         print(f"{BG}>>> COPY MODE: Skipping re-encode logic.{NC}")
         file_start_time = time.time()
-        
+
         cmd = build_ffmpeg_command(input_path, output_path, profile, quality, copy_audio, audio_mode, ss, to, video_mode='copy')
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        
+
         # Simple progress loop (copy/trim tends to be fast but we still want feedback)
         # Note: ffmpeg output parsing logic below relies partially on encoding stats.
         # Copy mode outputs less stats, but we can try reuse the existing loop.
-        
+
         cur_stats = {"bitrate": "copy", "speed": "N/A"}
         encode_start = time.time()
         captured_errors = []
-        
+
         # Start Non-Blocking Reader
         q = queue.Queue()
         t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
         t.daemon = True
         t.start()
-        
+
         try:
              while True:
                 try:
@@ -1143,11 +1143,11 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
                 if not line:
                     break
-                
+
                 # Capture potential errors
                 if line.strip() and not any(k in line for k in ['bitrate=', 'speed=', 'out_time_ms=', 'total_size=']):
                      captured_errors.append(line.strip())
-                     
+
                 # Only duration/size is really reliable in copy mode progress?
                 if 'out_time_ms=' in line:
                     val = line.split('=')[1].strip()
@@ -1159,30 +1159,30 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                             show_progress(ms / 1000000, duration_to_show, 'copy', "copy", "fast", elapsed)
                          except ValueError:
                             pass
-        
+
         except KeyboardInterrupt:
             process.terminate()
             if output_path.exists(): output_path.unlink()
             return (False, 0)
-            
+
         process.wait()
-        
+
         if process.returncode == 0:
              file_time = time.time() - file_start_time
              print(f" {BG}>>> SUCCESS (COPY)! Saved to {output_path.name} in {format_time(file_time)}.{NC}")
              batch_stats['total_time'] += file_time
              batch_stats['success'] += 1
-             
+
              # Calculate size diff just for logs, though savings aren't guaranteed
              size_after = output_path.stat().st_size
              saved_bytes = size_before - size_after
-             
+
              last_encode_result['filename'] = input_path.name
              last_encode_result['status'] = 'success'
              last_encode_result['reason'] = 'Video Copy (Passthrough)'
              last_encode_result['duration'] = file_time
              last_encode_result['saved_bytes'] = saved_bytes # Might be negative if container overhead
-             
+
              if port: notify_server(port, input_path)
              return (True, 0)
         else:
@@ -1802,19 +1802,19 @@ def print_batch_summary():
     print(f"{'='*52}")
 
 
-def write_encode_log(filename, status, encoder_name, quality=None, ssim=None, 
+def write_encode_log(filename, status, encoder_name, quality=None, ssim=None,
                      saved_pct=None, saved_bytes=None, duration=0, reason=None):
     """Write encoding result to a persistent log file. Appends to daily log."""
     log_date = datetime.now().strftime("%Y-%m-%d")
     log_file = LOG_DIR / f"encode_{log_date}.log"
-    
+
     timestamp = datetime.now().strftime("%H:%M:%S")
-    
+
     with open(log_file, 'a', encoding='utf-8') as f:
         f.write(f"\n[{timestamp}] {filename}\n")
         f.write(f"  Status:   {status.upper()}\n")
         f.write(f"  Encoder:  {encoder_name}\n")
-        
+
         if status == 'success':
             if quality:
                 f.write(f"  Quality:  Q={quality}\n")
@@ -1826,10 +1826,10 @@ def write_encode_log(filename, status, encoder_name, quality=None, ssim=None,
                 f.write(f"  Saved:    {format_size(saved_bytes)}\n")
         elif reason:
             f.write(f"  Reason:   {reason}\n")
-        
+
         f.write(f"  Duration: {format_time(duration)}\n")
         f.write("-" * 50 + "\n")
-    
+
     return log_file
 
 
@@ -1906,10 +1906,10 @@ def main():
 
     if args.min_size != DEFAULT_MIN_SIZE_MB:
         print(f"{Y}Min size: {args.min_size} MB{NC}")
-        
+
     if args.ss or args.to:
         print(f"{Y}Trim Active: {args.ss} -> {args.to}{NC}")
-    
+
     files = args.files
     if not files:
         print(f"{G}Drag and drop files or enter paths (space separated):{NC}")
@@ -1919,25 +1919,25 @@ def main():
             files = shlex.split(raw_input)
         except EOFError:
             return
-    
+
     # Filter out flags from files
     files = [f for f in files if not f.startswith('-')]
-    
+
     for f in files:
         batch_stats['processed'] += 1
         success, saved_bytes = process_file(
-            f, profile, 
-            min_size_mb=args.min_size, 
-            copy_audio=args.copy_audio, 
-            port=args.port, 
-            audio_mode=args.audio_mode, 
-            ss=args.ss, 
+            f, profile,
+            min_size_mb=args.min_size,
+            copy_audio=args.copy_audio,
+            port=args.port,
+            audio_mode=args.audio_mode,
+            ss=args.ss,
             to=args.to,
             video_mode=args.video_mode,
             q_override=args.q,
             presearch=not args.no_presearch
         )
-        
+
         # Write to encode log (for both batch controller and single-file calls)
         if last_encode_result['filename']:
             log_file = write_encode_log(
@@ -1971,13 +1971,13 @@ def main():
     # Print batch summary if multiple files
     if len(files) > 1:
         print_batch_summary()
-    
+
     # Show log file location
     if files and last_encode_result['filename']:
         log_date = datetime.now().strftime("%Y-%m-%d")
         log_path = LOG_DIR / f"encode_{log_date}.log"
         print(f"\n{G}📝 Log:{NC} {log_path}")
-    
+
     # Open folder and play sound
     if files:
         last_path = files[-1]
@@ -2001,14 +2001,14 @@ def notify_server(port, file_path):
     """Notify the local server that a file has been optimized."""
     if not port:
         return
-    
+
     try:
         import urllib.request
         from urllib.parse import quote
-        
+
         encoded_path = quote(str(Path(file_path).resolve()))
         url = f"http://localhost:{port}/api/mark_optimized?path={encoded_path}"
-        
+
         # Simple fire and forget request with short timeout
         with urllib.request.urlopen(url, timeout=2):
             pass

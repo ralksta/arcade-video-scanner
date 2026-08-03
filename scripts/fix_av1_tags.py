@@ -39,7 +39,7 @@ def test_decode(file_path: Path) -> bool:
 
 def fix_file(file_path: Path):
     print(f"\n{C}Analyzing: {file_path.name}{NC}")
-    
+
     # Check if we already have it correctly as AV1
     probe_cmd = ["ffprobe", "-v", "error", "-show_entries", "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
     try:
@@ -57,10 +57,10 @@ def fix_file(file_path: Path):
 
     print(f"  {Y}⚠ Decode errors detected. Testing AV1 container remux...{NC}")
     tmp_path = file_path.with_suffix('.tmp_remux.mp4')
-    
+
     # 2. Remux with 'av01' tag
     remux_cmd = [
-        "ffmpeg", "-v", "error", "-i", str(file_path), 
+        "ffmpeg", "-v", "error", "-i", str(file_path),
         "-c", "copy", "-tag:v", "av01", "-y", str(tmp_path)
     ]
     subprocess.run(remux_cmd, capture_output=True)
@@ -79,7 +79,7 @@ def main():
     print(f"{C}======================================================{NC}")
     print(f"{C} Arcade-Scanner AV1 Tag Fixer{NC}")
     print(f"{C}======================================================{NC}")
-    
+
     if len(sys.argv) > 1:
         directories = [Path(d) for d in sys.argv[1:]]
     else:
@@ -108,7 +108,7 @@ def main():
         p = Path(path_arg)
         if not p.exists():
             continue
-            
+
         if p.is_file():
             # Support direct files passed via arguments
             fix_file(p)

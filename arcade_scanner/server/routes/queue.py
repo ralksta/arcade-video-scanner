@@ -484,7 +484,7 @@ def handle_post(handler) -> bool:
                     print(f"⚠️ Could not create relative review dir ({e}), falling back to global {config.review_dir}")
                     review_job_dir = os.path.join(config.review_dir, f"job_{job_id}_{orig_stem}")
                     os.makedirs(review_job_dir, exist_ok=True)
-                
+
                 target_orig_path = os.path.join(review_job_dir, f"{orig_stem}_original{orig_ext}")
                 opt_path = os.path.join(review_job_dir, f"{orig_stem}_optimized.mp4")
 
@@ -503,7 +503,7 @@ def handle_post(handler) -> bool:
                 if os.path.exists(original_path):
                     import shutil
                     shutil.move(original_path, target_orig_path)
-                    
+
                     # 3. Update Database for original
                     # We need to preserve metadata, so we get the old entry, update it, and upsert
                     orig_entry = db.get(original_path)
@@ -511,12 +511,12 @@ def handle_post(handler) -> bool:
                         old_entry_dict = orig_entry.model_dump(by_alias=True)
                         # Remove old record (since path is PK)
                         db.remove(original_path)
-                        
+
                         # Update fields
                         old_entry_dict["FilePath"] = target_orig_path
                         old_entry_dict["Status"] = "REVIEW"
                         old_entry_dict["OriginalPath"] = original_path
-                        
+
                         from arcade_scanner.models.video_entry import VideoEntry
                         db.upsert(VideoEntry(**old_entry_dict))
 
@@ -528,7 +528,7 @@ def handle_post(handler) -> bool:
                         opt_entry_dict["Status"] = "REVIEW"
                         # Reset some props for the optimized version
                         opt_entry_dict["Bitrate_Mbps"] = 0 # Will be updated by scanner/analyzed later
-                        
+
                         db.upsert(VideoEntry(**opt_entry_dict))
                 else:
                     print(f"⚠️ Original file not found at {original_path}, skipping move.")
@@ -554,7 +554,7 @@ def handle_post(handler) -> bool:
                 result_message=f"Optimized: {opt_size/(1024*1024):.1f}MB (saved {saved/(1024*1024):.1f}MB)"
             )
             print(f"✅ Upload received for job {job_id}: {os.path.basename(opt_path)} ({opt_size/(1024*1024):.1f} MB)")
-            
+
             # Flush media cache so UI sees new entries (REVIEW status) immediately
             _media_cache.invalidate()
 

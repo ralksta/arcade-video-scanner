@@ -418,10 +418,10 @@ class SQLiteStore:
 
         with self._write_lock:
             self._ensure_connection()
-            
+
             placeholders = ", ".join("?" for _ in _COLUMNS)
             col_names = ", ".join(name for name, _ in _COLUMNS)
-            
+
             data = []
             for entry in entries:
                 if isinstance(entry, MediaAsset):

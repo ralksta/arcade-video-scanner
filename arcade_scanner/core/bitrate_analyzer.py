@@ -69,7 +69,7 @@ class BitrateProfile:
         if self.avg_bitrate_kbps == 0:
             return False
         return (self.bitrate_variance / self.avg_bitrate_kbps) > 0.25
-    
+
     @property
     def pixel_count(self) -> int:
         """Total pixels per frame."""

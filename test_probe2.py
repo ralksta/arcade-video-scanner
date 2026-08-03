@@ -36,6 +36,6 @@ async def test():
         print("FINAL RES:", final_res)
     except Exception as e:
         print("EXCEPTION:", e)
-    
+
 if __name__ == "__main__":
     asyncio.run(test())
