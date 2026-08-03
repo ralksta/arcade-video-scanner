@@ -542,7 +542,7 @@ def get_multi_ssim(
         process.wait()
 
         # Clear the progress line
-        sys.stdout.write(f"\r\033[2K")
+        sys.stdout.write("\r\033[2K")
         sys.stdout.flush()
 
         match = re.search(r'All:([\d.]+)', stderr_out)
@@ -1861,7 +1861,7 @@ def main():
     if args.port:
         print(f"🔌 Notification Port: {args.port}")
     else:
-        print(f"⚠️ No notification port provided. Status updates will be disabled.")
+        print("⚠️ No notification port provided. Status updates will be disabled.")
 
     # Select encoder
     if args.encoder == 'auto':

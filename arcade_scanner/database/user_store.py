@@ -63,7 +63,7 @@ class UserStore:
         if len(self.get_all_users()) > 0:
             return
 
-        print(f"📦 Found legacy users.json, migrating to SQLite...")
+        print("📦 Found legacy users.json, migrating to SQLite...")
         try:
             with open(self.json_path, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
@@ -369,7 +369,7 @@ class UserStore:
                     modified = True
 
             if modified:
-                print(f"📦 Migrated sensitive settings to 'admin'.")
+                print("📦 Migrated sensitive settings to 'admin'.")
                 self.add_user(admin)
 
         except Exception as e:

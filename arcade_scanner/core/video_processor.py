@@ -140,11 +140,11 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
 
         cached_entry = cache.get(filepath, {})
 
-        if rebuild_mode == 'thumbs':
-            existing_preview = cached_entry.get("preview", "")
-        elif rebuild_mode == 'previews':
+        if rebuild_mode == 'previews':
             existing_thumb = cached_entry.get("thumb", "")
-        else:
+        elif rebuild_mode != 'thumbs':
+            # Only a full run may short-circuit on the cache; an explicit
+            # rebuild must fall through and regenerate.
             if filepath in cache:
                 entry = cached_entry
                 if entry.get("mtime") == mtime and entry.get("size_mb") == size_mb and "codec" in entry:

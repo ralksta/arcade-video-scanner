@@ -68,7 +68,7 @@ class ScannerManager:
             fs_scanner.allow_images = scan_images
             if scan_images:
                 print("📸 Image scanning enabled (Fast Lane Active)")
-        except Exception as e:
+        except Exception:
             pass
 
         # 1. Load Cache

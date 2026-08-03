@@ -147,7 +147,7 @@ class ImageInspector(MediaInspector):
                 try:
                     asset = await self._build_asset_from_props(filepath, props)
                     future.set_result(asset)
-                except Exception as e:
+                except Exception:
                     future.set_result(None)
 
         except Exception as e:

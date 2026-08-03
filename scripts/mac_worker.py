@@ -407,7 +407,7 @@ Environment Variables:
     if schedule_window:
         print(f"  Schedule:  {args.schedule}")
     if args.pause_on_battery:
-        print(f"  Battery:   pause when unplugged")
+        print("  Battery:   pause when unplugged")
     print()
 
     # Auth

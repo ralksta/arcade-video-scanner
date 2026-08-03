@@ -73,7 +73,6 @@ def convert_to_gif(
     try:
         print(f"🎞️ Starting GIF conversion: {os.path.basename(output_path)}", flush=True)
 
-        gif_export_dir = os.path.dirname(output_path)
         input_args = ["ffmpeg", "-y"]
         if start_time is not None:
             input_args.extend(["-ss", str(start_time)])

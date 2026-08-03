@@ -29,7 +29,7 @@ def reset_password(username="admin", new_password="admin"):
             is_admin=True
         )
     else:
-        print(f"👤 User found. Updating password.")
+        print("👤 User found. Updating password.")
         salt = os.urandom(16)
         pwd_hash = user_db.hash_password(new_password, salt)
         user.password_hash = binascii.hexlify(pwd_hash).decode('ascii')

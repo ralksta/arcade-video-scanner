@@ -100,10 +100,10 @@ def main():
 
         if not directories:
             print(f"{R}No scan directories found. Please provide path as argument:{NC}")
-            print(f"  python3 fix_av1_tags.py /path/to/videos")
+            print("  python3 fix_av1_tags.py /path/to/videos")
             sys.exit(1)
 
-    print(f"Scanning provided paths:")
+    print("Scanning provided paths:")
     for path_arg in sys.argv[1:] if len(sys.argv) > 1 else directories:
         p = Path(path_arg)
         if not p.exists():

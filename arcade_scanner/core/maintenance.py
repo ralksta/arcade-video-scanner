@@ -49,7 +49,7 @@ def purge_media():
 
 def purge_thumbnails():
     """Deletes all thumbnail files only."""
-    print(f"🧹 Purging thumbnails...")
+    print("🧹 Purging thumbnails...")
 
     if "arcade_data" not in config.hidden_data_dir:
         print("❌ [Safety] HIDDEN_DATA_DIR looks suspicious. Aborting purge.")

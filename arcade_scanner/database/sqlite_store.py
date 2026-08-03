@@ -626,7 +626,7 @@ class SQLiteStore:
         if count > 0:
             return  # Already migrated
 
-        print(f"📦 Migrating JSON database → SQLite...")
+        print("📦 Migrating JSON database → SQLite...")
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
