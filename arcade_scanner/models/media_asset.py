@@ -1,7 +1,9 @@
-from enum import Enum
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
 import time
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class MediaType(str, Enum):
     VIDEO = "video"
@@ -41,29 +43,29 @@ class MediaAsset(BaseModel):
     file_path: str = Field(..., alias="FilePath", description="Absolute path to the media file")
     size_mb: float = Field(..., alias="Size_MB", description="File size in Megabytes")
     media_type: MediaType = Field(MediaType.UNKNOWN, description="Type of media (video, image)")
-    
+
     # Metadata Containers (Polymorphic)
     # We keep them optional; a file is either Video or Image (or potentially both if we get crazy?)
     # For now, distinct.
     video_metadata: Optional[VideoMetadata] = None
     image_metadata: Optional[ImageMetadata] = None
-    
+
     # Legacy Flattening Support (To be compatible with current Frontend/API)
     # These fields might duplicate data in sub-models for now, or we use properties.
     # For the immediate migration, we might want to populate these from the sub-models at export time.
     # However, keeping the main model clean is better.
-    
+
     # Status / Workflow
     status: str = Field("OK", alias="Status", description="Processing/Optimization status")
-    
+
     # User User State (Global for now, until full user-db split is finalized)
     favorite: bool = Field(False, description="Is marked as favorite")
     vaulted: bool = Field(False, alias="hidden", description="Is moved to vault/hidden")
     tags: List[str] = Field(default_factory=list, description="User defined tags")
-    
+
     # Assets
     thumb: str = Field("", description="Thumbnail filename")
-    
+
     # Chronology
     imported_at: int = Field(default_factory=lambda: int(time.time()), description="Timestamp when first imported")
     mtime: int = Field(0, description="Last modification timestamp of the file")
@@ -81,15 +83,15 @@ class MediaAsset(BaseModel):
     @property
     def codec(self) -> str:
         return self.video_metadata.codec if self.video_metadata else "unknown"
-    
+
     # --- LEGACY FLATTENING (Dict Export) ---
-    # These properties ensure that when dict() is called (if configured), or when using alias access, 
+    # These properties ensure that when dict() is called (if configured), or when using alias access,
     # it behaves somewhat like VideoEntry.
-    
+
     @property
     def Duration_Sec(self) -> float:
         return self.duration_sec
-    
+
     @property
     def Bitrate_Mbps(self) -> float:
         return self.bitrate_mbps
@@ -101,7 +103,7 @@ class MediaAsset(BaseModel):
     @property
     def Height(self) -> int:
         return self.video_metadata.height if self.video_metadata else (self.image_metadata.height if self.image_metadata else 0)
-    
+
     # Allow dict() export to include these flattening fields
     def dict(self, *args, **kwargs):
         d = super().dict(*args, **kwargs)

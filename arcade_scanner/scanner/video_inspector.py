@@ -1,10 +1,11 @@
-import os
 import asyncio
+import os
 from typing import Optional
 
 from ..models.media_asset import MediaAsset, MediaType, VideoMetadata
 from .inspector import MediaInspector
 from .media_probe import MediaProbe  # We'll reuse the internal static helpers for now
+
 
 class VideoInspector(MediaInspector):
     """
@@ -22,14 +23,14 @@ class VideoInspector(MediaInspector):
         # Reuse existing logic to get VideoEntry, then convert to MediaAsset
         # Or better: Call the low-level _run_ffprobe and build MediaAsset directly.
         # For Phase 1, let's wrap the existing probe for safety.
-        
+
         legacy_entry = await self.probe.get_metadata(filepath)
         if not legacy_entry:
             return None
-            
+
         # Convert VideoEntry -> MediaAsset
         # This acts as an adapter during the migration phase
-        
+
         # 1. Create specific metadata
         v_meta = VideoMetadata(
             codec=legacy_entry.codec or "unknown",
@@ -45,7 +46,7 @@ class VideoInspector(MediaInspector):
             pixel_format=legacy_entry.pixel_format or "",
             frame_rate=legacy_entry.frame_rate or 0.0
         )
-        
+
         # 2. Create Asset
         asset = MediaAsset(
             FilePath=legacy_entry.file_path,
@@ -60,5 +61,5 @@ class VideoInspector(MediaInspector):
             imported_at=legacy_entry.imported_at,
             mtime=legacy_entry.mtime
         )
-        
+
         return asset

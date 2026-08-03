@@ -403,3 +403,66 @@ class TestOrphanPruning:
         assert db.removed == [], (
             f"an unmounted target cost {len(db.removed)} library rows"
         )
+
+
+# ---------------------------------------------------------------------------
+# Stopping a scan from another thread
+#
+# main.py:100 runs the startup scan inside a daemon thread with its own event
+# loop, while the server serves requests on other threads. So stop() is called
+# from a different thread than the one running the scan — which is what the
+# stop signal has to survive.
+# ---------------------------------------------------------------------------
+
+class TestStopFromAnotherThread:
+    def test_stop_signal_crosses_thread_boundaries(self):
+        """A stop raised on another thread must actually end the scan."""
+        import threading
+
+        manager = ScannerManager()
+        db = FakeDB()
+        started = threading.Event()
+        release = threading.Event()
+
+        def on_yield(index):
+            if index == 0:
+                started.set()
+                # Hold the scan open until the other thread has called stop().
+                release.wait(timeout=5)
+
+        scanner = FakeScanner(
+            [(f"/media/clip_{i:03d}.mp4", True) for i in range(50)],
+            on_yield=on_yield,
+        )
+
+        result = {}
+
+        def run_in_thread():
+            # Mirrors main.py: asyncio.run inside a plain worker thread.
+            result["processed"] = run_scan(manager, db, scanner, make_config())
+
+        worker = threading.Thread(target=run_in_thread)
+        worker.start()
+
+        assert started.wait(timeout=5), "scan never started"
+        manager.stop()          # called from the main thread, not the scan's
+        release.set()
+        worker.join(timeout=15)
+
+        assert not worker.is_alive(), "scan did not finish after stop()"
+        assert len(db.upserted) < 50, (
+            f"stop() was ignored — {len(db.upserted)} of 50 files were still processed"
+        )
+
+    def test_stop_event_is_safe_to_set_across_threads(self):
+        """asyncio.Event.set() is not thread-safe; the stop flag must not be one."""
+        import asyncio as _asyncio
+
+        manager = ScannerManager()
+
+        assert not isinstance(manager._stop_event, _asyncio.Event), (
+            "stop() is called from request threads while the scan owns another "
+            "event loop, so the flag must be a threading primitive"
+        )
+        manager.stop()
+        assert manager._stop_event.is_set() is True

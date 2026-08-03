@@ -1,14 +1,16 @@
+import argparse
 import asyncio
+import os
 import time
 import webbrowser
-import argparse
-import os
+
 from arcade_scanner.config import config
+from arcade_scanner.core.maintenance import purge_broken_media, purge_media, purge_thumbnails
 from arcade_scanner.database import db, user_db
 from arcade_scanner.scanner import get_scanner_manager
-from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.server.web_server import start_server
-from arcade_scanner.core.maintenance import purge_media, purge_broken_media, purge_thumbnails
+from arcade_scanner.templates.dashboard_template import generate_html_report
+
 
 def run_scanner(args_list=None):
     parser = argparse.ArgumentParser(description="Arcade Media Scanner 6.3")
@@ -26,15 +28,15 @@ def run_scanner(args_list=None):
         run_onboarding()
 
     print("--- Arcade Media Scanner 6.7 ---")
-    
+
     # 0. Maintenance
     if args.rebuild:
         purge_media()
     elif args.rebuild_thumbs:
         purge_thumbnails()
 
-    
-    
+
+
     # 0.5 Data Migration
     print("📦 Checking for legacy user data to migrate...")
     user_db.migrate_from_db(db)
@@ -47,7 +49,7 @@ def run_scanner(args_list=None):
     # 2. Start Server FIRST — user sees dashboard immediately with cached data
     print("🌐 Starting server...")
     server, port = start_server(use_ssl=args.ssl)
-    
+
     # 3. Generate initial report from cache
     results = [e.model_dump(by_alias=True) for e in db.get_all()]
     generate_html_report(results, config.report_file, server_port=port)
@@ -63,12 +65,12 @@ def run_scanner(args_list=None):
         try:
             # Deferred from startup path — runs here so dashboard opens instantly
             purge_broken_media()
-            
+
             mgr = get_scanner_manager()
             should_force = args.rebuild or args.rebuild_thumbs
             if should_force:
                 print("Usage of rebuild flags will force a re-scan of metadata and assets.")
-            
+
             scan_counter = 0
             def print_progress(msg):
                 nonlocal scan_counter
@@ -79,18 +81,18 @@ def run_scanner(args_list=None):
                 import sys
                 sys.stdout.write(f"\r\033[K  🔍 Scanned {scan_counter} files... {filename}")
                 sys.stdout.flush()
-            
+
             print("🚀 Starting Library Scan (background)...")
             asyncio.run(mgr.run_scan(
                 progress_callback=print_progress,
                 force_rescan=should_force
             ))
             print()  # Newline after scan completion
-            
+
             # Regenerate report with fresh data
             results = [e.model_dump(by_alias=True) for e in db.get_all()]
             generate_html_report(results, config.report_file, server_port=port)
-            
+
         except KeyboardInterrupt:
             print("\n⚠️ Scan interrupted.")
         except Exception as e:

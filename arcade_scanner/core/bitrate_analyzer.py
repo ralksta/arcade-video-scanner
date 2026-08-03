@@ -14,7 +14,6 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Codec efficiency ratios – when transcoding *from* one codec *to* another,
 # the target codec may be more efficient.  A ratio < 1.0 means the target
@@ -69,7 +68,7 @@ class BitrateProfile:
         if self.avg_bitrate_kbps == 0:
             return False
         return (self.bitrate_variance / self.avg_bitrate_kbps) > 0.25
-    
+
     @property
     def pixel_count(self) -> int:
         """Total pixels per frame."""

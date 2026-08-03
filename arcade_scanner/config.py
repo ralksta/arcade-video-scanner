@@ -1,9 +1,10 @@
-import os
-import sys
 import json
+import os
 import socket
-from typing import List, Dict, Any, Optional
-from pydantic import Field, ConfigDict
+import sys
+from typing import Any, Dict, List, Optional
+
+from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 # ==============================================================================
@@ -268,10 +269,10 @@ class ConfigManager:
         The scanner needs to know EVERYTHING it should watch.
         """
         targets = set()
-        
+
         # 1. Add Default Home if needed
-        # targets.add(HOME_DIR) 
-        
+        # targets.add(HOME_DIR)
+
         # 2. Add User Targets
         # We need to import user_db here to avoid circular init issues at top level if possible
         # Or better, verify if user_db is ready.
@@ -283,10 +284,10 @@ class ConfigManager:
                         targets.add(t)
         except ImportError:
             pass # Startup case
-            
+
         if not targets:
             targets.add(HOME_DIR)
-            
+
         return list(targets)
 
     @property
@@ -295,7 +296,7 @@ class ConfigManager:
         Returns unique exclude paths from ALL users + defaults.
         """
         excludes = set(self.default_exclusions) # Start with defaults!
-        
+
         try:
             from arcade_scanner.database.user_store import user_db
             for user in user_db.get_all_users():
@@ -304,7 +305,7 @@ class ConfigManager:
                         excludes.add(e)
         except ImportError:
             pass
-            
+
         return list(excludes)
 
     @property

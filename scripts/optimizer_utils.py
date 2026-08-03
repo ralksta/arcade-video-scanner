@@ -8,7 +8,8 @@ from __future__ import annotations
 import json
 import re
 import statistics
-from datetime import datetime, time as dtime
+from datetime import datetime
+from datetime import time as dtime
 from pathlib import Path
 
 DEFAULT_HISTORY_PATH = Path.home() / ".arcade-scanner" / "logs" / "encode_history.jsonl"

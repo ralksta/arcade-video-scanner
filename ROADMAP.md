@@ -17,6 +17,12 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ### 🟢 User Experience
 - [ ] Customizable grid layout (card size, columns)
+- [ ] **Stop a running scan from the UI.** `ScannerManager.stop()` exists and
+      works — the startup scan runs in a daemon thread (`main.py:100`), so the
+      flag is reachable — but nothing calls it. Needs a `/api/scan/stop`
+      endpoint. Note that `/api/rescan` currently runs the scan synchronously
+      and blocks its request thread, so a scan started that way cannot be
+      stopped until it also moves to a background task.
 - [x] Keyboard shortcuts for common actions (arrows = navigate in cinema)
 
 ---

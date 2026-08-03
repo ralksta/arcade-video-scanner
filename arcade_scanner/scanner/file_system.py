@@ -1,18 +1,20 @@
-import os
 import asyncio
 import concurrent.futures
+import json
+import os
 import threading
 import time
-import json
-from typing import List, AsyncIterator, Set
+from typing import AsyncIterator, List, Set
+
 from ..config import config
+
 
 class AsyncFileSystem:
     """
     Handles asynchronous file system traversal.
     Uses asyncio to prevent blocking the main event loop during long scans.
     """
-    
+
     VIDEO_EXTENSIONS = frozenset({'.mp4', '.mkv', '.avi', '.mov', '.m4v', '.wmv', '.flv', '.webm', '.ts'})
     IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif'})
 
@@ -25,13 +27,13 @@ class AsyncFileSystem:
     def _load_settings(self):
         """Reload settings from config (called at scan start)."""
         self.min_size_bytes = config.settings.min_size_mb * 1024 * 1024
-        
+
         # Resolve excluded paths to absolute for robust matching
         self.exclude_abs: Set[str] = set()
         for p in config.active_exclude_paths:
             resolved = os.path.abspath(os.path.expanduser(p))
             self.exclude_abs.add(resolved)
-        
+
         # Load last scan time
         self._scan_time_file = os.path.join(config.hidden_data_dir, ".last_scan_time")
         self._load_last_scan_time()
@@ -63,13 +65,13 @@ class AsyncFileSystem:
         """
         # Reload settings fresh (picks up any changes to exclusions/min_size)
         self._load_settings()
-        
+
         for target in targets:
             abs_target = os.path.abspath(os.path.expanduser(target))
             if not os.path.exists(abs_target):
                 print(f"⚠️ Warning: Scan target not found: {abs_target}")
                 continue
-                
+
             # Bounded queue: limits RAM usage to ~500 paths at a time.
             # The walker thread blocks on put() when full → natural backpressure.
             queue: asyncio.Queue = asyncio.Queue(maxsize=500)
@@ -180,7 +182,7 @@ class AsyncFileSystem:
         # Skip macOS resource fork files (e.g., ._video.mp4)
         if filename.startswith("._"):
             return False
-        
+
         ext = os.path.splitext(filename)[1].lower()
         if ext in self.VIDEO_EXTENSIONS:
             return True
@@ -190,19 +192,19 @@ class AsyncFileSystem:
 
     def _is_valid_size(self, path: str) -> bool:
         ext = os.path.splitext(path)[1].lower()
-        
+
         # Images use KB threshold (configurable, e.g., 500 KB)
         if ext in self.IMAGE_EXTENSIONS:
             try:
                 return os.path.getsize(path) >= config.settings.min_image_size_kb * 1024
             except OSError:
                 return False
-            
+
         # Optimization check for videos
         basename = os.path.basename(path)
         if "_opt." in basename or "_trim." in basename:
             return True
-            
+
         try:
             return os.path.getsize(path) >= self.min_size_bytes
         except OSError:

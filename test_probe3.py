@@ -1,5 +1,7 @@
 import asyncio
+
 from arcade_scanner.scanner.media_probe import MediaProbe
+
 
 class NoSwallowMediaProbe(MediaProbe):
     async def get_metadata(self, filepath: str):

@@ -1,11 +1,12 @@
 import asyncio
 import os
-import subprocess
 import shutil
-from typing import Optional, Dict, List, Tuple
+import subprocess
+from typing import Dict, List, Optional, Tuple
 
-from ..models.media_asset import MediaAsset, MediaType, ImageMetadata
+from ..models.media_asset import ImageMetadata, MediaAsset, MediaType
 from .inspector import MediaInspector
+
 
 class ImageInspector(MediaInspector):
     """
@@ -37,7 +38,7 @@ class ImageInspector(MediaInspector):
             '.rwl'    # Leica RAW
         )
         self.has_sips = shutil.which('sips') is not None
-        
+
         # Batch queue for sips calls
         self._batch_queue: asyncio.Queue = None  # Created lazily per event loop
         self._batch_results: Dict[str, asyncio.Future] = {}
@@ -63,16 +64,16 @@ class ImageInspector(MediaInspector):
     async def _inspect_sips_batched(self, filepath: str) -> Optional[MediaAsset]:
         """Queue a file for batch sips inspection and wait for the result."""
         self._ensure_batch_infra()
-        
+
         # Create a future for this file's result
         loop = asyncio.get_event_loop()
         future = loop.create_future()
-        
+
         async with self._batch_lock:
             self._batch_results[filepath] = future
             self._batch_queue.put_nowait(filepath)
             queue_size = self._batch_queue.qsize()
-        
+
         # If we've hit batch size, flush immediately
         if queue_size >= self.BATCH_SIZE:
             asyncio.ensure_future(self._flush_batch())
@@ -80,7 +81,7 @@ class ImageInspector(MediaInspector):
             # Start a background worker that flushes on a timer
             self._batch_worker_started = True
             asyncio.ensure_future(self._batch_timer_worker())
-        
+
         # Wait for our result
         return await future
 
@@ -105,21 +106,21 @@ class ImageInspector(MediaInspector):
                     files.append(self._batch_queue.get_nowait())
                 except asyncio.QueueEmpty:
                     break
-        
+
         if not files:
             return
-        
+
         # Run single sips call for the entire batch
         try:
             cmd = ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', '-g', 'format'] + files
-            
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await proc.communicate()
-            
+
             if proc.returncode != 0:
                 # Some files may have failed — resolve with None
                 for filepath in files:
@@ -127,28 +128,28 @@ class ImageInspector(MediaInspector):
                     if future and not future.done():
                         future.set_result(None)
                 return
-            
+
             # Parse multi-file sips output
             output = stdout.decode()
             file_properties = self._parse_batch_sips_output(output)
-            
+
             # Create MediaAssets and resolve futures
             for filepath in files:
                 future = self._batch_results.pop(filepath, None)
                 if not future or future.done():
                     continue
-                
+
                 props = file_properties.get(filepath)
                 if not props:
                     future.set_result(None)
                     continue
-                
+
                 try:
                     asset = await self._build_asset_from_props(filepath, props)
                     future.set_result(asset)
-                except Exception as e:
+                except Exception:
                     future.set_result(None)
-                    
+
         except Exception as e:
             print(f"❌ Batch sips error: {e}")
             # Resolve all pending futures with None
@@ -162,13 +163,13 @@ class ImageInspector(MediaInspector):
         w = int(props.get('pixelWidth', 0))
         h = int(props.get('pixelHeight', 0))
         fmt = props.get('format', 'unknown')
-        
+
         i_meta = ImageMetadata(width=w, height=h, format=fmt)
-        
+
         file_stat = await asyncio.to_thread(os.stat, filepath)
         size_mb = file_stat.st_size / (1024 * 1024)
         mtime = int(file_stat.st_mtime)
-        
+
         return MediaAsset(
             FilePath=filepath,
             Size_MB=size_mb,
@@ -194,12 +195,12 @@ class ImageInspector(MediaInspector):
         result = {}
         current_file = None
         current_props = {}
-        
+
         for line in output.strip().split('\n'):
             stripped = line.strip()
             if not stripped:
                 continue
-            
+
             # Property lines have "key: value" format with leading whitespace
             if ': ' in line and (line.startswith('  ') or line.startswith('\t')):
                 parts = stripped.split(': ', 1)
@@ -211,11 +212,11 @@ class ImageInspector(MediaInspector):
                     result[current_file] = current_props
                 current_file = stripped
                 current_props = {}
-        
+
         # Don't forget the last file
         if current_file and current_props:
             result[current_file] = current_props
-        
+
         return result
 
     def _parse_sips_output(self, output: str) -> Dict[str, str]:
@@ -237,27 +238,27 @@ class ImageInspector(MediaInspector):
         """
         try:
             from PIL import Image
-            
+
             loop = asyncio.get_event_loop()
-            
+
             def _load_image():
                 with Image.open(filepath) as img:
                     width, height = img.size
                     fmt = img.format or 'unknown'
                     return width, height, fmt
-            
+
             width, height, fmt = await loop.run_in_executor(None, _load_image)
-            
+
             i_meta = ImageMetadata(
                 width=width,
                 height=height,
                 format=fmt.lower()
             )
-            
+
             file_stat = await asyncio.to_thread(os.stat, filepath)
             size_mb = file_stat.st_size / (1024 * 1024)
             mtime = int(file_stat.st_mtime)
-            
+
             return MediaAsset(
                 FilePath=filepath,
                 Size_MB=size_mb,
@@ -266,7 +267,7 @@ class ImageInspector(MediaInspector):
                 mtime=mtime,
                 imported_at=0
             )
-            
+
         except Exception as e:
             print(f"❌ Error inspecting image {filepath}: {e}")
             return None

@@ -6,15 +6,15 @@ the lazy-import helpers shared with other route modules.
 from __future__ import annotations
 
 import os
-import sys
 import shlex
 import subprocess
+import sys
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse, unquote
+from urllib.parse import parse_qs, unquote, urlparse
 
-from arcade_scanner.config import config, IS_WIN
+from arcade_scanner.config import IS_WIN, config
 from arcade_scanner.database import db, user_db
-from arcade_scanner.security import sanitize_path, is_path_allowed, SecurityError
+from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 
 # ---------------------------------------------------------------------------
 # Lazy imports – avoid circular deps with api_handler module-level singletons
@@ -317,8 +317,9 @@ def _handle_keep_optimized(handler) -> None:
 
     try:
         import shutil
-        from arcade_scanner.models.video_entry import VideoEntry # lazy
-        
+
+        from arcade_scanner.models.video_entry import VideoEntry  # lazy
+
         params = parse_qs(urlparse(handler.path).query)
         original_path = unquote(params.get("original", [None])[0])
         optimized_path = unquote(params.get("optimized", [None])[0])
@@ -337,14 +338,14 @@ def _handle_keep_optimized(handler) -> None:
                     # REVIEW MODE: Restoring to original path on disk
                     final_dest = entry_orig.original_path
                     print(f"🚀 Review Mode Keep: Moving {opt_abs} to {final_dest}")
-                    
+
                     os.makedirs(os.path.dirname(final_dest), exist_ok=True)
                     shutil.move(opt_abs, final_dest)
-                    
+
                     # Cleanup review versions
                     if os.path.exists(orig_abs):
                         os.remove(orig_abs)
-                    
+
                     # DB Update: Use optimized metadata but destination path
                     entry_opt = db.get(opt_abs)
                     if entry_opt:
@@ -353,10 +354,10 @@ def _handle_keep_optimized(handler) -> None:
                         opt_dict["Status"] = "OK"
                         opt_dict["OriginalPath"] = None
                         db.upsert(VideoEntry(**opt_dict))
-                    
+
                     db.remove(opt_abs)
                     db.remove(orig_abs)
-                    
+
                     # Cleanup empty review directory
                     try:
                         job_dir = os.path.dirname(orig_abs)
@@ -399,15 +400,16 @@ def _handle_discard_optimized(handler) -> None:
 
     try:
         import shutil
-        from arcade_scanner.models.video_entry import VideoEntry # lazy
-        
+
+        from arcade_scanner.models.video_entry import VideoEntry  # lazy
+
         params = parse_qs(urlparse(handler.path).query)
         path = unquote(params.get("path", [None])[0])
 
         if path:
             abs_path = os.path.abspath(path)
-            
-            # Review Mode Check: If this is an optimized file in a review folder, 
+
+            # Review Mode Check: If this is an optimized file in a review folder,
             # we must also restore the original file.
             entry = db.get(abs_path)
             if entry and entry.status == "REVIEW":
@@ -418,23 +420,23 @@ def _handle_discard_optimized(handler) -> None:
                     if v.status == "REVIEW" and os.path.dirname(v.file_path) == job_dir and "_original" in v.file_path:
                         orig_file = v
                         break
-                
+
                 if orig_file and orig_file.original_path:
                     print(f"⏪ Review Mode Discard: Restoring original to {orig_file.original_path}")
                     shutil.move(orig_file.file_path, orig_file.original_path)
-                    
+
                     # Restore DB entry
                     orig_dict = orig_file.model_dump(by_alias=True)
                     orig_dict["FilePath"] = orig_file.original_path
                     orig_dict["Status"] = "OK"
                     orig_dict["OriginalPath"] = None
                     db.upsert(VideoEntry(**orig_dict))
-                    
+
                     # Cleanup
                     if os.path.exists(abs_path): os.remove(abs_path)
                     db.remove(abs_path)
                     db.remove(orig_file.file_path)
-                    
+
                     try:
                         if os.path.exists(job_dir) and not os.listdir(job_dir):
                             os.rmdir(job_dir)
@@ -449,7 +451,7 @@ def _handle_discard_optimized(handler) -> None:
                 if os.path.exists(abs_path):
                     os.remove(abs_path)
                     db.remove(abs_path)
-            
+
             db.save()
             _get_media_cache().invalidate()
 
@@ -640,6 +642,7 @@ def _handle_batch_compress(handler) -> None:
 def _handle_rescan(handler) -> None:
     import asyncio
     import json
+
     from arcade_scanner.scanner import get_scanner_manager
     from arcade_scanner.templates.dashboard_template import generate_html_report
 

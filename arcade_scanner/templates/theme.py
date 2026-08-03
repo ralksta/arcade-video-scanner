@@ -1,11 +1,12 @@
 import json
 
+
 class BaseTheme:
     """
     Base Semantic Theme defining the contract and common properties.
     """
     name = "base"
-    
+
     # --- CSS Variables Map ---
     # These will be injected into :root and .dark
     # Format: {'var-name': ('light-value', 'dark-value')}
@@ -33,11 +34,11 @@ class BaseTheme:
     app_bg = "bg-arcade-bg min-h-screen transition-colors duration-300 font-sans text-text-main"
     header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 backdrop-blur transition-all duration-300"
     sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 p-4 gap-1 z-[100] transition-colors duration-300"
-    
+
     # Typography
     text_primary = "text-text-main"
     text_secondary = "text-text-muted"
-    
+
     def button_nav(self, active=False):
         base = "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all w-full text-left"
         if active:
@@ -48,11 +49,11 @@ class BaseTheme:
         """Generates the <style> block for CSS variables."""
         light_vars = []
         dark_vars = []
-        
+
         for name, (light, dark) in self.css_variables.items():
             light_vars.append(f"{name}: {light};")
             dark_vars.append(f"{name}: {dark};")
-            
+
         return f"""
         <style>
             :root {{
@@ -92,24 +93,24 @@ class BaseTheme:
 
 class ArcadeTheme(BaseTheme):
     name = "arcade"
-    
+
     css_variables = {
         '--arcade-bg': ('#f8f9fa', '#090012'),
         '--text-main': ('#0f172a', '#ffffff'),          # slate-900 light: 18:1 contrast
         '--text-muted': ('#374151', '#9ca3af'),         # gray-700 light: 7:1 contrast (WCAG AA+)
-        
+
         # Brand Colors
         '--arcade-purple': ('#e2e8f0', '#1a0530'),
         '--arcade-magenta': ('#be185d', '#8F0177'),
         '--arcade-pink': ('#db2777', '#DE1A58'),
         '--arcade-gold': ('#b45309', '#F4B342'),        # Darker gold for light mode readability
         '--arcade-cyan': ('#0d7a70', '#00ffd0'),        # Darker teal for light mode readability
-        
+
         # Surfaces
         '--surface-glass': ('rgba(255, 255, 255, 0.92)', 'rgba(20, 20, 30, 0.6)'),
         '--surface-border': ('rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)'),
     }
-    
+
     # Semantic overrides
     header_container = "fixed top-0 left-0 right-0 z-50 h-[34px] md:h-16 flex items-center justify-between px-3 md:px-6 pt-safe-top transition-all duration-300 bg-arcade-bg/95 backdrop-blur border-b border-black/5 dark:border-white/5"
     sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-black/5 dark:border-white/5 p-4 gap-1 z-[100]"
@@ -117,23 +118,23 @@ class ArcadeTheme(BaseTheme):
 
 class ProfessionalTheme(BaseTheme):
     name = "professional"
-    
+
     css_variables = {
         '--arcade-bg': ('#f3f4f6', '#0f172a'), # Slate-100 / Slate-900
         '--text-main': ('#111827', '#f9fafb'), # Gray-900 / Gray-50
         '--text-muted': ('#4b5563', '#9ca3af'), # Gray-600 light: 5.74:1 WCAG AA✓ / Gray-400 dark
-        
+
         # Re-map semantic colors to Professional Palette (Blue/Teal)
         '--arcade-purple': ('#e0e7ff', '#1e1b4b'), # Indigo
         '--arcade-magenta': ('#be185d', '#831843'), # Pink (Accents)
         '--arcade-pink': ('#db2777', '#be185d'),
         '--arcade-gold': ('#b45309', '#f59e0b'), # Amber
         '--arcade-cyan': ('#0284c7', '#38bdf8'), # Sky Blue (Primary)
-        
+
         '--surface-glass': ('rgba(255, 255, 255, 0.9)', 'rgba(15, 23, 42, 0.9)'),
         '--surface-border': ('#e5e7eb', '#1e293b'),
     }
-    
+
     # Cleaner, solid headers
     header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm"
     sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 p-4 gap-1 z-[100]"
@@ -148,24 +149,24 @@ class ProfessionalTheme(BaseTheme):
 
 class CandyTheme(BaseTheme):
     name = "candy"
-    
+
     # Palette provided: #FCF8F8 (Bg), #FBEFEF (Surface), #F9DFDF (Border), #F5AFAF (Accent)
     css_variables = {
         '--arcade-bg': ('#FCF8F8', '#1a0510'),
         '--text-main': ('#2d1a1a', '#FBEFEF'),          # Deep rose-charcoal, WCAG AA on #FCF8F8
         '--text-muted': ('#6b3a4a', '#F9DFDF'),         # Muted rose, not too bright
-        
+
         # Soft Accents
         '--arcade-purple': ('#FBEFEF', '#2d0f1a'),
         '--arcade-magenta': ('#b5476a', '#d16d8e'),     # Darkened for light readability
         '--arcade-pink': ('#F9DFDF', '#be185d'),
-        '--arcade-gold': ('#c2693a', '#F4B342'), 
+        '--arcade-gold': ('#c2693a', '#F4B342'),
         '--arcade-cyan': ('#be185d', '#00ffd0'),
-        
+
         '--surface-glass': ('rgba(252, 248, 248, 0.92)', 'rgba(26, 5, 16, 0.8)'),
         '--surface-border': ('#e8c8c8', '#4a1525'),
     }
-    
+
     header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 bg-arcade-bg/95 backdrop-blur border-b border-[#F9DFDF] dark:border-white/10"
     sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-[#F9DFDF] dark:border-white/10 p-4 gap-1 z-[100]"
 
@@ -183,18 +184,18 @@ CURRENT_THEME = THEMES["arcade"]
 def render_theme_css():
     """Generates the CSS <style> block for ALL themes."""
     css_lines = []
-    
+
     # Render Default (Root) - Fallback
     css_lines.append(":root {")
     for name, (light, _) in CURRENT_THEME.css_variables.items():
         css_lines.append(f"    {name}: {light};")
     css_lines.append("}")
-    
+
     css_lines.append(".dark {")
     for name, (_, dark) in CURRENT_THEME.css_variables.items():
         css_lines.append(f"    {name}: {dark};")
     css_lines.append("}")
-    
+
     # Render overrides for each theme
     for key, theme in THEMES.items():
         # Light Mode override
@@ -202,14 +203,14 @@ def render_theme_css():
         for name, (light, _) in theme.css_variables.items():
             css_lines.append(f"    {name}: {light};")
         css_lines.append("}")
-        
+
         # Dark Mode override
         css_lines.append(f'[data-theme="{key}"].dark {{') # Or .dark[data-theme="..."]
         css_lines.append(f"    /* {theme.name} Dark */")
         for name, (_, dark) in theme.css_variables.items():
             css_lines.append(f"    {name}: {dark};")
         css_lines.append("}")
-        
+
     css_lines.append("""
         body {
             background-color: var(--arcade-bg);
@@ -217,5 +218,5 @@ def render_theme_css():
             transition: background-color 0.3s ease, color 0.3s ease;
         }
     """)
-    
+
     return f"<style>{chr(10).join(css_lines)}</style>"

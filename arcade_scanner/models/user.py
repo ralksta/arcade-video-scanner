@@ -9,13 +9,13 @@ def _default_criteria():
     return {
         "tagLogic": "any",
         "include": {
-            "status": [], "codec": [], "tags": [], 
-            "resolution": [], "orientation": [], 
+            "status": [], "codec": [], "tags": [],
+            "resolution": [], "orientation": [],
             "media_type": [], "format": []
         },
         "exclude": {
-            "status": [], "codec": [], "tags": [], 
-            "resolution": [], "orientation": [], 
+            "status": [], "codec": [], "tags": [],
+            "resolution": [], "orientation": [],
             "media_type": [], "format": []
         },
         "favorites": None,
@@ -46,7 +46,6 @@ DEFAULT_SMART_COLLECTIONS = [
         "id": "col_apps_large_files",
         "name": "Large Files (>1GB)",
         "icon": "sd_storage",
-        "color": "#eab308", # Gold/Yellow - wait, user asked for Red. Let's stick to user request Red? User said "Large Files (Red)".
         "color": "#ef4444", # Red
         "category": "Library Overview",
         "criteria": {**_default_criteria(), "size": {"min": 1000, "max": None}}
@@ -86,15 +85,15 @@ class UserVideoData(BaseModel):
 
     # Smart Collections
     smart_collections: List[Dict[str, Any]] = Field(default_factory=_get_default_smart_collections, description="User defined smart collections")
-    
+
     # Scan Paths
     scan_targets: List[str] = Field(default_factory=list, description="User specific scan directories")
     exclude_paths: List[str] = Field(default_factory=list, description="User specific exclusion patterns")
     scan_images: bool = Field(False, description="Enable scanning of image files (jpg, png, etc.)")
-    
+
     # Setup Status
     setup_complete: bool = Field(True, description="Whether first-run setup wizard has been completed")
-    
+
     # Available Tags (Definitions)
     available_tags: List[Dict[str, str]] = Field(default_factory=list, description="User specific tag definitions")
 
@@ -112,6 +111,6 @@ class User(BaseModel):
     salt: str
     created_at: int = Field(default_factory=lambda: int(time.time()))
     is_admin: bool = False
-    
+
     # Embed user data directly for simplicity in JSON store
     data: UserVideoData = Field(default_factory=UserVideoData)

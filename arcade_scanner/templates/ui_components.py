@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from arcade_scanner.templates.theme import BaseTheme, render_theme_css
 
+
 def render_base_layout(theme: BaseTheme, content: str, scripts: str, active_theme_name: str = "arcade") -> str:
     """
     Renders the main HTML shell, injecting theme CSS variables and config.
@@ -142,16 +143,16 @@ def render_navigation(theme: BaseTheme) -> str:
     """
     Renders the sidebar navigation using theme-aware button styles.
     """
-    
+
     def nav_btn(id_val, onclick, icon, label, color_cls, active=False):
         # We manually construct specific arcade indicators because they use specific colors (gold, cyan, magenta)
         # In a fully generic theme, these colors would be abstractions like 'brand-primary'
         # But for now, we map them.
-        
+
         # Indicator line color class mapping
         bg_color = f"bg-{color_cls}" if "arcade" in color_cls else "bg-purple-500"
         text_color = f"text-{color_cls}" if "arcade" in color_cls else "text-purple-400"
-        
+
         return f"""
     <button id="{id_val}" onclick="{onclick}" class="nav-item {('active' if active else '')} {theme.button_nav(active)} group">
         <div class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 {bg_color} rounded-r {'transition-opacity' if active else 'opacity-0 transition-opacity'}"></div>

@@ -48,8 +48,8 @@ class TestGetVideoInfo:
         assert info["pix_fmt"] != ""
 
     def test_10bit_clip_detected_as_hdr(self, tmp_path):
-        from video_optimizer import get_video_info
         from optimizer_utils import is_hdr_or_10bit
+        from video_optimizer import get_video_info
         clip = tmp_path / "ten_bit.mp4"
         subprocess.run(
             ["ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=duration=1:size=320x240:rate=24",

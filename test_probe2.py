@@ -1,6 +1,8 @@
 import asyncio
 import json
+
 from arcade_scanner.config import config
+
 
 async def _run_ffprobe(filepath: str):
     print("CONFIG ffprobe_path:", config.settings.ffprobe_path)
@@ -36,6 +38,6 @@ async def test():
         print("FINAL RES:", final_res)
     except Exception as e:
         print("EXCEPTION:", e)
-    
+
 if __name__ == "__main__":
     asyncio.run(test())
