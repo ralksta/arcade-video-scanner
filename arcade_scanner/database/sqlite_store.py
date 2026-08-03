@@ -57,18 +57,28 @@ _COLUMNS = [
 class SQLiteStore:
     """
     SQLite-backed media metadata store.
-    Thread-safe via per-thread connections + write lock.
+
+    Thread-safe via one shared connection guarded by a reentrant lock. Every
+    method that touches the connection takes the lock — reads included. See
+    _write_lock for why reads cannot be left unguarded.
     """
 
     def __init__(self):
         self.db_file = os.path.join(config.hidden_data_dir, "media_library.db")
         self._conn: Optional[sqlite3.Connection] = None
         self._migrated = False
-        # Serialises writes, and every read on the encoding-queue path: the
-        # single sqlite3 connection is shared across server threads
-        # (check_same_thread=False), and concurrent use of one connection raises
-        # "bad parameter or other API misuse". Reentrant because _notify_change
-        # runs inside the lock and a callback may re-enter the store.
+        # Guards every use of the shared connection, reads included.
+        #
+        # sqlite3.threadsafety is 3 on a serialised SQLite build, so the C layer
+        # will not crash — but Python's sqlite3 keeps a per-connection statement
+        # cache, and threads running the *same* SQL share one prepared
+        # statement. Two threads stepping it at once consume each other's rows,
+        # and nothing raises: get_all() just returns the wrong set. Measured on
+        # an 800-row table with six concurrent readers, results ranged from 0 to
+        # 5199 rows.
+        #
+        # Reentrant because _notify_change fires inside the lock and a callback
+        # may re-enter the store.
         self._write_lock = threading.RLock()
         self.on_change_callbacks = []
 
@@ -87,6 +97,14 @@ class SQLiteStore:
         if self._conn is not None:
             return
 
+        with self._write_lock:
+            # Re-check inside the lock: two threads can both find _conn empty,
+            # and the loser would otherwise open a second connection and leak it.
+            if self._conn is not None:
+                return
+            self._open_connection()
+
+    def _open_connection(self):
         os.makedirs(os.path.dirname(self.db_file), exist_ok=True)
         self._conn = sqlite3.connect(
             self.db_file,
@@ -300,14 +318,18 @@ class SQLiteStore:
     def get_all(self) -> List[VideoEntry]:
         """Return all entries as VideoEntry models."""
         self._ensure_connection()
-        cursor = self._conn.execute("SELECT * FROM media")
-        results = []
-        for row in cursor:
-            try:
-                results.append(self._row_to_entry(row))
-            except Exception as e:
-                print(f"⚠️ Skipping corrupted DB row: {e}")
-        return results
+        # Shared connection: readers running the same SQL share one cached
+        # prepared statement, and stepping it from two threads makes them
+        # consume each other's rows -- silently, with no exception.
+        with self._write_lock:
+            cursor = self._conn.execute("SELECT * FROM media")
+            results = []
+            for row in cursor:
+                try:
+                    results.append(self._row_to_entry(row))
+                except Exception as e:
+                    print(f"⚠️ Skipping corrupted DB row: {e}")
+            return results
 
     def get_all_dicts(self) -> List[dict]:
         """Return all entries as plain dictionaries with UI aliases.
@@ -316,46 +338,58 @@ class SQLiteStore:
         as it avoids Pydantic model overhead.
         """
         self._ensure_connection()
-        cursor = self._conn.execute("SELECT * FROM media")
-        results = []
-        for row in cursor:
-            try:
-                results.append(self._row_to_api_dict(row))
-            except Exception as e:
-                print(f"⚠️ Skipping corrupted DB row (dict): {e}")
-        return results
+        # Shared connection: readers running the same SQL share one cached
+        # prepared statement, and stepping it from two threads makes them
+        # consume each other's rows -- silently, with no exception.
+        with self._write_lock:
+            cursor = self._conn.execute("SELECT * FROM media")
+            results = []
+            for row in cursor:
+                try:
+                    results.append(self._row_to_api_dict(row))
+                except Exception as e:
+                    print(f"⚠️ Skipping corrupted DB row (dict): {e}")
+            return results
 
     def get(self, path: str) -> Optional[VideoEntry]:
         """Lookup a single entry by file_path. O(1) indexed."""
         self._ensure_connection()
-        # Handle surrogate-escaped paths by using hybrid str/bytes for SQLite
-        safe_path = self._get_safe_path(path)
-        cursor = self._conn.execute(
-            "SELECT * FROM media WHERE file_path = ?", (safe_path,)
-        )
-        row = cursor.fetchone()
-        if row:
-            try:
-                return self._row_to_entry(row)
-            except Exception as e:
-                logger.error(f"⚠️ Failed to decode DB row: {e}")
-                return None
-        return None
+        # Shared connection: readers running the same SQL share one cached
+        # prepared statement, and stepping it from two threads makes them
+        # consume each other's rows -- silently, with no exception.
+        with self._write_lock:
+            # Handle surrogate-escaped paths by using hybrid str/bytes for SQLite
+            safe_path = self._get_safe_path(path)
+            cursor = self._conn.execute(
+                "SELECT * FROM media WHERE file_path = ?", (safe_path,)
+            )
+            row = cursor.fetchone()
+            if row:
+                try:
+                    return self._row_to_entry(row)
+                except Exception as e:
+                    logger.error(f"⚠️ Failed to decode DB row: {e}")
+                    return None
+            return None
 
     def get_by_thumb(self, thumb_name: str) -> Optional[VideoEntry]:
         """Fetch a single entry by thumb name."""
         self._ensure_connection()
-        cursor = self._conn.execute(
-            "SELECT * FROM media WHERE thumb = ?", (thumb_name,)
-        )
-        row = cursor.fetchone()
-        if row:
-            try:
-                return self._row_to_entry(row)
-            except Exception as e:
-                logger.error(f"⚠️ Failed to decode DB row for thumb: {e}")
-                return None
-        return None
+        # Shared connection: readers running the same SQL share one cached
+        # prepared statement, and stepping it from two threads makes them
+        # consume each other's rows -- silently, with no exception.
+        with self._write_lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM media WHERE thumb = ?", (thumb_name,)
+            )
+            row = cursor.fetchone()
+            if row:
+                try:
+                    return self._row_to_entry(row)
+                except Exception as e:
+                    logger.error(f"⚠️ Failed to decode DB row for thumb: {e}")
+                    return None
+            return None
 
     def upsert(self, entry) -> None:
         """Insert or replace an entry. Accepts VideoEntry or MediaAsset."""
@@ -431,24 +465,32 @@ class SQLiteStore:
         Use together with count() to build pagination UI.
         """
         self._ensure_connection()
-        offset = page * page_size
-        cursor = self._conn.execute(
-            "SELECT * FROM media ORDER BY mtime DESC LIMIT ? OFFSET ?",
-            (page_size, offset),
-        )
-        results = []
-        for row in cursor:
-            try:
-                results.append(self._row_to_entry(row))
-            except Exception as e:
-                logger.warning("Skipping corrupted DB row during get_page: %s", e)
-        return results
+        # Shared connection: readers running the same SQL share one cached
+        # prepared statement, and stepping it from two threads makes them
+        # consume each other's rows -- silently, with no exception.
+        with self._write_lock:
+            offset = page * page_size
+            cursor = self._conn.execute(
+                "SELECT * FROM media ORDER BY mtime DESC LIMIT ? OFFSET ?",
+                (page_size, offset),
+            )
+            results = []
+            for row in cursor:
+                try:
+                    results.append(self._row_to_entry(row))
+                except Exception as e:
+                    logger.warning("Skipping corrupted DB row during get_page: %s", e)
+            return results
 
     def count(self) -> int:
         """Return the total number of entries in the store."""
         self._ensure_connection()
-        cursor = self._conn.execute("SELECT COUNT(*) FROM media")
-        return cursor.fetchone()[0]
+        # Shared connection: readers running the same SQL share one cached
+        # prepared statement, and stepping it from two threads makes them
+        # consume each other's rows -- silently, with no exception.
+        with self._write_lock:
+            cursor = self._conn.execute("SELECT COUNT(*) FROM media")
+            return cursor.fetchone()[0]
 
     def cleanup_old_jobs(self, older_than_days: int = 30) -> int:
         """Delete completed/failed/cancelled jobs older than N days. Returns number of deleted rows."""

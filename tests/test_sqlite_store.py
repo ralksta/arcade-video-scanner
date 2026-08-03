@@ -288,3 +288,126 @@ class TestQueueClaimIsExclusive:
 
         assert first is not None
         assert second is None
+
+
+# ---------------------------------------------------------------------------
+# Concurrent reads on the shared connection
+#
+# One sqlite3.Connection is shared across server threads
+# (check_same_thread=False). sqlite3.threadsafety is 3 on this build, so the C
+# layer will not crash -- but Python's sqlite3 keeps a per-connection statement
+# cache, and threads running the *same* SQL share one prepared statement. Two
+# threads stepping it at once consume each other's rows.
+#
+# The failure is silent: no exception, just a wrong row count. _MediaCache then
+# holds that result for 30 seconds.
+# ---------------------------------------------------------------------------
+
+class TestConcurrentReads:
+    def _populate(self, store, n):
+        from arcade_scanner.models.video_entry import VideoEntry
+        store.bulk_upsert([
+            VideoEntry(FilePath=f"/fake/clip_{i:05d}.mp4", Size_MB=float(i))
+            for i in range(n)
+        ])
+
+    def test_concurrent_get_all_returns_the_whole_table_every_time(self, store):
+        """Every reader must see all rows, no matter who else is reading."""
+        rows = 800
+        self._populate(store, rows)
+        assert len(store.get_all()) == rows  # baseline, single threaded
+
+        counts = []
+        errors = []
+
+        for _ in range(20):
+            barrier = threading.Barrier(6)
+
+            def reader():
+                barrier.wait()
+                try:
+                    counts.append(len(store.get_all()))
+                except Exception as exc:  # noqa: BLE001 - recording is the point
+                    errors.append(f"{type(exc).__name__}: {exc}")
+
+            threads = [threading.Thread(target=reader) for _ in range(6)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        assert errors == [], f"first failure: {errors[0]}"
+        wrong = [c for c in counts if c != rows]
+        assert not wrong, (
+            f"{len(wrong)} of {len(counts)} concurrent reads returned a wrong row "
+            f"count (saw {sorted(set(wrong))[:5]}, expected {rows})"
+        )
+
+    def test_reads_stay_correct_while_a_writer_runs(self, store):
+        """A write in flight must not make a concurrent read lose rows."""
+        from arcade_scanner.models.video_entry import VideoEntry
+
+        rows = 500
+        self._populate(store, rows)
+
+        counts = []
+        errors = []
+
+        for round_nr in range(20):
+            barrier = threading.Barrier(6)
+
+            def reader():
+                barrier.wait()
+                try:
+                    counts.append(len(store.get_all()))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"read {type(exc).__name__}: {exc}")
+
+            def writer():
+                barrier.wait()
+                try:
+                    store.upsert(VideoEntry(FilePath=f"/fake/clip_{round_nr:05d}.mp4",
+                                            Size_MB=1.0))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"write {type(exc).__name__}: {exc}")
+
+            threads = [threading.Thread(target=reader) for _ in range(5)]
+            threads.append(threading.Thread(target=writer))
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        assert errors == [], f"first failure: {errors[0]}"
+        # The writer only overwrites existing paths, so the count never changes.
+        wrong = [c for c in counts if c != rows]
+        assert not wrong, (
+            f"{len(wrong)} of {len(counts)} reads saw a wrong row count "
+            f"(saw {sorted(set(wrong))[:5]}, expected {rows})"
+        )
+
+    def test_lazy_connection_setup_is_not_raced(self, patch_config):
+        """Several threads hitting a fresh store must share one connection."""
+        from arcade_scanner.database.sqlite_store import SQLiteStore
+
+        fresh = SQLiteStore()
+        seen = []
+        errors = []
+        barrier = threading.Barrier(8)
+
+        def touch():
+            barrier.wait()
+            try:
+                fresh.count()
+                seen.append(id(fresh._conn))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{type(exc).__name__}: {exc}")
+
+        threads = [threading.Thread(target=touch) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == [], f"first failure: {errors[0]}"
+        assert len(set(seen)) == 1, "threads ended up on different connections"
