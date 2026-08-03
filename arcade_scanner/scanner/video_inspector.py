@@ -1,10 +1,11 @@
-import os
 import asyncio
+import os
 from typing import Optional
 
 from ..models.media_asset import MediaAsset, MediaType, VideoMetadata
 from .inspector import MediaInspector
 from .media_probe import MediaProbe  # We'll reuse the internal static helpers for now
+
 
 class VideoInspector(MediaInspector):
     """

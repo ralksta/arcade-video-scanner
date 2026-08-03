@@ -1,5 +1,6 @@
 import json
 
+
 class BaseTheme:
     """
     Base Semantic Theme defining the contract and common properties.

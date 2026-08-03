@@ -1,12 +1,13 @@
-import sys
 import os
+import sys
 
 # Ensure project root is in path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from arcade_scanner.database import db
 from arcade_scanner.config import config
+from arcade_scanner.database import db
 from arcade_scanner.templates.dashboard_template import generate_html_report
+
 
 def main():
     print("Loading DB...")

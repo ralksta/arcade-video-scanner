@@ -114,8 +114,9 @@ def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool
     Returns:
         True if path is allowed, False otherwise
     """
-    from ..config import config, IS_WIN
     import sys
+
+    from ..config import IS_WIN, config
 
     if not path:
         return False

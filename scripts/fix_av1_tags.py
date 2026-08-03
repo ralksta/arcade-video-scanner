@@ -11,9 +11,9 @@ If the errors disappear, the file is confirmed as AV1 and fixed in-place.
 """
 
 import os
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 # Colors

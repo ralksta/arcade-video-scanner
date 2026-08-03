@@ -2,11 +2,11 @@
 Duplicate Media Detection Module.
 Finds duplicate videos and images in the media library.
 """
-import os
 import hashlib
-from typing import List, Dict, Optional, Set, Tuple
-from dataclasses import dataclass, field
+import os
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set, Tuple
 
 # Optional imagehash for perceptual image hashing
 try:
@@ -171,8 +171,9 @@ class DuplicateDetector:
         if self._hash_cache_file is not None:
             return  # Already loaded
 
-        from ..config import config
         import json
+
+        from ..config import config
 
         self._hash_cache_file = os.path.join(config.hidden_data_dir, ".phash_cache.json")
         try:

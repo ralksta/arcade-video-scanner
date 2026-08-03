@@ -6,15 +6,15 @@ the lazy-import helpers shared with other route modules.
 from __future__ import annotations
 
 import os
-import sys
 import shlex
 import subprocess
+import sys
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse, unquote
+from urllib.parse import parse_qs, unquote, urlparse
 
-from arcade_scanner.config import config, IS_WIN
+from arcade_scanner.config import IS_WIN, config
 from arcade_scanner.database import db, user_db
-from arcade_scanner.security import sanitize_path, is_path_allowed, SecurityError
+from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 
 # ---------------------------------------------------------------------------
 # Lazy imports – avoid circular deps with api_handler module-level singletons
@@ -317,7 +317,8 @@ def _handle_keep_optimized(handler) -> None:
 
     try:
         import shutil
-        from arcade_scanner.models.video_entry import VideoEntry # lazy
+
+        from arcade_scanner.models.video_entry import VideoEntry  # lazy
 
         params = parse_qs(urlparse(handler.path).query)
         original_path = unquote(params.get("original", [None])[0])
@@ -399,7 +400,8 @@ def _handle_discard_optimized(handler) -> None:
 
     try:
         import shutil
-        from arcade_scanner.models.video_entry import VideoEntry # lazy
+
+        from arcade_scanner.models.video_entry import VideoEntry  # lazy
 
         params = parse_qs(urlparse(handler.path).query)
         path = unquote(params.get("path", [None])[0])
@@ -640,6 +642,7 @@ def _handle_batch_compress(handler) -> None:
 def _handle_rescan(handler) -> None:
     import asyncio
     import json
+
     from arcade_scanner.scanner import get_scanner_manager
     from arcade_scanner.templates.dashboard_template import generate_html_report
 

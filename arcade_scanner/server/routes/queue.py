@@ -29,17 +29,16 @@ import threading
 import traceback
 import uuid
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 from arcade_scanner.config import config
 from arcade_scanner.database import db
-from arcade_scanner.security import sanitize_path, is_path_allowed, SecurityError
-from arcade_scanner.server.response_helpers import (
-    send_json,
-    require_auth,
-)
+from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 from arcade_scanner.server.api_handler import _media_cache
-
+from arcade_scanner.server.response_helpers import (
+    require_auth,
+    send_json,
+)
 
 # ---------------------------------------------------------------------------
 # GIF-Job-Tracking (in-memory, resets on server restart)

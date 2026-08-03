@@ -1,8 +1,10 @@
-import pytest
+import hashlib
 import os
 import sqlite3
-import hashlib
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 
 # Mock config for tests
 @pytest.fixture(autouse=True)
@@ -91,8 +93,8 @@ def test_encoding_queue_handles_surrogates(store):
         pytest.fail(f"get_next_pending failed with UnicodeEncodeError: {e}")
 
 def test_thumbnail_hashing_handles_surrogates():
-    from arcade_scanner.core.video_processor import create_thumbnail
     from arcade_scanner.config import config
+    from arcade_scanner.core.video_processor import create_thumbnail
 
     surrogate_path = "/media_nas/Sites/h\udcf6gl.mp4"
 

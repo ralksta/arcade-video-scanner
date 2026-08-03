@@ -1,13 +1,14 @@
+import binascii
+import hashlib
 import os
 import sys
-import hashlib
-import binascii
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from arcade_scanner.database.user_store import user_db, UserStore
+from arcade_scanner.database.user_store import UserStore, user_db
 from arcade_scanner.models.user import User
+
 
 def reset_password(username="admin", new_password="admin"):
     print(f"🔧 Resetting password for '{username}'...")

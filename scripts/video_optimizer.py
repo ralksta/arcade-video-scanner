@@ -5,18 +5,18 @@ Supports: NVIDIA NVENC (RTX 4090), Apple VideoToolbox (M4 Max), Intel QuickSync 
 
 New in V2.4: Bitrate analyzer integration ensures output never exceeds source bitrate.
 """
-import os
-import sys
-import subprocess
 import argparse
 import json
-import re
-import time
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict, Any
-import threading
+import os
 import queue
+import re
+import subprocess
+import sys
+import threading
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 # Import arcade_scanner core utilities
 # Use sys.path to avoid circular dependencies and keep script standalone
@@ -25,7 +25,7 @@ try:
     _core_path = Path(__file__).parent.parent / "arcade_scanner" / "core"
     if _core_path.exists():
         _sys.path.insert(0, str(_core_path))
-        from bitrate_analyzer import analyze_bitrate, BitrateProfile
+        from bitrate_analyzer import BitrateProfile, analyze_bitrate
         from hw_encode_detect import detect_hevc_optimizer_encoder
         _sys.path.pop(0)
         BITRATE_ANALYZER_AVAILABLE = True
@@ -45,14 +45,14 @@ try:
         sys.path.insert(0, _script_dir)
     from optimizer_utils import (
         append_encode_history,
-        suggest_q_from_history,
-        nearest_quality_index,
-        is_hdr_or_10bit,
         apply_hdr_adjustments,
-        parse_loudnorm_json,
         build_audio_filter_chain,
-        select_top_windows,
+        is_hdr_or_10bit,
         narrow_quality_window,
+        nearest_quality_index,
+        parse_loudnorm_json,
+        select_top_windows,
+        suggest_q_from_history,
     )
     OPTIMIZER_UTILS_AVAILABLE = True
 except ImportError:

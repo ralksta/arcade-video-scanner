@@ -1,6 +1,8 @@
 import asyncio
 import json
+
 from arcade_scanner.config import config
+
 
 async def _run_ffprobe(filepath: str):
     print("CONFIG ffprobe_path:", config.settings.ffprobe_path)

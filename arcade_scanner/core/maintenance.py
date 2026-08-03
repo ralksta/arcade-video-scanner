@@ -1,6 +1,8 @@
 import os
 import shutil
+
 from arcade_scanner.config import config
+
 
 def is_safe_to_delete(path: str, expected_parent: str, prefix: str, ext: str) -> bool:
     """Strict check to ensure the file is where we expect and named correctly."""

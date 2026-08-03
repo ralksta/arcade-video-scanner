@@ -3,10 +3,11 @@ First-run onboarding setup wizard for Arcade Media Scanner.
 Provides an interactive ASCII terminal experience for initial configuration.
 """
 import os
-import sys
 import shutil
 import subprocess
-from typing import Optional, List, Tuple
+import sys
+from typing import List, Optional, Tuple
+
 
 # ANSI color codes
 class Colors:
@@ -127,7 +128,7 @@ def reset_databases():
     Reset all application databases for a fresh start.
     Removes: users.db, video_cache.json, thumbnails
     """
-    from arcade_scanner.config import HIDDEN_DATA_DIR, THUMB_DIR, CACHE_FILE
+    from arcade_scanner.config import CACHE_FILE, HIDDEN_DATA_DIR, THUMB_DIR
 
     files_to_remove = [
         os.path.join(HIDDEN_DATA_DIR, "users.db"),
@@ -429,6 +430,7 @@ def apply_configuration(config: dict):
     Apply the wizard configuration to settings and user database.
     """
     import json
+
     from arcade_scanner.config import SETTINGS_FILE
 
     # 1. Update settings.json
@@ -500,6 +502,7 @@ def should_run_wizard() -> bool:
     Returns True if first_run_completed is not set to True.
     """
     import json
+
     from arcade_scanner.config import SETTINGS_FILE
 
     if not os.path.exists(SETTINGS_FILE):

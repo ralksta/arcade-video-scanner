@@ -10,17 +10,16 @@ Why this exists:
     These tests pin down range parsing, clamping, suffix ranges, 416
     handling, and the sendfile/chunk-loop fallback paths.
 """
-import io
 import email.utils
+import io
 
 import pytest
 
 from arcade_scanner.server.streaming_util import (
+    CHUNK_SIZE,
     parse_range_header,
     serve_file_range,
-    CHUNK_SIZE,
 )
-
 
 # ---------------------------------------------------------------------------
 # parse_range_header

@@ -1,8 +1,10 @@
+import os
 import socketserver
 import threading
-import os
-from arcade_scanner.config import config, PORT, find_free_port
+
+from arcade_scanner.config import PORT, config, find_free_port
 from arcade_scanner.server.api_handler import FinderHandler, load_duplicate_cache
+
 
 def start_server(use_ssl=False):
     """

@@ -1,14 +1,16 @@
+import argparse
 import asyncio
+import os
 import time
 import webbrowser
-import argparse
-import os
+
 from arcade_scanner.config import config
+from arcade_scanner.core.maintenance import purge_broken_media, purge_media, purge_thumbnails
 from arcade_scanner.database import db, user_db
 from arcade_scanner.scanner import get_scanner_manager
-from arcade_scanner.templates.dashboard_template import generate_html_report
 from arcade_scanner.server.web_server import start_server
-from arcade_scanner.core.maintenance import purge_media, purge_broken_media, purge_thumbnails
+from arcade_scanner.templates.dashboard_template import generate_html_report
+
 
 def run_scanner(args_list=None):
     parser = argparse.ArgumentParser(description="Arcade Media Scanner 6.3")

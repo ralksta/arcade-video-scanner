@@ -1,11 +1,12 @@
 import json
 import os
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 from arcade_scanner.server.response_helpers import send_json
 
+
 def _get_deps():
-    from arcade_scanner.server.api_handler import user_db, MAX_REQUEST_SIZE
+    from arcade_scanner.server.api_handler import MAX_REQUEST_SIZE, user_db
     return user_db, MAX_REQUEST_SIZE
 
 def handle_get(handler) -> bool:

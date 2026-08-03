@@ -3,12 +3,17 @@ import os
 
 from arcade_scanner.server.response_helpers import send_json
 
+
 def _get_deps():
-    from arcade_scanner.server.api_handler import (
-        _dup_mgr, db, user_db, MAX_REQUEST_SIZE,
-        background_duplicate_scan, clear_duplicate_cache
-    )
     from arcade_scanner.security import is_path_allowed
+    from arcade_scanner.server.api_handler import (
+        MAX_REQUEST_SIZE,
+        _dup_mgr,
+        background_duplicate_scan,
+        clear_duplicate_cache,
+        db,
+        user_db,
+    )
     return _dup_mgr, db, user_db, MAX_REQUEST_SIZE, background_duplicate_scan, clear_duplicate_cache, is_path_allowed
 
 def handle_get(handler) -> bool:

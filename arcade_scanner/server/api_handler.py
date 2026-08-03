@@ -1,26 +1,44 @@
 import http.server
-import os
-import subprocess
-import mimetypes
-import sys
-import time
 import json
-import threading
-from pathlib import Path
+import mimetypes
+import os
+import shlex
 import socket
 import ssl
-from urllib.parse import unquote, urlparse, parse_qs
-import shlex
+import subprocess
+import sys
 import tempfile
-from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE, DUPLICATES_CACHE_FILE
-from arcade_scanner.database import db, user_db
-from arcade_scanner.security import session_manager
+import threading
+import time
 from http.cookies import SimpleCookie
+from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
+
+from arcade_scanner.config import (
+    ALLOWED_THUMBNAIL_PREFIX,
+    DUPLICATES_CACHE_FILE,
+    IS_WIN,
+    MAX_REQUEST_SIZE,
+    SETTINGS_FILE,
+    config,
+)
+from arcade_scanner.database import db, user_db
 from arcade_scanner.scanner import get_scanner_manager
+from arcade_scanner.security import (
+    SecurityError,
+    is_path_allowed,
+    is_safe_directory_traversal,
+    sanitize_path,
+    session_manager,
+    validate_filename,
+)
+from arcade_scanner.server.response_helpers import (
+    send_bytes,
+    send_json,
+    send_not_modified_if_unchanged,
+)
 from arcade_scanner.server.streaming_util import serve_file_range
-from arcade_scanner.server.response_helpers import send_json, send_bytes, send_not_modified_if_unchanged
 from arcade_scanner.templates.dashboard_template import generate_html_report
-from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
 
 class _MediaCache:
@@ -308,7 +326,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
     def get_current_user(self):
         """Returns the username from the session cookie, Authorization header, query parameter, or None."""
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import parse_qs, urlparse
 
         # 1. Cookie prüfen
         if "Cookie" in self.headers:
@@ -387,7 +405,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self._response_started = False
         try:
-            from .routes import queue, settings, duplicates, tags, files
+            from .routes import duplicates, files, queue, settings, tags
             if queue.handle_get(self): return
             if settings.handle_get(self): return
             if duplicates.handle_get(self): return
@@ -884,7 +902,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         self._response_started = False
         try:
-            from .routes import queue, settings, duplicates, tags
+            from .routes import duplicates, queue, settings, tags
             if queue.handle_post(self): return
             if settings.handle_post(self): return
             if duplicates.handle_post(self): return

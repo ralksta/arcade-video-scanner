@@ -1,33 +1,35 @@
+import json
 import os
 import socket
 import time
-import json
+
 from arcade_scanner.config import config
+from arcade_scanner.templates.components import (
+    BATCH_BAR_COMPONENT,
+    CINEMA_MODAL_COMPONENT,
+    COLLECTION_MODAL_COMPONENT,
+    DUPLICATE_CHECKER_MODAL_COMPONENT,
+    FILTER_BAR_COMPONENT,
+    FILTER_PANEL_COMPONENT,
+    FOLDER_BROWSER_LEGEND_COMPONENT,
+    FOLDER_SIDEBAR_COMPONENT,
+    GIF_EXPORT_PANEL_COMPONENT,
+    HIDDEN_PATH_MODAL_COMPONENT,
+    LIST_VIEW_COMPONENT,
+    OPTIMIZE_PANEL_COMPONENT,
+    SAVED_VIEWS_COMPONENT,
+    SETTINGS_MODAL_COMPONENT,
+    SETUP_WIZARD_COMPONENT,
+    TAG_MANAGER_MODAL_COMPONENT,
+    TREEMAP_LEGEND_COMPONENT,
+)
 from arcade_scanner.templates.theme import CURRENT_THEME, THEMES
 from arcade_scanner.templates.ui_components import (
     render_base_layout,
     render_header,
-    render_navigation
+    render_navigation,
 )
-from arcade_scanner.templates.components import (
-    FILTER_BAR_COMPONENT,
-    FILTER_PANEL_COMPONENT,
-    TAG_MANAGER_MODAL_COMPONENT,
-    COLLECTION_MODAL_COMPONENT,
-    HIDDEN_PATH_MODAL_COMPONENT,
-    SETUP_WIZARD_COMPONENT,
-    LIST_VIEW_COMPONENT,
-    OPTIMIZE_PANEL_COMPONENT,
-    GIF_EXPORT_PANEL_COMPONENT,
-    SETTINGS_MODAL_COMPONENT,
-    CINEMA_MODAL_COMPONENT,
-    DUPLICATE_CHECKER_MODAL_COMPONENT,
-    TREEMAP_LEGEND_COMPONENT,
-    FOLDER_BROWSER_LEGEND_COMPONENT,
-    BATCH_BAR_COMPONENT,
-    FOLDER_SIDEBAR_COMPONENT,
-    SAVED_VIEWS_COMPONENT
-)
+
 
 def generate_html_report(results, report_file, server_port=8000):
     total_mb = sum(r["Size_MB"] for r in results)

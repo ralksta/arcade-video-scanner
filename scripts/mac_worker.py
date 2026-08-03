@@ -21,15 +21,15 @@ import signal
 import socket
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 # Add parent directory to path so we can import video_optimizer
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from optimizer_utils import parse_schedule, is_within_schedule, battery_from_pmset  # noqa: E402
+from optimizer_utils import battery_from_pmset, is_within_schedule, parse_schedule  # noqa: E402
 
 # Color codes
 G = "\033[92m"
@@ -236,7 +236,7 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
     client.update_status(job_id, "encoding")
 
     try:
-        from video_optimizer import process_file, detect_encoder, ENCODER_PROFILES
+        from video_optimizer import ENCODER_PROFILES, detect_encoder, process_file
 
         encoder_key = detect_encoder()
         if not encoder_key or encoder_key not in ENCODER_PROFILES:

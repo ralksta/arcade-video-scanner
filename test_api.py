@@ -1,5 +1,6 @@
-from arcade_scanner.database.user_store import user_db
 import os
+
+from arcade_scanner.database.user_store import user_db
 
 admin = user_db.get_user("admin")
 if admin:

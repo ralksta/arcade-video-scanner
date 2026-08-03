@@ -1,11 +1,12 @@
 import asyncio
 import os
-import subprocess
 import shutil
-from typing import Optional, Dict, List, Tuple
+import subprocess
+from typing import Dict, List, Optional, Tuple
 
-from ..models.media_asset import MediaAsset, MediaType, ImageMetadata
+from ..models.media_asset import ImageMetadata, MediaAsset, MediaType
 from .inspector import MediaInspector
+
 
 class ImageInspector(MediaInspector):
     """

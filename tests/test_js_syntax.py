@@ -16,8 +16,8 @@ What is checked:
     - Parsed with `node --check` (V8 syntax validation, no execution)
     - Any SyntaxError → test fails with the node error message
 """
-import subprocess
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest

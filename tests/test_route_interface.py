@@ -13,8 +13,8 @@ Why this exists:
     This test catches that class of bug at CI time, not at runtime.
 """
 import importlib
-import pkgutil
 import inspect
+import pkgutil
 
 import pytest
 

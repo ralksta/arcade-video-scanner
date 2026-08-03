@@ -1,12 +1,14 @@
-import sqlite3
+import binascii
+import hashlib
 import json
 import os
-import hashlib
-import binascii
 import shutil
-from typing import Optional, List, Dict
+import sqlite3
+from typing import Dict, List, Optional
+
 from arcade_scanner.config import config
 from arcade_scanner.models.user import User, UserVideoData
+
 
 class UserStore:
     """

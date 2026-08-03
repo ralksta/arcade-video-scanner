@@ -1,15 +1,16 @@
 #!/Users/ralfo/git/arcade-video-scanner/.venv/bin/python3
 import argparse
-import sys
-import os
 import binascii
 import getpass
+import os
+import sys
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from arcade_scanner.database import user_db
 from arcade_scanner.models.user import User
+
 
 def list_users(args):
     users = user_db.get_all_users()

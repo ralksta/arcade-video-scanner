@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from arcade_scanner.templates.theme import BaseTheme, render_theme_css
 
+
 def render_base_layout(theme: BaseTheme, content: str, scripts: str, active_theme_name: str = "arcade") -> str:
     """
     Renders the main HTML shell, injecting theme CSS variables and config.
