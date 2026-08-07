@@ -2223,6 +2223,9 @@ FILTER_BAR_COMPONENT = """
         <button id="refreshBtn" onclick="rescanLibrary()" class="bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white p-2 rounded-full transition-colors flex items-center justify-center flex-shrink-0" title="Rescan Library">
             <span class="material-icons text-[18px]">refresh</span>
         </button>
+        <button id="stopScanBtn" onclick="stopScan()" class="hidden bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 p-2 rounded-full transition-colors flex items-center justify-center flex-shrink-0" title="Scan stoppen">
+            <span class="material-icons text-[18px]">stop</span>
+        </button>
     </div>
 </div>
 

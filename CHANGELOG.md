@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added — Scan-Steuerung
+- **Scan stoppen aus der UI** (ROADMAP-Punkt): neuer Stop-Button neben dem
+  Rescan-Button, `GET /api/scan/stop` signalisiert `ScannerManager.stop()`.
+  Teilergebnisse bleiben erhalten (Orphan-Cleanup wird serverseitig
+  übersprungen).
+- **`/api/rescan` läuft im Hintergrund**: antwortet sofort mit 202 statt den
+  Request zu blockieren (Voraussetzung fürs Stoppen), `GET /api/scan/status`
+  zum Pollen; das Frontend lädt nach Abschluss automatisch neu. Doppelte
+  Scans werden mit 409 abgewiesen.
+
 ### Changed — Video Optimizer V2.5
 - **Downscaling**: New `--scale-height H` option scales the encode to H pixels height while keeping the source aspect ratio (width `-2`). Upscaling is refused, the SSIM reference is scaled to match so quality checks stay valid, and the constrained-VBR ladder is adjusted to the target resolution (~pixels^0.75) so a downscale actually converts into savings.
 - **Sample-Clip Pre-Search**: The quality binary search now runs on a ~24s stream-copied probe clip first, then narrows the full-encode search to predicted ±1 — typically 1-2 full passes instead of 3-4 (files ≥ 120s; `--no-presearch` to disable).

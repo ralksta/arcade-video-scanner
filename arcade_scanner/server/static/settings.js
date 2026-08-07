@@ -556,26 +556,60 @@ async function revealInFinder(path) {
  */
 function rescanLibrary() {
     const btn = document.getElementById('refreshBtn');
+    const stopBtn = document.getElementById('stopScanBtn');
     const originalContent = btn.innerHTML;
 
-    btn.innerHTML = '<span class="material-icons spin">sync</span> SCANNEN...';
+    btn.innerHTML = '<span class="material-icons spin">sync</span>';
     btn.style.pointerEvents = 'none';
-    document.body.style.opacity = '0.5';
+    if (stopBtn) stopBtn.classList.remove('hidden');
 
+    const restore = () => {
+        btn.innerHTML = originalContent;
+        btn.style.pointerEvents = 'auto';
+        if (stopBtn) stopBtn.classList.add('hidden');
+    };
+
+    // /api/rescan antwortet 202 und scannt im Hintergrund — Fortschritt pollen,
+    // damit /api/scan/stop den laufenden Scan erreichen kann.
     fetch('/api/rescan')
         .then(response => {
-            if (response.ok) return response.json();
-            throw new Error('Scan failed');
+            if (response.status === 409) throw new Error('Scan läuft bereits');
+            if (!response.ok) throw new Error('Scan failed');
+            return response.json();
         })
         .then(() => {
-            location.reload();
+            const poll = setInterval(() => {
+                fetch('/api/scan/status')
+                    .then(r => r.json())
+                    .then(status => {
+                        if (!status.is_scanning) {
+                            clearInterval(poll);
+                            location.reload();
+                        }
+                    })
+                    .catch(() => { clearInterval(poll); restore(); });
+            }, 2000);
         })
         .catch(e => {
             console.error(e);
-            alert('Scan error: ' + e.message);
-            btn.innerHTML = originalContent;
-            btn.style.pointerEvents = 'auto';
-            document.body.style.opacity = '1';
+            if (typeof showToast === 'function') showToast(e.message, 'error');
+            restore();
+        });
+}
+
+/**
+ * Stop a running library scan (partial results are kept; orphan cleanup is
+ * skipped server-side to protect existing entries).
+ */
+function stopScan() {
+    fetch('/api/scan/stop')
+        .then(r => {
+            if (r.status === 409) throw new Error('Kein Scan aktiv');
+            if (!r.ok) throw new Error('Stop fehlgeschlagen');
+            if (typeof showToast === 'function') showToast('Scan wird gestoppt…', 'info');
+        })
+        .catch(e => {
+            if (typeof showToast === 'function') showToast(e.message, 'warning');
         });
 }
 
@@ -838,6 +872,7 @@ window.revealInFinder = revealInFinder;
 
 // Rescan
 window.rescanLibrary = rescanLibrary;
+window.stopScan = stopScan;
 
 // Saved views
 window.renderSavedViews = renderSavedViews;
