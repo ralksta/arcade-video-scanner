@@ -12,8 +12,9 @@ jobs:
     uses: ralksta/ci-workflows/.github/workflows/python-ci.yml@main
     with:
       install: python -m pip install --upgrade pip && pip install -r requirements.txt && pip install -e ".[dev]"
-      # ruff/mypy stay advisory (lint-blocking/typecheck-blocking default to false)
-      # until the pre-existing debt is cleaned up, then flip them to true.
+      # ruff is now clean (PR #30 took it 316 -> 0) -> blocking to prevent regression.
+      # mypy stays advisory until its ~131 pre-existing errors are annotated.
       lint: ruff check .
+      lint-blocking: true
       typecheck: mypy arcade_scanner
       test: pytest
