@@ -69,4 +69,4 @@
 
 ### Task 6: Push + PR
 
-- [ ] `git push -u origin night/embedding-foundation`; PR against `dev` (title per NIGHT-LOOP2.md), body notes the pending 4090 real-run and Parts 2–4.
+- [x] `git push -u origin night/embedding-foundation`; PR against `dev` (title per NIGHT-LOOP2.md), body notes the pending 4090 real-run and Parts 2–4.
