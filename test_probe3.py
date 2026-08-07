@@ -18,13 +18,6 @@ class NoSwallowMediaProbe(MediaProbe):
         width = int(video_stream.get("width", 0))
         height = int(video_stream.get("height", 0))
         video_codec = video_stream.get("codec_name", "unknown")
-        profile = video_stream.get("profile", "")
-        pixel_format = video_stream.get("pix_fmt", "")
-        level_raw = video_stream.get("level", 0)
-        try:
-            level = float(level_raw)
-        except:
-            level = 0.0
         fps_str = video_stream.get("avg_frame_rate", "0/0")
         fps = 0.0
         if "/" in fps_str:
@@ -32,15 +25,14 @@ class NoSwallowMediaProbe(MediaProbe):
                 num, den = fps_str.split("/")
                 if float(den) > 0:
                     fps = float(num) / float(den)
-            except:
+            except Exception:
                 pass
         else:
             try:
                 fps = float(fps_str)
-            except:
+            except Exception:
                 pass
         audio_codec = audio_stream.get("codec_name", "unknown")
-        audio_channels = int(audio_stream.get("channels", 0))
         container = fmt.get("format_name", "unknown")
         status = "OK"
         from arcade_scanner.models.video_entry import VideoEntry

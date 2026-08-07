@@ -62,7 +62,8 @@ def test_sqlite_store_handles_surrogates(store):
 def test_manager_hash_generation_handles_surrogates():
     from arcade_scanner.scanner.manager import ScannerManager
 
-    manager = ScannerManager()
+    # Constructing the manager must not raise for surrogate-containing paths.
+    ScannerManager()
     surrogate_path = "/media_nas/Sites/h\udcf6gl.mp4"
 
     # Should not raise UnicodeEncodeError

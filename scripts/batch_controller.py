@@ -21,7 +21,10 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # Add parent path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from arcade_scanner.core.video_processor import get_best_encoder, get_optimal_workers
+from arcade_scanner.core.video_processor import (  # noqa: E402
+    get_best_encoder,
+    get_optimal_workers,
+)
 
 # --- COLORS ---
 G = '\033[0;32m'

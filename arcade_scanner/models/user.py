@@ -1,3 +1,4 @@
+import copy
 import time
 from typing import Any, Dict, List
 
@@ -66,8 +67,6 @@ DEFAULT_SMART_COLLECTIONS = [
         "criteria": {**_default_criteria(), "date": {"type": "relative", "relative": "7d", "from": None, "to": None}}
     }
 ]
-
-import copy
 
 
 def _get_default_smart_collections():
