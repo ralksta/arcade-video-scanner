@@ -147,3 +147,10 @@ function queueSelectedCandidates() {
     }
     _queuePaths([...candState.selected]);
 }
+
+// Explizite window-Exports (Konvention wie duplicates.js/optimizer.js)
+window.renderCandidatesView = renderCandidatesView;
+window.setCandidatesCodec = setCandidatesCodec;
+window.toggleCandidateSelect = toggleCandidateSelect;
+window.queueCandidate = queueCandidate;
+window.queueSelectedCandidates = queueSelectedCandidates;

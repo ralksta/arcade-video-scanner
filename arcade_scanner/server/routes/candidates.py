@@ -1,5 +1,6 @@
 """GET /api/candidates — re-encode candidates ranked by expected savings."""
 import os
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from arcade_scanner.core.optimization_advisor import EncodeHistory, build_candidates
@@ -11,7 +12,7 @@ VALID_CODECS = {"hevc", "av1"}
 _history = EncodeHistory()
 
 
-def _get_deps():
+def _get_deps() -> tuple[Any, Any]:
     from arcade_scanner.server.api_handler import db, user_db
     return db, user_db
 

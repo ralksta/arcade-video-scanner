@@ -277,7 +277,7 @@ class SQLiteStore:
             )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_active_queue_paths(self) -> set:
+    def get_active_queue_paths(self) -> set[str]:
         """file_paths of jobs currently pending or being processed."""
         conn = self._ensure_connection()
         with self._write_lock:
