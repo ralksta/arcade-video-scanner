@@ -3,8 +3,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 from arcade_scanner.core import optimization_advisor as adv
 from arcade_scanner.models.video_entry import VideoEntry
 
@@ -170,7 +168,6 @@ def test_build_candidates_sorted_by_absolute_mb(tmp_path):
     assert out["results"][1]["estimated_saved_mb"] > out["results"][2]["estimated_saved_mb"]
 
 
-@pytest.mark.xfail(reason="optimized_at field lands in Task 4", strict=False)
 def test_build_candidates_exclusions(tmp_path):
     entries = [
         _entry(file_path="/lib/queued.mp4"),

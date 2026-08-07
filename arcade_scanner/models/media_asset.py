@@ -70,6 +70,7 @@ class MediaAsset(BaseModel):
     imported_at: int = Field(default_factory=lambda: int(time.time()), description="Timestamp when first imported")
     mtime: int = Field(0, description="Last modification timestamp of the file")
     original_path: Optional[str] = Field(None, alias="OriginalPath", description="Source path before moving to review")
+    optimized_at: Optional[int] = Field(0, description="Unix timestamp of last successful optimization (0 = never)")
 
     # --- LEGACY COMPATIBILITY PROPERTIES (Snake Case) ---
     @property
