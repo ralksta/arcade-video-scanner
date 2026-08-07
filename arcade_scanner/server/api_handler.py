@@ -394,7 +394,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self._response_started = False
         try:
-            from .routes import duplicates, files, queue, settings, tags
+            from .routes import candidates, duplicates, files, queue, settings, tags
             if queue.handle_get(self):
                 return
             if settings.handle_get(self):
@@ -402,6 +402,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if duplicates.handle_get(self):
                 return
             if tags.handle_get(self):
+                return
+            if candidates.handle_get(self):
                 return
             if files.handle_get(self):
                 return
@@ -435,7 +437,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
             # 1. ROOT / INDEX -> Serve REPORT_FILE
-            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates"]
+            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
             clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
 
