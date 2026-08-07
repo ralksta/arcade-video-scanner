@@ -29,6 +29,13 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Optimizer-Kandidaten-Ansicht (2026-08-07)
+- **Kandidaten-Ansicht**: Ranks library by expected re-encode savings using bitrate-per-resolution heuristic and codec efficiency metrics.
+- **Real-World Refinement**: Results refined by actual outcomes from `encode_history.jsonl` once a resolution/bitrate class has 3+ encodes.
+- **Quick Queuing**: Row entries queue directly into the existing encoding queue with HEVC/AV1 toggle.
+- **Total Savings Display**: Header shows aggregate possible savings for the entire library.
+- **`optimized_at` Marker**: Successful optimizations now stamp media entries; optimized files are excluded from candidates (rescan-safe).
+
 ### ✅ Version 6.8.0 (2026-01-18)
 - **Visual Timeline Scrubber**: Professional timeline with frame-accurate seeking and thumbnail previews.
 - **GIF Export Panel**: Redesigned bottom panel UI with presets and size estimation.
