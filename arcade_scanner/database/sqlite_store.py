@@ -10,20 +10,18 @@ Benefits over the JSON format:
     - ACID guarantees for concurrent access
     - Scales to 100K+ entries without memory pressure
 """
+import json
 import logging
 import os
 import sqlite3
-import json
-import hashlib
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
 from ..config import config
 from ..models.video_entry import VideoEntry
-
 
 # All VideoEntry fields → SQLite columns
 # Primary key is file_path (TEXT). All other fields map 1:1.

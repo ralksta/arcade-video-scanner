@@ -1,8 +1,7 @@
 import asyncio
 import os
 import shutil
-import subprocess
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 from ..models.media_asset import ImageMetadata, MediaAsset, MediaType
 from .inspector import MediaInspector

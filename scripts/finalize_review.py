@@ -7,9 +7,8 @@ and allows the user to keep the optimized version or revert to the original.
 """
 
 import os
-import sys
 import shutil
-from pathlib import Path
+import sys
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,6 +17,7 @@ sys.path.insert(0, PROJECT_ROOT)
 from arcade_scanner.config import config
 from arcade_scanner.database import db
 from arcade_scanner.models.video_entry import VideoEntry
+
 
 def print_banner():
     print("╔════════════════════════════════════════╗")

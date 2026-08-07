@@ -12,7 +12,7 @@ import math
 import os
 import subprocess
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Codec efficiency ratios – when transcoding *from* one codec *to* another,

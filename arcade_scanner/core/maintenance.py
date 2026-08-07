@@ -1,5 +1,4 @@
 import os
-import shutil
 
 from arcade_scanner.config import config
 

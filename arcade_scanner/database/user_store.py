@@ -4,7 +4,7 @@ import json
 import os
 import shutil
 import sqlite3
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from arcade_scanner.config import config
 from arcade_scanner.models.user import User, UserVideoData

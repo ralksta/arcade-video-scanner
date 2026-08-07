@@ -4,16 +4,15 @@ Batch Controller V2.1 - Clean Summary Table Display with Logging
 Shows a live-updating status table for all parallel encodes.
 Writes detailed results to a persistent log file.
 """
-import os
-import sys
 import argparse
-import time
-import threading
-import subprocess
 import re
-from pathlib import Path
-from datetime import datetime
+import subprocess
+import sys
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from pathlib import Path
 
 # Logs directory
 LOG_DIR = Path.home() / ".arcade-scanner" / "logs"
@@ -22,7 +21,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # Add parent path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from arcade_scanner.core.video_processor import get_optimal_workers, get_best_encoder
+from arcade_scanner.core.video_processor import get_best_encoder, get_optimal_workers
 
 # --- COLORS ---
 G = '\033[0;32m'

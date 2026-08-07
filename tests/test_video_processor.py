@@ -6,8 +6,6 @@ Focus: IMAGE_EXTENSIONS constant, detect_h264_encoder dependency injection,
 import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from arcade_scanner.core.hw_encode_detect import detect_h264_encoder as detect_hw_encoder
 from arcade_scanner.core.video_processor import (
     IMAGE_EXTENSIONS,

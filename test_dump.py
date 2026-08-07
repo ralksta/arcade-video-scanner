@@ -1,5 +1,4 @@
 from arcade_scanner.database.sqlite_store import SQLiteStore
-from arcade_scanner.models.video_entry import VideoEntry
 
 db = SQLiteStore()
 print("DB Loaded.")

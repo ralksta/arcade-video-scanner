@@ -1,5 +1,3 @@
-import asyncio
-import os
 from typing import Optional
 
 from ..models.media_asset import MediaAsset, MediaType, VideoMetadata

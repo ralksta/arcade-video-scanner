@@ -2,12 +2,8 @@ import http.server
 import json
 import mimetypes
 import os
-import shlex
 import socket
 import ssl
-import subprocess
-import sys
-import tempfile
 import threading
 import time
 from http.cookies import SimpleCookie
@@ -17,18 +13,12 @@ from urllib.parse import parse_qs, unquote, urlparse
 from arcade_scanner.config import (
     ALLOWED_THUMBNAIL_PREFIX,
     DUPLICATES_CACHE_FILE,
-    IS_WIN,
-    MAX_REQUEST_SIZE,
-    SETTINGS_FILE,
     config,
 )
 from arcade_scanner.database import db, user_db
-from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.security import (
     SecurityError,
     is_path_allowed,
-    is_safe_directory_traversal,
-    sanitize_path,
     session_manager,
     validate_filename,
 )
@@ -371,7 +361,6 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         2. On miss: do a full cache warm from DB (first call) or a targeted scan for new entries
         3. On persistent miss: scan full DB once more (catches entries added after server start)
         """
-        import hashlib
         from collections import OrderedDict
 
         cache = FinderHandler._thumb_source_cache
@@ -586,7 +575,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     else:
                         self.send_error(404)
                         return
-                except Exception as e:
+                except Exception:
                     self.send_error(500)
                     return
 

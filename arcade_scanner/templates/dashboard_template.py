@@ -23,7 +23,7 @@ from arcade_scanner.templates.components import (
     TAG_MANAGER_MODAL_COMPONENT,
     TREEMAP_LEGEND_COMPONENT,
 )
-from arcade_scanner.templates.theme import CURRENT_THEME, THEMES
+from arcade_scanner.templates.theme import THEMES
 from arcade_scanner.templates.ui_components import (
     render_base_layout,
     render_header,

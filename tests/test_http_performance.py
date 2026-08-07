@@ -15,8 +15,6 @@ import email.utils
 import gzip
 import io
 
-import pytest
-
 from arcade_scanner.server.response_helpers import (
     GZIP_MIN_SIZE,
     client_accepts_gzip,

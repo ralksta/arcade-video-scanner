@@ -65,7 +65,7 @@ async def test():
         probe = NoSwallowMediaProbe()
         res = await probe.get_metadata("/Users/ralfo/Downloads/-5444695758810163208.mp4")
         print("SUCCESS:", res)
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
 

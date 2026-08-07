@@ -4,9 +4,8 @@ Provides an interactive ASCII terminal experience for initial configuration.
 """
 import os
 import shutil
-import subprocess
 import sys
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 
 # ANSI color codes

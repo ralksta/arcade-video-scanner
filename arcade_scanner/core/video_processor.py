@@ -4,6 +4,7 @@ import logging
 import os
 import subprocess
 from typing import Any, Dict, Optional
+
 from arcade_scanner.config import config
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,6 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
 
 
 # --- HARDWARE ENCODER DETECTION ---
-from arcade_scanner.core.hw_encode_detect import get_best_h264_encoder as get_best_encoder, get_optimal_workers
 
 def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None) -> Optional[Dict[str, Any]]:
     """
