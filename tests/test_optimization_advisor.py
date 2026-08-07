@@ -217,6 +217,36 @@ def test_build_candidates_reason_mentions_codec_and_resolution(tmp_path):
     reason = out["results"][0]["reason"]
     assert "h264" in reason.lower()
     assert "2160" in reason or "4k" in reason.lower()
+    assert "deutlich über referenz" in reason.lower()  # 45 Mbit/s 4K is above the ref
+
+
+def test_build_candidates_reason_below_reference_says_codec_wechsel(tmp_path):
+    # 3.5 Mbit/s @ 1080p is below the ~4 Mbit/s reference -> flat codec-factor gain,
+    # not "far above reference".
+    out = adv.build_candidates(
+        [_entry(bitrate_mbps=3.5, width=1920, height=1080)],
+        "hevc", _empty_history(tmp_path), set())
+    reason = out["results"][0]["reason"]
+    assert "codec-wechsel lohnt" in reason.lower()
+    assert "deutlich über referenz" not in reason.lower()
+
+
+def test_build_candidates_reason_same_codec_says_low_potential(tmp_path):
+    out = adv.build_candidates(
+        [_entry(codec="hevc")], "hevc", _empty_history(tmp_path), set())
+    reason = out["results"][0]["reason"]
+    assert "gleicher codec" in reason.lower()
+
+
+def test_build_candidates_same_codec_skips_history_override(tmp_path):
+    """An already-HEVC file must not inherit the h264-source median for its bucket."""
+    p = _write_history(tmp_path, [_rec(saved_pct=70.0), _rec(saved_pct=70.0),
+                                  _rec(saved_pct=70.0)])
+    out = adv.build_candidates([_entry(codec="hevc")], "hevc", adv.EncodeHistory(p), set())
+    r = out["results"][0]
+    assert r["source"] == "heuristic"
+    assert r["confidence"] == "medium"
+    assert r["estimated_saved_pct"] == 15.0
 
 
 def test_build_candidates_drops_below_min_threshold(tmp_path):
