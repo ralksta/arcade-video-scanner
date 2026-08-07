@@ -52,7 +52,7 @@ function _candHeader() {
         <div class="flex flex-wrap items-center gap-4">
             <div>
                 <div class="text-2xl font-bold text-arcade-cyan">~${_fmtGB(s.total_estimated_saved_mb)}</div>
-                <div class="text-xs text-gray-400">geschätzte Ersparnis · ${s.total_files} Kandidaten
+                <div class="text-xs text-gray-400">bis zu ${_fmtGB(s.total_estimated_saved_mb)} Ersparnis möglich (Schätzung) · ${s.total_files} Kandidaten
                      · ${s.history_based} mit echter Encode-Historie</div>
             </div>
             <div class="flex items-center gap-2 ml-auto">
