@@ -411,3 +411,53 @@ class TestConcurrentReads:
 
         assert errors == [], f"first failure: {errors[0]}"
         assert len(set(seen)) == 1, "threads ended up on different connections"
+
+
+# ---------------------------------------------------------------------------
+# Embedding storage (similarity part 1)
+# ---------------------------------------------------------------------------
+
+class TestEmbeddingStorage:
+    def test_tables_exist(self, store):
+        rows = store._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name IN ('embedding_meta', 'frame_embeddings')").fetchall()
+        assert len(rows) == 2
+
+    def test_store_and_read_roundtrip(self, store):
+        store.store_embedding("/lib/a.mp4", "ViT-B-16", 2, 111.0, b"MEAN",
+                              [(0, 1.5, b"F0"), (1, 3.0, b"F1")])
+        state = store.get_embedding_state()
+        assert state == {"/lib/a.mp4": (111.0, "ViT-B-16")}
+        vectors = store.get_mean_vectors()
+        assert vectors == [("/lib/a.mp4", "ViT-B-16", b"MEAN")]
+        frames = store._conn.execute(
+            "SELECT frame_index, ts_sec, vector FROM frame_embeddings "
+            "WHERE file_path = ? ORDER BY frame_index", ("/lib/a.mp4",)).fetchall()
+        assert [(r["frame_index"], r["ts_sec"], r["vector"]) for r in frames] == [
+            (0, 1.5, b"F0"), (1, 3.0, b"F1")]
+
+    def test_restore_replaces_old_rows(self, store):
+        store.store_embedding("/lib/a.mp4", "ViT-B-16", 2, 111.0, b"OLD",
+                              [(0, 1.0, b"X"), (1, 2.0, b"Y"), (2, 3.0, b"Z")])
+        store.store_embedding("/lib/a.mp4", "ViT-L-14", 2, 222.0, b"NEW", [(0, 1.0, b"N")])
+        assert store.get_embedding_state() == {"/lib/a.mp4": (222.0, "ViT-L-14")}
+        assert store.get_mean_vectors() == [("/lib/a.mp4", "ViT-L-14", b"NEW")]
+        count = store._conn.execute(
+            "SELECT COUNT(*) FROM frame_embeddings WHERE file_path = ?",
+            ("/lib/a.mp4",)).fetchone()[0]
+        assert count == 1
+
+    def test_delete_embedding(self, store):
+        store.store_embedding("/lib/a.mp4", "m", 1, 1.0, b"V", [(0, 0.0, b"F")])
+        store.delete_embedding("/lib/a.mp4")
+        assert store.get_embedding_state() == {}
+        count = store._conn.execute("SELECT COUNT(*) FROM frame_embeddings").fetchone()[0]
+        assert count == 0
+
+    def test_prune_removes_orphans(self, store):
+        store.store_embedding("/lib/keep.mp4", "m", 1, 1.0, b"V", [])
+        store.store_embedding("/lib/gone.mp4", "m", 1, 1.0, b"V", [])
+        removed = store.prune_embeddings({"/lib/keep.mp4"})
+        assert removed == 1
+        assert list(store.get_embedding_state()) == ["/lib/keep.mp4"]

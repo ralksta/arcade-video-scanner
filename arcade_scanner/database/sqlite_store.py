@@ -170,6 +170,90 @@ class SQLiteStore:
         except Exception:
             pass  # Column already exists
 
+        # Embedding storage (similarity part 1) — written by scripts/media_indexer.py,
+        # read by routes/similar.py. Vectors are L2-normalized float32 blobs.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS embedding_meta (
+                file_path   TEXT PRIMARY KEY,
+                model       TEXT NOT NULL,
+                dim         INTEGER NOT NULL,
+                mtime       REAL NOT NULL,
+                indexed_at  TEXT NOT NULL,
+                mean_vector BLOB NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS frame_embeddings (
+                file_path   TEXT NOT NULL,
+                frame_index INTEGER NOT NULL,
+                ts_sec      REAL NOT NULL,
+                vector      BLOB NOT NULL,
+                PRIMARY KEY (file_path, frame_index)
+            )
+        """)
+
+    # ------------------------------------------------------------------
+    # Embedding storage (similarity)
+    # ------------------------------------------------------------------
+
+    def store_embedding(self, file_path: str, model: str, dim: int, mtime: float,
+                        mean_vector: bytes, frames: list[tuple[int, float, bytes]]) -> None:
+        """Write one file's embeddings atomically, replacing any previous rows."""
+        conn = self._ensure_connection()
+        safe_path = self._get_safe_path(file_path)
+        with self._write_lock:
+            conn.execute("BEGIN")
+            try:
+                conn.execute("DELETE FROM frame_embeddings WHERE file_path = ?", (safe_path,))
+                conn.execute(
+                    "INSERT OR REPLACE INTO embedding_meta "
+                    "(file_path, model, dim, mtime, indexed_at, mean_vector) "
+                    "VALUES (?, ?, ?, ?, datetime('now'), ?)",
+                    (safe_path, model, dim, mtime, mean_vector),
+                )
+                conn.executemany(
+                    "INSERT INTO frame_embeddings (file_path, frame_index, ts_sec, vector) "
+                    "VALUES (?, ?, ?, ?)",
+                    [(safe_path, idx, ts, vec) for idx, ts, vec in frames],
+                )
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        self._notify_change()
+
+    def get_embedding_state(self) -> dict[str, tuple[float, str]]:
+        """path → (mtime, model) for incremental skip decisions."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute("SELECT file_path, mtime, model FROM embedding_meta")
+            return {self._decode_safe_path(row["file_path"]): (row["mtime"], row["model"])
+                    for row in cursor}
+
+    def get_mean_vectors(self) -> list[tuple[str, str, bytes]]:
+        """(path, model, mean_vector blob) for every indexed file."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute("SELECT file_path, model, mean_vector FROM embedding_meta")
+            return [(self._decode_safe_path(row["file_path"]), row["model"], row["mean_vector"])
+                    for row in cursor]
+
+    def delete_embedding(self, file_path: str) -> None:
+        conn = self._ensure_connection()
+        safe_path = self._get_safe_path(file_path)
+        with self._write_lock:
+            conn.execute("DELETE FROM embedding_meta WHERE file_path = ?", (safe_path,))
+            conn.execute("DELETE FROM frame_embeddings WHERE file_path = ?", (safe_path,))
+
+    def prune_embeddings(self, existing_paths: set[str]) -> int:
+        """Drop embeddings for files no longer in the library. Returns count removed."""
+        removed = 0
+        for path in list(self.get_embedding_state()):
+            if path not in existing_paths:
+                self.delete_embedding(path)
+                removed += 1
+        return removed
+
     # ------------------------------------------------------------------
     # Encoding Queue methods
     # ------------------------------------------------------------------

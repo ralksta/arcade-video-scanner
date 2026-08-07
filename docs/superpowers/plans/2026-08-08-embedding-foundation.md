@@ -35,9 +35,9 @@
 
 **Produces:** tables `embedding_meta(file_path PK, model, dim, mtime, indexed_at, mean_vector BLOB)`, `frame_embeddings(file_path, frame_index, ts_sec, vector BLOB, PK(file_path, frame_index))`; methods `store_embedding(file_path, model, dim, mtime, mean_vector: bytes, frames: list[tuple[int, float, bytes]]) -> None` (one transaction, replaces old rows), `get_embedding_state() -> dict[str, tuple[float, str]]` (path → (mtime, model)), `get_mean_vectors() -> list[tuple[str, str, bytes]]` ((path, model, blob)), `delete_embedding(file_path) -> None`, `prune_embeddings(existing_paths: set[str]) -> int`.
 
-- [ ] Tests: store/read roundtrip, replace-on-restore semantics (old frame rows gone), state map, prune removes orphans, tables exist on fresh DB.
-- [ ] Implement in `_create_table` + methods next to the auto-tag/queue sections (same `_write_lock`/`_get_safe_path` conventions).
-- [ ] pytest/ruff/mypy green; commit `feat(db): embedding storage tables and access methods`.
+- [x] Tests: store/read roundtrip, replace-on-restore semantics (old frame rows gone), state map, prune removes orphans, tables exist on fresh DB.
+- [x] Implement in `_create_table` + methods next to the auto-tag/queue sections (same `_write_lock`/`_get_safe_path` conventions).
+- [x] pytest/ruff/mypy green; commit `feat(db): embedding storage tables and access methods`.
 
 ### Task 3: `/api/similar` route
 
