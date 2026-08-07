@@ -991,7 +991,7 @@ git commit -m "feat(core): auto-tagging rule engine with post-scan hooks"
   - `handle_get(handler) -> bool`, `handle_post(handler) -> bool`
   - Deliberate deviation from the spec's action list: no `update` action (YAGNI) — editing a rule = delete + re-create in the modal. Reviewers: this is plan-intended, not an omission.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_routes_autotag.py
@@ -1142,12 +1142,12 @@ def test_run_endpoint():
     mock_run.assert_called_once_with("alice", user_db=user_db, media_db=media_db)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/pytest tests/test_routes_autotag.py -v`
 Expected: FAIL with "No module named ... routes.autotag"
 
-- [ ] **Step 3: Implement the route module**
+- [x] **Step 3: Implement the route module**
 
 ```python
 # arcade_scanner/server/routes/autotag.py
@@ -1264,7 +1264,7 @@ def handle_post(handler) -> bool:
     return False
 ```
 
-- [ ] **Step 4: Wire the dispatches**
+- [x] **Step 4: Wire the dispatches**
 
 `api_handler.py` GET (~line 398): import becomes `from .routes import autotag, candidates, duplicates, files, queue, settings, tags`; insert before `files.handle_get`:
 
@@ -1280,12 +1280,12 @@ def handle_post(handler) -> bool:
                 return
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `.venv/bin/pytest tests/test_routes_autotag.py tests/test_route_interface.py -v`
 Expected: all PASS (make the module conform if `test_route_interface.py` imposes a contract on route modules)
 
-- [ ] **Step 6: Lint, typecheck, commit**
+- [x] **Step 6: Lint, typecheck, commit**
 
 ```bash
 .venv/bin/ruff check arcade_scanner tests
