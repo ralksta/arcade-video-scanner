@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any
-from datetime import datetime
+import copy
 import time
+from typing import Any, Dict, List
 
-import uuid
+from pydantic import BaseModel, Field
+
 
 def _default_criteria():
     return {
@@ -68,7 +68,6 @@ DEFAULT_SMART_COLLECTIONS = [
     }
 ]
 
-import copy
 
 def _get_default_smart_collections():
     return copy.deepcopy(DEFAULT_SMART_COLLECTIONS)

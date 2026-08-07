@@ -1,6 +1,6 @@
 from typing import Optional, Protocol
 
-from ..models.media_asset import MediaAsset, MediaType
+from ..models.media_asset import MediaAsset
 
 
 class MediaInspector(Protocol):

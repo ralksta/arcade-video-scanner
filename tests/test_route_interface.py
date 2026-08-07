@@ -14,7 +14,6 @@ Why this exists:
 """
 import importlib
 import inspect
-import pkgutil
 
 import pytest
 

@@ -9,8 +9,6 @@ import gzip
 import json
 from http.server import BaseHTTPRequestHandler
 
-from arcade_scanner.config import MAX_REQUEST_SIZE
-
 # Bodies smaller than this aren't worth the gzip CPU/header overhead.
 GZIP_MIN_SIZE = 512
 

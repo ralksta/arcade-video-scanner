@@ -2,12 +2,8 @@ import http.server
 import json
 import mimetypes
 import os
-import shlex
 import socket
 import ssl
-import subprocess
-import sys
-import tempfile
 import threading
 import time
 from http.cookies import SimpleCookie
@@ -17,18 +13,12 @@ from urllib.parse import parse_qs, unquote, urlparse
 from arcade_scanner.config import (
     ALLOWED_THUMBNAIL_PREFIX,
     DUPLICATES_CACHE_FILE,
-    IS_WIN,
-    MAX_REQUEST_SIZE,
-    SETTINGS_FILE,
     config,
 )
 from arcade_scanner.database import db, user_db
-from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.security import (
     SecurityError,
     is_path_allowed,
-    is_safe_directory_traversal,
-    sanitize_path,
     session_manager,
     validate_filename,
 )
@@ -43,7 +33,7 @@ from arcade_scanner.templates.dashboard_template import generate_html_report
 
 class _MediaCache:
     """Thread-safe in-memory cache für db.get_all() mit 30s TTL.
-    
+
     Verhindert wiederholte Full-Table-Scans für API-Requests, die in kurzer
     Zeit mehrfach alle Einträge lesen. Wird explizit invalidiert wenn Daten
     verändert werden (upsert, remove etc.).
@@ -365,13 +355,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
     def _resolve_thumb_source(self, thumb_filename: str):
         """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path.
-        
+
         Strategy:
         1. Check in-memory LRU cache (fast path)
         2. On miss: do a full cache warm from DB (first call) or a targeted scan for new entries
         3. On persistent miss: scan full DB once more (catches entries added after server start)
         """
-        import hashlib
         from collections import OrderedDict
 
         cache = FinderHandler._thumb_source_cache
@@ -406,11 +395,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         self._response_started = False
         try:
             from .routes import duplicates, files, queue, settings, tags
-            if queue.handle_get(self): return
-            if settings.handle_get(self): return
-            if duplicates.handle_get(self): return
-            if tags.handle_get(self): return
-            if files.handle_get(self): return
+            if queue.handle_get(self):
+                return
+            if settings.handle_get(self):
+                return
+            if duplicates.handle_get(self):
+                return
+            if tags.handle_get(self):
+                return
+            if files.handle_get(self):
+                return
         except Exception as e:
             print(f"Module route error GET: {e}")
             if getattr(self, "_response_started", False):
@@ -586,7 +580,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     else:
                         self.send_error(404)
                         return
-                except Exception as e:
+                except Exception:
                     self.send_error(500)
                     return
 
@@ -712,7 +706,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         # Always show items in Review mode, regardless of scan targets
                         if entry["Status"] == "REVIEW" or is_match:
                              filtered_videos.append(entry)
-                             if is_match: match_count += 1
+                             if is_match:
+                                 match_count += 1
 
                     if not filtered_videos and all_entries:
                          sample = os.path.abspath(all_entries[0]["FilePath"])
@@ -903,10 +898,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         self._response_started = False
         try:
             from .routes import duplicates, queue, settings, tags
-            if queue.handle_post(self): return
-            if settings.handle_post(self): return
-            if duplicates.handle_post(self): return
-            if tags.handle_post(self): return
+            if queue.handle_post(self):
+                return
+            if settings.handle_post(self):
+                return
+            if duplicates.handle_post(self):
+                return
+            if tags.handle_post(self):
+                return
         except Exception as e:
             print(f"Module route error POST: {e}")
             if getattr(self, "_response_started", False):

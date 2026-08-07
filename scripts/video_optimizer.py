@@ -25,7 +25,7 @@ try:
     _core_path = Path(__file__).parent.parent / "arcade_scanner" / "core"
     if _core_path.exists():
         _sys.path.insert(0, str(_core_path))
-        from bitrate_analyzer import BitrateProfile, analyze_bitrate
+        from bitrate_analyzer import analyze_bitrate
         from hw_encode_detect import detect_hevc_optimizer_encoder
         _sys.path.pop(0)
         BITRATE_ANALYZER_AVAILABLE = True
@@ -519,7 +519,6 @@ def get_multi_ssim(
             text=True
         )
 
-        stderr_chunks = []
         out_time_us = 0
         total_us = total_sample_duration * 1_000_000
 
@@ -715,8 +714,10 @@ def build_ffmpeg_command(input_path, output_path, profile, quality_value, copy_a
     cmd = ['ffmpeg', '-y']
 
     # Trim input if needed (fast seek)
-    if ss: cmd.extend(['-ss', str(ss)])
-    if to: cmd.extend(['-to', str(to)])
+    if ss:
+        cmd.extend(['-ss', str(ss)])
+    if to:
+        cmd.extend(['-to', str(to)])
 
     if video_mode == 'copy':
         # Passthrough video
@@ -1189,7 +1190,6 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         # Note: ffmpeg output parsing logic below relies partially on encoding stats.
         # Copy mode outputs less stats, but we can try reuse the existing loop.
 
-        cur_stats = {"bitrate": "copy", "speed": "N/A"}
         encode_start = time.time()
         captured_errors = []
 
@@ -1232,7 +1232,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
         except KeyboardInterrupt:
             process.terminate()
-            if output_path.exists(): output_path.unlink()
+            if output_path.exists():
+                output_path.unlink()
             return (False, 0)
 
         process.wait()
@@ -1253,7 +1254,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
              last_encode_result['duration'] = file_time
              last_encode_result['saved_bytes'] = saved_bytes # Might be negative if container overhead
 
-             if port: notify_server(port, input_path)
+             if port:
+                 notify_server(port, input_path)
              return (True, 0)
         else:
 
@@ -1380,7 +1382,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             print()
 
             if early_abort:
-                if effective_out.exists(): effective_out.unlink()
+                if effective_out.exists():
+                    effective_out.unlink()
                 # Estimate how far over the target we projected to be.
                 # mid-encode: we wrote _abort_size bytes after _last_out_time_ms µs of video.
                 # total_duration_us = encode duration in µs.
@@ -1405,14 +1408,16 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 print(f"{R}FFmpeg error during encoding.{NC}")
                 for err in captured_errors[-10:]:
                     print(f"  {R}{err}{NC}")
-                if effective_out.exists(): effective_out.unlink()
+                if effective_out.exists():
+                    effective_out.unlink()
                 return (False, 0, 0, 'ffmpeg_error')
 
             size_after = effective_out.stat().st_size
 
             if size_after >= size_to_compare:
                 print(f" {R}-> File larger ({format_size(size_after)} > {format_size(size_to_compare)}).{NC}")
-                if effective_out != output_path and effective_out.exists(): effective_out.unlink()
+                if effective_out != output_path and effective_out.exists():
+                    effective_out.unlink()
                 return (False, size_after, 0, 'too_large')
 
             # Early savings check: skip SSIM if compression is not worth it
@@ -1421,7 +1426,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             MIN_SAVINGS_FOR_SSIM = 10.0  # Only run SSIM if we saved at least 10%
             if saved_pct_pre < MIN_SAVINGS_FOR_SSIM:
                 print(f" {Y}-> Saved only {saved_pct_pre:.2f}% – skipping SSIM (below {MIN_SAVINGS_FOR_SSIM:.0f}% threshold). Not optimal.{NC}")
-                if effective_out != output_path and effective_out.exists(): effective_out.unlink()
+                if effective_out != output_path and effective_out.exists():
+                    effective_out.unlink()
                 return (False, size_after, 0.0, 'poor_savings')
 
             # Quality verification: single ffmpeg pass over the pre-computed
@@ -1444,7 +1450,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
         except KeyboardInterrupt:
             print(f"\n{R}>>> Abort. Cleaning up...{NC}")
             process.terminate()
-            if effective_out.exists(): effective_out.unlink()
+            if effective_out.exists():
+                effective_out.unlink()
             _cleanup_staging()
             sys.exit(1)
 
@@ -1541,7 +1548,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                     low = mid + 1   # VideoToolbox: lower Q = more compression
                 else:
                     high = mid - 1  # NVENC: higher CQ = more compression
-                if staging.exists(): staging.unlink()
+                if staging.exists():
+                    staging.unlink()
                 continue
 
             if not success:
@@ -1557,7 +1565,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 print(f" {R}   -> Quality too low for this level.{NC}")
                 # Need better quality (less compression) → move towards index 0 (best quality).
                 high = mid - 1
-                if staging.exists(): staging.unlink()
+                if staging.exists():
+                    staging.unlink()
                 continue
 
             saved_bytes = size_to_compare - size_after
@@ -1658,8 +1667,6 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     # Fallback: Linear search (used when q_override is set or only 1 quality value)
     # Uses same staging strategy: encode to a temp file, promote if good, discard otherwise.
     quality = q_override if q_override is not None else quality_values[0]
-    linear_best_path: 'Path | None' = None
-    linear_best_result = None
     # Track best acceptable result: (quality, size_after, ssim, saved_pct, staging_path)
     linear_best_acceptable: 'tuple | None' = None
     linear_best_acceptable_path: 'Path | None' = None
@@ -1766,7 +1773,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                     if port:
                         notify_server(port, input_path)
                     return (True, saved_bytes_preview)
-            if staging.exists(): staging.unlink()
+            if staging.exists():
+                staging.unlink()
             _cleanup_staging()
             batch_stats['failed'] += 1
             file_time = time.time() - file_start_time
@@ -1820,7 +1828,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             print(f" {Y}   -> Not optimal (SSIM {ssim:.4f}, saved {saved_pct:.1f}%). Trying more compression...{NC}")
         else:
             print(f" {R}   -> Not optimal. Next pass...{NC}")
-            if staging.exists(): staging.unlink()
+            if staging.exists():
+                staging.unlink()
         quality += step
 
     # Loop exhausted – try the best acceptable fallback if we have one
@@ -2015,7 +2024,7 @@ def main():
 
         # Write to encode log (for both batch controller and single-file calls)
         if last_encode_result['filename']:
-            log_file = write_encode_log(
+            write_encode_log(
                 filename=last_encode_result['filename'],
                 status=last_encode_result['status'],
                 encoder_name=profile['name'],

@@ -12,28 +12,28 @@ def render_base_layout(theme: BaseTheme, content: str, scripts: str, active_them
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Arcade Video Dashboard</title>
-    
+
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=SF+Mono:wght@400;600&display=swap" rel="stylesheet">
-    
+
     <!-- Theme CSS Variables -->
     {render_theme_css()}
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     {theme.render_tailwind_config()}
-    
-    <style>        
+
+    <style>
         .scrollbar-hide::-webkit-scrollbar {{ display: none; }}
         .scrollbar-hide {{ -ms-overflow-style: none; scrollbar-width: none; }}
-        
+
         .glass-panel {{
             background: var(--surface-glass);
             backdrop-filter: blur(20px);
             border: 1px solid var(--surface-border);
         }}
-        
+
         /* JS Active State Helpers */
         #folderSidebar.active {{ transform: translateX(0); }}
         #batchBar.active {{ transform: translateY(0); }}
@@ -41,7 +41,7 @@ def render_base_layout(theme: BaseTheme, content: str, scripts: str, active_them
         #settingsModal.active {{ display: flex !important; opacity: 1; pointer-events: auto; }}
         #cinemaModal.active {{ opacity: 1; pointer-events: auto; }}
         #cinemaInfoPanel.active {{ transform: translateX(0); }}
-        
+
         /* Treemap Tooltip */
         #treemapTooltip {{
             position: fixed;
@@ -58,7 +58,7 @@ def render_base_layout(theme: BaseTheme, content: str, scripts: str, active_them
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
             transition: opacity 0.1s;
         }}
-        
+
         .responsive-grid {{
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(var(--grid-min-width, 240px), 1fr));
@@ -129,7 +129,7 @@ def render_header(theme: BaseTheme, hostname: str, count: int, size_gb: str) -> 
             <span class="material-icons text-[18px]">logout</span>
         </button>
     </div>
-    
+
     <!-- Mobile Actions -->
     <button onclick="openSettings()" class="md:hidden p-1 {theme.text_secondary} hover:text-black dark:hover:text-white">
         <span class="material-icons text-[18px]">settings</span>
@@ -165,13 +165,13 @@ def render_navigation(theme: BaseTheme) -> str:
     return f"""
 <nav class="{theme.sidebar_container}">
     <div class="text-[11px] font-bold {theme.text_secondary} uppercase tracking-widest mb-2 px-3">Workspace</div>
-    
+
     {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "dashboard", "Lobby", "arcade-cyan", active=True)}
     {nav_btn("m-favorites", "setWorkspaceMode('favorites')", "star", "Favoriten", "arcade-gold")}
     {nav_btn("m-optimized", "setWorkspaceMode('optimized')", "offline_bolt", "Review", "arcade-cyan")}
     {nav_btn("m-vault", "setWorkspaceMode('vault')", "archive", "Vault", "arcade-magenta")}
     {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplicates", "purple")}
-    
+
     <!-- Smart Collections Section -->
     <div class="mt-4 border-t border-black/5 dark:border-white/5 pt-3">
         <div class="flex items-center justify-between px-3 mb-2">
@@ -182,7 +182,7 @@ def render_navigation(theme: BaseTheme) -> str:
         </div>
         <div id="collectionsNav" class="space-y-0.5"></div>
     </div>
-    
+
     <div class="mt-auto border-t border-black/5 dark:border-white/5 pt-3">
         <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-black dark:hover:text-white transition-colors">
             <span class="material-icons text-[20px]">settings</span>

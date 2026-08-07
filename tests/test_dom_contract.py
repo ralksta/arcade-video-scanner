@@ -278,6 +278,7 @@ class TestApiResponseSchema:
             from arcade_scanner.server import response_helpers
         except ImportError as e:
             pytest.fail(f"response_helpers nicht importierbar: {e}")
+        assert response_helpers is not None
 
     def test_video_dict_has_required_keys(self):
         """
@@ -291,6 +292,7 @@ class TestApiResponseSchema:
             from arcade_scanner.core.video_processor import get_video_metadata
         except ImportError:
             pytest.skip("video_processor nicht verfügbar")
+        assert callable(get_video_metadata)
 
         # Felder die engine.js/cards.js auf dem Video-Object erwartet
         # Hinweis: In video_processor.py kann der interne Key-Name abweichen

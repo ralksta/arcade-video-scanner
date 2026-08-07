@@ -7,17 +7,17 @@ and allows the user to keep the optimized version or revert to the original.
 """
 
 import os
-import sys
 import shutil
-from pathlib import Path
+import sys
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-from arcade_scanner.config import config
-from arcade_scanner.database import db
-from arcade_scanner.models.video_entry import VideoEntry
+from arcade_scanner.config import config  # noqa: E402
+from arcade_scanner.database import db  # noqa: E402
+from arcade_scanner.models.video_entry import VideoEntry  # noqa: E402
+
 
 def print_banner():
     print("╔════════════════════════════════════════╗")
@@ -104,7 +104,8 @@ def finalize_pair(pair, decision):
             # Remove remaining files in job dir (like thumbnails if generated)
             for f in os.listdir(job_dir):
                 f_path = os.path.join(job_dir, f)
-                if os.path.isfile(f_path): os.remove(f_path)
+                if os.path.isfile(f_path):
+                    os.remove(f_path)
             os.rmdir(job_dir)
     except Exception as e:
         print(f"⚠️ Cleanup warning: {e}")

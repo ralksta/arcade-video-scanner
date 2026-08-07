@@ -10,20 +10,18 @@ Benefits over the JSON format:
     - ACID guarantees for concurrent access
     - Scales to 100K+ entries without memory pressure
 """
+import json
 import logging
 import os
 import sqlite3
-import json
-import hashlib
 import threading
 import time
-from typing import Dict, List, Optional
-
-logger = logging.getLogger(__name__)
+from typing import List, Optional
 
 from ..config import config
 from ..models.video_entry import VideoEntry
 
+logger = logging.getLogger(__name__)
 
 # All VideoEntry fields → SQLite columns
 # Primary key is file_path (TEXT). All other fields map 1:1.
@@ -333,7 +331,7 @@ class SQLiteStore:
 
     def get_all_dicts(self) -> List[dict]:
         """Return all entries as plain dictionaries with UI aliases.
-        
+
         This is much more memory efficient than get_all() for large libraries,
         as it avoids Pydantic model overhead.
         """

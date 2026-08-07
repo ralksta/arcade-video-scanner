@@ -23,7 +23,7 @@ from arcade_scanner.templates.components import (
     TAG_MANAGER_MODAL_COMPONENT,
     TREEMAP_LEGEND_COMPONENT,
 )
-from arcade_scanner.templates.theme import CURRENT_THEME, THEMES
+from arcade_scanner.templates.theme import THEMES
 from arcade_scanner.templates.ui_components import (
     render_base_layout,
     render_header,
@@ -102,15 +102,15 @@ def generate_html_report(results, report_file, server_port=8000):
     {nav_html}
 
     {FOLDER_SIDEBAR_COMPONENT}
-    
+
     <!-- Desktop: Main Content Area (offset by sidebar width) -->
     <div class="flex-1 flex flex-col md:ml-64 min-h-screen bg-arcade-bg relative overflow-x-hidden max-w-full">
         {header_html}
-        
+
         {FILTER_BAR_COMPONENT}
 
         {SAVED_VIEWS_COMPONENT}
-        
+
         {TREEMAP_LEGEND_COMPONENT}
 
         {FOLDER_BROWSER_LEGEND_COMPONENT}
@@ -127,7 +127,7 @@ def generate_html_report(results, report_file, server_port=8000):
 
         <!-- Main Content Container with safe area padding -->
         <main class="flex-1 p-2 md:p-6 pb-[80px] md:pb-6 relative w-full overflow-x-hidden" id="mainContentArea">
-            
+
             <!-- Video Grid -->
             <div id="videoGrid" class="responsive-grid transition-opacity duration-300 overflow-hidden">
                 <!-- Skeleton cards shown while data loads -->
@@ -141,23 +141,23 @@ def generate_html_report(results, report_file, server_port=8000):
                     </div>
                 </div>''' for _ in range(8)])}
             </div>
-            
+
             <!-- List View -->
             {LIST_VIEW_COMPONENT}
-            
+
             <!-- Treemap Container -->
             <div id="treemapContainer" class="hidden h-[70vh] w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl"></div>
-            
+
             <!-- Loading Spinner -->
             <div id="loadingSentinel" class="h-24 flex items-center justify-center opacity-0 transition-opacity">
                 <span class="material-icons animate-spin text-arcade-cyan text-3xl">refresh</span>
             </div>
-            
+
         </main>
 
-        
+
     </div>
-    
+
     <!-- Modals & Overlays -->
     {cinema_modal_html}
     {DUPLICATE_CHECKER_MODAL_COMPONENT}
@@ -170,7 +170,7 @@ def generate_html_report(results, report_file, server_port=8000):
     {SETUP_WIZARD_COMPONENT}
     {HIDDEN_PATH_MODAL_COMPONENT}
     {BATCH_BAR_COMPONENT}
-    
+
     <!-- Hidden frame for form submissions if needed -->
     <iframe name='h_frame' style='display:none;'></iframe>
     """

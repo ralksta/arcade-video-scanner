@@ -8,7 +8,6 @@ logger that writes to both the console and to a rotating log file.
 
 import logging
 import logging.handlers
-import os
 from pathlib import Path
 
 

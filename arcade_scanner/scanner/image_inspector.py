@@ -1,8 +1,7 @@
 import asyncio
 import os
 import shutil
-import subprocess
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 from ..models.media_asset import ImageMetadata, MediaAsset, MediaType
 from .inspector import MediaInspector
@@ -13,7 +12,7 @@ class ImageInspector(MediaInspector):
     Inspector for Image Files.
     Uses native macOS 'sips' for high performance metadata extraction without heavy dependencies.
     Falls back to Pillow if sips is missing (cross-platform safety).
-    
+
     Performance: Batches up to BATCH_SIZE files per sips subprocess call,
     reducing process overhead from ~50K spawns to ~500 for large libraries.
     """
@@ -182,7 +181,7 @@ class ImageInspector(MediaInspector):
     def _parse_batch_sips_output(self, output: str) -> Dict[str, Dict[str, str]]:
         """
         Parse multi-file sips output. Each file section starts with the filepath:
-        
+
         /path/to/file1.png
           pixelWidth: 1920
           pixelHeight: 1080

@@ -12,7 +12,7 @@ import math
 import os
 import subprocess
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Codec efficiency ratios – when transcoding *from* one codec *to* another,
@@ -207,7 +207,7 @@ class EncodingParams:
 def analyze_bitrate(filepath: str) -> BitrateProfile:
     """
     Use ffprobe to deeply analyse a video file's bitrate characteristics.
-    
+
     We use per-packet analysis (show_packets) to get accurate min/max/variance
     rather than relying solely on the container-level average.
     """

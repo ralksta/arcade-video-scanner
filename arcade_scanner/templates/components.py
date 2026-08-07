@@ -5,7 +5,7 @@ OPTIMIZE_PANEL_COMPONENT = """
 <!-- Optimize Panel (Tailwind) -->
 <div id="optimizePanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10050] animate-glow-pulse glow-cyan flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS and inline CSS in HEAD -->
-    
+
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-white/10 pb-2">
         <h3 class="text-white font-bold text-base flex items-center gap-2">
@@ -19,7 +19,7 @@ OPTIMIZE_PANEL_COMPONENT = """
 
     <!-- Grid Layout for Settings (Compact 4-col) -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        
+
         <!-- Codec Card -->
         <div class="bg-white/[0.03] hover:bg-white/[0.05] rounded-xl border border-white/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
@@ -81,12 +81,12 @@ OPTIMIZE_PANEL_COMPONENT = """
         <!-- Trim block -->
         <div class="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex-1 flex flex-col gap-2 relative group w-full">
             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-arcade-cyan/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none rounded-xl"></div>
-            
+
             <div class="flex items-center justify-between relative z-10 hidden md:flex">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
                     <span class="material-icons text-[14px]">content_cut</span> Trim
                 </div>
-                
+
                 <div class="flex items-center gap-1.5">
                     <input type="text" class="bg-black/40 border border-white/10 text-white px-2 py-0.5 text-xs rounded-md font-mono text-center w-[75px] focus:border-arcade-cyan focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all" id="optTrimStart" placeholder="00:00:00">
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-white/10 rounded-md text-gray-400 hover:bg-white/10 hover:text-arcade-cyan transition-colors" onclick="setTrimFromHead('start')" title="Set Start from playhead">
@@ -102,11 +102,11 @@ OPTIMIZE_PANEL_COMPONENT = """
                     </button>
                 </div>
             </div>
-            
+
             <!-- Timeline Scrubber -->
             <div class="relative w-full mt-0.5 z-10 min-h-[50px] md:min-h-[60px]" id="optimizeTimeline"></div>
         </div>
-        
+
         <!-- Actions -->
         <div class="flex items-center justify-end gap-2 shrink-0">
             <button class="px-4 py-2 rounded-xl text-sm font-bold text-gray-400 bg-transparent hover:bg-white/5 hover:text-white transition-colors" onclick="closeOptimize()">
@@ -124,7 +124,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
 <!-- GIF Export Panel (Tailwind) -->
 <div id="gifExportPanel" class="fixed bottom-4 left-0 right-0 mx-auto w-[96%] max-w-5xl bg-[#101018]/85 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl translate-y-[150%] transition-transform duration-500 z-[10100] animate-glow-pulse glow-purple flex flex-col gap-3">
     <!-- Active state class 'translate-y-0' handled by JS -->
-    
+
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-white/10 pb-2">
         <h3 class="text-white font-bold text-base flex items-center gap-2">
@@ -138,7 +138,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
 
     <!-- Grid Layout (5 cols: Preset / FPS / Loop / Speed / Quality) -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        
+
         <!-- Preset Card -->
         <div class="bg-white/[0.03] hover:bg-white/[0.05] rounded-xl border border-white/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
@@ -216,15 +216,15 @@ GIF_EXPORT_PANEL_COMPONENT = """
         <!-- Trim block -->
         <div class="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex-1 flex flex-col gap-2 relative group w-full">
             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none rounded-xl"></div>
-            
+
             <div class="flex items-center justify-between relative z-10 hidden md:flex">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
                     <span class="material-icons text-[14px]">content_cut</span> Trim
                 </div>
-                
+
                 <div class="flex items-center gap-1.5">
                     <span class="text-xs text-gray-500 mr-2">Dur: <span id="gifDuration" class="text-purple-400 font-mono">0.0s</span></span>
-                    
+
                     <input type="text" class="bg-black/40 border border-white/10 text-white px-2 py-0.5 text-xs rounded-md font-mono text-center w-[75px] focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400/30 transition-all" id="gifTrimStart" placeholder="00:00:00" oninput="updateGifEstimate()">
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-white/10 rounded-md text-gray-400 hover:bg-white/10 hover:text-purple-400 transition-colors" onclick="setGifTrimFromHead('start')" title="Set Start from playhead">
                         <span class="material-icons text-[12px]">arrow_downward</span>
@@ -239,11 +239,11 @@ GIF_EXPORT_PANEL_COMPONENT = """
                     </button>
                 </div>
             </div>
-            
+
             <!-- Timeline Scrubber -->
             <div class="relative w-full mt-0.5 z-10 min-h-[50px] md:min-h-[60px]" id="gifTimeline"></div>
         </div>
-        
+
         <!-- Actions -->
         <div class="flex items-center justify-end gap-2 shrink-0">
             <button class="px-4 py-2 rounded-xl text-sm font-bold text-gray-400 bg-transparent hover:bg-white/5 hover:text-white transition-colors" onclick="closeGifExport()">
@@ -261,17 +261,17 @@ CINEMA_MODAL_COMPONENT = """
 <!-- Cinema Modal (Tailwind) -->
 <div id="cinemaModal" class="fixed inset-0 z-50 bg-black opacity-0 pointer-events-none transition-opacity duration-500 flex flex-col justify-center items-center">
     <!-- Active class 'opacity-100 pointer-events-auto' toggled by JS -->
-    
+
     <button class="absolute top-4 right-4 text-white/50 hover:text-white z-50 p-2" onclick="closeCinema()">
         <span class="material-icons text-4xl">close</span>
     </button>
-    
+
     <h2 id="cinemaTitle" class="absolute top-6 left-0 right-0 text-center text-white/80 font-light tracking-[4px] text-lg uppercase pointer-events-none z-40 drop-shadow-lg transition-transform duration-500">Movie Player</h2>
-    
+
     <video id="cinemaVideo" controls preload="metadata" class="max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg outline-none transition-all duration-500 origin-bottom"></video>
-    
+
     <img id="cinemaImage" class="hidden max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg object-contain transition-all duration-500 origin-bottom" src="">
-    
+
     <div id="cinemaSourceMessage" class="hidden flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-2xl p-8 border border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.15)] text-center animate-glow-pulse glow-purple max-w-md w-full mx-4 z-40">
         <span class="material-icons text-purple-400 text-6xl mb-4">movie_filter</span>
         <h3 class="text-white text-xl font-bold tracking-widest mb-2">SOURCE MEDIA</h3>
@@ -285,7 +285,7 @@ CINEMA_MODAL_COMPONENT = """
             </a>
         </div>
     </div>
-    
+
     <div id="cinemaInfoPanel" class="absolute top-20 right-4 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 transform translate-x-[120%] transition-transform duration-300 z-40 text-sm text-gray-300 animate-glow-pulse glow-cyan">
         <div class="flex items-center gap-2 mb-3 text-white font-bold border-b border-white/10 pb-2">
             <span class="material-icons text-sm">info</span>
@@ -293,12 +293,12 @@ CINEMA_MODAL_COMPONENT = """
         </div>
         <div id="cinemaInfoContent" class="space-y-2 text-xs font-mono"></div>
     </div>
-    
+
     <!-- Assigned Tags Display (Visible List with Remove X) -->
     <div id="cinemaAssignedTags" class="absolute top-20 left-4 max-w-sm flex flex-wrap gap-2 z-40 pointer-events-auto">
         <!-- Populated by JS -->
     </div>
-    
+
     <!-- Tag Picker Dropdown (appears above the Tags button) -->
     <div id="cinemaTagPanel" class="hidden absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-3 z-50 min-w-[200px] max-w-[320px] animate-glow-pulse glow-cyan">
         <div class="flex items-center gap-2 mb-2 text-white/80 text-xs border-b border-white/10 pb-2">
@@ -309,7 +309,7 @@ CINEMA_MODAL_COMPONENT = """
             <!-- Populated by JS -->
         </div>
     </div>
-    
+
     <div id="cinemaActions" class="cinema-actions absolute bottom-8 flex gap-3 z-40">
 
         <!-- Info Button -->
@@ -399,12 +399,12 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
 <!-- Duplicate Checker Fullscreen Modal -->
 <div id="duplicateCheckerModal" class="fixed inset-0 z-50 bg-black opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col">
     <!-- Active class 'opacity-100 pointer-events-auto' toggled by JS -->
-    
+
     <!-- Close Button -->
     <button class="absolute top-6 right-6 text-white/50 hover:text-white z-50 p-2 transition-colors" onclick="closeDuplicateChecker()">
         <span class="material-icons text-4xl">close</span>
     </button>
-    
+
     <!-- Header: Group Counter -->
     <div class="absolute top-6 left-0 right-0 text-center z-40">
         <div class="text-white/60 text-sm font-mono mb-1">DUPLICATE GROUP</div>
@@ -415,11 +415,11 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
             2 duplicate candidates • Qualify diff: 0.0 pts
         </div>
     </div>
-    
+
     <!-- Main Comparison Area -->
     <div class="flex-1 flex items-center justify-center px-8 py-24">
         <div class="grid grid-cols-2 gap-8 w-full max-w-7xl">
-            
+
             <!-- File A (Left) -->
             <div id="dupFileA" class="duplicate-file-panel flex flex-col gap-4 p-6 rounded-2xl border-2 border-white/10 bg-white/[0.02] transition-all hover:border-purple-400/50 hover:scale-[1.02]">
                 <!-- Label -->
@@ -434,7 +434,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                         ✓ Higher Quality
                     </div>
                 </div>
-                
+
                 <!-- Thumbnail -->
                 <div class="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="previewDuplicateFile('A')">
                     <img id="dupFileAThumb" src="" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">
@@ -442,10 +442,10 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                         <span class="material-icons text-white text-4xl drop-shadow-lg">play_circle</span>
                     </div>
                 </div>
-                
+
                 <!-- Filename -->
                 <div class="text-white font-medium text-sm truncate" id="dupFileAName" title="">filename_a.mp4</div>
-                
+
                 <!-- Metadata Grid -->
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <div class="bg-white/5 rounded-lg p-2">
@@ -465,7 +465,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                         <div id="dupFileABitrate" class="text-white font-mono">--</div>
                     </div>
                 </div>
-                
+
                 <!-- Action Button -->
                 <button onclick="keepDuplicateFile('A')" class="w-full py-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border-2 border-purple-500/50 hover:border-purple-500 text-purple-400 hover:text-white font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group">
                     <span class="material-icons">check_circle</span>
@@ -473,7 +473,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                     <span class="text-xs opacity-60 group-hover:opacity-100">(Press 1 or ←)</span>
                 </button>
             </div>
-            
+
             <!-- File B (Right) -->
             <div id="dupFileB" class="duplicate-file-panel flex flex-col gap-4 p-6 rounded-2xl border-2 border-white/10 bg-white/[0.02] transition-all hover:border-purple-400/50 hover:scale-[1.02]">
                 <!-- Label -->
@@ -488,7 +488,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                         ✓ Higher Quality
                     </div>
                 </div>
-                
+
                 <!-- Thumbnail -->
                 <div class="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="previewDuplicateFile('B')">
                     <img id="dupFileBThumb" src="" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">
@@ -496,10 +496,10 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                         <span class="material-icons text-white text-4xl drop-shadow-lg">play_circle</span>
                     </div>
                 </div>
-                
+
                 <!-- Filename -->
                 <div class="text-white font-medium text-sm truncate" id="dupFileBName" title="">filename_b.mp4</div>
-                
+
                 <!-- Metadata Grid -->
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <div class="bg-white/5 rounded-lg p-2">
@@ -519,7 +519,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                         <div id="dupFileBBitrate" class="text-white font-mono">--</div>
                     </div>
                 </div>
-                
+
                 <!-- Action Button -->
                 <button onclick="keepDuplicateFile('B')" class="w-full py-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border-2 border-purple-500/50 hover:border-purple-500 text-purple-400 hover:text-white font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group">
                     <span class="material-icons">check_circle</span>
@@ -527,10 +527,10 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                     <span class="text-xs opacity-60 group-hover:opacity-100">(Press 2 or →)</span>
                 </button>
             </div>
-            
+
         </div>
     </div>
-    
+
     <!-- Bottom Action Bar -->
     <div class="absolute bottom-8 left-0 right-0 flex items-center justify-center gap-4 z-40">
         <!-- Skip Button -->
@@ -539,7 +539,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
             <span>Skip</span>
             <span class="text-xs opacity-60">(S or Space)</span>
         </button>
-        
+
         <!-- Any is Fine Button -->
         <button onclick="markAnyIsFine()" class="px-6 py-3 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 hover:border-green-500 text-green-400 hover:text-white font-semibold text-sm transition-all flex items-center gap-2">
             <span class="material-icons text-lg">done_all</span>
@@ -547,7 +547,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
             <span class="text-xs opacity-60">(A)</span>
         </button>
     </div>
-    
+
     <!-- Keyboard Shortcuts Legend -->
     <div class="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl px-6 py-3 z-30">
         <div class="flex items-center gap-6 text-xs text-white/60">
@@ -637,51 +637,51 @@ BATCH_BAR_COMPONENT = """
 <!-- Batch Action Bar -->
 <div id="batchBar" class="fixed bottom-20 md:bottom-8 left-1/2 md:left-[calc(50%+128px)] z-50 bg-[#0d0d14] border-2 border-arcade-cyan/30 rounded-2xl animate-glow-pulse glow-cyan px-4 py-2.5 flex items-center gap-2 transition-transform duration-300" style="transform: translateX(-50%) translateY(8rem);">
     <!-- Active class 'translate-y-0' handled by JS -->
-    
+
     <!-- Select All Button -->
     <button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition-all" onclick="selectAllVisible()">
         <span class="material-icons text-sm">select_all</span>
         All
     </button>
-    
+
     <div class="h-8 w-px bg-white/10"></div>
-    
+
     <span class="text-base font-bold text-white whitespace-nowrap"><span id="batchCount" class="text-arcade-cyan text-lg">0</span> Selected</span>
-    
+
     <div class="h-8 w-px bg-white/10"></div>
-    
+
     <!-- TAG Button -->
     <button class="batch-action-btn" style="--btn-color: #a855f7" onclick="openBatchTagModal()">
         <span class="material-icons text-base">label</span>
         <span>TAG</span>
     </button>
-    
+
     <!-- OPTIMIZE Button -->
     <button class="batch-action-btn" style="--btn-color: #00ffd0" onclick="triggerBatchCompress()">
         <span class="material-icons text-base">bolt</span>
         <span>OPTIMIZE</span>
     </button>
-    
+
     <!-- FAV Button -->
     <button class="batch-action-btn" style="--btn-color: #F4B342" onclick="triggerBatchFavorite(true)">
         <span class="material-icons text-base">star</span>
         <span>FAV</span>
     </button>
-    
+
     <!-- VAULT Button -->
     <button class="batch-action-btn" style="--btn-color: #DE1A58" onclick="triggerBatchHide(true)">
         <span class="material-icons text-base">archive</span>
         <span>VAULT</span>
     </button>
-    
+
     <!-- DELETE Button -->
     <button class="batch-action-btn" style="--btn-color: #EF4444" onclick="triggerBatchDelete()">
         <span class="material-icons text-base">delete_forever</span>
         <span>DELETE</span>
     </button>
-    
+
     <div class="h-8 w-px bg-white/10"></div>
-    
+
     <button class="text-gray-400 hover:text-white transition-colors p-1" onclick="clearSelection()" title="Clear Selection">
         <span class="material-icons text-xl">close</span>
     </button>
@@ -715,14 +715,14 @@ FOLDER_SIDEBAR_COMPONENT = """
 <!-- Folder Sidebar (Off-Canvas) -->
 <div id="folderSidebar" class="fixed inset-y-0 left-0 w-80 bg-[#101018]/95 backdrop-blur-xl border-r border-white/10 transform -translate-x-full transition-transform duration-300 z-30 flex flex-col pt-safe-top">
     <!-- Active class 'translate-x-0' handled by JS -->
-    
+
     <div class="p-4 border-b border-white/10 flex items-center justify-between">
         <h3 class="font-bold text-white tracking-wider">FOLDERS</h3>
         <button class="text-gray-400 hover:text-white" onclick="toggleFolderSidebar()">
             <span class="material-icons">close</span>
         </button>
     </div>
-    
+
     <div id="folderList" class="flex-1 overflow-y-auto p-2 space-y-1">
         <!-- Injected by JS -->
     </div>
@@ -741,11 +741,11 @@ FILTER_PANEL_COMPONENT = """
 <div id="filterPanel" class="fixed inset-0 z-40 hidden">
     <!-- Backdrop -->
     <div id="filterPanelBackdrop" class="absolute inset-0 bg-black/60 opacity-0 transition-opacity duration-300" onclick="closeFilterPanel()"></div>
-    
+
     <!-- Panel Content -->
     <div id="filterPanelContent" class="absolute bg-arcade-bg/98 dark:bg-[#12121a]/95 backdrop-blur-xl border-black/10 dark:border-white/10 shadow-2xl transition-transform duration-300 flex flex-col overflow-hidden
         right-0 top-0 bottom-0 w-80 translate-x-full rounded-l-2xl border-l">
-        
+
         <!-- Header -->
         <div class="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
             <div class="flex items-center gap-3">
@@ -757,10 +757,10 @@ FILTER_PANEL_COMPONENT = """
                 <span class="material-icons">close</span>
             </button>
         </div>
-        
+
         <!-- Scrollable Body -->
         <div class="flex-1 overflow-y-auto p-4 space-y-6">
-            
+
             <!-- SIZE Section -->
             <section>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Filesize (MB)</h3>
@@ -818,7 +818,7 @@ FILTER_PANEL_COMPONENT = """
                     </button>
                 </div>
             </section>
-            
+
             <!-- CODEC Section -->
             <section>
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Codec</h3>
@@ -837,7 +837,7 @@ FILTER_PANEL_COMPONENT = """
                     </button>
                 </div>
             </section>
-            
+
             <!-- TAGS Section -->
             <section>
                 <div class="flex items-center justify-between mb-3">
@@ -850,7 +850,7 @@ FILTER_PANEL_COMPONENT = """
                     <!-- Tag chips injected by JS -->
                     <span class="text-xs text-gray-600 italic">No tags created yet</span>
                 </div>
-                
+
                 <!-- Untagged Toggle -->
                 <label class="flex items-center gap-2 mt-4 cursor-pointer group">
                     <input type="checkbox" id="filterUntaggedOnly" onchange="toggleUntaggedFilter()" class="sr-only peer">
@@ -860,9 +860,9 @@ FILTER_PANEL_COMPONENT = """
                     <span class="text-sm text-gray-400 group-hover:text-white transition-colors">Show untagged only</span>
                 </label>
             </section>
-            
+
         </div>
-        
+
         <!-- Footer -->
         <div class="p-4 border-t border-black/5 dark:border-white/5 flex items-center justify-between shrink-0 bg-black/5 dark:bg-[#0a0a12]">
             <button onclick="resetFilters()" class="text-sm text-gray-500 hover:text-white transition-colors">
@@ -880,7 +880,7 @@ FILTER_PANEL_COMPONENT = """
     #filterPanel.active { display: block !important; }
     #filterPanel.active #filterPanelBackdrop { opacity: 1; }
     #filterPanel.active #filterPanelContent { transform: translateX(0); }
-    
+
     /* Filter Chip Styles */
     .filter-chip {
         padding: 0.375rem 0.875rem;
@@ -901,7 +901,7 @@ FILTER_PANEL_COMPONENT = """
         border-color: rgba(0, 255, 208, 0.5);
         color: #00ffd0;
     }
-    
+
     /* Tag Filter Chips */
     .tag-filter-chip {
         padding: 0.375rem 0.75rem;
@@ -942,7 +942,7 @@ TAG_MANAGER_MODAL_COMPONENT = """
 <!-- Tag Manager Modal -->
 <div id="tagManagerModal" class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 transform scale-95 transition-transform duration-300 overflow-hidden">
-        
+
         <!-- Header -->
         <div class="p-4 border-b border-white/5 flex items-center justify-between">
             <div class="flex items-center gap-3">
@@ -953,7 +953,7 @@ TAG_MANAGER_MODAL_COMPONENT = """
                 <span class="material-icons">close</span>
             </button>
         </div>
-        
+
         <!-- Create New Tag -->
         <div class="p-4 border-b border-white/5 bg-[#12121a]">
             <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Create New Tag</h3>
@@ -974,20 +974,20 @@ TAG_MANAGER_MODAL_COMPONENT = """
                                     <button type="button" class="w-6 h-6 rounded" style="background: #f97316" onclick="selectTagColor('#f97316')"></button>
                                 </div>
                             </div>
-                            
+
                             <!-- Shortcut Key -->
-                            <input type="text" id="newTagShortcut" 
-                                   placeholder="Key" 
+                            <input type="text" id="newTagShortcut"
+                                   placeholder="Key"
                                    maxlength="1"
                                    class="w-12 px-2 py-2 bg-black/40 border border-white/10 rounded-lg text-white text-center uppercase focus:outline-none focus:border-arcade-cyan/50"
                                    title="Cinema mode keyboard shortcut (A-Z, except F and V)">
-                            
+
                             <button type="button" onclick="createNewTag()" class="px-4 py-2 bg-arcade-cyan/20 text-arcade-cyan rounded-lg hover:bg-arcade-cyan/30 transition-colors text-sm font-medium">
                                 Add
                             </button>
             </div>
         </div>
-        
+
         <!-- Existing Tags List -->
         <div class="p-4 max-h-64 overflow-y-auto">
             <h3 id="manageTagsHeader" class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Manage Existing Tags</h3>
@@ -996,7 +996,7 @@ TAG_MANAGER_MODAL_COMPONENT = """
                 <p class="text-sm text-gray-600 italic">No tags created yet</p>
             </div>
         </div>
-        
+
         <!-- Footer -->
         <div class="p-4 border-t border-white/5 bg-[#0a0a12]">
             <button onclick="closeTagManager()" class="w-full py-2 bg-white/5 text-gray-400 font-medium rounded-lg hover:bg-white/10 hover:text-white transition-colors">
@@ -1498,7 +1498,7 @@ SETUP_WIZARD_COMPONENT = """
 <!-- First-Run Setup Wizard -->
 <div id="setupWizard" class="hidden fixed inset-0 z-50 bg-gradient-to-br from-[#0a0a12] via-[#1a1a24] to-[#0a0a12] flex items-center justify-center p-4">
     <div class="w-full max-w-3xl">
-        
+
         <!-- Welcome Header -->
         <div class="text-center mb-8">
             <div class="inline-block p-4 bg-arcade-cyan/10 rounded-full mb-4">
@@ -1510,7 +1510,7 @@ SETUP_WIZARD_COMPONENT = """
 
         <!-- Setup Card -->
         <div class="bg-[#1a1a24] rounded-2xl shadow-2xl border border-white/10 p-8">
-            
+
             <!-- Step 1: Select Directories -->
             <div class="mb-8">
                 <div class="flex items-center gap-3 mb-4">
@@ -1518,7 +1518,7 @@ SETUP_WIZARD_COMPONENT = """
                     <h2 class="text-xl font-semibold text-white">Select Media Directories</h2>
                 </div>
                 <p class="text-sm text-gray-400 mb-4">Choose which directories to scan for videos and images. Your media is mounted at <code class="px-2 py-0.5 bg-black/40 rounded text-arcade-cyan">/media</code></p>
-                
+
                 <!-- Directory List -->
                 <div id="setupDirectoryList" class="space-y-2 max-h-64 overflow-y-auto">
                     <!-- Populated dynamically -->
@@ -1567,7 +1567,7 @@ SETUP_WIZARD_COMPONENT = """
 
 <style>
     #setupWizard.active { display: flex !important; }
-    
+
     /* Custom scrollbar for directory list */
     #setupDirectoryList::-webkit-scrollbar {
         width: 8px;
@@ -1583,7 +1583,7 @@ SETUP_WIZARD_COMPONENT = """
     #setupDirectoryList::-webkit-scrollbar-thumb:hover {
         background: rgba(100, 255, 218, 0.3);
     }
-    
+
     .setup-dir-card {
         padding: 1rem;
         background: rgba(0, 0, 0, 0.3);
@@ -1606,14 +1606,14 @@ SETUP_WIZARD_COMPONENT = """
 SETTINGS_MODAL_COMPONENT = """
 <div id="settingsModal" class="hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
     <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-arcade-bg dark:bg-[#1a1a24] rounded-2xl animate-glow-pulse glow-cyan flex flex-col md:flex-row overflow-hidden border border-black/10 dark:border-white/10 transform scale-95 transition-transform duration-300">
-        
+
         <!-- Sidebar Navigation -->
         <aside class="w-full md:w-56 bg-[#f1f3f5] dark:bg-[#12121a] border-b md:border-b-0 md:border-r border-black/10 dark:border-white/5 flex md:flex-col shrink-0">
             <div class="p-4 md:p-5 flex items-center gap-3 border-b border-black/8 dark:border-white/5 md:border-none">
                 <span class="material-icons text-arcade-gold text-xl">settings</span>
                 <h2 class="font-semibold tracking-wide text-lg text-text-main dark:text-white">Settings</h2>
             </div>
-            
+
             <nav class="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:px-3 md:py-2 gap-1">
                 <button class="settings-nav-item active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="scanning">
                     <span class="material-icons text-lg">folder_open</span>
@@ -1630,9 +1630,9 @@ SETTINGS_MODAL_COMPONENT = """
                     <span class="hidden md:inline">Interface</span>
                     <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                
+
                 <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
-                
+
                 <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="storage">
                     <span class="material-icons text-lg">storage</span>
                     <span class="hidden md:inline">Storage</span>
@@ -1658,10 +1658,10 @@ SETTINGS_MODAL_COMPONENT = """
                 </button>
             </nav>
         </aside>
-        
+
         <!-- Main Content -->
         <main class="flex-1 flex flex-col min-w-0 bg-arcade-bg dark:bg-[#1a1a24]">
-            
+
             <!-- Header -->
             <header class="p-5 md:p-6 border-b border-white/5 flex justify-between items-center">
                 <div>
@@ -1672,10 +1672,10 @@ SETTINGS_MODAL_COMPONENT = """
                     <span class="material-icons">close</span>
                 </button>
             </header>
-            
+
             <!-- Scrollable Body -->
             <div class="settings-body flex-1 overflow-y-auto p-5 md:p-6 space-y-6">
-                
+
                 <!-- SCANNING SECTION -->
                 <div class="content-section active space-y-6" id="content-scanning">
                     <section class="space-y-3">
@@ -1687,7 +1687,7 @@ SETTINGS_MODAL_COMPONENT = """
                             <p class="text-sm text-gray-500 mt-1">Paths to scan for video files. One per line.</p>
                         </div>
                         <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsTargets" placeholder="/Users/username/Videos" rows="4" oninput="markSettingsUnsaved()"></textarea>
-                        
+
                         <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-3 text-sm text-blue-300">
                              <span class="material-icons text-blue-400 text-lg">info</span>
                              <div>
@@ -1696,7 +1696,7 @@ SETTINGS_MODAL_COMPONENT = """
                              </div>
                         </div>
                     </section>
-                    
+
                     <section class="space-y-3">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
@@ -1709,7 +1709,7 @@ SETTINGS_MODAL_COMPONENT = """
                             <!-- Populated by JS -->
                         </div>
                     </section>
-                    
+
                     <section class="space-y-3">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
@@ -1741,7 +1741,7 @@ SETTINGS_MODAL_COMPONENT = """
                         </label>
                     </section>
                 </div>
-                
+
                 <!-- PERFORMANCE SECTION -->
                 <div class="content-section hidden space-y-6" id="content-performance">
                     <section class="space-y-4">
@@ -1752,7 +1752,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Ignore videos smaller than this size.</p>
                         </div>
-                        
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Minimum Size</div>
@@ -1772,7 +1772,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </div>
                         </div>
                     </section>
-                    
+
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
@@ -1781,7 +1781,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Ignore images smaller than this. Filters out tiny icons/thumbnails.</p>
                         </div>
-                        
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Minimum Size</div>
@@ -1801,7 +1801,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </div>
                         </div>
                     </section>
-                    
+
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
@@ -1810,7 +1810,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Videos above this are marked as HIGH bitrate.</p>
                         </div>
-                        
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Bitrate Threshold</div>
@@ -1839,7 +1839,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Generate thumbnails during scan to prevent lag while scrolling.</p>
                         </div>
-                        
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Pre-compute Thumbnails</div>
@@ -1887,7 +1887,7 @@ SETTINGS_MODAL_COMPONENT = """
                         <input type="hidden" id="settingsEncodingPreset" value="balanced">
                     </section>
                 </div>
-                
+
                 <!-- INTERFACE SECTION -->
                 <div class="content-section hidden space-y-6" id="content-interface">
                     <section class="space-y-4">
@@ -1898,7 +1898,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Customize the visual style.</p>
                         </div>
-                        
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
                             <label class="block text-xs text-gray-400 mb-1">Color Paradigm</label>
                             <select id="settingsTheme" onchange="markSettingsUnsaved()" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none">
@@ -1918,9 +1918,9 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Customize the dashboard experience.</p>
                         </div>
-                        
 
-                        
+
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Video Optimizer</div>
@@ -1969,7 +1969,7 @@ SETTINGS_MODAL_COMPONENT = """
 
                     </section>
                 </div>
-                
+
                 <!-- STORAGE SECTION -->
                 <div class="content-section hidden space-y-6" id="content-storage">
                     <section class="space-y-4">
@@ -1980,7 +1980,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Disk space used by generated assets.</p>
                         </div>
-                        
+
                         <div class="grid grid-cols-2 gap-3">
                             <div class="bg-black/40 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
                                 <span class="material-icons text-gray-500 text-2xl">image</span>
@@ -1993,7 +1993,7 @@ SETTINGS_MODAL_COMPONENT = """
                                 <span class="text-lg font-mono text-arcade-cyan" id="statTotal">—</span>
                             </div>
                         </div>
-                        
+
                         <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex gap-3 text-sm text-amber-200">
                             <span class="material-icons text-amber-400 text-lg">info</span>
                             <div>Cache changes require an app restart. Clearing cache deletes all thumbnails.</div>
@@ -2030,13 +2030,13 @@ SETTINGS_MODAL_COMPONENT = """
                                 <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsSensitiveDirs" placeholder="/path/to/private" rows="3" oninput="markSettingsUnsaved()"></textarea>
                                 <p class="text-xs text-gray-500 mt-1">One absolute path per line. Files in these folders will be hidden.</p>
                             </div>
-                            
+
                             <div>
                                 <label class="block text-xs font-medium text-white mb-2">Sensitive Tags</label>
                                 <input type="text" id="settingsSensitiveTags" placeholder="nsfw, adult" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" oninput="markSettingsUnsaved()">
                                 <p class="text-xs text-gray-500 mt-1">Comma separated list of tags to hide.</p>
                             </div>
-                            
+
                             <div>
                                 <label class="block text-xs font-medium text-white mb-2">Sensitive Collections</label>
                                 <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsSensitiveCollections" placeholder="My Private Collection" rows="3" oninput="markSettingsUnsaved()"></textarea>
@@ -2056,7 +2056,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Download your current configuration, including collections and tags.</p>
                         </div>
-                        
+
                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Backup Configuration</div>
@@ -2077,7 +2077,7 @@ SETTINGS_MODAL_COMPONENT = """
                             </h3>
                             <p class="text-sm text-gray-500 mt-1">Restore configuration from a backup file. Existing settings will be overwritten.</p>
                         </div>
-                        
+
                          <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
                             <div class="flex items-center gap-4">
                                 <div class="flex-1">
@@ -2132,7 +2132,7 @@ SETTINGS_MODAL_COMPONENT = """
                     </section>
                 </div>
             </div>
-            
+
             <!-- Footer -->
             <footer class="p-4 border-t border-black/8 dark:border-white/5 bg-[#f1f3f5] dark:bg-[#12121a] flex justify-between items-center">
                 <div class="flex items-center gap-2">
@@ -2153,7 +2153,7 @@ SETTINGS_MODAL_COMPONENT = """
                     </button>
                 </div>
             </footer>
-            
+
         </main>
     </div>
 </div>
@@ -2176,7 +2176,7 @@ FILTER_BAR_COMPONENT = """
         <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[18px]">search</span>
         <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Search..." class="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-arcade-cyan/50 focus:bg-black/10 dark:focus:bg-white/10 transition-all placeholder-gray-500 dark:placeholder-gray-600">
     </div>
-    
+
     <!-- Filter Controls (Simplified) -->
     <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide flex-shrink-0">
         <!-- Unified Filters Button -->
@@ -2185,7 +2185,7 @@ FILTER_BAR_COMPONENT = """
             <span>Filters</span>
             <span id="filterBadge" class="hidden bg-arcade-cyan text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">0</span>
         </button>
-        
+
         <!-- Sort Dropdown (kept for quick access) -->
         <div class="relative group">
             <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[16px] pointer-events-none group-hover:text-arcade-cyan transition-colors">sort</span>
@@ -2196,7 +2196,7 @@ FILTER_BAR_COMPONENT = """
                 <option value="date">Date ↓</option>
             </select>
         </div>
-        
+
         <!-- View Toggles & Grid Scale -->
         <div class="hidden md:flex items-center bg-black/5 dark:bg-white/5 rounded-lg p-0.5 ml-2 border border-black/5 dark:border-white/5">
             <!-- Grid Scale Slider -->
@@ -2205,7 +2205,7 @@ FILTER_BAR_COMPONENT = """
                 <input type="range" id="gridScaleSlider" min="150" max="500" value="240" step="10" oninput="updateGridScale(this.value)" class="w-16 h-1 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer">
                 <span class="material-icons text-[16px] text-gray-500/70 group-hover:text-arcade-cyan transition-colors">photo_size_select_large</span>
             </div>
-            
+
             <button id="viewToggleGrid" onclick="setLayout('grid')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Grid View">
                 <span class="material-icons text-[18px]">grid_view</span>
             </button>
@@ -2219,7 +2219,7 @@ FILTER_BAR_COMPONENT = """
                 <span class="material-icons text-[18px]">folder</span>
             </button>
         </div>
-        
+
         <button id="refreshBtn" onclick="rescanLibrary()" class="bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white p-2 rounded-full transition-colors flex items-center justify-center flex-shrink-0" title="Rescan Library">
             <span class="material-icons text-[18px]">refresh</span>
         </button>

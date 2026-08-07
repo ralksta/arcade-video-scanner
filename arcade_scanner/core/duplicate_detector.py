@@ -151,13 +151,13 @@ class _BandedHashIndex:
 class DuplicateDetector:
     """
     Detects duplicate media files using various strategies.
-    
+
     Videos: Exact match on size + duration + resolution
     Images: Perceptual hash (if imagehash available) or exact size + resolution
-    
+
     Performance:
     - Perceptual hashes are cached to disk across scans
-    - Hash bucketing eliminates O(n²) comparisons 
+    - Hash bucketing eliminates O(n²) comparisons
     """
 
     def __init__(self):
@@ -222,13 +222,13 @@ class DuplicateDetector:
     def find_all_duplicates(self, entries: List, progress_callback=None, batch_size: int = 5000, batch_offset: int = 0) -> Tuple[List[DuplicateGroup], bool]:
         """
         Find duplicates in the media library with batching support.
-        
+
         Args:
             entries: List of VideoEntry objects from the database
             progress_callback: Optional callable(str, float) to report status and progress (0-100)
             batch_size: Max number of images to process per batch (default 5000)
             batch_offset: Starting offset for image processing (for pagination)
-            
+
         Returns:
             Tuple of (List of DuplicateGroup objects, has_more: bool indicating if more batches available)
         """
@@ -579,7 +579,7 @@ class DuplicateDetector:
         """
         Find duplicate images using perceptual hash.
         Images with hash difference <= threshold are considered duplicates.
-        
+
         Performance optimizations:
         - Hash caching: reuses previously computed hashes from disk
         - Hash bucketing: groups by exact hash first (O(n)), then near-miss via prefix buckets

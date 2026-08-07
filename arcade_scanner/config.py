@@ -2,7 +2,7 @@ import json
 import os
 import socket
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings

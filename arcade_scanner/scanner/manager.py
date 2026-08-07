@@ -3,12 +3,11 @@ import hashlib
 import os
 import threading
 import time
-from typing import Callable, List, Optional, Set
+from typing import Callable, Optional, Set
 
 from ..config import config
 from ..database import db
 from ..models.media_asset import MediaAsset
-from ..models.video_entry import VideoEntry
 from .file_system import fs_scanner
 from .image_inspector import ImageInspector
 from .media_probe import MediaProbe
@@ -99,7 +98,8 @@ class ScannerManager:
         workers = []
         # Number of workers should match concurrency settings to avoid process pile-up
         num_workers = config.settings.max_concurrent_video_scans
-        if num_workers < 1: num_workers = 1
+        if num_workers < 1:
+            num_workers = 1
 
         async def _check_system_load():
             """Simple Watchdog using load average."""

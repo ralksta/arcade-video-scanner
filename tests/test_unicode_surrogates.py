@@ -1,6 +1,4 @@
 import hashlib
-import os
-import sqlite3
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -64,7 +62,8 @@ def test_sqlite_store_handles_surrogates(store):
 def test_manager_hash_generation_handles_surrogates():
     from arcade_scanner.scanner.manager import ScannerManager
 
-    manager = ScannerManager()
+    # Constructing the manager must not raise for surrogate-containing paths.
+    ScannerManager()
     surrogate_path = "/media_nas/Sites/h\udcf6gl.mp4"
 
     # Should not raise UnicodeEncodeError
@@ -93,7 +92,6 @@ def test_encoding_queue_handles_surrogates(store):
         pytest.fail(f"get_next_pending failed with UnicodeEncodeError: {e}")
 
 def test_thumbnail_hashing_handles_surrogates():
-    from arcade_scanner.config import config
     from arcade_scanner.core.video_processor import create_thumbnail
 
     surrogate_path = "/media_nas/Sites/h\udcf6gl.mp4"
