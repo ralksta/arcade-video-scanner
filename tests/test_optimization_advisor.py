@@ -220,3 +220,16 @@ def test_build_candidates_reason_mentions_codec_and_resolution(tmp_path):
     reason = out["results"][0]["reason"]
     assert "h264" in reason.lower()
     assert "2160" in reason or "4k" in reason.lower()
+
+
+def test_build_candidates_drops_below_min_threshold(tmp_path):
+    """Verify that candidates with < 10% savings are dropped from both results and summary."""
+    # History with 5% savings (below 10% threshold) for the default bucket (2160/ultra)
+    p = _write_history(tmp_path, [_rec(saved_pct=5.0), _rec(saved_pct=5.0), _rec(saved_pct=5.0)])
+    out = adv.build_candidates([_entry()], "hevc", adv.EncodeHistory(p), set())
+    # Should be completely filtered out from results
+    assert out["results"] == []
+    # Summary should reflect no candidates pass the threshold
+    assert out["summary"]["total_files"] == 0
+    assert out["summary"]["total_estimated_saved_mb"] == 0.0
+    assert out["summary"]["history_based"] == 0
