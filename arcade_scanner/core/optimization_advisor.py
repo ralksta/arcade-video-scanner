@@ -55,15 +55,15 @@ _MAX_SAVED_PCT = 85.0     # never predict more than this
 _TARGET_ALIASES = {"hevc": {"hevc", "h265"}, "av1": {"av1"}}
 
 
-def _codec_efficiency(source_codec: str, target_codec: str) -> tuple[float, bool]:
-    """(bitrate multiplier source→target, is the pair actually known?)."""
+def _codec_efficiency(source_codec: str, target_codec: str) -> tuple[float, bool, bool]:
+    """(bitrate multiplier source→target, is the pair actually known?, is_same_codec)."""
     src = (source_codec or "").lower()
     if src in _TARGET_ALIASES.get(target_codec, {target_codec}):
-        return _SAME_CODEC_EFF, True
+        return _SAME_CODEC_EFF, True, True
     eff = CODEC_EFFICIENCY.get((src, target_codec))
     if eff is not None:
-        return eff, True
-    return _DEFAULT_EFF, False
+        return eff, True, False
+    return _DEFAULT_EFF, False, False
 
 
 def estimate_heuristic(entry: VideoEntry, target_codec: str) -> Optional[tuple[float, bool]]:
@@ -77,7 +77,7 @@ def estimate_heuristic(entry: VideoEntry, target_codec: str) -> Optional[tuple[f
     if source_kbps <= 0 or height <= 0:
         return None
 
-    eff, known = _codec_efficiency(entry.codec or "", target_codec)
+    eff, known, is_same_codec = _codec_efficiency(entry.codec or "", target_codec)
 
     ref = _REF_KBPS[resolution_class(height)]
     if target_codec == "av1":
@@ -89,7 +89,7 @@ def estimate_heuristic(entry: VideoEntry, target_codec: str) -> Optional[tuple[f
     # Predicted output: codec factor applied to the source, but never above
     # what a clean target-codec encode needs at this resolution (`ref`).
     # For same-codec re-encoding, minimal gains from re-optimization; don't cap at ref.
-    if eff == _SAME_CODEC_EFF:
+    if is_same_codec:
         # Same-codec: apply efficiency without ref cap (already efficiently encoded)
         predicted_kbps = source_kbps * eff
         predicted_kbps = max(predicted_kbps, source_kbps * (1 - _MAX_SAVED_PCT / 100))
