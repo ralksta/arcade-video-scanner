@@ -380,7 +380,8 @@ def handle_post(handler) -> bool:
 
             send_json(handler, {
                 "status": "processing",
-                "gif_job_id": gif_job_id,
+                # Wire key stays "job_id" — gif_export.js reads result.job_id to poll status.
+                "job_id": gif_job_id,
                 "output_filename": output_filename,
                 "output_path": output_path,
                 "estimated_size_mb": round(estimated_size_mb, 2),
