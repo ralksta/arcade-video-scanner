@@ -55,9 +55,9 @@
 
 **Produces:** importable WITHOUT ml deps. Pure helpers: `sample_timestamps(duration: float, count: int = 12) -> list[float]` (uniform across 5%–95%; duration ≤ 0 → `[0.0]`; short videos → fewer, min 1), `needs_index(path, mtime, model, state: dict) -> bool`. CLI: one-shot default, `--watch --interval N`, `--rebuild`, `--model` (default `ViT-B-16`); frame extraction via ffmpeg subprocess; model inference isolated in `_load_model()`/`_embed_frames()` with lazy torch/open_clip imports and clear install hint on ImportError; per-file errors logged + skipped; deleted files pruned; images single frame.
 
-- [ ] Tests: timestamp math (12 frames, 5%–95% bounds, 1s video → 1 frame), `needs_index` (new / same mtime+model skip / changed mtime / changed model), full `index_library` pass with mocked embed function + fake store recording `store_embedding` calls (no ffmpeg: frame extraction mocked).
-- [ ] Implement; verify module imports clean without torch installed.
-- [ ] pytest/ruff green (scripts/ is outside the mypy target); commit `feat(indexer): standalone GPU media indexer (CLIP embeddings, incremental)`.
+- [x] Tests: timestamp math (12 frames, 5%–95% bounds, 1s video → 1 frame), `needs_index` (new / same mtime+model skip / changed mtime / changed model), full `index_library` pass with mocked embed function + fake store recording `store_embedding` calls (no ffmpeg: frame extraction mocked).
+- [x] Implement; verify module imports clean without torch installed.
+- [x] pytest/ruff green (scripts/ is outside the mypy target); commit `feat(indexer): standalone GPU media indexer (CLIP embeddings, incremental)`.
 
 ### Task 5: `[indexer]` extra + changelog
 
