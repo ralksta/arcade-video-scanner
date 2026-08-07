@@ -29,6 +29,12 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Auto-Tagging Rules (2026-08-08)
+- **Regel-Engine**: Smart-Collection-Query + Ziel-Tag, läuft serverseitig nach jedem Scan.
+- **Apply-Once-Semantik**: manuell entfernte Tags werden nie erneut vergeben (`auto_tag_applied`-Buchhaltung).
+- **Evaluator-Parität**: Python-Port von `evaluateCollectionMatch`, per Node-vm-Test gegen das JS-Original gepinnt.
+- **UI**: Regel-Anlage im Collection-Editor ("Als Regel"), Verwaltung + "Jetzt ausführen" in den Settings.
+
 ### ✅ Version 6.8.0 (2026-01-18)
 - **Visual Timeline Scrubber**: Professional timeline with frame-accurate seeking and thumbnail previews.
 - **GIF Export Panel**: Redesigned bottom panel UI with presets and size estimation.

@@ -1514,7 +1514,7 @@ git commit -m "feat(web): Auto-Tagging-Regeln — Modal-Speichern und Settings-V
 **Files:**
 - Modify: `CHANGELOG.md` (`[Unreleased]`), `ROADMAP.md`
 
-- [ ] **Step 1: CHANGELOG entry** — under `## [Unreleased]`:
+- [x] **Step 1: CHANGELOG entry** — under `## [Unreleased]`:
 
 ```markdown
 ### Added — Auto-Tagging Rules
@@ -1528,7 +1528,7 @@ git commit -m "feat(web): Auto-Tagging-Regeln — Modal-Speichern und Settings-V
 
 `ROADMAP.md`: add a completed entry in the file's established style (✅ + date + feature bullets).
 
-- [ ] **Step 2: Full verification**
+- [x] **Step 2: Full verification**
 
 ```bash
 .venv/bin/pytest
@@ -1538,7 +1538,7 @@ git commit -m "feat(web): Auto-Tagging-Regeln — Modal-Speichern und Settings-V
 
 Expected: everything green.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add CHANGELOG.md ROADMAP.md
