@@ -7,6 +7,8 @@ codec efficiency; overridden by real results from encode_history.jsonl
 """
 from __future__ import annotations
 
+import json
+import statistics
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -115,3 +117,64 @@ class CandidateEstimate:
     confidence: str  # "high" | "medium" | "low"
     source: str      # "history" | "heuristic"
     reason: str
+
+
+# --- EncodeHistory --------------------------------------------------------
+# History `codec` holds encoder-profile names (hevc_nvenc, libx265, av1_nvenc…);
+# match the requested target codec by substring.
+_TARGET_SUBSTRINGS = {"hevc": ("hevc", "265"), "av1": ("av1",)}
+
+
+class EncodeHistory:
+    """mtime-cached reader over encode_history.jsonl (best-effort, never raises)."""
+
+    def __init__(self, path: Path = DEFAULT_HISTORY_PATH) -> None:
+        self.path = path
+        self._mtime: float = -1.0
+        self._records: list[dict] = []
+
+    def _load(self) -> list[dict]:
+        try:
+            mtime = self.path.stat().st_mtime
+        except OSError:
+            self._records = []
+            self._mtime = -1.0
+            return self._records
+        if mtime == self._mtime:
+            return self._records
+        records: list[dict] = []
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(rec, dict) and rec.get("saved_pct") is not None:
+                        records.append(rec)
+        except OSError:
+            records = []
+        self._records = records
+        self._mtime = mtime
+        return self._records
+
+    def median_saved_pct(self, target_codec: str, height: int, source_kbps: float,
+                         min_samples: int = 3) -> Optional[tuple[float, int]]:
+        """Median real saved_pct for the (target, resolution class, bitrate class) bucket."""
+        substrings = _TARGET_SUBSTRINGS.get(target_codec, (target_codec,))
+        want = (resolution_class(height), bitrate_class(source_kbps))
+        samples: list[float] = []
+        for rec in self._load():
+            codec_str = f"{rec.get('codec', '')}{rec.get('encoder', '')}".lower()
+            if not any(s in codec_str for s in substrings):
+                continue
+            try:
+                key = (resolution_class(int(rec.get("height", 0))),
+                       bitrate_class(float(rec.get("source_kbps", 0))))
+                if key == want:
+                    samples.append(float(rec["saved_pct"]))
+            except (TypeError, ValueError):
+                continue
+        if len(samples) < min_samples:
+            return None
+        return (float(statistics.median(samples)), len(samples))

@@ -1,4 +1,5 @@
 """Unit tests for the optimization advisor (pure logic, no ffmpeg/fs)."""
+import json
 import sys
 from pathlib import Path
 
@@ -76,3 +77,73 @@ def test_heuristic_savings_capped():
     result = adv.estimate_heuristic(_entry(bitrate_mbps=200.0), "hevc")
     assert result is not None
     assert result[0] <= 85.0
+
+
+# --- EncodeHistory tests --------------------------------------------------
+
+
+def _write_history(tmp_path, records):
+    p = tmp_path / "encode_history.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+    return p
+
+
+def _rec(**kw):
+    base = dict(ts="2026-08-01T00:00:00", file="x.mp4", encoder="hevc_nvenc",
+                codec="hevc_nvenc", height=2160, source_kbps=45000, q=30,
+                ssim=0.97, saved_pct=70.0)
+    base.update(kw)
+    # If codec is provided but encoder is not, update encoder to match
+    if 'codec' in kw and 'encoder' not in kw:
+        base['encoder'] = kw['codec']
+    return base
+
+
+def test_history_median_with_enough_samples(tmp_path):
+    p = _write_history(tmp_path, [_rec(saved_pct=60.0), _rec(saved_pct=70.0),
+                                  _rec(saved_pct=80.0)])
+    h = adv.EncodeHistory(p)
+    result = h.median_saved_pct("hevc", 2160, 45000)
+    assert result == (70.0, 3)
+
+
+def test_history_too_few_samples_returns_none(tmp_path):
+    p = _write_history(tmp_path, [_rec(), _rec()])
+    assert adv.EncodeHistory(p).median_saved_pct("hevc", 2160, 45000) is None
+
+
+def test_history_bucket_mismatch_returns_none(tmp_path):
+    p = _write_history(tmp_path, [_rec(), _rec(), _rec()])
+    h = adv.EncodeHistory(p)
+    assert h.median_saved_pct("hevc", 720, 45000) is None      # other resolution class
+    assert h.median_saved_pct("hevc", 2160, 3000) is None      # other bitrate class
+
+
+def test_history_target_codec_matching(tmp_path):
+    p = _write_history(tmp_path, [
+        _rec(codec="av1_nvenc", saved_pct=80.0), _rec(codec="av1_nvenc", saved_pct=80.0),
+        _rec(codec="av1_nvenc", saved_pct=80.0),
+        _rec(codec="libx265", saved_pct=50.0), _rec(codec="libx265", saved_pct=50.0),
+        _rec(codec="libx265", saved_pct=50.0),
+    ])
+    h = adv.EncodeHistory(p)
+    assert h.median_saved_pct("av1", 2160, 45000) == (80.0, 3)
+    assert h.median_saved_pct("hevc", 2160, 45000) == (50.0, 3)
+
+
+def test_history_corrupt_lines_and_missing_file(tmp_path):
+    p = tmp_path / "encode_history.jsonl"
+    p.write_text('not json\n{"broken": \n' + json.dumps(_rec()) + "\n", encoding="utf-8")
+    assert adv.EncodeHistory(p).median_saved_pct("hevc", 2160, 45000) is None  # 1 < 3
+    missing = adv.EncodeHistory(tmp_path / "nope.jsonl")
+    assert missing.median_saved_pct("hevc", 2160, 45000) is None
+
+
+def test_history_mtime_cache_reloads_on_change(tmp_path):
+    p = _write_history(tmp_path, [_rec(), _rec(), _rec()])
+    h = adv.EncodeHistory(p)
+    assert h.median_saved_pct("hevc", 2160, 45000) is not None
+    import os
+    _write_history(tmp_path, [_rec(saved_pct=10.0)] * 3)
+    os.utime(p, (1, 1))  # force a different mtime either way
+    assert h.median_saved_pct("hevc", 2160, 45000) == (10.0, 3)
