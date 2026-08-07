@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from arcade_scanner.config import (
     ALLOWED_THUMBNAIL_PREFIX,
     DUPLICATES_CACHE_FILE,
+    MAX_REQUEST_SIZE,  # noqa: F401 — re-exported for routes/* lazy imports
     config,
 )
 from arcade_scanner.database import db, user_db
