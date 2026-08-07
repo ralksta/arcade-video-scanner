@@ -433,14 +433,16 @@ def _handle_discard_optimized(handler) -> None:
                     db.upsert(VideoEntry(**orig_dict))
 
                     # Cleanup
-                    if os.path.exists(abs_path): os.remove(abs_path)
+                    if os.path.exists(abs_path):
+                        os.remove(abs_path)
                     db.remove(abs_path)
                     db.remove(orig_file.file_path)
 
                     try:
                         if os.path.exists(job_dir) and not os.listdir(job_dir):
                             os.rmdir(job_dir)
-                    except Exception: pass
+                    except Exception:
+                        pass
                 else:
                     # Just discard this file
                     if os.path.exists(abs_path):

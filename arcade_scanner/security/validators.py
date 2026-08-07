@@ -23,7 +23,7 @@ class PathValidator:
     def __init__(self, allowed_dirs: List[str]):
         """
         Initialize validator with allowed directories.
-        
+
         Args:
             allowed_dirs: List of directory paths to whitelist
         """
@@ -32,10 +32,10 @@ class PathValidator:
     def is_allowed(self, path: str) -> bool:
         """
         Check if path is within allowed directories.
-        
+
         Args:
             path: File path to validate
-            
+
         Returns:
             True if path is allowed, False otherwise
         """
@@ -50,13 +50,13 @@ class PathValidator:
     def validate(self, path: str) -> str:
         """
         Validate and return absolute path if allowed.
-        
+
         Args:
             path: File path to validate
-            
+
         Returns:
             Absolute path if valid
-            
+
         Raises:
             SecurityError: If path is not in whitelist
             ValueError: If path is invalid or doesn't exist
@@ -81,14 +81,14 @@ class PathValidator:
 def sanitize_path(path: str, allowed_dirs: Optional[List[str]] = None) -> str:
     """
     Sanitize and validate a file path.
-    
+
     Args:
         path: Path to sanitize
         allowed_dirs: Optional list of allowed directories. If None, uses config.
-        
+
     Returns:
         Absolute, validated path
-        
+
     Raises:
         SecurityError: If path validation fails
         ValueError: If path is invalid
@@ -106,11 +106,11 @@ def sanitize_path(path: str, allowed_dirs: Optional[List[str]] = None) -> str:
 def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool:
     """
     Check if a path is allowed based on scan targets and security rules.
-    
+
     Args:
         path: Path to check (file or directory)
         allowed_dirs: Optional list of allowed directories. Defaults to config scan targets.
-        
+
     Returns:
         True if path is allowed, False otherwise
     """
@@ -130,7 +130,8 @@ def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool
         allowed_abs = [os.path.realpath(os.path.abspath(d)) for d in allowed_dirs if d]
 
         # 2. Case-insensitive check on Windows/macOS
-        platform_norm = lambda p: p.lower() if (IS_WIN or sys.platform == "darwin") else p
+        def platform_norm(p):
+            return p.lower() if (IS_WIN or sys.platform == "darwin") else p
 
         path_norm = platform_norm(abs_path)
         is_whitelisted = any(path_norm.startswith(platform_norm(allowed)) for allowed in allowed_abs)
@@ -173,12 +174,12 @@ def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool
 def validate_filename(filename: str, prefix: str = "", suffix: str = "") -> bool:
     """
     Validate a filename matches expected pattern.
-    
+
     Args:
         filename: Filename to validate
         prefix: Required prefix (e.g., "thumb_")
         suffix: Required suffix (e.g., ".jpg")
-        
+
     Returns:
         True if filename is valid, False otherwise
     """
@@ -203,11 +204,11 @@ def validate_filename(filename: str, prefix: str = "", suffix: str = "") -> bool
 def is_safe_directory_traversal(base_dir: str, target_path: str) -> bool:
     """
     Check if target_path stays within base_dir (prevents directory traversal).
-    
+
     Args:
         base_dir: Base directory that should contain the target
         target_path: Path to check
-        
+
     Returns:
         True if target is within base, False otherwise
     """

@@ -247,10 +247,12 @@ class UserStore:
     def migrate_tags(self):
         """Migrates global available_tags to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
+        if not os.path.exists(settings_path):
+            return
 
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
@@ -275,10 +277,12 @@ class UserStore:
     def migrate_scan_settings(self):
         """Migrates global scan targets/excludes to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
+        if not os.path.exists(settings_path):
+            return
 
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
@@ -308,10 +312,12 @@ class UserStore:
     def migrate_collections(self):
         """Migrates smart collections from global settings to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
+        if not os.path.exists(settings_path):
+            return
 
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
@@ -336,10 +342,12 @@ class UserStore:
     def migrate_sensitive_settings(self):
         """Migrates global sensitive settings (Safe Mode) to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
+        if not os.path.exists(settings_path):
+            return
 
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
@@ -378,7 +386,8 @@ class UserStore:
     def cleanup_legacy_settings(self):
         """Removes migrated keys from settings.json."""
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
+        if not os.path.exists(settings_path):
+            return
 
         try:
             with open(settings_path, "r", encoding="utf-8") as f:

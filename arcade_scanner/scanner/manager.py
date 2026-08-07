@@ -98,7 +98,8 @@ class ScannerManager:
         workers = []
         # Number of workers should match concurrency settings to avoid process pile-up
         num_workers = config.settings.max_concurrent_video_scans
-        if num_workers < 1: num_workers = 1
+        if num_workers < 1:
+            num_workers = 1
 
         async def _check_system_load():
             """Simple Watchdog using load average."""
