@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed — Video Optimizer V2.5
+- **Downscaling**: New `--scale-height H` option scales the encode to H pixels height while keeping the source aspect ratio (width `-2`). Upscaling is refused, the SSIM reference is scaled to match so quality checks stay valid, and the constrained-VBR ladder is adjusted to the target resolution (~pixels^0.75) so a downscale actually converts into savings.
 - **Sample-Clip Pre-Search**: The quality binary search now runs on a ~24s stream-copied probe clip first, then narrows the full-encode search to predicted ±1 — typically 1-2 full passes instead of 3-4 (files ≥ 120s; `--no-presearch` to disable).
 - **Encode History Seeding**: Successful encodes are logged to `encode_history.jsonl`; future runs start the search at the median winning Q for the same encoder/resolution/bitrate class.
 - **HDR/10-bit Safety**: HDR and 10-bit sources are detected; VideoToolbox/NVENC/x265 encode main10 with BT.2020/PQ/HLG color passthrough, other encoders skip the file instead of mistagging it as BT.709 (previously colors washed out).
