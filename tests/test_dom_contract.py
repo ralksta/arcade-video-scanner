@@ -33,6 +33,8 @@ DYNAMIC_IDS = {
     "card-", "video-",
     # Toast-Queue (dynamisch per JS):
     "toast-",
+    # Von candidates.js dynamisch erzeugte IDs:
+    "cand-", "candidatesHeader", "candQueueSelectedBtn",
 }
 
 # IDs, die in externen Libraries oder conditionalem HTML sind (kein False-Positive)

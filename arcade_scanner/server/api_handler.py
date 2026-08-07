@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from arcade_scanner.config import (
     ALLOWED_THUMBNAIL_PREFIX,
     DUPLICATES_CACHE_FILE,
+    MAX_REQUEST_SIZE,  # noqa: F401 — re-exported for routes/* lazy imports
     config,
 )
 from arcade_scanner.database import db, user_db
@@ -394,7 +395,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self._response_started = False
         try:
-            from .routes import duplicates, files, queue, settings, tags
+            from .routes import candidates, duplicates, files, queue, settings, tags
             if queue.handle_get(self):
                 return
             if settings.handle_get(self):
@@ -402,6 +403,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if duplicates.handle_get(self):
                 return
             if tags.handle_get(self):
+                return
+            if candidates.handle_get(self):
                 return
             if files.handle_get(self):
                 return
@@ -435,7 +438,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
             # 1. ROOT / INDEX -> Serve REPORT_FILE
-            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates"]
+            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
             clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
 

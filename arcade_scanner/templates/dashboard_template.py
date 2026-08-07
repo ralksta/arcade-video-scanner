@@ -205,6 +205,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/treemap.js?v={int(time.time())}"></script>
     <script src="/static/settings.js?v={int(time.time())}"></script>
     <script src="/static/duplicates.js?v={int(time.time())}"></script>
+    <script src="/static/candidates.js?v={int(time.time())}"></script>
     <script src="/static/filter_engine.js?v={int(time.time())}"></script>
     <script src="/static/workspace.js?v={int(time.time())}"></script>
     <script src="/static/cards.js?v={int(time.time())}"></script>

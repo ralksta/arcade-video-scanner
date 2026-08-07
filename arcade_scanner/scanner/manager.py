@@ -240,6 +240,7 @@ class ScannerManager:
                         entry.favorite = cached_entry.favorite
                         entry.vaulted = cached_entry.vaulted
                         entry.tags = cached_entry.tags
+                        entry.optimized_at = cached_entry.optimized_at
                         if cached_entry.imported_at and cached_entry.imported_at > 0:
                             entry.imported_at = cached_entry.imported_at
 
