@@ -6,7 +6,7 @@ import hashlib
 import os
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # Optional imagehash for perceptual image hashing
 try:
@@ -75,11 +75,11 @@ class DuplicateGroup:
         }
 
 
-if hasattr(int, "bit_count"):  # Python 3.10+
-    _popcount = int.bit_count
-else:  # pyproject declares requires-python >=3.8
-    def _popcount(value: int) -> int:
-        return bin(value).count("1")
+def _popcount(value: int) -> int:
+    """Count set bits. Uses int.bit_count on 3.10+, else a portable fallback."""
+    if hasattr(value, "bit_count"):  # Python 3.10+
+        return value.bit_count()
+    return bin(value).count("1")
 
 
 def _hamming(a: int, b: int) -> int:
@@ -426,7 +426,7 @@ class DuplicateDetector:
         Threshold: max hash difference to consider as duplicate (0=exact, higher=more lenient)
         """
         # Get visual hashes for all files
-        hash_data: List[Tuple[any, any]] = []  # (file, phash_obj)
+        hash_data: List[Tuple[Any, Any]] = []  # (file, phash_obj)
 
         for f in files:
             path = f.file_path
@@ -590,7 +590,7 @@ class DuplicateDetector:
         self._ensure_hash_cache()
 
         # Phase 1: Compute/retrieve hashes with progress tracking
-        hash_data: List[Tuple[str, 'imagehash.ImageHash', any]] = []
+        hash_data: List[Tuple[str, 'imagehash.ImageHash', Any]] = []
         total_images = len(images)
         cache_hits = 0
         cache_misses = 0
@@ -618,9 +618,8 @@ class DuplicateDetector:
             # Cache miss — compute hash
             try:
                 with Image.open(path) as pil_img:
-                    if pil_img.mode not in ('RGB', 'L'):
-                        pil_img = pil_img.convert('RGB')
-                    phash = imagehash.phash(pil_img)
+                    hash_img = pil_img.convert('RGB') if pil_img.mode not in ('RGB', 'L') else pil_img
+                    phash = imagehash.phash(hash_img)
                     hash_str = str(phash)
                     hash_data.append((hash_str, phash, img))
                     self._set_cached_hash(path, hash_str)

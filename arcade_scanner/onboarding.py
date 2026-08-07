@@ -5,7 +5,7 @@ Provides an interactive ASCII terminal experience for initial configuration.
 import os
 import shutil
 import sys
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 
 # ANSI color codes
@@ -171,7 +171,7 @@ def run_setup_wizard() -> dict:
     print(f"  {Colors.DIM}Press Enter to accept defaults shown in [brackets].{Colors.RESET}")
     print()
 
-    config = {
+    config: Dict[str, Any] = {
         "scan_targets": [],
         "exclude_paths": [],
         "min_size_mb": 100,
@@ -469,9 +469,9 @@ def apply_configuration(config: dict):
                 admin.data.scan_targets.append(t)
 
         # Add exclusions
-        for e in config["exclude_paths"]:
-            if e not in admin.data.exclude_paths:
-                admin.data.exclude_paths.append(e)
+        for excl in config["exclude_paths"]:
+            if excl not in admin.data.exclude_paths:
+                admin.data.exclude_paths.append(excl)
 
         user_db.add_user(admin)
 

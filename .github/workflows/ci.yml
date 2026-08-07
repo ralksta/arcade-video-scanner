@@ -13,8 +13,9 @@ jobs:
     with:
       install: python -m pip install --upgrade pip && pip install -r requirements.txt && pip install -e ".[dev]"
       # ruff is now clean (PR #30 took it 316 -> 0) -> blocking to prevent regression.
-      # mypy stays advisory until its ~131 pre-existing errors are annotated.
+      # mypy is now clean (131 -> 0) -> blocking to prevent regression.
       lint: ruff check .
       lint-blocking: true
       typecheck: mypy arcade_scanner
+      typecheck-blocking: true
       test: pytest

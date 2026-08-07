@@ -84,8 +84,8 @@ class MediaProbe:
             if not raw_data or "streams" not in raw_data or not raw_data["streams"]:
                 return None
             # Find video and audio streams
-            video_stream = next((s for s in raw_data["streams"] if s.get("codec_type") == "video"), {})
-            audio_stream = next((s for s in raw_data["streams"] if s.get("codec_type") == "audio"), {})
+            video_stream: Dict[str, Any] = next((s for s in raw_data["streams"] if s.get("codec_type") == "video"), {})
+            audio_stream: Dict[str, Any] = next((s for s in raw_data["streams"] if s.get("codec_type") == "audio"), {})
 
             fmt = raw_data.get("format", {})
 
@@ -130,8 +130,8 @@ class MediaProbe:
             status = "OK"
 
             return VideoEntry(
-                FilePath=filepath,
-                Size_MB=round(size_mb, 2),
+                file_path=filepath,
+                size_mb=round(size_mb, 2),
                 Bitrate_Mbps=round(bitrate_bps / 1_000_000, 2),
                 Status=status,
                 codec=video_codec,

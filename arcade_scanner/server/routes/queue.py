@@ -150,8 +150,8 @@ def handle_get(handler) -> bool:
         user_name = require_auth(handler)
         if user_name is None:
             return True
-        job_id = path.split("/api/export/gif/status/")[1].split("?")[0]
-        job = GIF_JOBS.get(job_id)
+        gif_job_id = path.split("/api/export/gif/status/")[1].split("?")[0]
+        job = GIF_JOBS.get(gif_job_id)
         if job is None:
             handler.send_error(404, "Job not found")
         else:
@@ -367,12 +367,12 @@ def handle_post(handler) -> bool:
             os.makedirs(gif_export_dir, exist_ok=True)
             output_path = os.path.join(gif_export_dir, output_filename)
 
-            job_id = str(uuid.uuid4())[:8]
-            palette_path = os.path.join(gif_export_dir, f"palette_{job_id}.png")
+            gif_job_id = str(uuid.uuid4())[:8]
+            palette_path = os.path.join(gif_export_dir, f"palette_{gif_job_id}.png")
 
             t = threading.Thread(
                 target=convert_to_gif,
-                args=(video_path, output_path, palette_path, job_id, fps, width, height, quality, start_time, end_time, loop, speed),
+                args=(video_path, output_path, palette_path, gif_job_id, fps, width, height, quality, start_time, end_time, loop, speed),
                 daemon=True,
             )
 
@@ -380,7 +380,8 @@ def handle_post(handler) -> bool:
 
             send_json(handler, {
                 "status": "processing",
-                "job_id": job_id,
+                # Wire key stays "job_id" — gif_export.js reads result.job_id to poll status.
+                "job_id": gif_job_id,
                 "output_filename": output_filename,
                 "output_path": output_path,
                 "estimated_size_mb": round(estimated_size_mb, 2),

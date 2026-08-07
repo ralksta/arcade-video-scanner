@@ -3,7 +3,7 @@ import hashlib
 import os
 import threading
 import time
-from typing import Callable, Optional, Set
+from typing import Any, Callable, List, Optional, Set, Tuple
 
 from ..config import config
 from ..database import db
@@ -91,10 +91,11 @@ class ScannerManager:
         discovery_complete = True
 
         processed_count = 0
-        batch_entries = []
+        batch_entries: List[Any] = []
 
         # 2. Worker Queue Pattern
-        queue = asyncio.Queue(maxsize=100) # Buffer for discovered paths
+        # Items are (file_path, dir_changed, index, retries); None signals shutdown.
+        queue: "asyncio.Queue[Optional[Tuple[str, bool, int, int]]]" = asyncio.Queue(maxsize=100)
         workers = []
         # Number of workers should match concurrency settings to avoid process pile-up
         num_workers = config.settings.max_concurrent_video_scans
@@ -239,7 +240,7 @@ class ScannerManager:
                         entry.favorite = cached_entry.favorite
                         entry.vaulted = cached_entry.vaulted
                         entry.tags = cached_entry.tags
-                        if cached_entry.imported_at > 0:
+                        if cached_entry.imported_at and cached_entry.imported_at > 0:
                             entry.imported_at = cached_entry.imported_at
 
                     entry.mtime = int(file_stat.st_mtime)

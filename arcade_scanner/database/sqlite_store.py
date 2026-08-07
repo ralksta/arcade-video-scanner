@@ -16,7 +16,7 @@ import os
 import sqlite3
 import threading
 import time
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ..config import config
 from ..models.video_entry import VideoEntry
@@ -90,58 +90,66 @@ class SQLiteStore:
             except Exception:
                 pass
 
-    def _ensure_connection(self):
-        """Lazy-init the connection and create schema if needed."""
+    def _ensure_connection(self) -> sqlite3.Connection:
+        """Lazy-init the connection and create schema if needed.
+
+        Returns the live connection so callers get a non-``Optional`` handle.
+        """
         if self._conn is not None:
-            return
+            return self._conn
 
         with self._write_lock:
             # Re-check inside the lock: two threads can both find _conn empty,
             # and the loser would otherwise open a second connection and leak it.
             if self._conn is not None:
-                return
+                return self._conn
             self._open_connection()
+        assert self._conn is not None  # _open_connection always sets it
+        return self._conn
 
-    def _open_connection(self):
+    def _open_connection(self) -> None:
         os.makedirs(os.path.dirname(self.db_file), exist_ok=True)
-        self._conn = sqlite3.connect(
+        conn = sqlite3.connect(
             self.db_file,
             check_same_thread=False,
             isolation_level=None,  # autocommit
         )
-        self._conn.row_factory = sqlite3.Row
+        self._conn = conn
+        conn.row_factory = sqlite3.Row
         # Performance pragmas
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA cache_size=-64000")  # 64MB cache (Performance boost)
-        self._conn.execute("PRAGMA temp_store=MEMORY")
-        self._conn.execute("PRAGMA mmap_size=268435456") # 256MB mmap
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA cache_size=-64000")  # 64MB cache (Performance boost)
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA mmap_size=268435456") # 256MB mmap
 
         self._create_table()
 
-    def _create_table(self):
+    def _create_table(self) -> None:
         """Create the media table, indexes, and encoding_queue table if they don't exist."""
+        conn = self._conn
+        assert conn is not None  # only called from _open_connection
         cols = ", ".join(f"{name} {typedef}" for name, typedef in _COLUMNS)
-        self._conn.execute(f"CREATE TABLE IF NOT EXISTS media ({cols})")
+        conn.execute(f"CREATE TABLE IF NOT EXISTS media ({cols})")
 
         # Performance indexes for common filter/sort queries
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON media(status)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_codec ON media(codec)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_size_mb ON media(size_mb)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_mtime ON media(mtime)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_favorite ON media(favorite)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_vaulted ON media(vaulted)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_thumb ON media(thumb)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON media(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_codec ON media(codec)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_size_mb ON media(size_mb)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_mtime ON media(mtime)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_favorite ON media(favorite)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_vaulted ON media(vaulted)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_thumb ON media(thumb)")
 
         # Migration: Add original_path to media table if it doesn't exist
         try:
-            self._conn.execute("ALTER TABLE media ADD COLUMN original_path TEXT DEFAULT ''")
+            conn.execute("ALTER TABLE media ADD COLUMN original_path TEXT DEFAULT ''")
         except Exception:
             pass # Already exists
 
         # Encoding queue for remote optimization
-        self._conn.execute("""
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS encoding_queue (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_path TEXT NOT NULL,
@@ -158,7 +166,7 @@ class SQLiteStore:
         """)
         # Add target_codec column to existing installations (migration)
         try:
-            self._conn.execute("ALTER TABLE encoding_queue ADD COLUMN target_codec TEXT DEFAULT 'hevc'")
+            conn.execute("ALTER TABLE encoding_queue ADD COLUMN target_codec TEXT DEFAULT 'hevc'")
         except Exception:
             pass  # Column already exists
 
@@ -168,24 +176,24 @@ class SQLiteStore:
 
     def queue_encode(self, file_path: str, size_bytes: int = 0, target_codec: str = 'hevc') -> Optional[int]:
         """Add a file to the encoding queue. Returns job ID or None if already pending."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
 
         safe_path = self._get_safe_path(file_path)
         # Check-then-insert must hold the lock, or two callers both find no
         # pending job and both insert one for the same file.
         with self._write_lock:
-            cursor = self._conn.execute(
+            cursor = conn.execute(
                 "SELECT id FROM encoding_queue WHERE file_path = ? AND status IN ('pending', 'downloading', 'encoding', 'uploading')",
                 (safe_path,)
             )
             if cursor.fetchone():
                 return None  # Already queued
 
-            self._conn.execute(
+            conn.execute(
                 "INSERT INTO encoding_queue (file_path, status, size_bytes, target_codec, created_at) VALUES (?, 'pending', ?, ?, ?)",
                 (safe_path, size_bytes, target_codec, int(time.time()))
             )
-            cursor = self._conn.execute("SELECT last_insert_rowid()")
+            cursor = conn.execute("SELECT last_insert_rowid()")
             return cursor.fetchone()[0]
 
     def get_next_pending(self, worker_id: str = "") -> Optional[dict]:
@@ -197,11 +205,11 @@ class SQLiteStore:
         does not own. Without that check two workers encode the same file and
         race on the same output path.
         """
-        self._ensure_connection()
+        conn = self._ensure_connection()
 
         with self._write_lock:
             while True:
-                cursor = self._conn.execute(
+                cursor = conn.execute(
                     "SELECT id, file_path, size_bytes, target_codec FROM encoding_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
                 )
                 row = cursor.fetchone()
@@ -209,7 +217,7 @@ class SQLiteStore:
                     return None
 
                 job_id = row["id"]
-                cursor = self._conn.execute(
+                cursor = conn.execute(
                     "UPDATE encoding_queue SET status = 'downloading', started_at = ?, worker_id = ? WHERE id = ? AND status = 'pending'",
                     (int(time.time()), worker_id, job_id)
                 )
@@ -223,12 +231,12 @@ class SQLiteStore:
                     "target_codec": row["target_codec"] or "hevc",
                 }
 
-    def update_job_status(self, job_id: int, status: str, **kwargs) -> None:
+    def update_job_status(self, job_id: int, status: str, **kwargs: Any) -> None:
         """Update a job's status and optional fields (result_message, saved_bytes, completed_at)."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
 
         sets = ["status = ?"]
-        vals = [status]
+        vals: List[Any] = [status]
 
         if status in ("done", "failed"):
             sets.append("completed_at = ?")
@@ -241,16 +249,16 @@ class SQLiteStore:
 
         vals.append(job_id)
         with self._write_lock:
-            self._conn.execute(
+            conn.execute(
                 f"UPDATE encoding_queue SET {', '.join(sets)} WHERE id = ?",
                 tuple(vals)
             )
 
     def get_queue_status(self, limit: int = 20) -> List[dict]:
         """Return active + recent jobs for the UI."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
         with self._write_lock:
-            cursor = self._conn.execute(
+            cursor = conn.execute(
                 """SELECT id, file_path, status, size_bytes, created_at, started_at,
                           completed_at, worker_id, result_message, saved_bytes
                    FROM encoding_queue
@@ -269,15 +277,16 @@ class SQLiteStore:
             return self._cancel_job_locked(job_id)
 
     def _cancel_job_locked(self, job_id: int) -> bool:
+        conn = self._ensure_connection()
         # Delete if still pending
-        cursor = self._conn.execute(
+        cursor = conn.execute(
             "DELETE FROM encoding_queue WHERE id = ? AND status = 'pending'",
             (job_id,)
         )
         if cursor.rowcount > 0:
             return True
         # Mark active jobs as cancelled so the worker can detect it
-        cursor = self._conn.execute(
+        cursor = conn.execute(
             "UPDATE encoding_queue SET status = 'cancelled', result_message = 'Cancelled by user' "
             "WHERE id = ? AND status IN ('downloading', 'encoding', 'uploading')",
             (job_id,)
@@ -286,9 +295,9 @@ class SQLiteStore:
 
     def is_job_cancelled(self, job_id: int) -> bool:
         """Check if a job has been cancelled (worker polls this)."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
         with self._write_lock:
-            row = self._conn.execute(
+            row = conn.execute(
                 "SELECT status FROM encoding_queue WHERE id = ?", (job_id,)
             ).fetchone()
         return row is not None and row[0] == 'cancelled'
@@ -315,12 +324,12 @@ class SQLiteStore:
 
     def get_all(self) -> List[VideoEntry]:
         """Return all entries as VideoEntry models."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
         # Shared connection: readers running the same SQL share one cached
         # prepared statement, and stepping it from two threads makes them
         # consume each other's rows -- silently, with no exception.
         with self._write_lock:
-            cursor = self._conn.execute("SELECT * FROM media")
+            cursor = conn.execute("SELECT * FROM media")
             results = []
             for row in cursor:
                 try:
@@ -335,12 +344,12 @@ class SQLiteStore:
         This is much more memory efficient than get_all() for large libraries,
         as it avoids Pydantic model overhead.
         """
-        self._ensure_connection()
+        conn = self._ensure_connection()
         # Shared connection: readers running the same SQL share one cached
         # prepared statement, and stepping it from two threads makes them
         # consume each other's rows -- silently, with no exception.
         with self._write_lock:
-            cursor = self._conn.execute("SELECT * FROM media")
+            cursor = conn.execute("SELECT * FROM media")
             results = []
             for row in cursor:
                 try:
@@ -351,14 +360,14 @@ class SQLiteStore:
 
     def get(self, path: str) -> Optional[VideoEntry]:
         """Lookup a single entry by file_path. O(1) indexed."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
         # Shared connection: readers running the same SQL share one cached
         # prepared statement, and stepping it from two threads makes them
         # consume each other's rows -- silently, with no exception.
         with self._write_lock:
             # Handle surrogate-escaped paths by using hybrid str/bytes for SQLite
             safe_path = self._get_safe_path(path)
-            cursor = self._conn.execute(
+            cursor = conn.execute(
                 "SELECT * FROM media WHERE file_path = ?", (safe_path,)
             )
             row = cursor.fetchone()
@@ -372,12 +381,12 @@ class SQLiteStore:
 
     def get_by_thumb(self, thumb_name: str) -> Optional[VideoEntry]:
         """Fetch a single entry by thumb name."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
         # Shared connection: readers running the same SQL share one cached
         # prepared statement, and stepping it from two threads makes them
         # consume each other's rows -- silently, with no exception.
         with self._write_lock:
-            cursor = self._conn.execute(
+            cursor = conn.execute(
                 "SELECT * FROM media WHERE thumb = ?", (thumb_name,)
             )
             row = cursor.fetchone()
@@ -394,7 +403,7 @@ class SQLiteStore:
         from ..models.media_asset import MediaAsset
 
         with self._write_lock:
-            self._ensure_connection()
+            conn = self._ensure_connection()
             if isinstance(entry, MediaAsset):
                 entry = self._asset_to_video_entry(entry)
 
@@ -402,7 +411,7 @@ class SQLiteStore:
             col_names = ", ".join(name for name, _ in _COLUMNS)
             values = self._entry_to_tuple(entry)
 
-            self._conn.execute(
+            conn.execute(
                 f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                 values,
             )
@@ -415,7 +424,7 @@ class SQLiteStore:
             return
 
         with self._write_lock:
-            self._ensure_connection()
+            conn = self._ensure_connection()
 
             placeholders = ", ".join("?" for _ in _COLUMNS)
             col_names = ", ".join(name for name, _ in _COLUMNS)
@@ -426,31 +435,31 @@ class SQLiteStore:
                     entry = self._asset_to_video_entry(entry)
                 data.append(self._entry_to_tuple(entry))
 
-            self._conn.execute("BEGIN")
+            conn.execute("BEGIN")
             try:
-                self._conn.executemany(
+                conn.executemany(
                     f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                     data,
                 )
-                self._conn.execute("COMMIT")
+                conn.execute("COMMIT")
             except Exception:
-                self._conn.execute("ROLLBACK")
+                conn.execute("ROLLBACK")
                 raise
             self._notify_change()
 
     def remove(self, path: str) -> None:
         """Delete an entry by file_path."""
         with self._write_lock:
-            self._ensure_connection()
+            conn = self._ensure_connection()
             safe_path = self._get_safe_path(path)
-            self._conn.execute("DELETE FROM media WHERE file_path = ?", (safe_path,))
+            conn.execute("DELETE FROM media WHERE file_path = ?", (safe_path,))
             self._notify_change()
 
     def delete_all_photos(self) -> int:
         """Delete all entries where media_type = 'image'. Returns the number of deleted rows."""
         with self._write_lock:
-            self._ensure_connection()
-            cursor = self._conn.execute("DELETE FROM media WHERE media_type = 'image'")
+            conn = self._ensure_connection()
+            cursor = conn.execute("DELETE FROM media WHERE media_type = 'image'")
             deleted = cursor.rowcount
             if deleted > 0:
                 logger.info("Deleted %d photo entries from DB (include_photos disabled)", deleted)
@@ -462,13 +471,13 @@ class SQLiteStore:
         This avoids loading the entire library into memory for large collections.
         Use together with count() to build pagination UI.
         """
-        self._ensure_connection()
+        conn = self._ensure_connection()
         # Shared connection: readers running the same SQL share one cached
         # prepared statement, and stepping it from two threads makes them
         # consume each other's rows -- silently, with no exception.
         with self._write_lock:
             offset = page * page_size
-            cursor = self._conn.execute(
+            cursor = conn.execute(
                 "SELECT * FROM media ORDER BY mtime DESC LIMIT ? OFFSET ?",
                 (page_size, offset),
             )
@@ -482,20 +491,20 @@ class SQLiteStore:
 
     def count(self) -> int:
         """Return the total number of entries in the store."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
         # Shared connection: readers running the same SQL share one cached
         # prepared statement, and stepping it from two threads makes them
         # consume each other's rows -- silently, with no exception.
         with self._write_lock:
-            cursor = self._conn.execute("SELECT COUNT(*) FROM media")
+            cursor = conn.execute("SELECT COUNT(*) FROM media")
             return cursor.fetchone()[0]
 
     def cleanup_old_jobs(self, older_than_days: int = 30) -> int:
         """Delete completed/failed/cancelled jobs older than N days. Returns number of deleted rows."""
-        self._ensure_connection()
+        conn = self._ensure_connection()
         cutoff = int(time.time()) - (older_than_days * 86400)
         with self._write_lock:
-            cursor = self._conn.execute(
+            cursor = conn.execute(
                 "DELETE FROM encoding_queue "
                 "WHERE status IN ('done', 'failed', 'cancelled') "
                 "  AND completed_at > 0 AND completed_at < ?",
@@ -612,14 +621,15 @@ class SQLiteStore:
             original_path=entry.original_path,
         )
 
-    def _migrate_from_json(self):
+    def _migrate_from_json(self) -> None:
         """One-time migration: import all entries from video_cache.json into SQLite."""
         json_path = config.cache_file  # video_cache.json
         if not os.path.exists(json_path):
             return
 
+        conn = self._ensure_connection()
         # Check if we already have data (migration already done)
-        cursor = self._conn.execute("SELECT COUNT(*) FROM media")
+        cursor = conn.execute("SELECT COUNT(*) FROM media")
         count = cursor.fetchone()[0]
         if count > 0:
             return  # Already migrated
@@ -635,7 +645,7 @@ class SQLiteStore:
 
             migrated = 0
             # Use a transaction for bulk insert performance
-            self._conn.execute("BEGIN")
+            conn.execute("BEGIN")
             try:
                 for path, entry_dict in raw_data.items():
                     try:
@@ -644,16 +654,16 @@ class SQLiteStore:
                         ve = VideoEntry(**entry_dict)
                         placeholders = ", ".join("?" for _ in _COLUMNS)
                         col_names = ", ".join(name for name, _ in _COLUMNS)
-                        self._conn.execute(
+                        conn.execute(
                             f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                             self._entry_to_tuple(ve),
                         )
                         migrated += 1
                     except Exception as e:
                         print(f"⚠️ Skipping entry {path}: {e}")
-                self._conn.execute("COMMIT")
+                conn.execute("COMMIT")
             except Exception:
-                self._conn.execute("ROLLBACK")
+                conn.execute("ROLLBACK")
                 raise
 
             print(f"✅ Migrated {migrated} entries from JSON → SQLite")
