@@ -178,3 +178,69 @@ class EncodeHistory:
         if len(samples) < min_samples:
             return None
         return (float(statistics.median(samples)), len(samples))
+
+
+# --- build_candidates -------------------------------------------------------
+
+MIN_LISTED_SAVED_PCT = 10.0
+
+
+def _reason(entry: VideoEntry, saved_pct: float, source: str, samples: int) -> str:
+    codec = (entry.codec or "unknown").upper()
+    res = f"{entry.height}p" if (entry.height or 0) > 0 else "?"
+    rate = f"{entry.bitrate_mbps:.1f} Mbit/s"
+    if source == "history":
+        return f"{codec}, {res}, {rate} — {samples} echte Encodes in dieser Klasse"
+    return f"{codec}, {res}, {rate} — deutlich über Referenz"
+
+
+def build_candidates(entries: list[VideoEntry], target_codec: str,
+                     history: EncodeHistory, exclude_paths: set[str],
+                     limit: int = 100) -> dict:
+    """Rank re-encode candidates by absolute expected savings (MB, desc)."""
+    candidates: list[CandidateEstimate] = []
+    for entry in entries:
+        if entry.media_type != "video":
+            continue
+        if getattr(entry, "optimized_at", 0):
+            continue
+        if entry.file_path in exclude_paths:
+            continue
+        heur = estimate_heuristic(entry, target_codec)
+        if heur is None:
+            continue
+        saved_pct, known_pair = heur
+        source = "heuristic"
+        confidence = "medium" if known_pair else "low"
+        samples = 0
+        hist = history.median_saved_pct(
+            target_codec, entry.height or 0, (entry.bitrate_mbps or 0.0) * 1000.0)
+        if hist is not None:
+            saved_pct, samples = hist
+            source, confidence = "history", "high"
+        if saved_pct < MIN_LISTED_SAVED_PCT:
+            continue
+        candidates.append(CandidateEstimate(
+            file_path=entry.file_path,
+            size_mb=entry.size_mb,
+            codec=entry.codec or "unknown",
+            width=entry.width or 0,
+            height=entry.height or 0,
+            bitrate_mbps=entry.bitrate_mbps or 0.0,
+            thumb=entry.thumb or "",
+            estimated_saved_mb=round(entry.size_mb * saved_pct / 100.0, 1),
+            estimated_saved_pct=round(saved_pct, 1),
+            confidence=confidence,
+            source=source,
+            reason=_reason(entry, saved_pct, source, samples),
+        ))
+
+    candidates.sort(key=lambda c: c.estimated_saved_mb, reverse=True)
+    return {
+        "summary": {
+            "total_files": len(candidates),
+            "total_estimated_saved_mb": round(sum(c.estimated_saved_mb for c in candidates), 1),
+            "history_based": sum(1 for c in candidates if c.source == "history"),
+        },
+        "results": [c.__dict__.copy() for c in candidates[:limit]],
+    }

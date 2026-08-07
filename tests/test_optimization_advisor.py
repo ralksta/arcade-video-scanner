@@ -3,6 +3,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from arcade_scanner.core import optimization_advisor as adv
 from arcade_scanner.models.video_entry import VideoEntry
 
@@ -144,3 +146,77 @@ def test_history_mtime_cache_reloads_on_change(tmp_path):
     _write_history(tmp_path, [_rec(saved_pct=10.0)] * 3)
     os.utime(p, (1, 1))  # force a different mtime either way
     assert h.median_saved_pct("hevc", 2160, 45000) == (10.0, 3)
+
+
+# --- build_candidates tests -----------------------------------------------
+
+
+def _empty_history(tmp_path):
+    return adv.EncodeHistory(tmp_path / "none.jsonl")
+
+
+def test_build_candidates_sorted_by_absolute_mb(tmp_path):
+    entries = [
+        _entry(file_path="/lib/small.mp4", size_mb=100.0),            # same pct, less MB
+        _entry(file_path="/lib/big.mp4", size_mb=8000.0),
+        _entry(file_path="/lib/lean.mp4", size_mb=5000.0, bitrate_mbps=1.2,
+               width=1280, height=720),                                # included, lower pct
+    ]
+    out = adv.build_candidates(entries, "hevc", _empty_history(tmp_path), set())
+    paths = [r["file_path"] for r in out["results"]]
+    # Sorted by absolute MB savings (desc): big > lean > small
+    assert paths == ["/lib/big.mp4", "/lib/lean.mp4", "/lib/small.mp4"]
+    assert out["results"][0]["estimated_saved_mb"] > out["results"][1]["estimated_saved_mb"]
+    assert out["results"][1]["estimated_saved_mb"] > out["results"][2]["estimated_saved_mb"]
+
+
+@pytest.mark.xfail(reason="optimized_at field lands in Task 4", strict=False)
+def test_build_candidates_exclusions(tmp_path):
+    entries = [
+        _entry(file_path="/lib/queued.mp4"),
+        _entry(file_path="/lib/done.mp4", optimized_at=1723000000),
+        _entry(file_path="/lib/photo.jpg", media_type="image"),
+        _entry(file_path="/lib/nodata.mp4", bitrate_mbps=0.0),
+        _entry(file_path="/lib/ok.mp4"),
+    ]
+    out = adv.build_candidates(entries, "hevc", _empty_history(tmp_path),
+                               exclude_paths={"/lib/queued.mp4"})
+    assert [r["file_path"] for r in out["results"]] == ["/lib/ok.mp4"]
+
+
+def test_build_candidates_history_beats_heuristic(tmp_path):
+    p = _write_history(tmp_path, [_rec(saved_pct=40.0), _rec(saved_pct=42.0),
+                                  _rec(saved_pct=44.0)])
+    out = adv.build_candidates([_entry()], "hevc", adv.EncodeHistory(p), set())
+    r = out["results"][0]
+    assert r["source"] == "history"
+    assert r["confidence"] == "high"
+    assert r["estimated_saved_pct"] == 42.0
+    assert r["estimated_saved_mb"] == 420.0  # 1000 MB * 42%
+    assert out["summary"]["history_based"] == 1
+
+
+def test_build_candidates_confidence_levels(tmp_path):
+    out = adv.build_candidates(
+        [_entry(file_path="/lib/known.mp4"),
+         _entry(file_path="/lib/odd.mp4", codec="prores")],
+        "hevc", _empty_history(tmp_path), set())
+    by_path = {r["file_path"]: r for r in out["results"]}
+    assert by_path["/lib/known.mp4"]["confidence"] == "medium"
+    assert by_path["/lib/odd.mp4"]["confidence"] == "low"
+    assert all(r["source"] == "heuristic" for r in out["results"])
+
+
+def test_build_candidates_summary_counts_all_but_results_capped(tmp_path):
+    entries = [_entry(file_path=f"/lib/v{i}.mp4") for i in range(5)]
+    out = adv.build_candidates(entries, "hevc", _empty_history(tmp_path), set(), limit=2)
+    assert len(out["results"]) == 2
+    assert out["summary"]["total_files"] == 5
+    assert out["summary"]["total_estimated_saved_mb"] > out["results"][0]["estimated_saved_mb"]
+
+
+def test_build_candidates_reason_mentions_codec_and_resolution(tmp_path):
+    out = adv.build_candidates([_entry()], "hevc", _empty_history(tmp_path), set())
+    reason = out["results"][0]["reason"]
+    assert "h264" in reason.lower()
+    assert "2160" in reason or "4k" in reason.lower()
