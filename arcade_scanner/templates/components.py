@@ -1340,6 +1340,13 @@ COLLECTION_MODAL_COMPONENT = """
                 <button id="deleteCollectionBtn" onclick="deleteCurrentCollection()" class="hidden text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 px-2 py-1 rounded transition-colors">
                     <span class="material-icons text-sm align-middle mr-1">delete</span>Delete
                 </button>
+                <div class="flex items-center gap-2">
+                    <input id="autoTagName" type="text" placeholder="auto-tag…"
+                           class="w-28 px-2 py-1.5 rounded-lg text-xs bg-white/10 border border-white/10 text-white placeholder-gray-500">
+                    <button onclick="saveAutoTagRule()"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-arcade-cyan/20 text-arcade-cyan hover:bg-arcade-cyan/30 transition-colors"
+                            title="Aktuelle Kriterien als Auto-Tag-Regel speichern">Als Regel</button>
+                </div>
             </div>
             <div class="flex gap-3">
                 <button onclick="closeCollectionModal()" class="px-4 py-2 bg-white/5 text-gray-400 font-medium rounded-lg hover:bg-white/10 hover:text-white transition-colors">
@@ -1654,6 +1661,11 @@ SETTINGS_MODAL_COMPONENT = """
                 <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="queue">
                     <span class="material-icons text-lg">cloud_sync</span>
                     <span class="hidden md:inline">Remote Queue</span>
+                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
+                </button>
+                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="autotagging">
+                    <span class="material-icons text-lg">sell</span>
+                    <span class="hidden md:inline">Auto-Tagging</span>
                     <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
             </nav>
@@ -2129,6 +2141,25 @@ SETTINGS_MODAL_COMPONENT = """
                             <span class="material-icons text-blue-400 text-lg">info</span>
                             <div>Start the Mac worker with: <code class="px-2 py-0.5 bg-black/40 rounded text-arcade-cyan">python3 mac_worker.py --server http://&lt;ip&gt;:8000 --user admin</code></div>
                         </div>
+                    </section>
+                </div>
+
+                <div class="content-section hidden space-y-6" id="content-autotagging">
+                    <section class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-base font-medium text-white flex items-center gap-2">
+                                    <span class="material-icons text-lg text-arcade-cyan">sell</span>
+                                    Auto-Tagging-Regeln
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-1">Regeln vergeben ihr Tag automatisch nach jedem Scan. Anlegen im Collection-Editor ("Als Regel").</p>
+                            </div>
+                            <button id="autotagRunBtn" onclick="runAutoTagRules()"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold bg-arcade-cyan/20 text-arcade-cyan hover:bg-arcade-cyan/30 transition-colors">
+                                Jetzt ausführen
+                            </button>
+                        </div>
+                        <div id="autotagRulesList" class="space-y-2"></div>
                     </section>
                 </div>
             </div>

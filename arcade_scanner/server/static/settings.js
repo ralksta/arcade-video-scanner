@@ -346,6 +346,11 @@ function initSettingsNavigation() {
 
             // Update header
             updateSettingsHeader(sectionId);
+
+            // Auto-Tagging section loads its rule list lazily
+            if (sectionId === 'autotagging' && typeof renderAutoTagRules === 'function') {
+                renderAutoTagRules();
+            }
         });
     });
 
@@ -388,6 +393,10 @@ function updateSettingsHeader(sectionId) {
         'queue': {
             title: 'Remote Queue',
             subtitle: 'Monitor Mac encoding queue'
+        },
+        'autotagging': {
+            title: 'Auto-Tagging',
+            subtitle: 'Regeln, die passenden Dateien automatisch Tags geben'
         }
     };
 

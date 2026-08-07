@@ -1310,7 +1310,7 @@ git commit -m "feat(web): /api/autotag rule CRUD and manual run endpoints"
 - Consumes: `POST/GET /api/autotag/rules`, `POST /api/autotag/run` (Task 5); `collectionCriteriaNew` (module-level criteria object in `collections.js`, populated by the query-builder modal); `showToast(msg, type)` global.
 - Produces: window-level functions (top-level `function` declarations): `saveAutoTagRule()`, `renderAutoTagRules()`, `toggleAutoTagRule(id, enabled)`, `deleteAutoTagRule(id)`, `runAutoTagRules()`. Static IDs: `autoTagName` (modal input), `content-autotagging`, `autotagRulesList`, `autotagRunBtn`. Dynamic ID prefix: `atrule-`.
 
-- [ ] **Step 1: Write `autotag.js`**
+- [x] **Step 1: Write `autotag.js`**
 
 ```javascript
 // arcade_scanner/server/static/autotag.js
@@ -1415,7 +1415,7 @@ window.deleteAutoTagRule = deleteAutoTagRule;
 window.runAutoTagRules = runAutoTagRules;
 ```
 
-- [ ] **Step 2: Template edits**
+- [x] **Step 2: Template edits**
 
 `components.py` — collection modal footer: read lines 1333-1352 first, then insert a compact row ABOVE the existing Cancel/Save button row (`~1345`), inside the footer container:
 
@@ -1488,16 +1488,16 @@ window.runAutoTagRules = runAutoTagRules;
     "atrule-",
 ```
 
-- [ ] **Step 3: Run the static suites**
+- [x] **Step 3: Run the static suites**
 
 Run: `.venv/bin/pytest tests/test_js_syntax.py tests/test_dom_contract.py tests/test_js_completeness.py tests/test_js_runtime_patterns.py tests/test_dashboard_template.py -v`
 Expected: all PASS (fix any undefined-global/missing-ID findings per the tests' conventions)
 
-- [ ] **Step 4: Manual smoke test**
+- [x] **Step 4: Manual smoke test**
 
 Run the server (`.venv/bin/python3 -m arcade_scanner.main --skip-setup`), log in, open the collection modal, build a query (e.g. search term), enter a tag name, click "Als Regel" → success toast. Open Settings → Auto-Tagging: rule listed, toggle works, "Jetzt ausführen" shows "N Tags vergeben" and the tags appear on matching files after reload. Rescan (settings) must complete without errors.
 
-- [ ] **Step 5: Lint, commit**
+- [x] **Step 5: Lint, commit**
 
 ```bash
 .venv/bin/ruff check .
