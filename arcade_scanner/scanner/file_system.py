@@ -4,7 +4,7 @@ import json
 import os
 import threading
 import time
-from typing import AsyncIterator, List, Set
+from typing import AsyncIterator, List, Set, Tuple
 
 from ..config import config
 
@@ -59,9 +59,10 @@ class AsyncFileSystem:
         except Exception as e:
             print(f"⚠️ Could not save scan time: {e}")
 
-    async def scan_directories(self, targets: List[str]) -> AsyncIterator[str]:
+    async def scan_directories(self, targets: List[str]) -> AsyncIterator[Tuple[str, bool]]:
         """
-        Asynchronously yields absolute paths of valid video files found in targets.
+        Asynchronously yields ``(absolute_path, dir_changed)`` tuples for valid
+        media files found in targets.
         """
         # Reload settings fresh (picks up any changes to exclusions/min_size)
         self._load_settings()
