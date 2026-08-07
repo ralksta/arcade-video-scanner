@@ -165,7 +165,7 @@ class EncodeHistory:
         want = (resolution_class(height), bitrate_class(source_kbps))
         samples: list[float] = []
         for rec in self._load():
-            codec_str = f"{rec.get('codec', '')}{rec.get('encoder', '')}".lower()
+            codec_str = str(rec.get("codec", "")).lower()
             if not any(s in codec_str for s in substrings):
                 continue
             try:

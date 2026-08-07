@@ -93,9 +93,6 @@ def _rec(**kw):
                 codec="hevc_nvenc", height=2160, source_kbps=45000, q=30,
                 ssim=0.97, saved_pct=70.0)
     base.update(kw)
-    # If codec is provided but encoder is not, update encoder to match
-    if 'codec' in kw and 'encoder' not in kw:
-        base['encoder'] = kw['codec']
     return base
 
 
