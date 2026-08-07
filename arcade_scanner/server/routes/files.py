@@ -667,6 +667,9 @@ def _handle_rescan(handler) -> None:
             loop.close()
             asyncio.set_event_loop(None)
 
+        from arcade_scanner.core.auto_tagger import run_post_scan_auto_tagging
+        run_post_scan_auto_tagging()
+
         media_cache = _get_media_cache()
         port = handler.server.server_address[1]
         results = [e.model_dump(by_alias=True) for e in media_cache.get()]

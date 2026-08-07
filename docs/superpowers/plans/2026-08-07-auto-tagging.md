@@ -697,7 +697,7 @@ git commit -m "feat(db): auto_tag_applied bookkeeping table and rule storage fie
 
 Per-user evaluation: the global dict's `tags`/`favorite`/`hidden` fields are overridden with the user's own data before matching (`tags` = `user.data.tags.get(path, [])`, `favorite` = path in `user.data.favorites`, `hidden` = path in `user.data.vaulted`) — per-user state lives in `user_data`, not the media row.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_auto_tagger.py
@@ -830,12 +830,12 @@ def test_post_scan_runner_skips_users_without_rules():
     udb.add_user.assert_not_called()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/pytest tests/test_auto_tagger.py -v`
 Expected: FAIL with "No module named 'arcade_scanner.core.auto_tagger'"
 
-- [ ] **Step 3: Implement the engine**
+- [x] **Step 3: Implement the engine**
 
 ```python
 # arcade_scanner/core/auto_tagger.py
@@ -941,7 +941,7 @@ def run_post_scan_auto_tagging(*, user_db: Any = None, media_db: Any = None) -> 
 
 Note: the singleton import names must match the actual modules — check `arcade_scanner/database/__init__.py` / how `main.py` imports `db` and `user_db`, and use the same import paths the rest of the codebase uses (e.g. `from arcade_scanner.database.sqlite_store import db`). Adjust the two lazy imports if the real singletons live elsewhere; the tests always inject fakes so they don't depend on this.
 
-- [ ] **Step 4: Wire the two post-scan hooks**
+- [x] **Step 4: Wire the two post-scan hooks**
 
 `arcade_scanner/main.py` — inside `background_scan()`, after the `asyncio.run(mgr.run_scan(...))` call and its newline print (~line 89), BEFORE the report rebuild:
 
@@ -959,12 +959,12 @@ Note: the singleton import names must match the actual modules — check `arcade
 
 (Both call sites rely on `run_post_scan_auto_tagging` swallowing all errors — a broken rule must never break a scan.)
 
-- [ ] **Step 5: Run tests + the touched suites**
+- [x] **Step 5: Run tests + the touched suites**
 
 Run: `.venv/bin/pytest tests/test_auto_tagger.py tests/test_routes_files.py tests/test_scanner_manager.py -v`
 Expected: all PASS (files-route tests still green: the hook is inside `_handle_rescan`, existing tests for it must not break — if one does because of the new import, patch `run_post_scan_auto_tagging` in that test following the file's patching style)
 
-- [ ] **Step 6: Lint, typecheck, commit**
+- [x] **Step 6: Lint, typecheck, commit**
 
 ```bash
 .venv/bin/ruff check arcade_scanner tests
