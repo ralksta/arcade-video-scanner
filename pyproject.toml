@@ -29,6 +29,11 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.0",
 ]
+# GPU embedding indexer (scripts/media_indexer.py) — NEVER a server runtime dep
+indexer = [
+    "torch>=2.0",
+    "open_clip_torch>=2.24",
+]
 
 [project.scripts]
 arcade-scanner = "arcade_scanner.main:run_scanner"

@@ -29,6 +29,12 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Embedding Foundation — Ähnlichkeit Teil 1 (2026-08-08)
+- **Vektor-Speicher**: `embedding_meta`/`frame_embeddings` in SQLite, float32-Blobs, L2-normalisiert.
+- **GPU-Indexer**: eigenständiges Skript mit optionalen ML-Deps (`[indexer]`), inkrementell.
+- **`/api/similar`**: Brute-Force-kNN serverseitig ohne neue Runtime-Dependencies.
+- Geplant als Teil 2–4: „Ähnliche Videos"-Leiste im Cinema, Themen-Clustering, semantische Textsuche.
+
 ### ✅ Version 6.8.0 (2026-01-18)
 - **Visual Timeline Scrubber**: Professional timeline with frame-accurate seeking and thumbnail previews.
 - **GIF Export Panel**: Redesigned bottom panel UI with presets and size estimation.

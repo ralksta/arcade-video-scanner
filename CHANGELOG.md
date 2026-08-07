@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added — Embedding Foundation (Ähnlichkeit Teil 1)
+- **GPU-Indexer** (`scripts/media_indexer.py`): berechnet CLIP-Embeddings
+  (Default ViT-B-16, 12 Frames pro Video, Bilder 1 Frame) und schreibt sie in
+  die Haupt-DB. Inkrementell (mtime/Modell), `--watch`, `--rebuild`; eigene
+  optionale Dependency-Gruppe `pip install -e ".[indexer]"` — der Server
+  selbst bleibt ohne ML-Abhängigkeiten.
+- **`GET /api/similar`**: nächste Nachbarn über die gespeicherten
+  Mean-Vektoren (pures Python, kein NumPy), Session-pflichtig und
+  Vault-gefiltert; Cache invalidiert sich bei Indexer-Läufen selbst.
+
 ### Changed — Video Optimizer V2.5
 - **Downscaling**: New `--scale-height H` option scales the encode to H pixels height while keeping the source aspect ratio (width `-2`). Upscaling is refused, the SSIM reference is scaled to match so quality checks stay valid, and the constrained-VBR ladder is adjusted to the target resolution (~pixels^0.75) so a downscale actually converts into savings.
 - **Sample-Clip Pre-Search**: The quality binary search now runs on a ~24s stream-copied probe clip first, then narrows the full-encode search to predicted ±1 — typically 1-2 full passes instead of 3-4 (files ≥ 120s; `--no-presearch` to disable).

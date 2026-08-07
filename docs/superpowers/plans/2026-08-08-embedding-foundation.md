@@ -63,9 +63,9 @@
 
 **Files:** Modify `pyproject.toml` (optional-dependencies group `indexer = ["torch", "open_clip_torch"]`), `CHANGELOG.md`, `ROADMAP.md`.
 
-- [ ] Add extra; assert server test suite still passes without it installed (it is not installed in this venv — that IS the proof).
-- [ ] CHANGELOG `[Unreleased]` + ROADMAP entry.
-- [ ] Full pytest/ruff/mypy; commit `docs: changelog & roadmap for the embedding foundation`.
+- [x] Add extra; assert server test suite still passes without it installed (it is not installed in this venv — that IS the proof).
+- [x] CHANGELOG `[Unreleased]` + ROADMAP entry.
+- [x] Full pytest/ruff/mypy; commit `docs: changelog & roadmap for the embedding foundation`.
 
 ### Task 6: Push + PR
 
