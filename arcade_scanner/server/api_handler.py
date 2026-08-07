@@ -394,7 +394,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self._response_started = False
         try:
-            from .routes import duplicates, files, queue, settings, tags
+            from .routes import duplicates, files, queue, settings, similar, tags
             if queue.handle_get(self):
                 return
             if settings.handle_get(self):
@@ -402,6 +402,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if duplicates.handle_get(self):
                 return
             if tags.handle_get(self):
+                return
+            if similar.handle_get(self):
                 return
             if files.handle_get(self):
                 return

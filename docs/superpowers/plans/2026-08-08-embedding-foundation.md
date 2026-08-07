@@ -45,9 +45,9 @@
 
 **Produces:** `handle_get(handler) -> bool`; module-level `SimilarityCache` (mean vectors decoded once, invalidated via `db.register_on_change`); response contract per Global Constraints; vault filtering via requesting user's `data.vaulted` (abspath), query file itself excluded.
 
-- [ ] Tests (FakeHandler pattern from `tests/test_routes_queue.py`, `_get_deps` patched): session 401, missing path 400, empty index → `not_indexed`, unknown path 404, ranked results with limit, vaulted results omitted, query path excluded.
-- [ ] Implement + wire dispatch (GET only).
-- [ ] pytest/ruff/mypy green; commit `feat(web): /api/similar kNN endpoint over stored embeddings`.
+- [x] Tests (FakeHandler pattern from `tests/test_routes_queue.py`, `_get_deps` patched): session 401, missing path 400, empty index → `not_indexed`, unknown path 404, ranked results with limit, vaulted results omitted, query path excluded.
+- [x] Implement + wire dispatch (GET only).
+- [x] pytest/ruff/mypy green; commit `feat(web): /api/similar kNN endpoint over stored embeddings`.
 
 ### Task 4: `scripts/media_indexer.py`
 
