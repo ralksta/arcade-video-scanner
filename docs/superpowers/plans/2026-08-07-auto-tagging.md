@@ -576,7 +576,7 @@ git commit -m "test(core): JS/Python parity fixtures for the criteria evaluator"
 **Interfaces:**
 - Produces: `SQLiteStore.get_auto_tag_applied(username: str, rule_id: str) -> set[str]`, `SQLiteStore.mark_auto_tag_applied(username: str, rule_id: str, file_paths: list[str]) -> None` (idempotent), `SQLiteStore.clear_auto_tag_applied(username: str, rule_id: str) -> None`; `UserVideoData.auto_tag_rules: List[Dict[str, Any]]` (default `[]`). Rule shape (created by Task 5): `{"id": str, "name": str, "tag": str, "criteria": dict, "enabled": bool}`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # append to tests/test_sqlite_store.py
@@ -604,12 +604,12 @@ class TestAutoTagApplied:
         assert store.get_auto_tag_applied("alice", "r1") == set()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/pytest tests/test_sqlite_store.py -k AutoTag -v`
 Expected: FAIL with "has no attribute 'mark_auto_tag_applied'"
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `sqlite_store.py` — in `_create_table`, after the `encoding_queue` block:
 
@@ -667,12 +667,12 @@ New methods next to the queue methods:
     auto_tag_rules: List[Dict[str, Any]] = Field(default_factory=list, description="Rules that auto-apply a tag to matching files after each scan")
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `.venv/bin/pytest tests/test_sqlite_store.py -v`
 Expected: all PASS (including the pre-existing schema tests)
 
-- [ ] **Step 5: Lint, typecheck, commit**
+- [x] **Step 5: Lint, typecheck, commit**
 
 ```bash
 .venv/bin/ruff check arcade_scanner tests

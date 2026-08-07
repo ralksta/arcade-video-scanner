@@ -411,3 +411,30 @@ class TestConcurrentReads:
 
         assert errors == [], f"first failure: {errors[0]}"
         assert len(set(seen)) == 1, "threads ended up on different connections"
+
+
+# ---------------------------------------------------------------------------
+# Auto-Tagging bookkeeping
+# ---------------------------------------------------------------------------
+
+class TestAutoTagApplied:
+    def test_roundtrip_and_idempotence(self, store):
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4", "/lib/b.mp4"])
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4"])  # duplicate: no error
+        assert store.get_auto_tag_applied("alice", "r1") == {"/lib/a.mp4", "/lib/b.mp4"}
+
+    def test_scoped_per_user_and_rule(self, store):
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4"])
+        assert store.get_auto_tag_applied("bob", "r1") == set()
+        assert store.get_auto_tag_applied("alice", "r2") == set()
+
+    def test_clear_rule(self, store):
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4"])
+        store.mark_auto_tag_applied("alice", "r2", ["/lib/a.mp4"])
+        store.clear_auto_tag_applied("alice", "r1")
+        assert store.get_auto_tag_applied("alice", "r1") == set()
+        assert store.get_auto_tag_applied("alice", "r2") == {"/lib/a.mp4"}
+
+    def test_empty_mark_is_noop(self, store):
+        store.mark_auto_tag_applied("alice", "r1", [])
+        assert store.get_auto_tag_applied("alice", "r1") == set()

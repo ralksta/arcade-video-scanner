@@ -170,6 +170,51 @@ class SQLiteStore:
         except Exception:
             pass  # Column already exists
 
+        # Auto-tagging apply-once bookkeeping (spec: apply-once semantics —
+        # a manually removed tag is never re-applied by its rule)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS auto_tag_applied (
+                username  TEXT NOT NULL,
+                rule_id   TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                PRIMARY KEY (username, rule_id, file_path)
+            )
+        """)
+
+    # ------------------------------------------------------------------
+    # Auto-Tagging bookkeeping
+    # ------------------------------------------------------------------
+
+    def get_auto_tag_applied(self, username: str, rule_id: str) -> set[str]:
+        """file_paths a rule has already been applied to for this user."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute(
+                "SELECT file_path FROM auto_tag_applied WHERE username = ? AND rule_id = ?",
+                (username, rule_id),
+            )
+            return {self._decode_safe_path(row["file_path"]) for row in cursor}
+
+    def mark_auto_tag_applied(self, username: str, rule_id: str, file_paths: list[str]) -> None:
+        """Record applied (user, rule, path) triples. Idempotent."""
+        if not file_paths:
+            return
+        conn = self._ensure_connection()
+        with self._write_lock:
+            conn.executemany(
+                "INSERT OR IGNORE INTO auto_tag_applied (username, rule_id, file_path) VALUES (?, ?, ?)",
+                [(username, rule_id, self._get_safe_path(p)) for p in file_paths],
+            )
+
+    def clear_auto_tag_applied(self, username: str, rule_id: str) -> None:
+        """Drop a rule's bookkeeping (rule deleted)."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            conn.execute(
+                "DELETE FROM auto_tag_applied WHERE username = ? AND rule_id = ?",
+                (username, rule_id),
+            )
+
     # ------------------------------------------------------------------
     # Encoding Queue methods
     # ------------------------------------------------------------------
