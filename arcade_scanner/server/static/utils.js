@@ -144,6 +144,23 @@ function _repositionToasts() {
 
 window.showToast = showToast;
 
+/**
+ * Escape a string for safe interpolation into HTML markup or attributes.
+ * File names may contain &, <, >, " or ' — unescaped they break markup,
+ * data-path attributes and onclick handlers.
+ * @param {*} value - Value to escape
+ * @returns {string} HTML-safe string
+ */
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
 
 
 
