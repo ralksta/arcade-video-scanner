@@ -25,9 +25,9 @@
 
 **Produces:** `encode_vector(values: Sequence[float]) -> bytes` (L2-normalizes), `decode_vector(blob: bytes) -> list[float]`, `dot(a: list[float], b: list[float]) -> float`, `top_k(query: list[float], candidates: Iterable[tuple[str, list[float]]], k: int, exclude: set[str]) -> list[tuple[str, float]]` (desc by score).
 
-- [ ] Tests: roundtrip codec (float32 precision ~1e-6), normalization (norm 1.0; zero vector stays zero), top_k ordering/limit/exclude.
-- [ ] Implement with `struct.pack(f"<{n}f", ...)`, no numpy.
-- [ ] pytest/ruff/mypy green; commit `feat(core): vector codec and pure-python kNN for similarity`.
+- [x] Tests: roundtrip codec (float32 precision ~1e-6), normalization (norm 1.0; zero vector stays zero), top_k ordering/limit/exclude.
+- [x] Implement with `struct.pack(f"<{n}f", ...)`, no numpy.
+- [x] pytest/ruff/mypy green; commit `feat(core): vector codec and pure-python kNN for similarity`.
 
 ### Task 2: SQLite embedding tables + store methods
 
