@@ -35,7 +35,7 @@
 
 The port must mirror the JS logic 1:1, including its quirks (e.g. `timestamp == 0` fails any non-"all" date filter; `favorites: None` means "don't care"; `include.status` value `"optimized_files"` matches `"_opt"` in the path). The JS reads both alias spellings (`width`/`Width`) — keep that.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_criteria_eval.py
@@ -211,12 +211,12 @@ class TestVideoMatches:
         assert video_matches(_video(), c) is True
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/pytest tests/test_criteria_eval.py -v`
 Expected: FAIL with "No module named 'arcade_scanner.core.criteria_eval'"
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```python
 # arcade_scanner/core/criteria_eval.py
@@ -425,12 +425,12 @@ def video_matches(video: dict, criteria: Optional[dict], now: Optional[int] = No
     return True
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/pytest tests/test_criteria_eval.py -v`
 Expected: all PASS
 
-- [ ] **Step 5: Lint, typecheck, commit**
+- [x] **Step 5: Lint, typecheck, commit**
 
 ```bash
 .venv/bin/ruff check arcade_scanner/core/criteria_eval.py tests/test_criteria_eval.py
