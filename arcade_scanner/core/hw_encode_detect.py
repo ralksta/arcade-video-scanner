@@ -2,6 +2,7 @@ import logging
 import os
 import subprocess
 import sys
+from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def get_available_ffmpeg_encoders() -> str:
         logger.debug("Failed to get ffmpeg encoders: %s", e)
         return ""
 
-def test_ffmpeg_encoder(codec: str, extra_args: list = None) -> bool:
+def test_ffmpeg_encoder(codec: str, extra_args: Optional[List[str]] = None) -> bool:
     """Test if an encoder actually works by performing a tiny lavfi encode."""
     if extra_args is None:
         extra_args = []
@@ -32,7 +33,7 @@ def test_ffmpeg_encoder(codec: str, extra_args: list = None) -> bool:
     except Exception:
         return False
 
-def get_vaapi_device(log_fn=None) -> str:
+def get_vaapi_device(log_fn: Optional[Callable[[str], None]] = None) -> Optional[str]:
     """Detect the best VAAPI device, testing common paths."""
     if log_fn is None:
         log_fn = logger.info

@@ -201,13 +201,13 @@ def _handle_mark_optimized(handler) -> None:
         if entry:
             entry.status = "OK"
         else:
-            size_mb = 0
+            size_mb = 0.0
             try:
                 if os.path.exists(abs_path):
                     size_mb = os.path.getsize(abs_path) / (1024 * 1024)
             except OSError as e:
                 print(f"⚠️ Could not stat file {abs_path}: {e}")
-            entry = VideoEntry(FilePath=abs_path, Size_MB=size_mb, Status="OK")
+            entry = VideoEntry(file_path=abs_path, size_mb=size_mb, Status="OK")
         db.upsert(entry)
         db.save()
         _get_media_cache().invalidate()
@@ -284,7 +284,9 @@ def _handle_compress(handler) -> None:
 
         if IS_WIN:
             print(f"🚀 Launching Optimizer (Win): {' '.join(cmd_parts)}")
-            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            # CREATE_NEW_CONSOLE only exists in subprocess on Windows; this branch
+            # is guarded by IS_WIN, but mypy checks against the current (non-Win) stubs.
+            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)  # type: ignore[attr-defined]
         else:
             safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
             print(f"🚀 Launching Optimizer (Mac): {safe_cmd}")
@@ -626,7 +628,8 @@ def _handle_batch_compress(handler) -> None:
         ]
 
         if IS_WIN:
-            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            # CREATE_NEW_CONSOLE only exists in subprocess on Windows; guarded by IS_WIN.
+            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)  # type: ignore[attr-defined]
         else:
             safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
             print(f"🚀 Launching Batch Controller: {len(validated_paths)} files")

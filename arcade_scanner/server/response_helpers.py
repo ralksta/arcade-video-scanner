@@ -8,6 +8,12 @@ from __future__ import annotations
 import gzip
 import json
 from http.server import BaseHTTPRequestHandler
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Nur zur Typprüfung importiert, um einen Zirkelimport zur Laufzeit zu
+    # vermeiden. FinderHandler ergänzt BaseHTTPRequestHandler um get_current_user().
+    from arcade_scanner.server.api_handler import FinderHandler
 
 # Bodies smaller than this aren't worth the gzip CPU/header overhead.
 GZIP_MIN_SIZE = 512
@@ -97,7 +103,7 @@ def send_json_error(handler: BaseHTTPRequestHandler, status: int, message: str) 
     send_json(handler, {"error": message}, status=status)
 
 
-def require_auth(handler: BaseHTTPRequestHandler) -> str | None:
+def require_auth(handler: "FinderHandler") -> str | None:
     """Prüft ob der Request authentifiziert ist.
 
     Gibt den Benutzernamen zurück wenn authentifiziert, sendet ansonsten

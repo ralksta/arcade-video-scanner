@@ -4,8 +4,8 @@ import socket
 import sys
 from typing import Any, Dict, List
 
-from pydantic import ConfigDict, Field
-from pydantic_settings import BaseSettings
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ==============================================================================
 # CONSTANTS & PATHS
@@ -166,7 +166,7 @@ class AppSettings(BaseSettings):
     max_concurrent_image_scans: int = Field(5)
     enable_resource_watchdog: bool = Field(True)
 
-    model_config = ConfigDict(
+    model_config = SettingsConfigDict(
         env_prefix="ARCADE_",
         extra="ignore",
     )
@@ -187,7 +187,7 @@ class ConfigManager:
 
     def _load_settings(self) -> AppSettings:
         # Load from JSON if exists
-        file_data = {}
+        file_data: Dict[str, Any] = {}
         if os.path.exists(SETTINGS_FILE):
             try:
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:

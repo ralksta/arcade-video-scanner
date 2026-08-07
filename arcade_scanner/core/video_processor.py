@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import subprocess
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from arcade_scanner.config import config
 
@@ -14,7 +14,7 @@ IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', 
 
 
 def get_video_metadata(filepath: str) -> Dict[str, Any]:
-    cmd = [
+    cmd: List[Union[str, bytes]] = [
         "ffprobe",
         "-v",
         "error",
@@ -68,7 +68,7 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
         # Get duration for smart seeking if not provided
         if duration is None:
             try:
-                cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
+                cmd_dur: List[Union[str, bytes]] = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
                 duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
             except Exception as e:
                 logger.debug("Duration probe failed for %s: %s", video_path, e)
@@ -128,7 +128,7 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
 
 # --- HARDWARE ENCODER DETECTION ---
 
-def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None) -> Optional[Dict[str, Any]]:
+def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Legacy method kept for compatibility if needed, but updated to use new config.
     """

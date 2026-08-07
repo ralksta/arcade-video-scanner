@@ -170,8 +170,8 @@ class ImageInspector(MediaInspector):
         mtime = int(file_stat.st_mtime)
 
         return MediaAsset(
-            FilePath=filepath,
-            Size_MB=size_mb,
+            file_path=filepath,
+            size_mb=size_mb,
             media_type=MediaType.IMAGE,
             image_metadata=i_meta,
             mtime=mtime,
@@ -259,8 +259,8 @@ class ImageInspector(MediaInspector):
             mtime = int(file_stat.st_mtime)
 
             return MediaAsset(
-                FilePath=filepath,
-                Size_MB=size_mb,
+                file_path=filepath,
+                size_mb=size_mb,
                 media_type=MediaType.IMAGE,
                 image_metadata=i_meta,
                 mtime=mtime,

@@ -47,8 +47,8 @@ class VideoInspector(MediaInspector):
 
         # 2. Create Asset
         asset = MediaAsset(
-            FilePath=legacy_entry.file_path,
-            Size_MB=legacy_entry.size_mb,
+            file_path=legacy_entry.file_path,
+            size_mb=legacy_entry.size_mb,
             media_type=MediaType.VIDEO,
             video_metadata=v_meta,
             status=legacy_entry.status,
