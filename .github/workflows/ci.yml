@@ -9,31 +9,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   ci:
-    name: Lint, Type-check & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e ".[dev]"
-      - name: Ruff
-        # Advisory only: the package currently has many pre-existing style
-        # findings. Kept non-blocking so it does not gate the pipeline; clean
-        # these up incrementally, then flip to blocking.
-        continue-on-error: true
-        run: ruff check .
-      - name: Mypy
-        # Advisory only: ~131 pre-existing typing errors. Non-blocking until
-        # the codebase is annotated; flip to blocking once clean.
-        continue-on-error: true
-        run: mypy arcade_scanner
-      - name: Pytest
-        run: pytest
+    uses: ralksta/ci-workflows/.github/workflows/python-ci.yml@main
+    with:
+      install: python -m pip install --upgrade pip && pip install -r requirements.txt && pip install -e ".[dev]"
+      # ruff/mypy stay advisory (lint-blocking/typecheck-blocking default to false)
+      # until the pre-existing debt is cleaned up, then flip them to true.
+      lint: ruff check .
+      typecheck: mypy arcade_scanner
+      test: pytest
