@@ -90,7 +90,9 @@ def _is_excluded(video_val: str, arr: list) -> bool:
 
 def video_matches(video: dict, criteria: Optional[dict], now: Optional[int] = None) -> bool:
     """Return True when `video` (API-dict shape) matches `criteria`."""
-    if not criteria:
+    # JS: `if (!criteria) return true` — only null/undefined skip evaluation;
+    # an empty {} object is truthy in JS and still filters hidden videos.
+    if criteria is None:
         return True
     if now is None:
         now = int(time.time())

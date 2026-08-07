@@ -454,7 +454,7 @@ git commit -m "feat(core): Python port of the collection criteria evaluator"
 
 The harness pins `Date.now` inside the vm to `FIXED_NOW * 1000` so relative-date fixtures are deterministic on both sides (Python gets `now=FIXED_NOW`).
 
-- [ ] **Step 1: Write the Node harness**
+- [x] **Step 1: Write the Node harness**
 
 ```javascript
 // tests/js_eval_harness.js
@@ -481,7 +481,7 @@ const results = fixtures.cases.map(c => !!evaluate(c.video, c.criteria));
 process.stdout.write(JSON.stringify(results));
 ```
 
-- [ ] **Step 2: Write the fixtures**
+- [x] **Step 2: Write the fixtures**
 
 `tests/fixtures/criteria_parity.json` — `now` is the pinned epoch; every case is `{name, video, criteria, expected}`. Cover each criteria dimension, including the quirks:
 
@@ -503,7 +503,7 @@ process.stdout.write(JSON.stringify(results));
 
 Extend the file to at least 20 cases covering: include/exclude codec substring + case-insensitivity, tags any/all, exclude tags, resolution (incl. portrait-4k), orientation, media_type include+exclude, format from extension, status match + `optimized_files` quirk, favorites true/false/"true"/null, size min/max boundary (exactly at min), duration bounds, search filename vs path, relative date 7d inside/outside, `imported_at: 0, mtime: 0` with a date filter (expected false), and one criteria object with an unknown extra field (expected true). Derive `expected` by hand from the JS logic; the test will tell you if you got one wrong — fix the fixture only after confirming which side is actually right.
 
-- [ ] **Step 3: Write the parity test**
+- [x] **Step 3: Write the parity test**
 
 ```python
 # tests/test_criteria_parity.py
@@ -550,12 +550,12 @@ def test_js_side_matches_expectations_and_python():
         assert js_result is py_result, f"drift: {case['name']}"
 ```
 
-- [ ] **Step 4: Run the parity test**
+- [x] **Step 4: Run the parity test**
 
 Run: `.venv/bin/pytest tests/test_criteria_parity.py -v`
 Expected: PASS (or a mismatch naming the exact fixture — resolve by checking the JS logic, then fix fixture or port)
 
-- [ ] **Step 5: Lint, commit**
+- [x] **Step 5: Lint, commit**
 
 ```bash
 .venv/bin/ruff check tests/test_criteria_parity.py
