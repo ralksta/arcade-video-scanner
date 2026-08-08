@@ -2,12 +2,10 @@ import http.server
 import json
 import mimetypes
 import os
-import socket
 import ssl
 import threading
 import time
 from http.cookies import SimpleCookie
-from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from arcade_scanner.config import (
@@ -826,79 +824,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                 send_json(self, {"tags": tags})
 
-            # Unreachable block removed
-
-
-            # ================================================================
-            # DUPLICATE DETECTION API
-            # ================================================================
-            elif self.path.startswith("/api/queue/next"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    worker_id = params.get("worker_id", [socket.gethostname()])[0]
-                    job = db.get_next_pending(worker_id=worker_id)
-                    if job:
-                        send_json(self, job)
-                    else:
-                        self.send_response(204)
-                        self.end_headers()
-                except Exception as e:
-                    print(f"❌ Error in queue/next: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/queue/check?"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    job_id = int(params.get("job_id", [0])[0])
-                    cancelled = db.is_job_cancelled(job_id) if job_id else False
-                    send_json(self, {"cancelled": cancelled})
-                except Exception as e:
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/queue/download?"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    job_id = int(params.get("job_id", [0])[0])
-                    if not job_id:
-                        self.send_error(400, "Missing job_id")
-                        return
-
-                    # Look up job to get file path
-                    jobs = db.get_queue_status(limit=100)
-                    job = next((j for j in jobs if j["id"] == job_id), None)
-                    if not job:
-                        self.send_error(404, "Job not found")
-                        return
-
-                    file_path = job["file_path"]
-                    if not os.path.exists(file_path):
-                        db.update_job_status(job_id, "failed", result_message="Source file not found")
-                        self.send_error(404, "Source file not found")
-                        return
-
-                    file_size = os.path.getsize(file_path)
-                    filename = os.path.basename(file_path)
-                    mime, _ = mimetypes.guess_type(file_path)
-
-                    self.send_response(200)
-                    self.send_header("Content-Type", mime or "application/octet-stream")
-                    self.send_header("Content-Length", str(file_size))
-                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-                    self.send_header("X-Original-Path", file_path)
-                    self.end_headers()
-
-                    # Stream in 8KB chunks
-                    with open(file_path, 'rb') as f:
-                        while True:
-                            chunk = f.read(8192)
-                            if not chunk:
-                                break
-                            self.wfile.write(chunk)
-
-                    print(f"📤 Queue download: {filename} ({file_size / (1024*1024):.1f} MB) for job {job_id}")
-                except Exception as e:
-                    print(f"❌ Error in queue/download: {e}")
-                    self.send_error(500, str(e))
+            # NOTE: the /api/queue/* endpoints live in routes/queue.py and are
+            # dispatched at the top of do_GET/do_POST — never add copies here.
 
             else:
                 # 404 for anything else
@@ -1033,113 +960,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 handle_post_remove_photos(self)
                 return
 
-            # ================================================================
-            # DUPLICATE DETECTION - DELETE FILES
-            # ================================================================
-            # ================================================================
-            # GIF EXPORT
-            # ================================================================
-            elif self.path == "/api/queue/cancel":
-                try:
-                    content_len = int(self.headers.get('Content-Length', 0))
-                    post_body = self.rfile.read(content_len)
-                    data = json.loads(post_body)
-                    job_id = int(data.get("job_id", 0))
-
-                    if db.cancel_job(job_id):
-                        print(f"🗑️ Cancelled queue job {job_id}")
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": True}).encode())
-                    else:
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": False, "error": "Job not cancellable"}).encode())
-                except Exception as e:
-                    print(f"❌ Error in queue/cancel: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/queue/upload?"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    job_id = int(params.get("job_id", [0])[0])
-                    if not job_id:
-                        self.send_error(400, "Missing job_id")
-                        return
-
-                    # Look up job
-                    jobs = db.get_queue_status(limit=100)
-                    job = next((j for j in jobs if j["id"] == job_id), None)
-                    if not job:
-                        self.send_error(404, "Job not found")
-                        return
-
-                    original_path = job["file_path"]
-                    orig_stem = Path(original_path).stem
-                    orig_dir = os.path.dirname(original_path)
-                    opt_path = os.path.join(orig_dir, f"{orig_stem}_opt.mp4")
-
-                    content_len = int(self.headers.get('Content-Length', 0))
-
-                    # Stream upload to disk in chunks
-                    with open(opt_path, 'wb') as out:
-                        remaining = content_len
-                        while remaining > 0:
-                            chunk_size = min(8192, remaining)
-                            chunk = self.rfile.read(chunk_size)
-                            if not chunk:
-                                break
-                            out.write(chunk)
-                            remaining -= len(chunk)
-
-                    opt_size = os.path.getsize(opt_path)
-                    orig_size = os.path.getsize(original_path) if os.path.exists(original_path) else 0
-                    saved = orig_size - opt_size
-
-                    db.update_job_status(job_id, "done", saved_bytes=saved,
-                                        result_message=f"Optimized: {opt_size/(1024*1024):.1f}MB (saved {saved/(1024*1024):.1f}MB)")
-
-                    print(f"✅ Upload received for job {job_id}: {os.path.basename(opt_path)} ({opt_size/(1024*1024):.1f} MB, saved {saved/(1024*1024):.1f} MB)")
-
-                    # Trigger report regeneration
-                    try:
-                        current_port = self.server.server_address[1]
-                        report_debouncer.schedule(current_port)
-                    except Exception as e:
-                        print(f"⚠️ Report scheduling after upload failed: {e}")
-
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True, "opt_path": opt_path, "saved_bytes": saved}).encode())
-
-                except Exception as e:
-                    print(f"❌ Error in queue/upload: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path == "/api/queue/complete":
-                try:
-                    content_len = int(self.headers.get('Content-Length', 0))
-                    post_body = self.rfile.read(content_len)
-                    data = json.loads(post_body)
-
-                    job_id = int(data.get("job_id", 0))
-                    status = data.get("status", "done")
-                    message = data.get("message", "")
-                    saved_bytes = int(data.get("saved_bytes", 0))
-
-                    db.update_job_status(job_id, status, result_message=message, saved_bytes=saved_bytes)
-                    print(f"📋 Job {job_id} completed: {status} — {message}")
-
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True}).encode())
-                except Exception as e:
-                    print(f"❌ Error in queue/complete: {e}")
-                    self.send_error(500, str(e))
+            # NOTE: the /api/queue/* endpoints live in routes/queue.py and are
+            # dispatched at the top of do_POST — never add copies here.
 
             else:
                 self.send_error(404)

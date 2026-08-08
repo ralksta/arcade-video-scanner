@@ -8,6 +8,10 @@ encodes it using VideoToolbox, and uploads the result.
 Usage:
     python3 mac_worker.py --server http://192.168.1.100:8000 --user admin --password secret
 
+Credentials are mandatory: every /api/queue/* endpoint requires a session.
+Server sessions live in memory, so the worker re-authenticates automatically
+whenever a request comes back 401 (e.g. after a server restart).
+
 Requirements:
     - macOS with VideoToolbox (Apple Silicon or Intel with T2)
     - ffmpeg installed (brew install ffmpeg)
@@ -17,9 +21,11 @@ Requirements:
 import argparse
 import json
 import os
+import shutil
 import signal
 import socket
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -72,52 +78,76 @@ signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 
+class AuthError(Exception):
+    """Raised when the worker cannot (re-)establish a session."""
+
+
 class WorkerClient:
     """HTTP client for the Arcade Server queue API."""
 
     def __init__(self, server_url: str, username: str = "", password: str = ""):
         self.server = server_url.rstrip("/")
+        self.username = username
+        self.password = password
         self.session_token = None
         self.hostname = socket.gethostname()
 
         if username:
-            self._login(username, password)
+            self._login()
 
-    def _login(self, username: str, password: str):
-        """Authenticate and store session token."""
+    def _login(self):
+        """Authenticate and store the session token."""
         url = f"{self.server}/api/login"
-        data = json.dumps({"username": username, "password": password}).encode()
+        data = json.dumps({"username": self.username, "password": self.password}).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
 
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
-                # Extract session cookie
                 cookie_header = resp.headers.get("Set-Cookie", "")
                 if "session_token=" in cookie_header:
-                    token = cookie_header.split("session_token=")[1].split(";")[0]
-                    self.session_token = token
-                    print(f"{G}✓ Authenticated as '{username}'{NC}")
-                else:
-                    print(f"{Y}⚠ Login succeeded but no session token received{NC}")
+                    self.session_token = cookie_header.split("session_token=")[1].split(";")[0]
+                    print(f"{G}✓ Authenticated as '{self.username}'{NC}")
+                    return
+                raise AuthError("login succeeded but no session token received")
         except urllib.error.HTTPError as e:
-            print(f"{R}✗ Login failed: {e.code} {e.reason}{NC}")
-            sys.exit(1)
-        except Exception as e:
-            print(f"{R}✗ Connection failed: {e}{NC}")
-            sys.exit(1)
+            raise AuthError(f"login failed: {e.code} {e.reason}") from e
+        except urllib.error.URLError as e:
+            raise AuthError(f"connection failed: {e}") from e
 
-    def _headers(self) -> dict:
-        h = {}
+    def _headers(self, extra: dict | None = None) -> dict:
+        h = dict(extra or {})
         if self.session_token:
             h["Cookie"] = f"session_token={self.session_token}"
         return h
 
+    def _open(self, url: str, data=None, method: str = "GET", timeout: int = 10,
+              headers: dict | None = None):
+        """Perform one request, re-authenticating once on 401.
+
+        Sessions are held in the server's memory, so every server restart
+        invalidates this worker's token. Without the retry the worker would
+        just log 401s forever.
+        """
+        for attempt in (1, 2):
+            req = urllib.request.Request(url, data=data, headers=self._headers(headers),
+                                         method=method)
+            try:
+                return urllib.request.urlopen(req, timeout=timeout)
+            except urllib.error.HTTPError as e:
+                if e.code == 401 and attempt == 1 and self.username:
+                    print(f"{Y}⚠ Session expired — re-authenticating...{NC}")
+                    self._login()
+                    if callable(getattr(data, "seek", None)):
+                        data.seek(0)  # rewind a streamed body before the retry
+                    continue
+                raise
+        raise AuthError("unreachable")  # pragma: no cover
+
     def poll_next_job(self) -> dict | None:
         """Check for next pending job. Returns job dict or None."""
         url = f"{self.server}/api/queue/next?worker_id={self.hostname}"
-        req = urllib.request.Request(url, headers=self._headers())
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with self._open(url, timeout=10) as resp:
                 if resp.status == 204:
                     return None
                 return json.loads(resp.read())
@@ -126,16 +156,18 @@ class WorkerClient:
                 return None
             print(f"{R}✗ Poll error: {e.code}{NC}")
             return None
+        except AuthError as e:
+            print(f"{R}✗ Authentication error: {e}{NC}")
+            return None
         except Exception as e:
             print(f"{R}✗ Poll connection error: {e}{NC}")
             return None
 
-    def download_file(self, job_id: int, dest_path: str) -> bool:
+    def download_file(self, job_id: int, dest_path: str, on_progress=None) -> bool:
         """Download source file from server."""
         url = f"{self.server}/api/queue/download?job_id={job_id}"
-        req = urllib.request.Request(url, headers=self._headers())
         try:
-            with urllib.request.urlopen(req, timeout=3600) as resp:
+            with self._open(url, timeout=3600) as resp:
                 total = int(resp.headers.get("Content-Length", 0))
                 downloaded = 0
                 with open(dest_path, "wb") as f:
@@ -149,6 +181,8 @@ class WorkerClient:
                             pct = downloaded * 100 // total
                             mb = downloaded / (1024 * 1024)
                             print(f"\r  ↓ {mb:.1f}/{total/(1024*1024):.1f} MB ({pct}%)", end="", flush=True)
+                            if on_progress:
+                                on_progress(downloaded, total)
                 print()  # newline after progress
                 return True
         except Exception as e:
@@ -156,51 +190,134 @@ class WorkerClient:
             return False
 
     def upload_file(self, job_id: int, file_path: str) -> bool:
-        """Upload optimized file to server."""
+        """Upload optimized file to server.
+
+        The body is streamed straight from the file handle — reading a
+        multi-GB encode into memory first would blow up the worker.
+        """
         url = f"{self.server}/api/queue/upload?job_id={job_id}"
         file_size = os.path.getsize(file_path)
-
-        headers = self._headers()
-        headers["Content-Length"] = str(file_size)
-        headers["Content-Type"] = "application/octet-stream"
+        headers = {
+            "Content-Length": str(file_size),
+            "Content-Type": "application/octet-stream",
+        }
 
         try:
             with open(file_path, "rb") as f:
-                req = urllib.request.Request(url, data=f.read(), headers=headers, method="POST")
-                with urllib.request.urlopen(req, timeout=3600) as resp:
+                with self._open(url, data=f, method="POST", timeout=3600,
+                                headers=headers) as resp:
                     result = json.loads(resp.read())
+                    if not result.get("success", False):
+                        print(f"{R}✗ Server rejected upload: {result.get('error', 'unknown')}{NC}")
                     return result.get("success", False)
         except Exception as e:
             print(f"{R}✗ Upload failed: {e}{NC}")
             return False
 
-    def update_status(self, job_id: int, status: str, **kwargs):
-        """Report job status to server."""
+    def update_status(self, job_id: int, status: str, **kwargs) -> bool:
+        """Report job status. False means the server no longer wants this job."""
         url = f"{self.server}/api/queue/complete"
         data = {"job_id": job_id, "status": status}
         data.update(kwargs)
         body = json.dumps(data).encode()
 
-        headers = self._headers()
-        headers["Content-Type"] = "application/json"
-        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-
         try:
-            with urllib.request.urlopen(req, timeout=10):
-                pass
+            with self._open(url, data=body, method="POST", timeout=10,
+                            headers={"Content-Type": "application/json"}) as resp:
+                result = json.loads(resp.read() or b"{}")
+                return bool(result.get("success", True))
         except Exception as e:
             print(f"{Y}⚠ Status update failed: {e}{NC}")
+            return True  # a network hiccup is not a cancellation
 
-    def check_cancelled(self, job_id: int) -> bool:
-        """Check if a job was cancelled by the user."""
-        url = f"{self.server}/api/queue/check?job_id={job_id}"
-        req = urllib.request.Request(url, headers=self._headers())
+    def report_progress(self, job_id: int, progress_pct: float, eta_seconds: int,
+                        phase: str) -> bool:
+        """Heartbeat. False means the job was cancelled or is gone."""
+        url = f"{self.server}/api/queue/progress"
+        body = json.dumps({
+            "job_id": job_id,
+            "progress_pct": round(progress_pct, 1),
+            "eta_seconds": int(eta_seconds),
+            "phase": phase,
+        }).encode()
+
         try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with self._open(url, data=body, method="POST", timeout=10,
+                            headers={"Content-Type": "application/json"}) as resp:
+                result = json.loads(resp.read() or b"{}")
+                return not result.get("cancelled", False)
+        except Exception as e:
+            print(f"{Y}⚠ Heartbeat failed: {e}{NC}")
+            return True  # unreachable server != cancelled job
+
+    def check_cancelled(self, job_id: int) -> bool | None:
+        """Was the job cancelled? None means 'could not find out'."""
+        url = f"{self.server}/api/queue/check?job_id={job_id}"
+        try:
+            with self._open(url, timeout=5) as resp:
                 data = json.loads(resp.read())
                 return data.get("cancelled", False)
-        except Exception:
-            return False
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return True  # job is gone — nothing left to encode for
+            print(f"{Y}⚠ Cancel check failed: {e.code}{NC}")
+            return None
+        except Exception as e:
+            print(f"{Y}⚠ Cancel check failed: {e}{NC}")
+            return None
+
+
+class JobReporter:
+    """Pushes progress to the server on a timer and watches for cancellation.
+
+    The optimizer's callback runs inside the ffmpeg reader loop, so it may only
+    touch local state — this thread does the network I/O, which also gives the
+    server a heartbeat during phases the callback never sees (probing, SSIM,
+    transfers). A stalled worker is what lets the server requeue the job.
+    """
+
+    INTERVAL = 10
+
+    def __init__(self, client: WorkerClient, job_id: int):
+        self.client = client
+        self.job_id = job_id
+        self.cancelled = threading.Event()
+        self._state = {"pct": 0.0, "eta": 0, "phase": ""}
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        self._thread.start()
+        return self
+
+    def stop(self):
+        self._stop.set()
+
+    def set_phase(self, phase: str, pct: float = 0.0, eta: int = 0):
+        with self._lock:
+            self._state = {"pct": pct, "eta": eta, "phase": phase}
+
+    def on_encode_progress(self, current: float, total: float, label: str):
+        """process_file's progress_callback — local writes only, no I/O."""
+        pct = (current * 100.0 / total) if total > 0 else 0.0
+        with self._lock:
+            self._state = {"pct": min(100.0, pct), "eta": 0, "phase": label}
+
+    def on_transfer_progress(self, done: int, total: int):
+        pct = (done * 100.0 / total) if total > 0 else 0.0
+        with self._lock:
+            self._state["pct"] = min(100.0, pct)
+
+    def _run(self):
+        while not self._stop.wait(self.INTERVAL):
+            with self._lock:
+                state = dict(self._state)
+            alive = self.client.report_progress(
+                self.job_id, state["pct"], state["eta"], state["phase"])
+            if not alive:
+                self.cancelled.set()
+                return
 
 
 def process_job(client: WorkerClient, job: dict, work_dir: str):
@@ -212,28 +329,55 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
 
     print(f"\n{B}{C}═══ Job #{job_id}: {filename} ═══{NC}")
 
+    # One directory per job: two files with the same basename from different
+    # library folders would otherwise collide, and a leftover <stem>_opt.mp4
+    # would make process_file skip the encode and hand back the stale file.
+    job_dir = os.path.join(work_dir, f"job_{job_id}")
+    if os.path.exists(job_dir):
+        shutil.rmtree(job_dir, ignore_errors=True)
+    os.makedirs(job_dir, exist_ok=True)
+
+    reporter = JobReporter(client, job_id).start()
+    try:
+        _run_job(client, job, job_id, filename, stem, job_dir, reporter)
+    finally:
+        reporter.stop()
+        shutil.rmtree(job_dir, ignore_errors=True)
+
+
+def _is_cancelled(client: WorkerClient, reporter: "JobReporter", job_id: int) -> bool:
+    if reporter.cancelled.is_set():
+        return True
+    # None = the server could not be asked; treat that as "keep going" so a
+    # network blip does not throw away a finished encode.
+    return client.check_cancelled(job_id) is True
+
+
+def _run_job(client, job, job_id, filename, stem, job_dir, reporter):
     # 1. Download
-    src_path = os.path.join(work_dir, filename)
+    src_path = os.path.join(job_dir, filename)
     print(f"  {C}↓ Downloading...{NC}")
+    reporter.set_phase("download")
     client.update_status(job_id, "downloading")
 
-    if not client.download_file(job_id, src_path):
+    if not client.download_file(job_id, src_path, on_progress=reporter.on_transfer_progress):
         client.update_status(job_id, "failed", message="Download failed")
         return
 
     src_size = os.path.getsize(src_path)
     print(f"  {G}✓ Downloaded: {src_size / (1024*1024):.1f} MB{NC}")
 
-    # Check for cancellation before encoding
-    if client.check_cancelled(job_id):
+    if _is_cancelled(client, reporter, job_id):
         print(f"  {Y}⏹ Job cancelled by user{NC}")
-        _cleanup(src_path)
         return
 
     # 2. Encode
     target_codec = job.get("target_codec", "hevc")
     print(f"  {C}⚡ Encoding with VideoToolbox (codec: {target_codec})...{NC}")
-    client.update_status(job_id, "encoding")
+    reporter.set_phase("encode")
+    if not client.update_status(job_id, "encoding"):
+        print(f"  {Y}⏹ Server dropped the job — stopping{NC}")
+        return
 
     try:
         from video_optimizer import ENCODER_PROFILES, detect_encoder, process_file
@@ -242,7 +386,6 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
         if not encoder_key or encoder_key not in ENCODER_PROFILES:
             print(f"  {R}✗ No hardware encoder detected{NC}")
             client.update_status(job_id, "failed", message="No hardware encoder on this Mac")
-            _cleanup(src_path)
             return
 
         # AV1 codec override: map hardware encoder → AV1 variant
@@ -261,28 +404,21 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
         profile = ENCODER_PROFILES[encoder_key]
         print(f"  Using encoder: {profile['name']}")
 
-        opt_path = os.path.join(work_dir, f"{stem}_opt.mp4")
+        opt_path = os.path.join(job_dir, f"{stem}_opt.mp4")
 
-        success, saved_bytes = process_file(
+        success, _ = process_file(
             src_path, profile,
             min_size_mb=0,  # No minimum — always encode
             copy_audio=False,
             audio_mode="enhanced",
-            video_mode="compress"
+            video_mode="compress",
+            progress_callback=reporter.on_encode_progress,
         )
 
-        # Check if output exists
         if not success or not os.path.exists(opt_path):
-            # process_file puts output next to input. Check for it.
-            expected_opt = os.path.join(work_dir, f"{stem}_opt.mp4")
-            if os.path.exists(expected_opt):
-                opt_path = expected_opt
-                success = True
-            else:
-                print(f"  {R}✗ Encoding failed or no output produced{NC}")
-                client.update_status(job_id, "failed", message="Encoding failed")
-                _cleanup(src_path)
-                return
+            print(f"  {R}✗ Encoding failed or no output produced{NC}")
+            client.update_status(job_id, "failed", message="Encoding failed")
+            return
 
         opt_size = os.path.getsize(opt_path)
         saved = src_size - opt_size
@@ -291,43 +427,26 @@ def process_job(client: WorkerClient, job: dict, work_dir: str):
     except ImportError:
         print(f"  {R}✗ video_optimizer.py not found in {SCRIPT_DIR}{NC}")
         client.update_status(job_id, "failed", message="video_optimizer.py not found")
-        _cleanup(src_path)
         return
     except Exception as e:
         print(f"  {R}✗ Encoding error: {e}{NC}")
         client.update_status(job_id, "failed", message=f"Encoding error: {e}")
-        _cleanup(src_path)
         return
 
-    # Check for cancellation before upload
-    if client.check_cancelled(job_id):
+    if _is_cancelled(client, reporter, job_id):
         print(f"  {Y}⏹ Job cancelled by user{NC}")
-        _cleanup(src_path, opt_path)
         return
 
     # 3. Upload
     print(f"  {C}↑ Uploading optimized file...{NC}")
+    reporter.set_phase("upload")
     client.update_status(job_id, "uploading")
 
     if client.upload_file(job_id, opt_path):
         print(f"  {G}✓ Upload complete!{NC}")
+        print(f"{B}{G}═══ Job #{job_id} done ═══{NC}\n")
     else:
-        client.update_status(job_id, "failed", message="Upload failed",
-                           saved_bytes=saved)
-
-    # 4. Cleanup
-    _cleanup(src_path, opt_path)
-    print(f"  {G}✓ Temp files cleaned up{NC}")
-    print(f"{B}{G}═══ Job #{job_id} done ═══{NC}\n")
-
-
-def _cleanup(*paths):
-    for p in paths:
-        try:
-            if p and os.path.exists(p):
-                os.remove(p)
-        except Exception:
-            pass
+        client.update_status(job_id, "failed", message="Upload failed", saved_bytes=saved)
 
 
 def load_env(env_path=".env"):
@@ -410,8 +529,18 @@ Environment Variables:
         print("  Battery:   pause when unplugged")
     print()
 
-    # Auth
-    client = WorkerClient(args.server, args.user, args.password)
+    # Auth — every /api/queue/* endpoint requires a session, so there is no
+    # anonymous mode to fall back to.
+    if not args.user:
+        print(f"{R}✗ No username given. Use --user/--password (or ARCADE_USER/"
+              f"ARCADE_PASSWORD) — the queue API rejects anonymous workers.{NC}")
+        sys.exit(2)
+
+    try:
+        client = WorkerClient(args.server, args.user, args.password)
+    except AuthError as e:
+        print(f"{R}✗ {e}{NC}")
+        sys.exit(1)
 
     # Main loop
     print(f"{C}Polling for jobs...{NC}")

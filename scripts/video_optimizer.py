@@ -606,6 +606,19 @@ def show_progress(current, total, encoder="", bitrate="0kb/s", speed="0x", elaps
     sys.stdout.write(f"\r\033[2K {G}{encoder}{NC} [{arrow}{spaces}] {BG}{int(percent)}%{NC} | {speed} | {bitrate} | {elapsed_str} / {eta_str}")
     sys.stdout.flush()
 
+def _report_progress(callback, current, total, label=""):
+    """Feed an optional embedding caller (see process_file's progress_callback).
+
+    Swallows everything: a broken callback must never kill a running encode.
+    """
+    if callback is None:
+        return
+    try:
+        callback(float(current), float(total), label)
+    except Exception:
+        pass
+
+
 def analyze_packet_hotspots(input_path, bucket_len: float = 5.0) -> dict:
     """Sum video packet bytes per bucket_len-second bucket (no decode, fast).
 
@@ -928,8 +941,16 @@ def estimate_optimal_q(input_path, profile, quality_values, bitrate_values,
             except OSError:
                 pass
 
-def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress', q_override=None, presearch=True, scale_height=None):
-    """Process a single video file. Returns (success, bytes_saved)."""
+def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress', q_override=None, presearch=True, scale_height=None, progress_callback=None):
+    """Process a single video file. Returns (success, bytes_saved).
+
+    `progress_callback(done_seconds, total_seconds, label)` is called while
+    ffmpeg runs, so an embedding caller (scripts/mac_worker.py) can report
+    progress upstream. It fires from the ffmpeg reader loop — it must return
+    fast and must not do network I/O, or it stalls the progress pipe.
+    Percentages are per pass: the quality search runs several passes and each
+    one restarts at 0, which is what `label` is for.
+    """
     input_path = Path(input_path)
     is_trim = ss is not None or to is not None
 
@@ -1227,6 +1248,7 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                             elapsed = time.time() - encode_start
                             duration_to_show = trim_duration if is_trim else info['duration']
                             show_progress(ms / 1000000, duration_to_show, 'copy', "copy", "fast", elapsed)
+                            _report_progress(progress_callback, ms / 1000000, duration_to_show, 'copy')
                          except ValueError:
                             pass
 
@@ -1343,6 +1365,8 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                             elapsed = time.time() - encode_start
                             duration_to_show = trim_duration if is_trim else info['duration']
                             show_progress(ms / 1000000, duration_to_show, profile['codec'], cur_stats["bitrate"], cur_stats["speed"], elapsed)
+                            _report_progress(progress_callback, ms / 1000000, duration_to_show,
+                                             f"encode Q={quality_val}")
 
                             # Rolling projection: predict final size from current progress.
                             # Use out_time_ms + _abort_size (updated from total_size= just before).

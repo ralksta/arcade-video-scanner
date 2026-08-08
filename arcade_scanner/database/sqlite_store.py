@@ -168,7 +168,12 @@ class SQLiteStore:
                 completed_at INTEGER DEFAULT 0,
                 worker_id TEXT DEFAULT '',
                 result_message TEXT DEFAULT '',
-                saved_bytes INTEGER DEFAULT 0
+                saved_bytes INTEGER DEFAULT 0,
+                progress_pct REAL DEFAULT 0,
+                eta_seconds INTEGER DEFAULT 0,
+                phase TEXT DEFAULT '',
+                last_seen INTEGER DEFAULT 0,
+                attempts INTEGER DEFAULT 0
             )
         """)
         # Add target_codec column to existing installations (migration)
@@ -176,6 +181,19 @@ class SQLiteStore:
             conn.execute("ALTER TABLE encoding_queue ADD COLUMN target_codec TEXT DEFAULT 'hevc'")
         except Exception:
             pass  # Column already exists
+
+        # Migration: progress/heartbeat columns for the remote worker
+        for _ddl in (
+            "ALTER TABLE encoding_queue ADD COLUMN progress_pct REAL DEFAULT 0",
+            "ALTER TABLE encoding_queue ADD COLUMN eta_seconds INTEGER DEFAULT 0",
+            "ALTER TABLE encoding_queue ADD COLUMN phase TEXT DEFAULT ''",
+            "ALTER TABLE encoding_queue ADD COLUMN last_seen INTEGER DEFAULT 0",
+            "ALTER TABLE encoding_queue ADD COLUMN attempts INTEGER DEFAULT 0",
+        ):
+            try:
+                conn.execute(_ddl)
+            except Exception:
+                pass  # Column already exists
 
         # Embedding storage (similarity part 1) — written by scripts/media_indexer.py,
         # read by routes/similar.py. Vectors are L2-normalized float32 blobs.
@@ -343,6 +361,10 @@ class SQLiteStore:
         conn = self._ensure_connection()
 
         with self._write_lock:
+            # A worker that died mid-job leaves its row on downloading/encoding
+            # forever, which also blocks queue_encode() for that file. There is
+            # no background scheduler in this app, so reclaim lazily here.
+            self._reclaim_stale_locked()
             while True:
                 cursor = conn.execute(
                     "SELECT id, file_path, size_bytes, target_codec FROM encoding_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
@@ -352,9 +374,12 @@ class SQLiteStore:
                     return None
 
                 job_id = row["id"]
+                now = int(time.time())
                 cursor = conn.execute(
-                    "UPDATE encoding_queue SET status = 'downloading', started_at = ?, worker_id = ? WHERE id = ? AND status = 'pending'",
-                    (int(time.time()), worker_id, job_id)
+                    "UPDATE encoding_queue SET status = 'downloading', started_at = ?, "
+                    "worker_id = ?, last_seen = ?, progress_pct = 0, eta_seconds = 0, "
+                    "phase = 'download' WHERE id = ? AND status = 'pending'",
+                    (now, worker_id, now, job_id)
                 )
                 if cursor.rowcount == 0:
                     continue  # Someone else claimed it first — try the next one.
@@ -366,12 +391,62 @@ class SQLiteStore:
                     "target_codec": row["target_codec"] or "hevc",
                 }
 
-    def update_job_status(self, job_id: int, status: str, **kwargs: Any) -> None:
-        """Update a job's status and optional fields (result_message, saved_bytes, completed_at)."""
+    def _reclaim_stale_locked(self, timeout_seconds: int = 900, max_attempts: int = 3) -> int:
+        """Requeue (or fail) jobs whose worker stopped reporting. Caller holds the lock.
+
+        `last_seen` is only written by workers that speak the progress protocol;
+        older rows fall back to `started_at` so they cannot hang forever either.
+        """
+        conn = self._ensure_connection()
+        cutoff = int(time.time()) - timeout_seconds
+        stale = (
+            "status IN ('downloading', 'encoding', 'uploading') "
+            "AND COALESCE(NULLIF(last_seen, 0), started_at, 0) < ?"
+        )
+
+        # Out of retries → give up so the row stops being 'active'.
+        dead = conn.execute(
+            f"UPDATE encoding_queue SET status = 'failed', completed_at = ?, "
+            f"result_message = 'Worker vanished' WHERE {stale} AND attempts >= ?",
+            (int(time.time()), cutoff, max_attempts)
+        ).rowcount
+
+        requeued = conn.execute(
+            f"UPDATE encoding_queue SET status = 'pending', worker_id = '', started_at = 0, "
+            f"progress_pct = 0, eta_seconds = 0, phase = '', last_seen = 0, "
+            f"attempts = attempts + 1 WHERE {stale}",
+            (cutoff,)
+        ).rowcount
+
+        if dead or requeued:
+            print(f"♻️  Queue reclaim: {requeued} requeued, {dead} failed (worker timeout)")
+        return dead + requeued
+
+    def get_job(self, job_id: int) -> Optional[dict]:
+        """Look up a single job by id. `file_path` comes back usable for os.* calls."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            row = conn.execute(
+                "SELECT * FROM encoding_queue WHERE id = ?", (job_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        job = dict(row)
+        job["file_path"] = self._decode_safe_path(job["file_path"])
+        return job
+
+    def update_job_status(self, job_id: int, status: str, guard_active: bool = False,
+                          **kwargs: Any) -> bool:
+        """Update a job's status and optional fields. Returns True if a row changed.
+
+        With `guard_active` the update only fires while the job is still running,
+        so a late status report from the worker cannot resurrect a job the user
+        cancelled in the meantime.
+        """
         conn = self._ensure_connection()
 
-        sets = ["status = ?"]
-        vals: List[Any] = [status]
+        sets = ["status = ?", "last_seen = ?"]
+        vals: List[Any] = [status, int(time.time())]
 
         if status in ("done", "failed"):
             sets.append("completed_at = ?")
@@ -382,12 +457,30 @@ class SQLiteStore:
                 sets.append(f"{key} = ?")
                 vals.append(kwargs[key])
 
+        where = "id = ?"
         vals.append(job_id)
+        if guard_active:
+            where += " AND status NOT IN ('cancelled', 'done', 'failed')"
+
         with self._write_lock:
-            conn.execute(
-                f"UPDATE encoding_queue SET {', '.join(sets)} WHERE id = ?",
+            cursor = conn.execute(
+                f"UPDATE encoding_queue SET {', '.join(sets)} WHERE {where}",
                 tuple(vals)
             )
+            return cursor.rowcount > 0
+
+    def update_job_progress(self, job_id: int, progress_pct: float = 0.0,
+                            eta_seconds: int = 0, phase: str = "") -> bool:
+        """Store a worker heartbeat. False means the job is gone or no longer active."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute(
+                "UPDATE encoding_queue SET progress_pct = ?, eta_seconds = ?, phase = ?, "
+                "last_seen = ? WHERE id = ? AND status NOT IN ('cancelled', 'done', 'failed')",
+                (max(0.0, min(100.0, float(progress_pct))), int(eta_seconds), phase,
+                 int(time.time()), job_id)
+            )
+            return cursor.rowcount > 0
 
     def get_queue_status(self, limit: int = 20) -> List[dict]:
         """Return active + recent jobs for the UI."""
@@ -395,7 +488,8 @@ class SQLiteStore:
         with self._write_lock:
             cursor = conn.execute(
                 """SELECT id, file_path, status, size_bytes, created_at, started_at,
-                          completed_at, worker_id, result_message, saved_bytes
+                          completed_at, worker_id, result_message, saved_bytes,
+                          progress_pct, eta_seconds, phase, last_seen, attempts
                    FROM encoding_queue
                    ORDER BY
                        CASE WHEN status IN ('pending','downloading','encoding','uploading') THEN 0 ELSE 1 END,
@@ -403,7 +497,10 @@ class SQLiteStore:
                    LIMIT ?""",
                 (limit,)
             )
-            return [dict(row) for row in cursor.fetchall()]
+            jobs = [dict(row) for row in cursor.fetchall()]
+        for job in jobs:
+            job["file_path"] = self._decode_safe_path(job["file_path"])
+        return jobs
 
     def get_active_queue_paths(self) -> set[str]:
         """file_paths of jobs currently pending or being processed."""

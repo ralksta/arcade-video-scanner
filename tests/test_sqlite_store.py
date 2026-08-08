@@ -291,6 +291,102 @@ class TestQueueClaimIsExclusive:
 
 
 # ---------------------------------------------------------------------------
+# Job lookup, heartbeats and stale-worker recovery
+#
+# scripts/mac_worker.py can die mid-job (crash, reboot, network loss). Without
+# recovery the row stays 'downloading' forever, which also makes queue_encode
+# refuse that file permanently.
+# ---------------------------------------------------------------------------
+
+class TestQueueRecovery:
+    def _claim(self, store, path="/fake/recover.mp4"):
+        store._conn.execute("DELETE FROM encoding_queue")
+        store.queue_encode(path)
+        return store.get_next_pending(worker_id="dead-worker")["id"]
+
+    def _make_stale(self, store, job_id):
+        store._conn.execute(
+            "UPDATE encoding_queue SET last_seen = 1, started_at = 1 WHERE id = ?",
+            (job_id,))
+
+    def test_a_stale_job_returns_to_the_queue(self, store):
+        job_id = self._claim(store)
+        self._make_stale(store, job_id)
+
+        reclaimed = store.get_next_pending(worker_id="fresh-worker")
+
+        assert reclaimed is not None and reclaimed["id"] == job_id
+        assert store.get_job(job_id)["attempts"] == 1
+
+    def test_a_reclaimed_file_can_be_queued_again(self, store):
+        """The real damage of a hung job: queue_encode blocks that file."""
+        job_id = self._claim(store)
+        self._make_stale(store, job_id)
+
+        store._reclaim_stale_locked()
+
+        assert store.get_job(job_id)["status"] == "pending"
+
+    def test_a_job_that_keeps_dying_is_failed(self, store):
+        job_id = self._claim(store)
+        store._conn.execute("UPDATE encoding_queue SET attempts = 3 WHERE id = ?", (job_id,))
+        self._make_stale(store, job_id)
+
+        store._reclaim_stale_locked()
+
+        assert store.get_job(job_id)["status"] == "failed"
+        assert store.queue_encode("/fake/recover.mp4") is not None
+
+    def test_a_live_heartbeat_prevents_reclaim(self, store):
+        job_id = self._claim(store)
+        self._make_stale(store, job_id)
+        store.update_job_progress(job_id, 50.0, 30, "encode Q=60")
+
+        store._reclaim_stale_locked()
+
+        assert store.get_job(job_id)["status"] == "downloading"
+
+    def test_progress_is_stored_and_clamped(self, store):
+        job_id = self._claim(store)
+
+        store.update_job_progress(job_id, 250.0, 12, "encode Q=55")
+
+        job = store.get_job(job_id)
+        assert job["progress_pct"] == 100.0
+        assert (job["eta_seconds"], job["phase"]) == (12, "encode Q=55")
+
+    def test_progress_on_a_cancelled_job_is_refused(self, store):
+        """The worker learns about the cancellation from this False."""
+        job_id = self._claim(store)
+        store.cancel_job(job_id)
+
+        assert store.update_job_progress(job_id, 10.0, 0, "encode") is False
+
+    def test_a_guarded_status_update_cannot_resurrect_a_cancelled_job(self, store):
+        job_id = self._claim(store)
+        store.cancel_job(job_id)
+
+        applied = store.update_job_status(job_id, "encoding", guard_active=True)
+
+        assert applied is False
+        assert store.get_job(job_id)["status"] == "cancelled"
+
+    def test_get_job_finds_jobs_beyond_the_ui_page(self, store):
+        """Download/upload used to search get_queue_status(limit=100), which
+        lists the *newest* jobs while the worker claims the oldest."""
+        store._conn.execute("DELETE FROM encoding_queue")
+        for i in range(150):
+            store.queue_encode(f"/fake/bulk_{i}.mp4")
+
+        claimed = store.get_next_pending(worker_id="w")
+
+        assert store.get_job(claimed["id"])["file_path"] == "/fake/bulk_0.mp4"
+
+    def test_get_job_returns_none_for_an_unknown_id(self, store):
+        assert store.get_job(999999) is None
+
+
+# ---------------------------------------------------------------------------
 # Concurrent reads on the shared connection
 #
 # One sqlite3.Connection is shared across server threads

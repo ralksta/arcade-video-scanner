@@ -75,9 +75,13 @@ class FakeDB:
         self.queued = []
         self.cancelled = []
         self.status_updates = []
+        self.progress_updates = []
 
     def get_queue_status(self, limit=20):
         return self.jobs
+
+    def get_job(self, job_id):
+        return next((j for j in self.jobs if j["id"] == job_id), None)
 
     def get_next_pending(self, worker_id=""):
         return self.next_job
@@ -93,8 +97,14 @@ class FakeDB:
         self.cancelled.append(job_id)
         return True
 
-    def update_job_status(self, job_id, status, **kwargs):
+    def update_job_status(self, job_id, status, guard_active=False, **kwargs):
         self.status_updates.append((job_id, status))
+        self.status_kwargs = kwargs
+        return True
+
+    def update_job_progress(self, job_id, progress_pct=0.0, eta_seconds=0, phase=""):
+        self.progress_updates.append((job_id, progress_pct, eta_seconds, phase))
+        return True
 
 
 def run_route(handler, fake_db=None, path_allowed=True, post=False):
@@ -129,6 +139,7 @@ POST_ROUTES = [
     ("/api/queue/add", {"file_path": "/media/a.mp4"}),
     ("/api/queue/cancel", {"job_id": 1}),
     ("/api/queue/upload?job_id=1", None),
+    ("/api/queue/progress", {"job_id": 1, "progress_pct": 42, "phase": "encode Q=60"}),
     ("/api/queue/complete", {"job_id": 1, "status": "done"}),
 ]
 
@@ -310,11 +321,21 @@ class TestQueueCheck:
 
     def test_running_job_is_not_reported_as_cancelled(self):
         handler = FakeHandler("/api/queue/check?job_id=1")
+        jobs = [{"id": 1, "file_path": "/media/a.mp4", "status": "encoding"}]
 
         with patch("arcade_scanner.server.routes.queue.send_json") as send_json:
-            run_route(handler)
+            run_route(handler, fake_db=FakeDB(jobs=jobs))
 
         assert send_json.call_args[0][1] == {"cancelled": False}
+
+    def test_a_deleted_job_counts_as_cancelled(self):
+        """Otherwise the worker keeps encoding for a row that no longer exists."""
+        handler = FakeHandler("/api/queue/check?job_id=1")
+
+        with patch("arcade_scanner.server.routes.queue.send_json") as send_json:
+            run_route(handler, fake_db=FakeDB(jobs=[]))
+
+        assert send_json.call_args[0][1] == {"cancelled": True}
 
 
 class TestQueueDownload:
@@ -336,6 +357,131 @@ class TestQueueDownload:
 
         assert handler.error == 404
         assert db.status_updates == [(1, "failed")]
+
+
+def db_status(fake_db):
+    return fake_db.status_updates
+
+
+class TestQueueComplete:
+    def test_intermediate_report_does_not_clear_saved_bytes(self):
+        """The worker posts 'encoding' with no savings yet — that must not
+        overwrite the real number a later 'done' will carry."""
+        handler = FakeHandler("/api/queue/complete",
+                              body={"job_id": 1, "status": "encoding"})
+
+        _, db = run_route(handler, post=True)
+
+        assert db.status_updates == [(1, "encoding")]
+        assert "saved_bytes" not in db.status_kwargs
+
+    def test_reported_saved_bytes_are_passed_through(self):
+        handler = FakeHandler("/api/queue/complete",
+                              body={"job_id": 1, "status": "failed", "saved_bytes": 512})
+
+        _, db = run_route(handler, post=True)
+
+        assert db.status_kwargs["saved_bytes"] == 512
+
+
+class TestQueueProgress:
+    def test_a_heartbeat_is_stored(self):
+        handler = FakeHandler("/api/queue/progress",
+                              body={"job_id": 3, "progress_pct": 42.5,
+                                    "eta_seconds": 90, "phase": "encode Q=60"})
+
+        with patch("arcade_scanner.server.routes.queue.send_json") as send_json:
+            _, db = run_route(handler, post=True)
+
+        assert db.progress_updates == [(3, 42.5, 90, "encode Q=60")]
+        assert send_json.call_args[0][1] == {"success": True, "cancelled": False}
+
+
+class TestQueueUpload:
+    """The upload handler replaces real files, so these run against tmp_path."""
+
+    def test_an_oversized_body_is_refused(self, tmp_path):
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"x" * 100)
+        jobs = [{"id": 1, "file_path": str(src), "size_bytes": 100}]
+        handler = FakeHandler("/api/queue/upload?job_id=1")
+        handler.headers = {"Content-Length": str(10 * 1024)}
+
+        _, db = run_route(handler, fake_db=FakeDB(jobs=jobs), post=True)
+
+        assert handler.error == 413
+        assert db.status_updates == [(1, "failed")]
+        assert not list(tmp_path.glob(".*part"))
+
+    def test_a_truncated_upload_never_touches_the_original(self, tmp_path):
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        jobs = [{"id": 1, "file_path": str(src), "size_bytes": 8}]
+        handler = FakeHandler("/api/queue/upload?job_id=1")
+        handler.rfile = FakeRFile(b"half")          # promises 8, delivers 4
+        handler.headers = {"Content-Length": "8"}
+
+        fake_db = FakeDB(jobs=jobs)
+        with patch("arcade_scanner.server.routes.queue.db", fake_db):
+            queue.handle_post(handler)
+
+        assert handler.error == 400
+        assert src.read_bytes() == b"original"
+        assert db_status(fake_db) == [(1, "failed")]
+        assert not list(tmp_path.glob(".*part"))
+
+    def test_standard_mode_replaces_the_original(self, tmp_path):
+        src = tmp_path / "a.mkv"
+        src.write_bytes(b"original-bytes-long")
+        jobs = [{"id": 1, "file_path": str(src), "size_bytes": 19, "target_codec": "hevc"}]
+        handler = FakeHandler("/api/queue/upload?job_id=1")
+        handler.rfile = FakeRFile(b"opt")
+        handler.headers = {"Content-Length": "3"}
+
+        fake_db = FakeDB(jobs=jobs)
+        fake_db.get = MagicMock(return_value=None)   # no media row → no bookkeeping
+        settings = MagicMock()
+        settings.settings.enable_review_mode = False
+
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.config", settings), \
+             patch("arcade_scanner.server.routes.queue.verify_media_integrity",
+                   return_value=(True, "ok")), \
+             patch("arcade_scanner.server.routes.queue._media_cache"), \
+             patch("arcade_scanner.server.routes.queue.send_json") as send_json:
+            queue.handle_post(handler)
+
+        assert not src.exists(), "the .mkv original must be gone after the replace"
+        assert (tmp_path / "a.mp4").read_bytes() == b"opt"
+        assert not list(tmp_path.glob("*_opt.mp4")), "no leftover _opt.mp4 sidecar"
+        assert not list(tmp_path.glob(".*part"))
+        assert send_json.call_args[0][1]["success"] is True
+        assert db_status(fake_db) == [(1, "done")]
+
+    def test_a_failed_integrity_check_keeps_the_original(self, tmp_path):
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        jobs = [{"id": 1, "file_path": str(src), "size_bytes": 8}]
+        handler = FakeHandler("/api/queue/upload?job_id=1")
+        handler.rfile = FakeRFile(b"broken!!")
+        handler.headers = {"Content-Length": "8"}
+
+        fake_db = FakeDB(jobs=jobs)
+        fake_db.get = MagicMock(return_value=None)
+        settings = MagicMock()
+        settings.settings.enable_review_mode = False
+
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.config", settings), \
+             patch("arcade_scanner.server.routes.queue.verify_media_integrity",
+                   return_value=(False, "decode errors")), \
+             patch("arcade_scanner.server.routes.queue.send_json") as send_json:
+            queue.handle_post(handler)
+
+        assert src.read_bytes() == b"original"
+        assert not list(tmp_path.glob(".*part"))
+        assert send_json.call_args[0][1]["success"] is False
+        assert db_status(fake_db) == [(1, "failed")]
 
 
 class TestDownloadGif:

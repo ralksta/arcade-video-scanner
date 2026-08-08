@@ -37,6 +37,39 @@ All notable changes to this project will be documented in this file.
   Verzeichnislisten und 38×22-Toggle-Switches.
 
 ### Fixed
+- **Remote-Encoding (Mac-Worker) wieder zuverlässig.** Der Worker meldet sich
+  jetzt selbst neu an, wenn die Session abläuft — bisher lief er nach jedem
+  Server-Neustart endlos in `401`, weil Sessions nur im RAM liegen und
+  `_login()` einmalig beim Start aufgerufen wurde. Ohne `--user`/`--password`
+  bricht er mit klarer Meldung ab, statt still nichts zu tun; die veralteten
+  Beispiele ohne Credentials in Doku und Settings-Hinweis sind korrigiert.
+- Download und Upload eines Jobs suchten die Job-ID in den *neuesten* 100
+  Einträgen, während der Worker den *ältesten* Job bekommt — ab 100 Jobs in der
+  Queue schlug der Download deshalb zuverlässig mit 404 fehl. Beide Endpunkte
+  nutzen jetzt einen direkten Lookup per ID.
+- Queue-Endpunkte lieferten Dateipfade mit kaputtem Encoding (Surrogates)
+  escaped zurück, sodass Down-/Upload die Datei nicht fanden.
+- Abgestürzte Worker hinterließen Jobs dauerhaft auf `downloading`/`encoding`;
+  dieselbe Datei ließ sich danach nie wieder einreihen. Jobs ohne Heartbeat
+  werden nach 15 Minuten neu eingereiht (nach 3 Versuchen `failed`).
+- Ein Abbruch durch den Nutzer konnte von einer verspäteten Statusmeldung des
+  Workers wieder überschrieben werden; `saved_bytes` wurde bei jedem
+  Zwischenstatus auf 0 zurückgesetzt.
+- Nach einem abgebrochenen Lauf konnte der Worker eine alte `_opt.mp4` aus dem
+  Arbeitsverzeichnis als Erfolg hochladen — jeder Job bekommt jetzt ein eigenes
+  Verzeichnis, und der „Datei liegt zufällig da"-Fallback ist entfernt.
+- Der Upload las die komplette Datei in den RAM (mehrere GB pro Job) und wurde
+  serverseitig weder auf Größe noch auf Vollständigkeit geprüft: eine
+  abgebrochene Verbindung galt als fertiger Encode. Jetzt Streaming-Upload,
+  Größenlimit und Integritätsprüfung (ffprobe-Dauer + strikter Decode) vor dem
+  atomaren Replace.
+- Im Standard-Modus (Review Mode aus) legte der Upload nur eine `_opt.mp4`
+  neben das Original, ersetzte nichts und erzeugte keinen Datenbankeintrag.
+  Die optimierte Datei tritt jetzt atomar an die Stelle des Originals und
+  übernimmt dessen Metadaten.
+- Unerreichbare Kopien der Queue-Routen in `api_handler.py` entfernt — sie
+  hatten keine Auth-Prüfung und wären bei einer Änderung der
+  Dispatch-Reihenfolge scharf geworden.
 - Duplicate-Checker und Settings-Dialog lagen mit `z-index` unter der
   Sidebar (`z-100`) und wurden von ihr überlappt.
 - Reste der alten Palette, die per Inline-Style bzw. hartkodiertem Hex an den
@@ -46,6 +79,14 @@ All notable changes to this project will be documented in this file.
   Hover der Folder-Cards, das HEVC-Label im Treemap und der Batch-Warnhinweis.
 
 ### Added
+- **Fortschrittsanzeige für Remote-Encodes.** Die Remote-Queue in den
+  Einstellungen zeigt jetzt Fortschrittsbalken, aktuelle Phase, Restzeit und
+  den Worker-Namen; der Poll-Takt geht auf 2 s, solange Jobs laufen, und auf
+  10 s im Leerlauf. Der Worker sendet dafür alle 10 s einen Heartbeat an das
+  neue `POST /api/queue/progress`, gespeist aus dem neuen optionalen
+  `progress_callback` von `process_file()`. Die Prozentangabe gilt pro
+  Encode-Pass — die Qualitätssuche startet den Balken mehrfach neu, deshalb
+  steht die Phase daneben.
 - **Duplikat-Scan findet re-encodete Videos**: Der bisherige Video-Pass gruppiert
   nach gerundeter Größe + Dauer + Auflösung. Eine transkodierte Kopie (H.264 →
   HEVC, 1080p → 720p, anderer CRF) teilt keinen dieser Werte und landete damit
