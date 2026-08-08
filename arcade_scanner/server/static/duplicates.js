@@ -294,7 +294,7 @@ function renderDuplicatesView() {
                                     ` : ''}
                                     
                                     <!-- Thumbnail -->
-                                    <div class="relative aspect-video bg-black cursor-pointer group" onclick="openCinema(this)" data-path="${file.path}">
+                                    <div class="relative aspect-video bg-black cursor-pointer group" onclick="openCinema(this)" data-path="${escapeHtml(file.path)}">
                                         <img src="${thumbSrc}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
@@ -302,12 +302,12 @@ function renderDuplicatesView() {
                                     </div>
                                     
                                     <div class="p-3 flex flex-col gap-2">
-                                        <div class="text-sm font-medium text-gray-200 truncate" title="${file.path}">
-                                            ${file.path.split(/[\\/]/).pop()}
+                                        <div class="text-sm font-medium text-gray-200 truncate" title="${escapeHtml(file.path)}">
+                                            ${escapeHtml(file.path.split(/[\\/]/).pop())}
                                         </div>
-                                        
-                                        <div class="text-xs text-gray-500 truncate" title="${file.path}">
-                                            ${file.path.split(/[\\/]/).slice(-3, -1).join('/')}
+
+                                        <div class="text-xs text-gray-500 truncate" title="${escapeHtml(file.path)}">
+                                            ${escapeHtml(file.path.split(/[\\/]/).slice(-3, -1).join('/'))}
                                         </div>
                                         
                                         <div class="flex items-center gap-2 text-[10px] text-gray-400 font-mono flex-wrap">
@@ -319,7 +319,7 @@ function renderDuplicatesView() {
                                         
                                         ${window.IS_LOCAL_ACCESS ? `
                                         <!-- Reveal in Finder Button (only on local access) -->
-                                        <button onclick="revealInFinder('${file.path.replace(/'/g, "\\'")}')"
+                                        <button onclick="revealInFinder('${escapeHtml(file.path.replace(/'/g, "\\'"))}')"
                                                 class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">folder_open</span>
                                             Reveal in Finder

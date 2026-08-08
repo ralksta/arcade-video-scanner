@@ -283,6 +283,27 @@ class TestMarkOptimized:
         assert db.upserted == []
         assert handler.status == 204
 
+    def test_existing_entry_gets_optimized_timestamp(self):
+        entry = VideoEntry(FilePath="/media/a.mp4", Size_MB=10.0, Status="HIGH")
+        db = FakeDB([entry])
+        handler = FakeHandler("/api/mark_optimized?path=/media/a.mp4")
+
+        run_route(handler, fake_db=db)
+
+        assert db.upserted[0].status == "OK"
+        assert db.upserted[0].optimized_at > 0
+        assert handler.status == 204
+
+    def test_new_entry_gets_optimized_timestamp(self):
+        db = FakeDB()
+        handler = FakeHandler("/api/mark_optimized?path=/media/new.mp4")
+
+        with patch("arcade_scanner.server.routes.files.os.path.getsize",
+                   return_value=5 * 1024 * 1024):
+            run_route(handler, fake_db=db)
+
+        assert db.upserted[0].optimized_at > 0
+
 
 # ---------------------------------------------------------------------------
 # /api/rescan (background) + /api/scan/status + /api/scan/stop

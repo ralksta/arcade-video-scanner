@@ -9,6 +9,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -207,9 +208,11 @@ def _handle_mark_optimized(handler) -> None:
             handler.send_error(403, "Forbidden - Path not in scan directories")
             return
 
+        now = int(time.time())
         entry = db.get(abs_path)
         if entry:
             entry.status = "OK"
+            entry.optimized_at = now
         else:
             size_mb = 0.0
             try:
@@ -217,7 +220,8 @@ def _handle_mark_optimized(handler) -> None:
                     size_mb = os.path.getsize(abs_path) / (1024 * 1024)
             except OSError as e:
                 print(f"⚠️ Could not stat file {abs_path}: {e}")
-            entry = VideoEntry(file_path=abs_path, size_mb=size_mb, Status="OK")
+            entry = VideoEntry(file_path=abs_path, size_mb=size_mb, Status="OK",
+                               optimized_at=now)
         db.upsert(entry)
         db.save()
         _get_media_cache().invalidate()

@@ -14,6 +14,23 @@ All notable changes to this project will be documented in this file.
   zum Pollen; das Frontend lädt nach Abschluss automatisch neu. Doppelte
   Scans werden mit 409 abgewiesen.
 
+### Added — Auto-Tagging Rules
+- **Auto-Tag-Regeln**: eine Regel = Smart-Collection-Query + Ziel-Tag. Regeln
+  laufen serverseitig nach jedem Scan und auf Knopfdruck (Settings →
+  Auto-Tagging). Apply-once: ein manuell entferntes Tag wird nie erneut
+  vergeben. Anlegen direkt im Collection-Editor ("Als Regel").
+- **Server-seitige Query-Auswertung**: Python-Port des Collection-Evaluators,
+  per Node-Paritätstest gegen `collections.js` gepinnt.
+
+### Added — Optimizer Candidates View
+- **Kandidaten-Ansicht** (`/candidates`): ranks the library by expected re-encode
+  savings (bitrate-per-resolution heuristic + codec efficiency), refined by real
+  results from `encode_history.jsonl` once a resolution/bitrate class has ≥3
+  encodes. Header shows the total possible savings; rows queue directly into the
+  existing encoding queue (HEVC/AV1 toggle).
+- **`optimized_at` marker**: successful optimizations now stamp the media entry;
+  optimized files no longer appear as candidates (rescan-safe).
+
 ### Changed — Video Optimizer V2.5
 - **Downscaling**: New `--scale-height H` option scales the encode to H pixels height while keeping the source aspect ratio (width `-2`). Upscaling is refused, the SSIM reference is scaled to match so quality checks stay valid, and the constrained-VBR ladder is adjusted to the target resolution (~pixels^0.75) so a downscale actually converts into savings.
 - **Sample-Clip Pre-Search**: The quality binary search now runs on a ~24s stream-copied probe clip first, then narrows the full-encode search to predicted ±1 — typically 1-2 full passes instead of 3-4 (files ≥ 120s; `--no-presearch` to disable).

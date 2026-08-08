@@ -1,0 +1,682 @@
+{
+ "now": 1786000000,
+ "cases": [
+  {
+   "name": "empty criteria matches",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {},
+   "expected": true
+  },
+  {
+   "name": "hidden never matches",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": true,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {},
+   "expected": false
+  },
+  {
+   "name": "include codec mismatch",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "codec": [
+      "hevc"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "include codec case-insensitive",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "HEVC",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "codec": [
+      "hevc"
+     ]
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "exclude codec substring",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "exclude": {
+     "codec": [
+      "h264"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "tags any matches one",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [
+     "gopro"
+    ],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "tagLogic": "any",
+    "include": {
+     "tags": [
+      "gopro",
+      "drone"
+     ]
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "tags all needs every",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [
+     "gopro"
+    ],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "tagLogic": "all",
+    "include": {
+     "tags": [
+      "gopro",
+      "drone"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "exclude tags",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [
+     "private"
+    ],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "exclude": {
+     "tags": [
+      "private"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "include resolution mismatch",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "resolution": [
+      "4k"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "portrait 4k counts as 4k",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 2160,
+    "Height": 3840,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "resolution": [
+      "4k"
+     ]
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "include orientation portrait",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1080,
+    "Height": 1920,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "orientation": [
+      "portrait"
+     ]
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "exclude orientation portrait",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1080,
+    "Height": 1920,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "exclude": {
+     "orientation": [
+      "portrait"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "include media_type image on video",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "media_type": [
+      "image"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "exclude media_type video",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "exclude": {
+     "media_type": [
+      "video"
+     ]
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "format from extension",
+   "video": {
+    "FilePath": "/lib/a.mkv",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "format": [
+      "mkv"
+     ]
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "status exact match",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "HIGH",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "status": [
+      "HIGH"
+     ]
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "optimized_files quirk",
+   "video": {
+    "FilePath": "/lib/b_opt.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "include": {
+     "status": [
+      "optimized_files"
+     ]
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "favorites true wants favorite",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": true,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "favorites": true
+   },
+   "expected": true
+  },
+  {
+   "name": "favorites string false excludes favorite",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": true,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "favorites": "false"
+   },
+   "expected": false
+  },
+  {
+   "name": "favorites null means dont care",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": true,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "favorites": null
+   },
+   "expected": true
+  },
+  {
+   "name": "size min boundary inclusive",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 1000,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "size": {
+     "min": 1000,
+     "max": null
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "duration max exceeded",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 90,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "duration": {
+     "min": null,
+     "max": 60
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "search matches path segment",
+   "video": {
+    "FilePath": "/media/GoPro/dive.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "gopro"
+   },
+   "expected": true
+  },
+  {
+   "name": "relative date 7d inside",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785913600,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "date": {
+     "type": "relative",
+     "relative": "7d"
+    }
+   },
+   "expected": true
+  },
+  {
+   "name": "relative date 7d outside",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1782544000,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "date": {
+     "type": "relative",
+     "relative": "7d"
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "no timestamp fails date filter",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 0,
+    "mtime": 0
+   },
+   "criteria": {
+    "date": {
+     "type": "relative",
+     "relative": "7d"
+    }
+   },
+   "expected": false
+  },
+  {
+   "name": "unknown criteria field ignored",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "hidden": false,
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "someFutureField": {
+     "x": 1
+    }
+   },
+   "expected": true
+  }
+ ]
+}

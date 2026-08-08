@@ -39,6 +39,7 @@ class VideoEntry(BaseModel):
     imported_at: Optional[int] = Field(0, description="Timestamp when first imported/scanned")
     mtime: Optional[int] = Field(0, description="Last modification timestamp of the file")
     original_path: Optional[str] = Field(None, alias="OriginalPath", description="Source path of the file before it was moved to review")
+    optimized_at: Optional[int] = Field(0, description="Unix timestamp of last successful optimization (0 = never)")
 
 
     model_config = ConfigDict(
