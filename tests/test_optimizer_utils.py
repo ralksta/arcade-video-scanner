@@ -14,20 +14,20 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from optimizer_utils import (  # noqa: E402
-    bitrate_class,
-    resolution_class,
     append_encode_history,
-    suggest_q_from_history,
-    nearest_quality_index,
-    is_hdr_or_10bit,
     apply_hdr_adjustments,
-    parse_loudnorm_json,
-    build_audio_filter_chain,
-    select_top_windows,
-    narrow_quality_window,
-    parse_schedule,
-    is_within_schedule,
     battery_from_pmset,
+    bitrate_class,
+    build_audio_filter_chain,
+    is_hdr_or_10bit,
+    is_within_schedule,
+    narrow_quality_window,
+    nearest_quality_index,
+    parse_loudnorm_json,
+    parse_schedule,
+    resolution_class,
+    select_top_windows,
+    suggest_q_from_history,
 )
 
 

@@ -11,9 +11,9 @@ If the errors disappear, the file is confirmed as AV1 and fixed in-place.
 """
 
 import os
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 # Colors
@@ -39,7 +39,7 @@ def test_decode(file_path: Path) -> bool:
 
 def fix_file(file_path: Path):
     print(f"\n{C}Analyzing: {file_path.name}{NC}")
-    
+
     # Check if we already have it correctly as AV1
     probe_cmd = ["ffprobe", "-v", "error", "-show_entries", "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
     try:
@@ -57,10 +57,10 @@ def fix_file(file_path: Path):
 
     print(f"  {Y}⚠ Decode errors detected. Testing AV1 container remux...{NC}")
     tmp_path = file_path.with_suffix('.tmp_remux.mp4')
-    
+
     # 2. Remux with 'av01' tag
     remux_cmd = [
-        "ffmpeg", "-v", "error", "-i", str(file_path), 
+        "ffmpeg", "-v", "error", "-i", str(file_path),
         "-c", "copy", "-tag:v", "av01", "-y", str(tmp_path)
     ]
     subprocess.run(remux_cmd, capture_output=True)
@@ -79,7 +79,7 @@ def main():
     print(f"{C}======================================================{NC}")
     print(f"{C} Arcade-Scanner AV1 Tag Fixer{NC}")
     print(f"{C}======================================================{NC}")
-    
+
     if len(sys.argv) > 1:
         directories = [Path(d) for d in sys.argv[1:]]
     else:
@@ -100,15 +100,15 @@ def main():
 
         if not directories:
             print(f"{R}No scan directories found. Please provide path as argument:{NC}")
-            print(f"  python3 fix_av1_tags.py /path/to/videos")
+            print("  python3 fix_av1_tags.py /path/to/videos")
             sys.exit(1)
 
-    print(f"Scanning provided paths:")
+    print("Scanning provided paths:")
     for path_arg in sys.argv[1:] if len(sys.argv) > 1 else directories:
         p = Path(path_arg)
         if not p.exists():
             continue
-            
+
         if p.is_file():
             # Support direct files passed via arguments
             fix_file(p)

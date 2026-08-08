@@ -105,8 +105,7 @@ function createComparisonCard(pair) {
     const isSmaller = diffMB < 0;
 
     const container = document.createElement('div');
-    // col-span-1 md:col-span-2 relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4
-    container.className = 'col-span-1 md:col-span-2 relative w-full bg-arcade-bg dark:bg-[#14141c] rounded-xl overflow-hidden border border-black/8 dark:border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4';
+    container.className = 'col-span-1 md:col-span-2 relative w-full bg-card rounded-ds-md overflow-hidden border border-[var(--ds-hairline)] hover:border-[var(--ds-hairline-strong)] transition-colors duration-200 video-card-container comparison-card flex flex-col md:flex-row p-4 gap-4';
 
     // Explicitly set grid span here, though class handles it usually, but existing grid logic might override without it if it was inline style before
     container.style.gridColumn = "span 2";
@@ -119,7 +118,7 @@ function createComparisonCard(pair) {
         <div class="flex-1 min-w-0 flex flex-col gap-2">
             <div class="text-xs font-bold text-gray-500 uppercase tracking-widest flex justify-between">
                 <span>Original</span>
-                <span class="text-[9px] bg-white/5 px-1 rounded">${orig.codec}</span>
+                <span class="text-[9px] bg-[var(--ds-fill-soft)] px-1 rounded">${orig.codec}</span>
             </div>
             
             <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="openCinema(this)" data-path="${orig.FilePath}">
@@ -146,10 +145,10 @@ function createComparisonCard(pair) {
              <div class="text-2xl font-bold ${isSmaller ? 'text-green-400 drop-shadow-[0_0_8px_rgba(76,217,100,0.4)]' : 'text-red-500'} font-mono tracking-tighter">${diffPct.toFixed(1)}%</div>
              <div class="text-xs text-gray-500 font-mono mb-2">${diffMB.toFixed(1)} MB</div>
              
-             <button class="w-full py-2 rounded-lg bg-arcade-cyan/20 text-arcade-cyan hover:bg-arcade-cyan hover:text-black border border-arcade-cyan/30 hover:shadow-[0_0_10px_rgba(0,255,208,0.3)] text-xs font-bold transition-all flex items-center justify-center gap-1 mt-1" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')">
+             <button class="ds-btn ds-btn-primary w-full mt-1" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')">
                 <span class="material-icons text-[14px]">check</span> KEEP
              </button>
-             <button class="w-full py-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
+             <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-white border border-white/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
                 <span class="material-icons text-[14px]">delete</span> DISCARD
              </button>
         </div>
@@ -161,7 +160,7 @@ function createComparisonCard(pair) {
                 <span class="text-[9px] bg-arcade-cyan/10 text-arcade-cyan px-1 rounded border border-arcade-cyan/20">${opt.codec}</span>
             </div>
             
-             <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group border border-arcade-cyan/30 shadow-[0_0_10px_rgba(0,255,208,0.05)]" onclick="openCinema(this)" data-path="${opt.FilePath}">
+             <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group border-[1.5px] border-accent" onclick="openCinema(this)" data-path="${opt.FilePath}">
                  <img src="/thumbnails/${opt.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
@@ -234,6 +233,46 @@ function discardOptimized(opt) {
 // This comment preserves the location for reference
 
 /**
+ * Optimize-Button einer Karte.
+ *
+ * Ausgelagert, weil der Nicht-Docker-Zweig den Pfad in eine URL schreibt und
+ * encodeURIComponent auf Dateinamen mit ungültigen UTF-8-Bytes `URIError: URI
+ * malformed` wirft (Pythons surrogateescape liefert sie als einzelne Surrogate).
+ * Inline in der Kartenvorlage hätte das die gesamte Grid-Ansicht mitgerissen.
+ * Lässt sich der Pfad nicht kodieren, wird der Button deaktiviert statt eine URL
+ * zu bauen, die der Server ohnehin nicht dekodieren kann.
+ *
+ * @param {Object} v - Video metadata object
+ * @returns {string} HTML für den Button
+ */
+function _optimizeButton(v) {
+    const cls = 'w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center ' +
+                'justify-center backdrop-blur text-white transition-all transform hover:scale-110';
+
+    if (window.IS_DOCKER) {
+        // Der Docker-Pfad reicht den Pfad als JS-String weiter, nicht als URL —
+        // hier gibt es kein Encoding-Problem.
+        return `
+                 <button class="${cls}" title="Queue for Mac" onclick="event.stopPropagation(); queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\'")}')">
+                    <span class="material-icons">cloud_upload</span>
+                 </button>`;
+    }
+
+    const enc = safeEncodePath(v.FilePath);
+    if (enc === null) {
+        return `
+                 <button class="${cls} opacity-40 cursor-not-allowed" disabled
+                         title="Optimieren nicht möglich: Der Dateiname enthält ungültige UTF-8-Bytes. Datei nach UTF-8 umbenennen.">
+                    <span class="material-icons">bolt</span>
+                 </button>`;
+    }
+    return `
+                 <button class="${cls}" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${enc}&audio=standard', 'h_frame')">
+                    <span class="material-icons">bolt</span>
+                 </button>`;
+}
+
+/**
  * Create a video/image card element for the grid or list view
  * Includes thumbnail, metadata badges, action buttons, and tag display
  *
@@ -252,9 +291,9 @@ function discardOptimized(opt) {
  */
 function createVideoCard(v) {
     const container = document.createElement('div');
-    // Using utility classes for the card wrapper
-    // group relative w-full bg-[#14141c] rounded-xl overflow-hidden border border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container
-    container.className = 'group relative w-full bg-arcade-bg dark:bg-[#14141c] rounded-xl overflow-hidden border border-black/8 dark:border-white/5 hover:border-arcade-cyan/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,208,0.1)] video-card-container flex flex-col';
+    // Design System: Card = bg surface, 1px hairline, 8px radius, ruhiger Hover
+    // (Border-Lift statt Multi-Color-Glow).
+    container.className = 'group relative w-full bg-card rounded-ds-md overflow-hidden border border-[var(--ds-hairline)] hover:border-[var(--ds-hairline-strong)] transition-colors duration-200 video-card-container flex flex-col';
     // Debug layout
     if (window.debugLayout) console.log('Created card with classes:', container.className);
     container.setAttribute('data-path', v.FilePath); // Keep this for JS logic
@@ -262,6 +301,11 @@ function createVideoCard(v) {
     const isHevc = (v.codec || '').includes('hevc') || (v.codec || '').includes('h265');
     const isAv1  = (v.codec || '').includes('av1') || (v.codec || '').includes('av01');
     const barW = Math.min(100, ((v.Bitrate_Mbps || 0) / 25) * 100);
+    const rate = v.Bitrate_Mbps || 0;
+    // Bitrate-Tier -> semantische Farbe (nur diese drei, kein Farb-Freistil)
+    const rateColor = rate >= 10 ? 'var(--ds-bitrate)'
+                    : rate >= 3  ? 'var(--ds-hevc)'
+                                 : 'var(--ds-optimized)';
     const fileName = v.FilePath.split(/[\\\\/]/).pop();
     const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
     const dirName = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
@@ -271,20 +315,12 @@ function createVideoCard(v) {
         <div class="card-media relative aspect-video bg-black overflow-hidden group cursor-pointer"
              onclick="handleCardClick(event, this)">
              
-             <!-- Image Type Indicator -->
-             ${v.media_type === 'image' ? `
-                 <div class="absolute top-2 left-10 z-20 bg-purple-900/80 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-bold text-purple-300 border border-purple-500/30 flex items-center gap-1">
-                     <span class="material-icons text-[12px]">image</span>
-                     IMG
-                 </div>
-             ` : ''}
-
              <!-- Corner Checkbox -->
-             <div class="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-black/50 text-arcade-cyan focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
+             <div class="absolute top-1.5 left-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                <input type="checkbox" class="w-4 h-4 rounded-[4px] border-white/30 bg-black/50 text-accent focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
              </div>
 
-             <button class="favorite-btn absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-black/40 backdrop-blur hover:bg-black/60 flex items-center justify-center transition-all ${v.favorite ? 'text-arcade-gold active scale-110' : 'text-gray-400 opacity-0 group-hover:opacity-100'}"
+             <button class="favorite-btn absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-full bg-black/45 flex items-center justify-center transition-all ${v.favorite ? 'text-bitrate active' : 'text-white/70 opacity-0 group-hover:opacity-100'}"
                 onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))">
                 <span class="material-icons text-lg">${v.favorite ? 'star' : 'star_border'}</span>
              </button>
@@ -307,55 +343,53 @@ function createVideoCard(v) {
                     <span class="material-icons">folder_open</span>
                  </button>
                  ` : ''}
-                 <button class="w-12 h-12 rounded-full bg-arcade-cyan/20 hover:bg-arcade-cyan text-arcade-cyan hover:text-black border border-arcade-cyan/50 flex items-center justify-center backdrop-blur transition-all transform hover:scale-110 shadow-[0_0_15px_rgba(0,255,208,0.3)]" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
+                 <button class="w-11 h-11 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] flex items-center justify-center backdrop-blur transition-colors" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
                     <span class="material-icons text-3xl">play_arrow</span>
                  </button>
                  <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
                     <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
-                  ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? `
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${window.IS_DOCKER ? 'Queue for Mac' : 'Optimize'}" onclick="event.stopPropagation(); ${window.IS_DOCKER ? `queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\\\'")}')` : `window.open('/compress?path=${encodeURIComponent(v.FilePath)}&audio=standard', 'h_frame')`}">
-                    <span class="material-icons">${window.IS_DOCKER ? 'cloud_upload' : 'bolt'}</span>
-                 </button>` : ''}
+                  ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? _optimizeButton(v) : ''}
              </div>
              
-             <div class="absolute bottom-2 left-2 flex gap-1 flex-wrap pr-12 pointer-events-none">
-                 ${v.Status === 'SOURCE' 
-                    ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 backdrop-blur border border-purple-500/30">SOURCE</span>`
-                    : `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-black/60 text-white backdrop-blur border border-white/10">${v.Status}</span>`
+             <!-- Badge-Cluster: Status + Codec, 4px Gap, 6px Inset -->
+             <div class="absolute bottom-1.5 left-1.5 flex gap-1 flex-wrap pr-12 pointer-events-none">
+                 ${v.media_type === 'image'
+                    ? `<span class="ds-badge ds-badge-accent">IMG</span>`
+                    : `<span class="ds-badge ${v.Status === 'HIGH' ? 'ds-badge-bitrate' : 'ds-badge-neutral'}">${v.Status}</span>`
                  }
-                 ${isHevc ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-arcade-cyan/20 text-arcade-cyan backdrop-blur border border-arcade-cyan/30">HEVC</span>' : ''}
-                 ${isAv1  ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-500/25 text-violet-300 backdrop-blur border border-violet-500/40">AV1</span>' : ''}
-                 ${fileName.includes('_opt.') ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400 backdrop-blur border border-green-500/30">OPT</span>' : ''}
+                 ${isHevc ? '<span class="ds-badge ds-badge-hevc">HEVC</span>' : ''}
+                 ${isAv1  ? '<span class="ds-badge ds-badge-av1">AV1</span>' : ''}
+                 ${fileName.includes('_opt.') ? '<span class="ds-badge ds-badge-optimized">OPT</span>' : ''}
              </div>
-             
+
              <!-- Duration -->
-             <span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-black/80 text-white backdrop-blur pointer-events-none">
+             <span class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-semibold bg-black/70 text-white pointer-events-none">
                 ${v.Duration_Sec ? formatDuration(v.Duration_Sec) : ''}
              </span>
         </div>
 
         <!-- Content -->
-        <div class="card-body p-3 flex flex-col gap-1">
-            <h3 class="text-sm font-medium text-text-main dark:text-gray-200 line-clamp-1 group-hover:text-arcade-cyan transition-colors" title="${fileName}">${fileName}</h3>
-            <p class="text-[11px] text-text-muted dark:text-gray-500 truncate" title="${v.FilePath}">${dirName}</p>
-            
+        <div class="card-body px-[11px] py-2.5 flex flex-col gap-0.5">
+            <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${fileName}">${fileName}</h3>
+            <p class="text-[10.5px] text-text-muted truncate" title="${v.FilePath}">${dirName}</p>
+
             ${renderVideoCardTags(v.tags || [])}
-            
-            <div class="flex items-center justify-between mt-1 text-xs font-mono text-text-muted dark:text-gray-400" style="font-variant-numeric:tabular-nums">
+
+            <div class="flex items-center justify-between mt-2 text-[11px] font-mono text-label">
                 <div class="flex items-center gap-2">
-                    <span class="bg-black/6 dark:bg-white/5 px-1.5 py-0.5 rounded text-[10px]">${v.Size_MB.toFixed(0)} MB</span>
-                    ${v.media_type === 'video' ? `<span style="color:${(v.Bitrate_Mbps||0)>=10?'#00ffd0':(v.Bitrate_Mbps||0)>=3?'#fbbf24':'#f87171'}">${v.Bitrate_Mbps.toFixed(1)} Mb/s</span>` : ''}
+                    <span class="bg-[var(--ds-fill-soft)] text-label px-1.5 py-0.5 rounded-[4px]">${v.Size_MB.toFixed(0)} MB</span>
+                    ${v.media_type === 'video' ? `<span style="color:${rateColor}">${v.Bitrate_Mbps.toFixed(1)} Mbps</span>` : ''}
                 </div>
-                <button class="text-gray-600 hover:text-white transition-colors hide-toggle-btn cursor-pointer" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))" title="${v.hidden ? 'Restore' : 'Move to Vault'}">
+                <button class="text-text-muted hover:text-text-main transition-colors hide-toggle-btn cursor-pointer" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))" title="${v.hidden ? 'Restore' : 'Move to Vault'}">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${v.hidden ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>' : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'}</svg>
                 </button>
             </div>
 
             
-            <!-- Progress Bar (semantic bitrate color) -->
-            <div class="mt-2 h-0.5 w-full bg-black/8 dark:bg-white/5 rounded-full overflow-hidden">
-                <div class="h-full rounded-full transition-all duration-500" style="width: ${barW}%; background: ${(v.Bitrate_Mbps || 0) >= 10 ? 'linear-gradient(90deg,#00ffd0,#0ea5e9)' : (v.Bitrate_Mbps || 0) >= 3 ? 'linear-gradient(90deg,#fbbf24,#f59e0b)' : 'linear-gradient(90deg,#f87171,#ef4444)'}"></div>
+            <!-- Bitrate-Bar: 3px, Track white/6, Fill in Tier-Farbe -->
+            <div class="mt-2 h-[3px] w-full bg-[var(--ds-fill)] rounded-[2px] overflow-hidden">
+                <div class="h-full rounded-[2px] transition-all duration-500" style="width: ${barW}%; background: ${rateColor}"></div>
             </div>
         </div>
     `;
@@ -759,7 +793,7 @@ function renderActiveFiltersRow() {
 
     row.classList.remove('hidden');
     chipsContainer.innerHTML = chips.map(c => `
-        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-white/10 text-gray-300 border border-white/10 ${c.isNeg ? 'line-through decoration-red-500 decoration-2 text-red-200' : ''}">
+        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-[var(--ds-hairline-strong)] text-gray-300 border border-[var(--ds-hairline-strong)] ${c.isNeg ? 'line-through decoration-red-500 decoration-2 text-red-200' : ''}">
             ${c.type === 'tag' ? `<span class="w-2 h-2 rounded-full" style="background: ${c.color}"></span>` : ''}
             ${c.label}
             <button class="hover:text-arcade-pink" onclick="removeActiveFilter('${c.type}', '${c.label}')">×</button>
@@ -821,19 +855,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.body.setAttribute('data-workspace', initialWorkspace);
 
     // Apply initial workspace colors
-    const wsColors = {
-        lobby: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
-        favorites: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' },
-        optimized: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
-        review: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
-        vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' }
-    };
-    const colors = wsColors[initialWorkspace] || wsColors.lobby;
-    const wsIndicator = document.querySelector('.workspace-indicator');
-    if (wsIndicator) {
-        wsIndicator.style.borderBottomColor = colors.accent;
-        wsIndicator.style.backgroundColor = colors.bg;
-    }
+    // Design System: alle Workspaces teilen sich EINEN Accent — der Indikator
+    // wird komplett ueber CSS-Tokens gestylt, kein Inline-Farb-Mapping mehr.
 
     // Load available tags for filtering
     if (typeof loadAvailableTags === 'function') {

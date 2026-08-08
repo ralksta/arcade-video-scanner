@@ -1,5 +1,5 @@
 import asyncio
-import sys
+
 
 async def test():
     print("STARTING TEST")
@@ -10,6 +10,6 @@ async def test():
         print("Res1:", type(res1), res1)
     except Exception as e:
         print("EXCEPTION:", e)
-    
+
 if __name__ == "__main__":
     asyncio.run(test())

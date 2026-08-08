@@ -2,10 +2,6 @@
 """
 Shared pytest fixtures for arcade-video-scanner tests.
 """
-import os
-import json
-import tempfile
-import threading
 from pathlib import Path
 
 import pytest

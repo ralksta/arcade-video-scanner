@@ -1,7 +1,6 @@
 
-import sys
 import os
-import json
+import sys
 
 # Add project root to path
 sys.path.append(os.getcwd())
@@ -15,7 +14,7 @@ print(f"Current Smart Collections: {config.settings.smart_collections}")
 collections_to_restore = [
     {
         "id": "poppers",
-        "name": "Poppers", 
+        "name": "Poppers",
         "icon": "science", # Poppers -> Science/Chemistry bottle
         "criteria": {"tags": ["poppers"]}
     },
@@ -27,7 +26,7 @@ collections_to_restore = [
     },
     {
         "id": "pantyhose",
-        "name": "Pantyhose", 
+        "name": "Pantyhose",
         "icon": "checkroom", # Pantyhose -> Clothes
         "criteria": {"tags": ["pantyhose"]}
     },

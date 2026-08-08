@@ -1,31 +1,40 @@
 import http.server
-import os
-import subprocess
-import mimetypes
-import sys
-import time
 import json
-import threading
-from pathlib import Path
+import mimetypes
+import os
 import socket
 import ssl
-from urllib.parse import unquote, urlparse, parse_qs
-import shlex
-import tempfile
-from arcade_scanner.config import config, IS_WIN, MAX_REQUEST_SIZE, ALLOWED_THUMBNAIL_PREFIX, SETTINGS_FILE, DUPLICATES_CACHE_FILE
-from arcade_scanner.database import db, user_db
-from arcade_scanner.security import session_manager
+import threading
+import time
 from http.cookies import SimpleCookie
-from arcade_scanner.scanner import get_scanner_manager
+from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
+
+from arcade_scanner.config import (
+    ALLOWED_THUMBNAIL_PREFIX,
+    DUPLICATES_CACHE_FILE,
+    MAX_REQUEST_SIZE,  # noqa: F401 — re-exported for routes/* lazy imports
+    config,
+)
+from arcade_scanner.database import db, user_db
+from arcade_scanner.security import (
+    SecurityError,
+    is_path_allowed,
+    session_manager,
+    validate_filename,
+)
+from arcade_scanner.server.response_helpers import (
+    send_bytes,
+    send_json,
+    send_not_modified_if_unchanged,
+)
 from arcade_scanner.server.streaming_util import serve_file_range
-from arcade_scanner.server.response_helpers import send_json, send_bytes, send_not_modified_if_unchanged
 from arcade_scanner.templates.dashboard_template import generate_html_report
-from arcade_scanner.security import sanitize_path, is_path_allowed, validate_filename, is_safe_directory_traversal, SecurityError
 
 
 class _MediaCache:
     """Thread-safe in-memory cache für db.get_all() mit 30s TTL.
-    
+
     Verhindert wiederholte Full-Table-Scans für API-Requests, die in kurzer
     Zeit mehrfach alle Einträge lesen. Wird explizit invalidiert wenn Daten
     verändert werden (upsert, remove etc.).
@@ -186,7 +195,13 @@ def background_duplicate_scan(
             _dup_mgr.update_state(message=msg, progress=int(pct))
 
         detector = DuplicateDetector()
-        all_videos = _media_cache.get()
+        # Bewusst db.get_all() statt _media_cache.get(): der Cache liefert seit
+        # dem OOM-Fix API-Dicts mit UI-Aliasen ("FilePath"), der DuplicateDetector
+        # arbeitet aber durchgängig objektbasiert (v.file_path, v.size_mb,
+        # media_type). Mit Dicts crasht der Filter unten, und selbst ohne ihn
+        # liefe der Detector still falsch: getattr(dict, 'media_type', 'video')
+        # ergibt immer 'video', Bilder würden nie als Bilder erkannt.
+        all_videos = db.get_all()
         print(f"🔍 Duplicate scan: {len(all_videos)} total files in database")
 
         if user_scan_targets:
@@ -205,9 +220,17 @@ def background_duplicate_scan(
         )
         print(f"🔍 Found {len(results)} duplicate groups (has_more: {has_more})")
 
+        # Replacing the cache wholesale is correct: a run's result now covers
+        # every image with a known hash, not just its own slice, so each run is
+        # a superset of the last. (While batches were slices, this line quietly
+        # threw away everything the previous batch had found.)
         _dup_mgr.cache = [g.to_dict() for g in results]
         _dup_mgr.update_state(
             has_more=has_more,
+            # An opaque continuation token, no longer a list index — the
+            # detector tracks progress by what its hash cache already holds.
+            # It only has to stay non-zero, because loadDuplicates() treats
+            # offset 0 as "show cached results" instead of "scan again".
             next_offset=batch_offset + 5000 if has_more else 0,
         )
         save_duplicate_cache()
@@ -289,7 +312,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         """Override to suppress noisy requests (static files, thumbnails, polling)."""
         try:
             path = getattr(self, 'path', None)
-            
+
             # Paths that are ALWAYS quiet (polling, thumbnails, static assets)
             if path and (path in self.QUIET_PATHS or path.startswith(("/thumbnails/", "/static/"))):
                 return
@@ -303,12 +326,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         except Exception:
             # Never let logging crash the request
             pass
-            
+
         super().log_message(format, *args)
 
     def get_current_user(self):
         """Returns the username from the session cookie, Authorization header, query parameter, or None."""
-        from urllib.parse import urlparse, parse_qs
+        from urllib.parse import parse_qs, urlparse
 
         # 1. Cookie prüfen
         if "Cookie" in self.headers:
@@ -347,13 +370,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
     def _resolve_thumb_source(self, thumb_filename: str):
         """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path.
-        
+
         Strategy:
         1. Check in-memory LRU cache (fast path)
         2. On miss: do a full cache warm from DB (first call) or a targeted scan for new entries
         3. On persistent miss: scan full DB once more (catches entries added after server start)
         """
-        import hashlib
         from collections import OrderedDict
 
         cache = FinderHandler._thumb_source_cache
@@ -387,12 +409,32 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self._response_started = False
         try:
-            from .routes import queue, settings, duplicates, tags, files
-            if queue.handle_get(self): return
-            if settings.handle_get(self): return
-            if duplicates.handle_get(self): return
-            if tags.handle_get(self): return
-            if files.handle_get(self): return
+            from .routes import (
+                autotag,
+                candidates,
+                duplicates,
+                files,
+                queue,
+                settings,
+                similar,
+                tags,
+            )
+            if queue.handle_get(self):
+                return
+            if settings.handle_get(self):
+                return
+            if duplicates.handle_get(self):
+                return
+            if tags.handle_get(self):
+                return
+            if autotag.handle_get(self):
+                return
+            if candidates.handle_get(self):
+                return
+            if similar.handle_get(self):
+                return
+            if files.handle_get(self):
+                return
         except Exception as e:
             print(f"Module route error GET: {e}")
             if getattr(self, "_response_started", False):
@@ -420,13 +462,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(body)
                 return
 
-            
-            
+
+
             # 1. ROOT / INDEX -> Serve REPORT_FILE
-            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates"]
+            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
             clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
-                
+
                 # AUTH CHECK for Root
                 user = self.get_current_user()
                 if not user:
@@ -469,31 +511,31 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             elif self.path.startswith("/thumbnails/"):
                 try:
                     rel_path = unquote(self.path[12:])  # remove /thumbnails/
-                    
+
                     # Security Fix C-4: Prevent path traversal
                     thumb_dir_abs = os.path.abspath(config.thumb_dir)
                     file_path = os.path.abspath(os.path.join(thumb_dir_abs, rel_path))
-                    
+
                     # Ensure result is still inside thumb_dir (prevents ../ attacks)
                     if not file_path.startswith(thumb_dir_abs):
                         print(f"🚨 Path traversal attempt blocked: {rel_path}")
                         self.send_error(403, "Forbidden")
                         return
-                    
+
                     # Additional filename validation (must match thumbnail pattern)
                     filename = os.path.basename(file_path)
                     if not validate_filename(filename, prefix=ALLOWED_THUMBNAIL_PREFIX, suffix=".jpg"):
                         print(f"🚨 Invalid thumbnail name: {filename}")
                         self.send_error(400, "Invalid thumbnail name")
                         return
-                    
+
                     # Lazy generation: if thumb doesn't exist on disk, generate on-demand
                     if not (os.path.exists(file_path) and os.path.isfile(file_path)):
                         source_path = self._resolve_thumb_source(filename)
                         if source_path:
                             from arcade_scanner.core.video_processor import create_thumbnail
                             create_thumbnail(source_path)
-                    
+
                     if os.path.exists(file_path) and os.path.isfile(file_path):
                         fs = os.stat(file_path)
                         if send_not_modified_if_unchanged(self, fs.st_mtime):
@@ -531,7 +573,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     # This handles paths like /static/styles.css AND /arcade_scanner/server/static/styles.css
                     rel_path = self.path.split("/static/")[-1].split('?')[0]
                     file_path = os.path.normpath(os.path.join(config.static_dir, rel_path))
-                    
+
                     # Security check: Ensure the resolved path is inside STATIC_DIR
                     if not file_path.lower().startswith(os.path.normpath(config.static_dir).lower()):
                         self.send_error(403)
@@ -568,7 +610,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     else:
                         self.send_error(404)
                         return
-                except Exception as e:
+                except Exception:
                     self.send_error(500)
                     return
 
@@ -578,7 +620,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 if not user_name:
                     self.send_error(401, "Unauthorized")
                     return
-                
+
                 u = user_db.get_user(user_name)
                 if u:
                     send_bytes(self, u.data.model_dump_json().encode(), "application/json", compress=True)
@@ -600,7 +642,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 try:
                     params = parse_qs(urlparse(self.path).query)
                     file_path = params.get("path", [None])[0]
-                    
+
                     if not file_path:
                         self.send_error(400, "Missing path parameter")
                         return
@@ -611,11 +653,11 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         error_msg = "Forbidden - Path outside allowed scan directories"
                         if not os.path.exists(os.path.realpath(os.path.abspath(file_path))):
                             error_msg = "Forbidden - File not found on disk"
-                            
+
                         print(f"🚨 Unauthorized stream access blocked ({error_msg}): {file_path}")
                         self.send_error(403, error_msg)
                         return
-                    
+
                     serve_file_range(self, file_path, method="GET")
                 except SecurityError as e:
                     print(f"🚨 Security violation in stream: {e}")
@@ -624,7 +666,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error in stream endpoint: {e}")
                     self.send_error(500)
 
-            
+
             elif self.path == "/api/cache-stats":
                 # Calculate cache sizes
                 def get_dir_size(path):
@@ -638,17 +680,17 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     except OSError:
                         pass
                     return total
-                
+
                 thumb_size = get_dir_size(config.thumb_dir) / (1024 * 1024)  # MB
                 total_size = thumb_size
-                
+
                 stats = {
                     "thumbnails_mb": round(thumb_size, 2),
                     "total_mb": round(total_size, 2)
                 }
 
                 send_json(self, stats)
-            
+
             # --- TAG SYSTEM ENDPOINTS ---
             # --- TAG SYSTEM ENDPOINTS ---
             elif self.path == "/api/setup/status":
@@ -657,7 +699,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 if not user_name:
                     self.send_error(401)
                     return
-                
+
                 u = user_db.get_user(user_name)
                 setup_complete = getattr(u.data, 'setup_complete', True) if u else True
 
@@ -669,12 +711,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 if not user_name:
                     self.send_error(401)
                     return
-                
+
                 u = user_db.get_user(user_name)
                 if not u:
                     self.send_error(401)
                     return
-                
+
                 # Filter videos
                 user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
                 print(f"🔍 API Debug: User '{user_name}' targets: {user_targets}")
@@ -694,14 +736,15 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         # Always show items in Review mode, regardless of scan targets
                         if entry["Status"] == "REVIEW" or is_match:
                              filtered_videos.append(entry)
-                             if is_match: match_count += 1
-                    
+                             if is_match:
+                                 match_count += 1
+
                     if not filtered_videos and all_entries:
                          sample = os.path.abspath(all_entries[0]["FilePath"])
                          print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(sample.startswith(t) for t in user_targets)})")
                     else:
                          print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
-                
+
                 # send_json gzips the (potentially multi-MB) library dump
                 send_json(self, filtered_videos)
 
@@ -719,7 +762,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         "samples": []
                     }
                 }
-                
+
                 # Users
                 for u in user_db.get_all_users():
                     debug_info["users"].append({
@@ -727,7 +770,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         "is_admin": u.is_admin,
                         "targets": u.data.scan_targets
                     })
-                
+
                 # DB Samples (Top 20)
                 cursor = db._conn.execute("SELECT file_path, status, media_type FROM media LIMIT 20")
                 for row in cursor:
@@ -736,7 +779,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         "status": row[1],
                         "type": row[2]
                     })
-                
+
                 # Mount Check
                 mount_status = {}
                 for m in ["/media", "/media_nas", "/media_ralf"]:
@@ -748,33 +791,33 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     except Exception as e:
                         count = -1
                         sample = [str(e)]
-                    
+
                     mount_status[m] = {
                         "exists": exists,
                         "is_dir": is_dir,
                         "count": count,
                         "sample": sample
                     }
-                
+
                 debug_info["mount_check"] = mount_status
 
                 send_json(self, debug_info)
 
-            
+
             elif self.path.startswith("/api/video/tags?"):
                 # GET: Return tags for a specific video
                 user_name = self.get_current_user()
                 if not user_name:
                     self.send_error(401)
                     return
-                
+
                 params = parse_qs(urlparse(self.path).query)
                 path = params.get("path", [None])[0]
-                
+
                 if not path:
                     self.send_error(400, "Missing path parameter")
                     return
-                
+
                 abs_path = os.path.abspath(path)
                 u = user_db.get_user(user_name)
                 tags = []
@@ -782,10 +825,10 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     tags = u.data.tags[abs_path]
 
                 send_json(self, {"tags": tags})
-            
+
             # Unreachable block removed
 
-            
+
             # ================================================================
             # DUPLICATE DETECTION API
             # ================================================================
@@ -867,12 +910,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         try:
             if self.path.startswith("/stream?path="):
                 file_path = unquote(self.path.split("path=")[1])
-                
+
                 # Security: Validate path
                 if not is_path_allowed(file_path):
                     self.send_error(403, "Forbidden")
                     return
-                
+
                 serve_file_range(self, file_path, method="HEAD")
 
             else:
@@ -884,11 +927,17 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         self._response_started = False
         try:
-            from .routes import queue, settings, duplicates, tags
-            if queue.handle_post(self): return
-            if settings.handle_post(self): return
-            if duplicates.handle_post(self): return
-            if tags.handle_post(self): return
+            from .routes import autotag, duplicates, queue, settings, tags
+            if queue.handle_post(self):
+                return
+            if settings.handle_post(self):
+                return
+            if duplicates.handle_post(self):
+                return
+            if tags.handle_post(self):
+                return
+            if autotag.handle_post(self):
+                return
         except Exception as e:
             print(f"Module route error POST: {e}")
             if getattr(self, "_response_started", False):
@@ -968,7 +1017,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     cookie = SimpleCookie(self.headers["Cookie"])
                     if "session_token" in cookie:
                         session_manager.revoke_session(cookie["session_token"].value)
-                
+
                 self.send_response(200)
                 cookie = SimpleCookie()
                 cookie["session_token"] = ""

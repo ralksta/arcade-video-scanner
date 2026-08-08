@@ -17,11 +17,34 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ### 🟢 User Experience
 - [ ] Customizable grid layout (card size, columns)
+- [x] **Stop a running scan from the UI.** (2026-08-08) `/api/scan/stop` +
+      `/api/scan/status` Endpoints, Stop-Button neben dem Rescan-Button;
+      `/api/rescan` läuft dafür jetzt als Hintergrund-Thread (202 + Polling
+      statt blockierendem Request).
 - [x] Keyboard shortcuts for common actions (arrows = navigate in cinema)
 
 ---
 
 ## Completed Features
+
+### ✅ Embedding Foundation — Ähnlichkeit Teil 1 (2026-08-08)
+- **Vektor-Speicher**: `embedding_meta`/`frame_embeddings` in SQLite, float32-Blobs, L2-normalisiert.
+- **GPU-Indexer**: eigenständiges Skript mit optionalen ML-Deps (`[indexer]`), inkrementell.
+- **`/api/similar`**: Brute-Force-kNN serverseitig ohne neue Runtime-Dependencies.
+- Geplant als Teil 2–4: „Ähnliche Videos"-Leiste im Cinema, Themen-Clustering, semantische Textsuche.
+
+### ✅ Auto-Tagging Rules (2026-08-08)
+- **Regel-Engine**: Smart-Collection-Query + Ziel-Tag, läuft serverseitig nach jedem Scan.
+- **Apply-Once-Semantik**: manuell entfernte Tags werden nie erneut vergeben (`auto_tag_applied`-Buchhaltung).
+- **Evaluator-Parität**: Python-Port von `evaluateCollectionMatch`, per Node-vm-Test gegen das JS-Original gepinnt.
+- **UI**: Regel-Anlage im Collection-Editor ("Als Regel"), Verwaltung + "Jetzt ausführen" in den Settings.
+
+### ✅ Optimizer-Kandidaten-Ansicht (2026-08-07)
+- **Kandidaten-Ansicht**: Ranks library by expected re-encode savings using bitrate-per-resolution heuristic and codec efficiency metrics.
+- **Real-World Refinement**: Results refined by actual outcomes from `encode_history.jsonl` once a resolution/bitrate class has 3+ encodes.
+- **Quick Queuing**: Row entries queue directly into the existing encoding queue with HEVC/AV1 toggle.
+- **Total Savings Display**: Header shows aggregate possible savings for the entire library.
+- **`optimized_at` Marker**: Successful optimizations now stamp media entries; optimized files are excluded from candidates (rescan-safe).
 
 ### ✅ Version 6.8.0 (2026-01-18)
 - **Visual Timeline Scrubber**: Professional timeline with frame-accurate seeking and thumbnail previews.

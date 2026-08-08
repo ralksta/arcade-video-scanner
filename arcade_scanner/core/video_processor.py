@@ -3,7 +3,8 @@ import json
 import logging
 import os
 import subprocess
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
+
 from arcade_scanner.config import config
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', 
 
 
 def get_video_metadata(filepath: str) -> Dict[str, Any]:
-    cmd = [
+    cmd: List[Union[str, bytes]] = [
         "ffprobe",
         "-v",
         "error",
@@ -29,7 +30,7 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
         # Use os.fsencode for path to handle surrogates safely in subprocess
         safe_path = os.fsencode(filepath)
         cmd[cmd.index(filepath)] = safe_path
-        
+
         result = subprocess.run(
             cmd, capture_output=True, text=False, check=True, timeout=60
         )
@@ -45,12 +46,12 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
     file_hash = hashlib.md5(video_path.encode('utf-8', 'surrogateescape')).hexdigest()
     thumb_name = f"thumb_{file_hash}.jpg"
     thumb_path = os.path.join(config.thumb_dir, thumb_name)
-    
+
     if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
         print(f"🖼️  Generating thumbnail: {os.path.basename(video_path)}")
         # Check if image (Image processing without seeking)
         is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
-        
+
         if is_image:
              vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
              cmd = ["ffmpeg", "-i", video_path, "-threads", "1", "-strict", "unofficial", "-vf", vf_filter, thumb_path, "-y", "-loglevel", "error"]
@@ -67,7 +68,7 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
         # Get duration for smart seeking if not provided
         if duration is None:
             try:
-                cmd_dur = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
+                cmd_dur: List[Union[str, bytes]] = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
                 duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
             except Exception as e:
                 logger.debug("Duration probe failed for %s: %s", video_path, e)
@@ -82,11 +83,11 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
             vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
             if use_scene_detect:
                 vf_filter = f"select='gt(scene\\,0.4)',{vf_filter}"
-            
+
             cmd = ["ffmpeg", "-ss", seek_time]
             if use_scene_detect:
                 cmd.extend(["-t", "10"])  # Search up to 10 seconds for a scene change
-                
+
             cmd.extend([
                 "-i", video_path,
                 "-vframes", "1", "-q:v", "4",
@@ -106,29 +107,28 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
 
         # Attempt 1: Simple Smart Seek (Fastest)
         success = try_extract(ss, use_scene_detect=False)
-        
+
         # Attempt 2: Smart Seek with Scene Detection (Optional fallback)
         # We only do this if Attempt 1 failed or we really want fancy thumbnails
         # For now, let's keep it simple to avoid timeouts
         if not success:
             success = try_extract(ss, use_scene_detect=True)
-        
+
         # Attempt 3: Fallback to 0s if failed
         if not success and ss != "0":
             success = try_extract("0", use_scene_detect=False)
 
         if not success:
             return ""
-            
+
     return thumb_name
 
 
 
 
 # --- HARDWARE ENCODER DETECTION ---
-from arcade_scanner.core.hw_encode_detect import get_best_h264_encoder as get_best_encoder, get_optimal_workers
 
-def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None) -> Optional[Dict[str, Any]]:
+def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Legacy method kept for compatibility if needed, but updated to use new config.
     """
@@ -139,12 +139,12 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
         mtime = stats.st_mtime
 
         cached_entry = cache.get(filepath, {})
-        
-        if rebuild_mode == 'thumbs':
-            existing_preview = cached_entry.get("preview", "")
-        elif rebuild_mode == 'previews':
+
+        if rebuild_mode == 'previews':
             existing_thumb = cached_entry.get("thumb", "")
-        else:
+        elif rebuild_mode != 'thumbs':
+            # Only a full run may short-circuit on the cache; an explicit
+            # rebuild must fall through and regenerate.
             if filepath in cache:
                 entry = cached_entry
                 if entry.get("mtime") == mtime and entry.get("size_mb") == size_mb and "codec" in entry:
@@ -167,7 +167,7 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: str = None
             thumb = create_thumbnail(filepath)
         else:
             thumb = existing_thumb if rebuild_mode == 'previews' else create_thumbnail(filepath)
-            
+
         # Preview generation removed
         preview = ""
 

@@ -3,7 +3,6 @@ Tests for arcade_scanner.logging_config
 """
 import logging
 import logging.handlers
-from pathlib import Path
 
 import pytest
 

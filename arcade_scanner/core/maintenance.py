@@ -1,27 +1,28 @@
 import os
-import shutil
+
 from arcade_scanner.config import config
+
 
 def is_safe_to_delete(path: str, expected_parent: str, prefix: str, ext: str) -> bool:
     """Strict check to ensure the file is where we expect and named correctly."""
     abs_path = os.path.abspath(path)
     abs_parent = os.path.abspath(expected_parent)
-    
+
     # Check if file is actually inside the expected directory
     if not abs_path.startswith(abs_parent):
         return False
-        
+
     filename = os.path.basename(path)
     # Check naming pattern
     if not (filename.startswith(prefix) and filename.lower().endswith(ext)):
         return False
-        
+
     return True
 
 def purge_media():
     """Deletes all files in the thumbnail and preview directories with safety checks."""
     print(f"🧹 Purging media in {config.hidden_data_dir}...")
-    
+
     # Double check that hidden_data_dir is what we think it is (should be inside project)
     if "arcade_data" not in config.hidden_data_dir:
         print("❌ [Safety] HIDDEN_DATA_DIR looks suspicious. Aborting purge.")
@@ -47,8 +48,8 @@ def purge_media():
 
 def purge_thumbnails():
     """Deletes all thumbnail files only."""
-    print(f"🧹 Purging thumbnails...")
-    
+    print("🧹 Purging thumbnails...")
+
     if "arcade_data" not in config.hidden_data_dir:
         print("❌ [Safety] HIDDEN_DATA_DIR looks suspicious. Aborting purge.")
         return
@@ -83,7 +84,7 @@ def purge_broken_media():
                         try:
                             os.remove(file_path)
                             removed_count += 1
-                        except:
+                        except Exception:
                             pass
     if removed_count > 0:
         print(f"🧹 Cleaned up {removed_count} failed media generation(s)")

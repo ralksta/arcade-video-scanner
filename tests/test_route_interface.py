@@ -13,7 +13,6 @@ Why this exists:
     This test catches that class of bug at CI time, not at runtime.
 """
 import importlib
-import pkgutil
 import inspect
 
 import pytest
@@ -77,3 +76,17 @@ def test_route_handle_get_returns_bool(module_path):
                 f"{module_path}.{fn_name} return annotation must be bool, "
                 f"got {ret!r}"
             )
+
+
+def test_api_handler_re_exports_max_request_size():
+    """
+    Regression test: MAX_REQUEST_SIZE must be re-exported from api_handler.py
+    so that routes/* modules can lazily import it at request time.
+
+    This was broken by commit cf62272 ("style: ruff safe fixes") which removed
+    the unused import, breaking every GET to /api/tags and /api/settings.
+    """
+    from arcade_scanner.server.api_handler import MAX_REQUEST_SIZE
+
+    assert isinstance(MAX_REQUEST_SIZE, int), "MAX_REQUEST_SIZE must be an integer"
+    assert MAX_REQUEST_SIZE > 0, "MAX_REQUEST_SIZE must be positive"

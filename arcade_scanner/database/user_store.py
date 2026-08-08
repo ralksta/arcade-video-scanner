@@ -1,12 +1,14 @@
-import sqlite3
+import binascii
+import hashlib
 import json
 import os
-import hashlib
-import binascii
 import shutil
-from typing import Optional, List, Dict
+import sqlite3
+from typing import List, Optional
+
 from arcade_scanner.config import config
 from arcade_scanner.models.user import User, UserVideoData
+
 
 class UserStore:
     """
@@ -15,10 +17,10 @@ class UserStore:
     def __init__(self):
         self.db_path = os.path.join(config.hidden_data_dir, "users.db")
         self.json_path = os.path.join(config.hidden_data_dir, "users.json")
-        
+
         self._init_db()
         self._migrate_from_json_file()
-        
+
         # Ensure default admin exists if DB is empty
         if not self.get_user("admin"):
             self.create_default_admin()
@@ -61,11 +63,11 @@ class UserStore:
         if len(self.get_all_users()) > 0:
             return
 
-        print(f"📦 Found legacy users.json, migrating to SQLite...")
+        print("📦 Found legacy users.json, migrating to SQLite...")
         try:
             with open(self.json_path, "r", encoding="utf-8") as f:
                 raw_data = json.load(f)
-            
+
             count = 0
             for username, data in raw_data.items():
                 try:
@@ -74,14 +76,14 @@ class UserStore:
                     count += 1
                 except Exception as e:
                     print(f"⚠️ Failed to migrate user {username}: {e}")
-            
+
             print(f"✅ Migrated {count} users to SQLite.")
-            
+
             # Rename legacy file
             bak_path = self.json_path + ".bak"
             shutil.move(self.json_path, bak_path)
             print(f"Example: Moved users.json to {bak_path}")
-            
+
         except Exception as e:
             print(f"❌ Error migrating users.json: {e}")
 
@@ -98,7 +100,7 @@ class UserStore:
             if row:
                 data_json = row["user_data"]
                 user_data = UserVideoData(**json.loads(data_json)) if data_json else UserVideoData()
-                
+
                 return User(
                     username=row["username"],
                     password_hash=row["password_hash"],
@@ -148,7 +150,7 @@ class UserStore:
                 try:
                     data_json = row["user_data"]
                     user_data = UserVideoData(**json.loads(data_json)) if data_json else UserVideoData()
-                    
+
                     users.append(User(
                         username=row["username"],
                         password_hash=row["password_hash"],
@@ -171,13 +173,13 @@ class UserStore:
         print("👤 Creating default admin user (SQLite)...")
         salt = os.urandom(16)
         pwd_hash = self.hash_password("admin", salt)
-        
+
         # Docker mode: Trigger setup wizard on first login
         user_data = UserVideoData()
         if os.getenv("CONFIG_DIR"):
             print("🐳 Docker mode - setup wizard will appear on first login")
             user_data.setup_complete = False
-        
+
         admin_user = User(
             username="admin",
             password_hash=binascii.hexlify(pwd_hash).decode('ascii'),
@@ -221,12 +223,12 @@ class UserStore:
                 admin.data.favorites.append(entry.file_path)
                 modified = True
                 count_fav += 1
-            
+
             if entry.vaulted and entry.file_path not in admin.data.vaulted:
                 admin.data.vaulted.append(entry.file_path)
                 modified = True
                 count_hidden += 1
-            
+
             if entry.tags and entry.file_path not in admin.data.tags:
                 admin.data.tags[entry.file_path] = list(entry.tags)
                 modified = True
@@ -235,7 +237,7 @@ class UserStore:
         if modified:
             print(f"📦 Migrating legacy data to 'admin': {count_fav} favs, {count_hidden} hidden, {count_tags} tagged videos.")
             self.add_user(admin) # Save changes
-            
+
         self.migrate_collections()
         self.migrate_scan_settings()
         self.migrate_tags()
@@ -245,24 +247,26 @@ class UserStore:
     def migrate_tags(self):
         """Migrates global available_tags to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
-            
+        if not os.path.exists(settings_path):
+            return
+
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             legacy_tags = data.get("available_tags", [])
             added = 0
             current_names = {t.get("name") for t in admin.data.available_tags}
-            
+
             for tag in legacy_tags:
                 if isinstance(tag, dict) and tag.get("name") not in current_names:
                     admin.data.available_tags.append(tag)
                     added += 1
-            
+
             if added > 0:
                 print(f"📦 Migrated {added} tags to 'admin'.")
                 self.add_user(admin)
@@ -273,29 +277,31 @@ class UserStore:
     def migrate_scan_settings(self):
         """Migrates global scan targets/excludes to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
-            
+        if not os.path.exists(settings_path):
+            return
+
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             legacy_targets = data.get("scan_targets", [])
             added_targets = 0
             for t in legacy_targets:
                 if t not in admin.data.scan_targets:
                     admin.data.scan_targets.append(t)
                     added_targets += 1
-            
+
             legacy_excludes = data.get("exclude_paths", [])
             added_excludes = 0
             for e in legacy_excludes:
                 if e not in admin.data.exclude_paths:
                     admin.data.exclude_paths.append(e)
                     added_excludes += 1
-            
+
             if added_targets > 0 or added_excludes > 0:
                 print(f"📦 Migrated scan settings to 'admin': {added_targets} targets, {added_excludes} excludes.")
                 self.add_user(admin)
@@ -306,15 +312,17 @@ class UserStore:
     def migrate_collections(self):
         """Migrates smart collections from global settings to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
+        if not os.path.exists(settings_path):
+            return
 
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             legacy_collections = data.get("smart_collections", [])
             if legacy_collections:
                 current_ids = {c.get("id") for c in admin.data.smart_collections}
@@ -323,7 +331,7 @@ class UserStore:
                     if col.get("id") not in current_ids:
                         admin.data.smart_collections.append(col)
                         added += 1
-                
+
                 if added > 0:
                      print(f"📦 Migrated {added} smart collections to 'admin'.")
                      self.add_user(admin)
@@ -334,17 +342,19 @@ class UserStore:
     def migrate_sensitive_settings(self):
         """Migrates global sensitive settings (Safe Mode) to admin user."""
         admin = self.get_user("admin")
-        if not admin: return
+        if not admin:
+            return
 
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
-            
+        if not os.path.exists(settings_path):
+            return
+
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             modified = False
-            
+
             # Sensitive Dirs
             s_dirs = data.get("sensitive_dirs", [])
             for d in s_dirs:
@@ -365,9 +375,9 @@ class UserStore:
                 if c not in admin.data.sensitive_collections:
                     admin.data.sensitive_collections.append(c)
                     modified = True
-            
+
             if modified:
-                print(f"📦 Migrated sensitive settings to 'admin'.")
+                print("📦 Migrated sensitive settings to 'admin'.")
                 self.add_user(admin)
 
         except Exception as e:
@@ -376,33 +386,34 @@ class UserStore:
     def cleanup_legacy_settings(self):
         """Removes migrated keys from settings.json."""
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path): return
+        if not os.path.exists(settings_path):
+            return
 
         try:
             with open(settings_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             keys_to_remove = [
-                "smart_collections", 
-                "scan_targets", 
-                "exclude_paths", 
+                "smart_collections",
+                "scan_targets",
+                "exclude_paths",
                 "available_tags",
                 "sensitive_dirs",
                 "sensitive_tags",
                 "sensitive_collections"
             ]
-            
+
             modified = False
             for k in keys_to_remove:
                 if k in data:
                     del data[k]
                     modified = True
-            
+
             if modified:
                 print("🧹 Cleaning up legacy keys from settings.json...")
                 with open(settings_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)
-                    
+
         except Exception as e:
             print(f"⚠️ Error cleaning settings: {e}")
 

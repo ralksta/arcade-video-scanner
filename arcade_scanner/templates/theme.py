@@ -1,87 +1,158 @@
+"""
+Arcade Scanner Design System — single source of truth for visual tokens.
+
+Ersetzt die frueheren drei Themes (Arcade/Professional/Candy) durch EIN
+dark-first Theme mit genau einem Brand-Accent (Magenta) und einer kleinen
+Menge semantischer Farben, die ausschliesslich fuer Badges verwendet werden.
+
+Token-Konvention:
+    --ds-<name>       fertiger Farbwert (Hex/rgba) fuer handgeschriebenes CSS
+    --ds-<name>-rgb   nur die RGB-Kanaele, damit Tailwind Opacity-Modifier
+                      (z.B. bg-accent/20) korrekt aufloesen kann
+Die Legacy-Variablen (--arcade-*, --text-*) bleiben als Aliase bestehen, damit
+noch nicht migrierte Templates/JS-Dateien automatisch die neue Palette erben.
+"""
+
 import json
 
-class BaseTheme:
-    """
-    Base Semantic Theme defining the contract and common properties.
-    """
-    name = "base"
-    
-    # --- CSS Variables Map ---
-    # These will be injected into :root and .dark
-    # Format: {'var-name': ('light-value', 'dark-value')}
-    css_variables = {
-        '--arcade-bg': ('#ffffff', '#000000'),
-        '--text-main': ('#000000', '#ffffff'),
-        '--text-muted': ('#666666', '#999999'),
-        '--arcade-cyan': ('#06b6d4', '#00ffd0'), # Defaults
-        '--arcade-gold': ('#d97706', '#F4B342'),
-        '--arcade-magenta': ('#be185d', '#8F0177'),
-    }
+# ==============================================================================
+# TOKENS
+# ==============================================================================
 
-    # --- Tailwind Config Colors ---
-    # These map semantic names to CSS variables or raw values
-    tailwind_colors = {
-        'arcade-bg': 'var(--arcade-bg)',
-        'text-main': 'var(--text-main)',
-        'text-muted': 'var(--text-muted)',
-        'arcade-cyan': 'var(--arcade-cyan)',
-        'arcade-gold': 'var(--arcade-gold)',
-        'arcade-magenta': 'var(--arcade-magenta)',
-    }
+# Neutrale Flaechenskala: (light, dark)
+SURFACES = {
+    "bg": ("#f6f6f8", "#0b0b10"),
+    "surface": ("#ffffff", "#15151d"),
+    "surface-2": ("#ffffff", "#1a1a24"),
+    "border": ("#e2e2e6", "#2a2a35"),
+    "text": ("#15151d", "#f2f2f5"),
+    "text-muted": ("#5c5c66", "#6b6b76"),
+    # Fliesstext sitzt zwischen text und text-muted
+    "text-body": ("#3a3a44", "#c7c7cf"),
+    # Eyebrow/Label-Grau
+    "text-label": ("#6b6b76", "#9a9aa6"),
+    # Kopfzeile sitzt minimal ueber dem Hintergrund
+    "header": ("#ffffff", "#101015"),
+    "sidebar": ("#ffffff", "#0e0e13"),
+    "card": ("#ffffff", "#14141a"),
+}
 
-    # --- Semantic Classes ---
-    app_bg = "bg-arcade-bg min-h-screen transition-colors duration-300 font-sans text-text-main"
-    header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 backdrop-blur transition-all duration-300"
-    sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 p-4 gap-1 z-[100] transition-colors duration-300"
-    
-    # Typography
+# Brand + Semantik. Identisch in Light und Dark — nur EIN Accent.
+BRAND = {
+    "accent": "#c4179f",
+    "accent-hover": "#e34fc0",
+    "accent-tint": "#e879c6",
+    # Semantische Farben ausschliesslich fuer Badges/Readouts:
+    "hevc": "#22d3c7",
+    "av1": "#a78bfa",
+    "bitrate": "#f2b544",
+    "optimized": "#4ade80",
+    "danger": "#f36969",
+}
+
+SPACING = [4, 8, 12, 16, 24, 32, 48]
+RADII = {"xs": 4, "sm": 6, "md": 8, "lg": 10}
+
+FONT_SANS = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+FONT_MONO = "ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace"
+
+
+def _rgb(hex_color: str) -> str:
+    """'#c4179f' -> '196 23 159' (Tailwind-Alpha-kompatibel)."""
+    h = hex_color.lstrip("#")
+    return " ".join(str(int(h[i:i + 2], 16)) for i in (0, 2, 4))
+
+
+class Theme:
+    """
+    Das (einzige) Theme. Die Klasse bleibt als Objekt erhalten, weil
+    ui_components/dashboard_template semantische Klassenstrings von ihr beziehen.
+    """
+
+    name = "arcade"
+
+    # --- Layout-Konstanten ---
+    sidebar_width = "200px"
+
+    # --- Semantische Klassen ---
+    app_bg = "bg-arcade-bg min-h-screen font-sans text-text-main antialiased"
+    header_container = (
+        "fixed top-0 left-0 right-0 z-50 h-[46px] md:h-[52px] flex items-center "
+        "justify-between px-3 md:px-[22px] bg-header border-b border-line/60"
+    )
+    sidebar_container = (
+        "hidden md:flex flex-col w-[200px] fixed left-0 top-[52px] bottom-0 "
+        "bg-sidebar border-r border-line/60 px-3 py-4 gap-0.5 z-[100]"
+    )
+
     text_primary = "text-text-main"
     text_secondary = "text-text-muted"
-    
-    def button_nav(self, active=False):
-        base = "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all w-full text-left"
+
+    def button_nav(self, active: bool = False) -> str:
+        """Nav-Row laut Spec: 9px/10px Padding, 6px Radius, 10px Gap."""
+        base = (
+            "group relative flex items-center gap-2.5 px-2.5 py-2.5 rounded-md "
+            "text-[13px] w-full text-left transition-colors"
+        )
         if active:
-            return f"{base} bg-black/5 dark:bg-white/5 font-medium text-black dark:text-white"
-        return f"{base} text-text-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-black dark:hover:text-white"
+            return f"{base} bg-accent/[0.12] text-text-main font-semibold"
+        return f"{base} text-label font-normal hover:bg-[var(--ds-fill-soft)] hover:text-text-main"
 
-    def render_css_variables(self):
-        """Generates the <style> block for CSS variables."""
-        light_vars = []
-        dark_vars = []
-        
-        for name, (light, dark) in self.css_variables.items():
-            light_vars.append(f"{name}: {light};")
-            dark_vars.append(f"{name}: {dark};")
-            
-        return f"""
-        <style>
-            :root {{
-                {chr(10).join(light_vars)}
-            }}
-            .dark {{
-                {chr(10).join(dark_vars)}
-            }}
-            body {{
-                background-color: var(--arcade-bg);
-                color: var(--text-main);
-                transition: background-color 0.3s ease, color 0.3s ease;
-            }}
-        </style>
-        """
+    # --- Rendering ---
+    def render_tailwind_config(self) -> str:
+        """Tailwind-Config: Farben zeigen auf die RGB-Kanal-Variablen, damit
+        Utility-Modifier wie `bg-accent/20` echte Transparenz erzeugen."""
 
-    def render_tailwind_config(self):
-        """Generates the Tailwind config script."""
+        def c(token: str) -> str:
+            return f"rgb(var(--ds-{token}-rgb) / <alpha-value>)"
+
+        colors = {
+            # Neue semantische Namen
+            "bg": c("bg"),
+            "surface": c("surface"),
+            "surface-2": c("surface-2"),
+            "line": c("border"),
+            "card": c("card"),
+            "header": c("header"),
+            "sidebar": c("sidebar"),
+            "body-text": c("text-body"),
+            "label": c("text-label"),
+            "accent": c("accent"),
+            "accent-hover": c("accent-hover"),
+            "accent-tint": c("accent-tint"),
+            "hevc": c("hevc"),
+            "av1": c("av1"),
+            "bitrate": c("bitrate"),
+            "optimized": c("optimized"),
+            "danger": c("danger"),
+            # Legacy-Aliase — zeigen bewusst auf den EINEN Accent bzw. die
+            # passende semantische Farbe, damit nicht migrierte Dateien
+            # automatisch konform werden.
+            "arcade-bg": c("bg"),
+            "text-main": c("text"),
+            "text-muted": c("text-muted"),
+            "arcade-cyan": c("accent"),
+            "arcade-magenta": c("accent"),
+            "arcade-pink": c("accent-hover"),
+            "arcade-gold": c("bitrate"),
+        }
+
         config = {
             "darkMode": "class",
             "theme": {
                 "extend": {
-                    "colors": self.tailwind_colors,
+                    "colors": colors,
                     "fontFamily": {
-                        "sans": ["Inter", "sans-serif"],
-                        "mono": ["SF Mono", "monospace"]
-                    }
+                        "sans": ["Inter", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+                        "mono": [
+                            "ui-monospace", "SF Mono", "Cascadia Code",
+                            "Menlo", "Consolas", "monospace",
+                        ],
+                    },
+                    "borderRadius": {f"ds-{k}": f"{v}px" for k, v in RADII.items()},
+                    "spacing": {f"ds-{v}": f"{v}px" for v in SPACING},
                 }
-            }
+            },
         }
         return f"""
         <script>
@@ -89,133 +160,214 @@ class BaseTheme:
         </script>
         """
 
-
-class ArcadeTheme(BaseTheme):
-    name = "arcade"
-    
-    css_variables = {
-        '--arcade-bg': ('#f8f9fa', '#090012'),
-        '--text-main': ('#0f172a', '#ffffff'),          # slate-900 light: 18:1 contrast
-        '--text-muted': ('#374151', '#9ca3af'),         # gray-700 light: 7:1 contrast (WCAG AA+)
-        
-        # Brand Colors
-        '--arcade-purple': ('#e2e8f0', '#1a0530'),
-        '--arcade-magenta': ('#be185d', '#8F0177'),
-        '--arcade-pink': ('#db2777', '#DE1A58'),
-        '--arcade-gold': ('#b45309', '#F4B342'),        # Darker gold for light mode readability
-        '--arcade-cyan': ('#0d7a70', '#00ffd0'),        # Darker teal for light mode readability
-        
-        # Surfaces
-        '--surface-glass': ('rgba(255, 255, 255, 0.92)', 'rgba(20, 20, 30, 0.6)'),
-        '--surface-border': ('rgba(0, 0, 0, 0.12)', 'rgba(255, 255, 255, 0.08)'),
-    }
-    
-    # Semantic overrides
-    header_container = "fixed top-0 left-0 right-0 z-50 h-[34px] md:h-16 flex items-center justify-between px-3 md:px-6 pt-safe-top transition-all duration-300 bg-arcade-bg/95 backdrop-blur border-b border-black/5 dark:border-white/5"
-    sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-black/5 dark:border-white/5 p-4 gap-1 z-[100]"
+    def render_css_variables(self) -> str:
+        return render_theme_css()
 
 
-class ProfessionalTheme(BaseTheme):
-    name = "professional"
-    
-    css_variables = {
-        '--arcade-bg': ('#f3f4f6', '#0f172a'), # Slate-100 / Slate-900
-        '--text-main': ('#111827', '#f9fafb'), # Gray-900 / Gray-50
-        '--text-muted': ('#4b5563', '#9ca3af'), # Gray-600 light: 5.74:1 WCAG AA✓ / Gray-400 dark
-        
-        # Re-map semantic colors to Professional Palette (Blue/Teal)
-        '--arcade-purple': ('#e0e7ff', '#1e1b4b'), # Indigo
-        '--arcade-magenta': ('#be185d', '#831843'), # Pink (Accents)
-        '--arcade-pink': ('#db2777', '#be185d'),
-        '--arcade-gold': ('#b45309', '#f59e0b'), # Amber
-        '--arcade-cyan': ('#0284c7', '#38bdf8'), # Sky Blue (Primary)
-        
-        '--surface-glass': ('rgba(255, 255, 255, 0.9)', 'rgba(15, 23, 42, 0.9)'),
-        '--surface-border': ('#e5e7eb', '#1e293b'),
-    }
-    
-    # Cleaner, solid headers
-    header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-sm"
-    sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 p-4 gap-1 z-[100]"
-
-    def button_nav(self, active=False):
-        # Professional buttons are simpler, less neon
-        base = "group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full"
-        if active:
-            return f"{base} bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-        return f"{base} text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white"
+# Aktive Instanz. `BaseTheme` bleibt als Alias erhalten (Type-Hints/Importe).
+CURRENT_THEME = Theme()
+BaseTheme = Theme
 
 
-class CandyTheme(BaseTheme):
-    name = "candy"
-    
-    # Palette provided: #FCF8F8 (Bg), #FBEFEF (Surface), #F9DFDF (Border), #F5AFAF (Accent)
-    css_variables = {
-        '--arcade-bg': ('#FCF8F8', '#1a0510'),
-        '--text-main': ('#2d1a1a', '#FBEFEF'),          # Deep rose-charcoal, WCAG AA on #FCF8F8
-        '--text-muted': ('#6b3a4a', '#F9DFDF'),         # Muted rose, not too bright
-        
-        # Soft Accents
-        '--arcade-purple': ('#FBEFEF', '#2d0f1a'),
-        '--arcade-magenta': ('#b5476a', '#d16d8e'),     # Darkened for light readability
-        '--arcade-pink': ('#F9DFDF', '#be185d'),
-        '--arcade-gold': ('#c2693a', '#F4B342'), 
-        '--arcade-cyan': ('#be185d', '#00ffd0'),
-        
-        '--surface-glass': ('rgba(252, 248, 248, 0.92)', 'rgba(26, 5, 16, 0.8)'),
-        '--surface-border': ('#e8c8c8', '#4a1525'),
-    }
-    
-    header_container = "fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-6 bg-arcade-bg/95 backdrop-blur border-b border-[#F9DFDF] dark:border-white/10"
-    sidebar_container = "hidden md:flex flex-col w-64 fixed left-0 top-16 bottom-0 bg-arcade-bg/50 border-r border-[#F9DFDF] dark:border-white/10 p-4 gap-1 z-[100]"
+def _var_block(mode_index: int) -> str:
+    """Erzeugt alle Custom Properties fuer light (0) bzw. dark (1)."""
+    lines = []
+    for token, pair in SURFACES.items():
+        value = pair[mode_index]
+        lines.append(f"    --ds-{token}: {value};")
+        lines.append(f"    --ds-{token}-rgb: {_rgb(value)};")
+    for token, value in BRAND.items():
+        lines.append(f"    --ds-{token}: {value};")
+        lines.append(f"    --ds-{token}-rgb: {_rgb(value)};")
+
+    bg, surface, border = (
+        SURFACES["bg"][mode_index],
+        SURFACES["surface"][mode_index],
+        SURFACES["border"][mode_index],
+    )
+    text, muted = SURFACES["text"][mode_index], SURFACES["text-muted"][mode_index]
+
+    # Hairlines: im Dark-Mode als weisse Low-Opacity-Linien, im Light-Mode schwarz.
+    hairline = "rgba(255,255,255,0.08)" if mode_index else "rgba(0,0,0,0.08)"
+    hairline_strong = "rgba(255,255,255,0.12)" if mode_index else "rgba(0,0,0,0.12)"
+    fill_soft = "rgba(255,255,255,0.05)" if mode_index else "rgba(0,0,0,0.04)"
+    fill = "rgba(255,255,255,0.06)" if mode_index else "rgba(0,0,0,0.05)"
+
+    lines += [
+        f"    --ds-hairline: {hairline};",
+        f"    --ds-hairline-strong: {hairline_strong};",
+        f"    --ds-fill-soft: {fill_soft};",
+        f"    --ds-fill: {fill};",
+        # Legacy-Aliase
+        f"    --arcade-bg: {bg};",
+        f"    --text-main: {text};",
+        f"    --text-muted: {muted};",
+        f"    --arcade-magenta: {BRAND['accent']};",
+        f"    --arcade-pink: {BRAND['accent-hover']};",
+        f"    --arcade-cyan: {BRAND['accent']};",
+        f"    --arcade-gold: {BRAND['bitrate']};",
+        f"    --arcade-purple: {SURFACES['surface-2'][mode_index]};",
+        f"    --surface-glass: {surface};",
+        f"    --surface-border: {border};",
+    ]
+    return "\n".join(lines)
 
 
-# Theme Registry
-THEMES = {
-    "arcade": ArcadeTheme(),
-    "professional": ProfessionalTheme(),
-    "candy": CandyTheme()
-}
+def render_theme_css() -> str:
+    """Generiert den <style>-Block mit allen Design-Tokens."""
+    spacing_vars = "\n".join(f"    --ds-space-{v}: {v}px;" for v in SPACING)
+    radius_vars = "\n".join(f"    --ds-radius-{k}: {v}px;" for k, v in RADII.items())
 
-# Active Theme Instance (Default)
-CURRENT_THEME = THEMES["arcade"]
+    return f"""<style>
+:root {{
+{_var_block(0)}
+{spacing_vars}
+{radius_vars}
+    --ds-font-sans: {FONT_SANS};
+    --ds-font-mono: {FONT_MONO};
+    color-scheme: light;
+}}
 
-def render_theme_css():
-    """Generates the CSS <style> block for ALL themes."""
-    css_lines = []
-    
-    # Render Default (Root) - Fallback
-    css_lines.append(":root {")
-    for name, (light, _) in CURRENT_THEME.css_variables.items():
-        css_lines.append(f"    {name}: {light};")
-    css_lines.append("}")
-    
-    css_lines.append(".dark {")
-    for name, (_, dark) in CURRENT_THEME.css_variables.items():
-        css_lines.append(f"    {name}: {dark};")
-    css_lines.append("}")
-    
-    # Render overrides for each theme
-    for key, theme in THEMES.items():
-        # Light Mode override
-        css_lines.append(f'[data-theme="{key}"] {{')
-        for name, (light, _) in theme.css_variables.items():
-            css_lines.append(f"    {name}: {light};")
-        css_lines.append("}")
-        
-        # Dark Mode override
-        css_lines.append(f'[data-theme="{key}"].dark {{') # Or .dark[data-theme="..."]
-        css_lines.append(f"    /* {theme.name} Dark */")
-        for name, (_, dark) in theme.css_variables.items():
-            css_lines.append(f"    {name}: {dark};")
-        css_lines.append("}")
-        
-    css_lines.append("""
-        body {
-            background-color: var(--arcade-bg);
-            color: var(--text-main);
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-    """)
-    
-    return f"<style>{chr(10).join(css_lines)}</style>"
+.dark {{
+{_var_block(1)}
+    color-scheme: dark;
+}}
+
+html, body {{
+    background-color: var(--ds-bg);
+    color: var(--ds-text);
+    font-family: var(--ds-font-sans);
+}}
+
+/* Alle Zahlen-/Pfad-/Codec-Readouts laufen im System-Mono mit tabular-nums */
+.font-mono, code, kbd, pre, [style*="tabular-nums"] {{
+    font-family: var(--ds-font-mono);
+    font-variant-numeric: tabular-nums;
+}}
+
+/* --- Design-System Utilities --- */
+.ds-eyebrow {{
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ds-text-label);
+}}
+
+/* Badge-Pattern: bg 16%, Text voll, Border 35% */
+.ds-badge {{
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: rgb(var(--ds-badge-rgb));
+    background: rgb(var(--ds-badge-rgb) / 0.17);
+    border: 1px solid rgb(var(--ds-badge-rgb) / 0.35);
+    backdrop-filter: blur(4px);
+}}
+.ds-badge-accent {{ --ds-badge-rgb: var(--ds-accent-tint-rgb); }}
+.ds-badge-hevc {{ --ds-badge-rgb: var(--ds-hevc-rgb); }}
+.ds-badge-av1 {{ --ds-badge-rgb: var(--ds-av1-rgb); }}
+.ds-badge-bitrate {{ --ds-badge-rgb: var(--ds-bitrate-rgb); }}
+.ds-badge-optimized {{ --ds-badge-rgb: var(--ds-optimized-rgb); }}
+.ds-badge-danger {{ --ds-badge-rgb: var(--ds-danger-rgb); }}
+.ds-badge-neutral {{
+    color: #fff;
+    background: rgba(0,0,0,0.6);
+    border-color: rgba(255,255,255,0.1);
+}}
+
+/* Buttons */
+.ds-btn {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: var(--ds-font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}}
+.ds-btn-primary {{ background: var(--ds-accent); color: #fff; }}
+.ds-btn-primary:hover {{ background: var(--ds-accent-hover); }}
+.ds-btn-secondary {{
+    background: var(--ds-fill);
+    border-color: var(--ds-hairline-strong);
+    color: var(--ds-text);
+}}
+.ds-btn-secondary:hover {{ background: var(--ds-hairline-strong); }}
+.ds-btn-danger {{
+    background: transparent;
+    border-color: rgb(var(--ds-danger-rgb) / 0.4);
+    color: var(--ds-danger);
+}}
+.ds-btn-danger:hover {{ background: rgb(var(--ds-danger-rgb) / 0.12); }}
+.ds-btn-ghost {{
+    background: transparent;
+    color: var(--ds-text-muted);
+    padding: 9px 12px;
+}}
+.ds-btn-ghost:hover {{ color: var(--ds-text); }}
+
+/* Filter-Chips */
+.ds-chip {{
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    background: var(--ds-fill-soft);
+    border: 1px solid var(--ds-hairline-strong);
+    color: var(--ds-text-body);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color .15s ease, color .15s ease;
+}}
+.ds-chip:hover {{ background: var(--ds-fill); color: var(--ds-text); }}
+.ds-chip.active {{
+    background: var(--ds-accent);
+    border-color: var(--ds-accent);
+    color: #fff;
+    font-weight: 600;
+}}
+
+/* Toggle-Switch (38x22) */
+.ds-switch {{
+    position: relative;
+    width: 38px;
+    height: 22px;
+    border-radius: 11px;
+    background: var(--ds-hairline-strong);
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color .18s ease;
+}}
+.ds-switch::after {{
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #8a8a94;
+    transition: transform .18s ease, background-color .18s ease;
+}}
+.ds-switch[aria-checked="true"] {{ background: var(--ds-accent); }}
+.ds-switch[aria-checked="true"]::after {{ transform: translateX(16px); background: #fff; }}
+
+/* Fokus: ein Accent-Ring, keine Multi-Color-Glows mehr */
+:focus-visible {{
+    outline: 2px solid rgb(var(--ds-accent-rgb) / 0.7);
+    outline-offset: 2px;
+}}
+</style>"""

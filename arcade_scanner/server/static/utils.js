@@ -144,6 +144,49 @@ function _repositionToasts() {
 
 window.showToast = showToast;
 
+/**
+ * Escape a string for safe interpolation into HTML markup or attributes.
+ * File names may contain &, <, >, " or ' — unescaped they break markup,
+ * data-path attributes and onclick handlers.
+ * @param {*} value - Value to escape
+ * @returns {string} HTML-safe string
+ */
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
+/**
+ * URL-encode a file path, or return null if it cannot be encoded.
+ *
+ * Dateinamen mit ungültigen UTF-8-Bytes (cp1252-Reste auf dem NAS) liest Python
+ * per surrogateescape als einzelne Surrogate U+DC80–U+DCFF ein und reicht sie so
+ * ans Frontend. encodeURIComponent wirft darauf `URIError: URI malformed` — in
+ * einer Render-Schleife reißt das die komplette Ansicht mit.
+ *
+ * Bewusst kein Reparaturversuch: die Gegenstelle dekodiert mit `unquote()` ohne
+ * errors='surrogateescape' und käme an den Originalpfad ohnehin nicht heran. Der
+ * Aufrufer soll die betroffene Aktion deaktivieren, statt eine URL zu bauen, die
+ * serverseitig ins Leere läuft.
+ *
+ * @param {string} path - File path
+ * @returns {string|null} Encoded path, or null if it contains lone surrogates
+ */
+function safeEncodePath(path) {
+    try {
+        return encodeURIComponent(path);
+    } catch (e) {
+        if (e instanceof URIError) return null;
+        throw e;
+    }
+}
+window.safeEncodePath = safeEncodePath;
+
 
 
 

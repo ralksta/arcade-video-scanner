@@ -1,17 +1,18 @@
 import asyncio
 import hashlib
 import os
+import threading
 import time
-from typing import Callable, Optional, List, Set
+from typing import Any, Callable, List, Optional, Set, Tuple
 
 from ..config import config
 from ..database import db
-from ..models.video_entry import VideoEntry
 from ..models.media_asset import MediaAsset
 from .file_system import fs_scanner
+from .image_inspector import ImageInspector
 from .media_probe import MediaProbe
 from .video_inspector import VideoInspector
-from .image_inspector import ImageInspector
+
 
 class ScannerManager:
     """
@@ -23,14 +24,19 @@ class ScannerManager:
     """
     def __init__(self):
         self.is_scanning = False
-        self._stop_event = asyncio.Event()
+        # A threading.Event, not an asyncio one: main.py runs the scan inside a
+        # daemon thread with its own event loop, so stop() is always called from
+        # a different thread than the scan. asyncio.Event.set() is not
+        # thread-safe. Nothing awaits this flag — it is only polled with
+        # is_set() — so a threading.Event is a drop-in and actually correct.
+        self._stop_event = threading.Event()
         self.probe = MediaProbe() # Own the probe (ProcessPool)
         self.video_inspector = VideoInspector(self.probe)
         self.image_inspector = ImageInspector()
-        
+
         # Concurrency Lanes (created lazily in run_scan to bind to correct event loop)
         self.sem_video = None
-        self.sem_image = None 
+        self.sem_image = None
 
     async def run_scan(self, progress_callback: Optional[Callable[[str], None]] = None, force_rescan: bool = False) -> int:
         """
@@ -38,13 +44,13 @@ class ScannerManager:
         """
         if self.is_scanning:
             return 0
-            
+
         self.is_scanning = True
         self._stop_event.clear()
-        
+
         start_time = time.time()
         print(f"🚀 Starting Scan on: {config.active_scan_targets}")
-        
+
         # Create semaphores bound to current event loop (fixes asyncio event loop mismatch)
         # Heavy Lane (FFprobe/FFmpeg) - CPU bound
         # Create semaphores bound to current event loop
@@ -61,9 +67,9 @@ class ScannerManager:
             fs_scanner.allow_images = scan_images
             if scan_images:
                 print("📸 Image scanning enabled (Fast Lane Active)")
-        except Exception as e:
+        except Exception:
             pass
-        
+
         # 1. Load Cache
         db.load()
         existing_paths = {entry.file_path for entry in db.get_all()}
@@ -83,22 +89,24 @@ class ScannerManager:
         # Cleared when the discovery loop is cut short, so the cleanup can tell
         # "this file is gone" apart from "we never got that far".
         discovery_complete = True
-        
+
         processed_count = 0
-        batch_entries = []
-        
+        batch_entries: List[Any] = []
+
         # 2. Worker Queue Pattern
-        queue = asyncio.Queue(maxsize=100) # Buffer for discovered paths
+        # Items are (file_path, dir_changed, index, retries); None signals shutdown.
+        queue: "asyncio.Queue[Optional[Tuple[str, bool, int, int]]]" = asyncio.Queue(maxsize=100)
         workers = []
         # Number of workers should match concurrency settings to avoid process pile-up
         num_workers = config.settings.max_concurrent_video_scans
-        if num_workers < 1: num_workers = 1
+        if num_workers < 1:
+            num_workers = 1
 
         async def _check_system_load():
             """Simple Watchdog using load average."""
             if not config.settings.enable_resource_watchdog:
                 return
-            
+
             try:
                 load = os.getloadavg()[0]
                 cpu_count = os.cpu_count() or 1
@@ -125,12 +133,12 @@ class ScannerManager:
                     if item is None: # Poison pill
                         queue.task_done()
                         break
-                    
+
                     path, dir_changed, idx, total = item
-                    
+
                     await _check_system_load()
                     await _process_path(path, dir_changed, idx, total)
-                    
+
                     processed_count += 1
                     queue.task_done()
                 except Exception as e:
@@ -147,7 +155,7 @@ class ScannerManager:
             elif self.image_inspector.can_handle(path):
                 inspector = self.image_inspector
                 sem = self.sem_image
-            
+
             if not inspector or not sem:
                 return
 
@@ -192,18 +200,18 @@ class ScannerManager:
             async with sem:
                 if self._stop_event.is_set():
                     return
-                
+
                 progress_prefix = f"[{current_idx}/{total_count}] " if total_count > 0 else ""
-                    
+
                 if progress_callback:
                     progress_callback(f"Analyzing {os.path.basename(path)}")
-                
+
                 if config.settings.verbose_scanning:
                     print(f"🔍 {progress_prefix}Analyzing (FULL PATH): {path}")
                 elif (processed_count > 0 and processed_count % 10 == 0) or current_idx == total_count:
                     if processed_count > 0:
                         print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
-                
+
                 # 3. Probe using Selected Inspector
                 entry: Optional[MediaAsset] = None
                 scan_start_time = time.time()
@@ -216,29 +224,30 @@ class ScannerManager:
                     scan_duration = time.time() - scan_start_time
                     print(f"❌ {progress_prefix}Inspect failed in {scan_duration:.2f}s for {path}: {e}")
                     entry = None
-                
+
                 if not entry:
                     print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
                 else:
                     parent_dir = os.path.basename(os.path.dirname(path)).lower()
                     is_source_dir = parent_dir in ['source', 'originals', 'raw']
-                    
+
                     if is_source_dir or entry.bitrate_mbps > config.settings.source_bitrate_threshold_mbps:
                         entry.status = "SOURCE"
                     elif entry.bitrate_mbps * 1000 > config.settings.bitrate_threshold_kbps and entry.status == "OK":
                         entry.status = "HIGH"
-                        
+
                     if cached_entry:
                         entry.favorite = cached_entry.favorite
                         entry.vaulted = cached_entry.vaulted
                         entry.tags = cached_entry.tags
-                        if cached_entry.imported_at > 0:
+                        entry.optimized_at = cached_entry.optimized_at
+                        if cached_entry.imported_at and cached_entry.imported_at > 0:
                             entry.imported_at = cached_entry.imported_at
-                    
+
                     entry.mtime = int(file_stat.st_mtime)
                     if entry.imported_at == 0:
                         entry.imported_at = int(time.time())
-                    
+
                     file_hash = hashlib.md5(path.encode('utf-8', 'surrogateescape')).hexdigest()
                     entry.thumb = f"thumb_{file_hash}.jpg"
 
@@ -248,7 +257,7 @@ class ScannerManager:
                             from ..core.video_processor import create_thumbnail
                             duration = entry.duration_sec if hasattr(entry, 'duration_sec') else None
                             await asyncio.to_thread(create_thumbnail, path, duration)
-                        
+
                     # Batching for performance
                     batch_entries.append(entry)
                     if len(batch_entries) >= 10:
@@ -273,7 +282,7 @@ class ScannerManager:
             # Stop Workers
             for _ in range(num_workers):
                 await queue.put(None)
-            
+
             await asyncio.gather(*workers)
             await _flush_batch() # Final flush
 
@@ -296,17 +305,17 @@ class ScannerManager:
 
                 if removed_count > 0:
                     print(f"🗑 Removed {removed_count} files (deleted or now excluded).")
-            
+
             # Save scan timestamp for incremental scanning
             fs_scanner.save_last_scan_time()
-            
+
         except Exception as e:
             print(f"❌ Scan failed: {e}")
         finally:
             self.is_scanning = False
             duration = time.time() - start_time
             print(f"✅ Scan completed in {duration:.2f}s. Processed {processed_count} new/updated files.")
-            
+
         return processed_count
 
     def stop(self):

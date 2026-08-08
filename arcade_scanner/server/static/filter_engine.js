@@ -117,8 +117,8 @@ function setSort(s) {
  */
 function filterAndSort(scrollToTop = false) {
     try {
-        // Duplicates mode has its own rendering logic
-        if (workspaceMode === 'duplicates') {
+        // Duplicates/Candidates modes have their own rendering logic
+        if (workspaceMode === 'duplicates' || workspaceMode === 'candidates') {
             return;
         }
 
@@ -298,7 +298,7 @@ function filterAndSort(scrollToTop = false) {
         if (sizeEl) sizeEl.innerText = formatSize(tSize);
 
         // Update Quick Stats Ribbon
-        if (workspaceMode !== 'optimized' && workspaceMode !== 'duplicates') {
+        if (workspaceMode !== 'optimized' && workspaceMode !== 'duplicates' && workspaceMode !== 'candidates') {
             // Stats are now updated during the filter loop pass
         } else {
             const ribbon = document.getElementById('quickStatsRibbon');
@@ -325,7 +325,7 @@ function _updateQuickStats(stats, workspaceMode) {
     const ribbon = document.getElementById('quickStatsRibbon');
     if (!ribbon) return;
 
-    if (workspaceMode === 'optimized' || workspaceMode === 'duplicates') {
+    if (workspaceMode === 'optimized' || workspaceMode === 'duplicates' || workspaceMode === 'candidates') {
         ribbon.style.display = 'none';
         return;
     }

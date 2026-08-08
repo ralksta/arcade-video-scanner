@@ -17,7 +17,6 @@ Coverage:
 """
 
 import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -25,11 +24,10 @@ import pytest
 from arcade_scanner.security.validators import (
     PathValidator,
     SecurityError,
-    validate_filename,
-    is_safe_directory_traversal,
     is_path_allowed,
+    is_safe_directory_traversal,
+    validate_filename,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

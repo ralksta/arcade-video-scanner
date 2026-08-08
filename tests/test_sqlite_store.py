@@ -288,3 +288,249 @@ class TestQueueClaimIsExclusive:
 
         assert first is not None
         assert second is None
+
+
+# ---------------------------------------------------------------------------
+# Concurrent reads on the shared connection
+#
+# One sqlite3.Connection is shared across server threads
+# (check_same_thread=False). sqlite3.threadsafety is 3 on this build, so the C
+# layer will not crash -- but Python's sqlite3 keeps a per-connection statement
+# cache, and threads running the *same* SQL share one prepared statement. Two
+# threads stepping it at once consume each other's rows.
+#
+# The failure is silent: no exception, just a wrong row count. _MediaCache then
+# holds that result for 30 seconds.
+# ---------------------------------------------------------------------------
+
+class TestConcurrentReads:
+    def _populate(self, store, n):
+        from arcade_scanner.models.video_entry import VideoEntry
+        store.bulk_upsert([
+            VideoEntry(FilePath=f"/fake/clip_{i:05d}.mp4", Size_MB=float(i))
+            for i in range(n)
+        ])
+
+    def test_concurrent_get_all_returns_the_whole_table_every_time(self, store):
+        """Every reader must see all rows, no matter who else is reading."""
+        rows = 800
+        self._populate(store, rows)
+        assert len(store.get_all()) == rows  # baseline, single threaded
+
+        counts = []
+        errors = []
+
+        for _ in range(20):
+            barrier = threading.Barrier(6)
+
+            def reader():
+                barrier.wait()
+                try:
+                    counts.append(len(store.get_all()))
+                except Exception as exc:  # noqa: BLE001 - recording is the point
+                    errors.append(f"{type(exc).__name__}: {exc}")
+
+            threads = [threading.Thread(target=reader) for _ in range(6)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        assert errors == [], f"first failure: {errors[0]}"
+        wrong = [c for c in counts if c != rows]
+        assert not wrong, (
+            f"{len(wrong)} of {len(counts)} concurrent reads returned a wrong row "
+            f"count (saw {sorted(set(wrong))[:5]}, expected {rows})"
+        )
+
+    def test_reads_stay_correct_while_a_writer_runs(self, store):
+        """A write in flight must not make a concurrent read lose rows."""
+        from arcade_scanner.models.video_entry import VideoEntry
+
+        rows = 500
+        self._populate(store, rows)
+
+        counts = []
+        errors = []
+
+        for round_nr in range(20):
+            barrier = threading.Barrier(6)
+
+            def reader():
+                barrier.wait()
+                try:
+                    counts.append(len(store.get_all()))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"read {type(exc).__name__}: {exc}")
+
+            def writer():
+                barrier.wait()
+                try:
+                    store.upsert(VideoEntry(FilePath=f"/fake/clip_{round_nr:05d}.mp4",
+                                            Size_MB=1.0))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"write {type(exc).__name__}: {exc}")
+
+            threads = [threading.Thread(target=reader) for _ in range(5)]
+            threads.append(threading.Thread(target=writer))
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        assert errors == [], f"first failure: {errors[0]}"
+        # The writer only overwrites existing paths, so the count never changes.
+        wrong = [c for c in counts if c != rows]
+        assert not wrong, (
+            f"{len(wrong)} of {len(counts)} reads saw a wrong row count "
+            f"(saw {sorted(set(wrong))[:5]}, expected {rows})"
+        )
+
+    def test_lazy_connection_setup_is_not_raced(self, patch_config):
+        """Several threads hitting a fresh store must share one connection."""
+        from arcade_scanner.database.sqlite_store import SQLiteStore
+
+        fresh = SQLiteStore()
+        seen = []
+        errors = []
+        barrier = threading.Barrier(8)
+
+        def touch():
+            barrier.wait()
+            try:
+                fresh.count()
+                seen.append(id(fresh._conn))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{type(exc).__name__}: {exc}")
+
+        threads = [threading.Thread(target=touch) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == [], f"first failure: {errors[0]}"
+        assert len(set(seen)) == 1, "threads ended up on different connections"
+
+
+# ---------------------------------------------------------------------------
+# Embedding storage (similarity part 1)
+# ---------------------------------------------------------------------------
+
+class TestEmbeddingStorage:
+    def test_tables_exist(self, store):
+        rows = store._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name IN ('embedding_meta', 'frame_embeddings')").fetchall()
+        assert len(rows) == 2
+
+    def test_store_and_read_roundtrip(self, store):
+        store.store_embedding("/lib/a.mp4", "ViT-B-16", 2, 111.0, b"MEAN",
+                              [(0, 1.5, b"F0"), (1, 3.0, b"F1")])
+        state = store.get_embedding_state()
+        assert state == {"/lib/a.mp4": (111.0, "ViT-B-16")}
+        vectors = store.get_mean_vectors()
+        assert vectors == [("/lib/a.mp4", "ViT-B-16", b"MEAN")]
+        frames = store._conn.execute(
+            "SELECT frame_index, ts_sec, vector FROM frame_embeddings "
+            "WHERE file_path = ? ORDER BY frame_index", ("/lib/a.mp4",)).fetchall()
+        assert [(r["frame_index"], r["ts_sec"], r["vector"]) for r in frames] == [
+            (0, 1.5, b"F0"), (1, 3.0, b"F1")]
+
+    def test_restore_replaces_old_rows(self, store):
+        store.store_embedding("/lib/a.mp4", "ViT-B-16", 2, 111.0, b"OLD",
+                              [(0, 1.0, b"X"), (1, 2.0, b"Y"), (2, 3.0, b"Z")])
+        store.store_embedding("/lib/a.mp4", "ViT-L-14", 2, 222.0, b"NEW", [(0, 1.0, b"N")])
+        assert store.get_embedding_state() == {"/lib/a.mp4": (222.0, "ViT-L-14")}
+        assert store.get_mean_vectors() == [("/lib/a.mp4", "ViT-L-14", b"NEW")]
+        count = store._conn.execute(
+            "SELECT COUNT(*) FROM frame_embeddings WHERE file_path = ?",
+            ("/lib/a.mp4",)).fetchone()[0]
+        assert count == 1
+
+    def test_delete_embedding(self, store):
+        store.store_embedding("/lib/a.mp4", "m", 1, 1.0, b"V", [(0, 0.0, b"F")])
+        store.delete_embedding("/lib/a.mp4")
+        assert store.get_embedding_state() == {}
+        count = store._conn.execute("SELECT COUNT(*) FROM frame_embeddings").fetchone()[0]
+        assert count == 0
+
+    def test_prune_removes_orphans(self, store):
+        store.store_embedding("/lib/keep.mp4", "m", 1, 1.0, b"V", [])
+        store.store_embedding("/lib/gone.mp4", "m", 1, 1.0, b"V", [])
+        removed = store.prune_embeddings({"/lib/keep.mp4"})
+        assert removed == 1
+        assert list(store.get_embedding_state()) == ["/lib/keep.mp4"]
+# ---------------------------------------------------------------------------
+# Auto-Tagging bookkeeping
+# ---------------------------------------------------------------------------
+
+class TestAutoTagApplied:
+    def test_roundtrip_and_idempotence(self, store):
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4", "/lib/b.mp4"])
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4"])  # duplicate: no error
+        assert store.get_auto_tag_applied("alice", "r1") == {"/lib/a.mp4", "/lib/b.mp4"}
+
+    def test_scoped_per_user_and_rule(self, store):
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4"])
+        assert store.get_auto_tag_applied("bob", "r1") == set()
+        assert store.get_auto_tag_applied("alice", "r2") == set()
+
+    def test_clear_rule(self, store):
+        store.mark_auto_tag_applied("alice", "r1", ["/lib/a.mp4"])
+        store.mark_auto_tag_applied("alice", "r2", ["/lib/a.mp4"])
+        store.clear_auto_tag_applied("alice", "r1")
+        assert store.get_auto_tag_applied("alice", "r1") == set()
+        assert store.get_auto_tag_applied("alice", "r2") == {"/lib/a.mp4"}
+
+    def test_empty_mark_is_noop(self, store):
+        store.mark_auto_tag_applied("alice", "r1", [])
+        assert store.get_auto_tag_applied("alice", "r1") == set()
+
+
+def test_optimized_at_roundtrip(store):
+    from arcade_scanner.models.video_entry import VideoEntry
+    e = VideoEntry(file_path="/lib/a.mp4", size_mb=10.0, optimized_at=1723000000)
+    store.upsert(e)
+    got = store.get("/lib/a.mp4")
+    assert got is not None
+    assert got.optimized_at == 1723000000
+
+
+def test_optimized_at_defaults_to_zero(store):
+    from arcade_scanner.models.video_entry import VideoEntry
+    store.upsert(VideoEntry(file_path="/lib/b.mp4", size_mb=10.0))
+    got = store.get("/lib/b.mp4")
+    assert got is not None
+    assert got.optimized_at == 0
+
+
+def test_get_active_queue_paths(store):
+    from arcade_scanner.models.video_entry import VideoEntry
+    store.upsert(VideoEntry(file_path="/lib/q.mp4", size_mb=10.0))
+    job_id = store.queue_encode("/lib/q.mp4", size_bytes=1, target_codec="hevc")
+    assert job_id is not None
+    assert store.get_active_queue_paths() == {"/lib/q.mp4"}
+    store.update_job_status(job_id, "done")
+    assert store.get_active_queue_paths() == set()
+
+
+def test_optimized_at_migration_on_existing_db(patch_config, tmp_path):
+    """A pre-existing DB without the column gets it via ALTER TABLE on open."""
+    import sqlite3
+
+    from arcade_scanner.database.sqlite_store import _COLUMNS, SQLiteStore
+    db_file = tmp_path / "media_library.db"
+    legacy_cols = ", ".join(
+        f"{name} {typedef}" for name, typedef in _COLUMNS if name != "optimized_at")
+    conn = sqlite3.connect(db_file)
+    conn.execute(f"CREATE TABLE media ({legacy_cols})")
+    conn.execute("INSERT INTO media (file_path, size_mb) VALUES ('/lib/old.mp4', 5.0)")
+    conn.commit()
+    conn.close()
+
+    s = SQLiteStore()
+    s._ensure_connection()
+    entry = s.get("/lib/old.mp4")
+    assert entry is not None
+    assert entry.optimized_at == 0

@@ -18,17 +18,16 @@ import os
 
 from arcade_scanner.server.response_helpers import send_json
 
-
 # ---------------------------------------------------------------------------
 # Lazy singletons (imported inside functions to avoid circular imports)
 # ---------------------------------------------------------------------------
 
 def _get_singletons():
     from arcade_scanner.server.api_handler import (
-        config,
-        user_db,
-        report_debouncer,
         MAX_REQUEST_SIZE,
+        config,
+        report_debouncer,
+        user_db,
     )
     return config, user_db, report_debouncer, MAX_REQUEST_SIZE
 
@@ -337,6 +336,7 @@ def handle_post_restore(handler) -> None:
 def handle_post_remove_photos(handler) -> None:
     """Remove all photo entries from the DB (called after user confirms the modal)."""
     import json
+
     from arcade_scanner.database.sqlite_store import db
 
     user_name = handler.get_current_user()

@@ -6,15 +6,16 @@ the lazy-import helpers shared with other route modules.
 from __future__ import annotations
 
 import os
-import sys
 import shlex
 import subprocess
+import sys
+import time
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse, unquote
+from urllib.parse import parse_qs, unquote, urlparse
 
-from arcade_scanner.config import config, IS_WIN
+from arcade_scanner.config import IS_WIN, config
 from arcade_scanner.database import db, user_db
-from arcade_scanner.security import sanitize_path, is_path_allowed, SecurityError
+from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 
 # ---------------------------------------------------------------------------
 # Lazy imports – avoid circular deps with api_handler module-level singletons
@@ -94,6 +95,16 @@ def handle_get(handler) -> bool:
     # /api/rescan
     if path == "/api/rescan":
         _handle_rescan(handler)
+        return True
+
+    # /api/scan/status
+    if path == "/api/scan/status":
+        _handle_scan_status(handler)
+        return True
+
+    # /api/scan/stop
+    if path == "/api/scan/stop":
+        _handle_scan_stop(handler)
         return True
 
     # /api/backup
@@ -197,17 +208,20 @@ def _handle_mark_optimized(handler) -> None:
             handler.send_error(403, "Forbidden - Path not in scan directories")
             return
 
+        now = int(time.time())
         entry = db.get(abs_path)
         if entry:
             entry.status = "OK"
+            entry.optimized_at = now
         else:
-            size_mb = 0
+            size_mb = 0.0
             try:
                 if os.path.exists(abs_path):
                     size_mb = os.path.getsize(abs_path) / (1024 * 1024)
             except OSError as e:
                 print(f"⚠️ Could not stat file {abs_path}: {e}")
-            entry = VideoEntry(FilePath=abs_path, Size_MB=size_mb, Status="OK")
+            entry = VideoEntry(file_path=abs_path, size_mb=size_mb, Status="OK",
+                               optimized_at=now)
         db.upsert(entry)
         db.save()
         _get_media_cache().invalidate()
@@ -284,7 +298,9 @@ def _handle_compress(handler) -> None:
 
         if IS_WIN:
             print(f"🚀 Launching Optimizer (Win): {' '.join(cmd_parts)}")
-            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            # CREATE_NEW_CONSOLE only exists in subprocess on Windows; this branch
+            # is guarded by IS_WIN, but mypy checks against the current (non-Win) stubs.
+            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)  # type: ignore[attr-defined]
         else:
             safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
             print(f"🚀 Launching Optimizer (Mac): {safe_cmd}")
@@ -317,8 +333,9 @@ def _handle_keep_optimized(handler) -> None:
 
     try:
         import shutil
-        from arcade_scanner.models.video_entry import VideoEntry # lazy
-        
+
+        from arcade_scanner.models.video_entry import VideoEntry  # lazy
+
         params = parse_qs(urlparse(handler.path).query)
         original_path = unquote(params.get("original", [None])[0])
         optimized_path = unquote(params.get("optimized", [None])[0])
@@ -337,14 +354,14 @@ def _handle_keep_optimized(handler) -> None:
                     # REVIEW MODE: Restoring to original path on disk
                     final_dest = entry_orig.original_path
                     print(f"🚀 Review Mode Keep: Moving {opt_abs} to {final_dest}")
-                    
+
                     os.makedirs(os.path.dirname(final_dest), exist_ok=True)
                     shutil.move(opt_abs, final_dest)
-                    
+
                     # Cleanup review versions
                     if os.path.exists(orig_abs):
                         os.remove(orig_abs)
-                    
+
                     # DB Update: Use optimized metadata but destination path
                     entry_opt = db.get(opt_abs)
                     if entry_opt:
@@ -353,10 +370,10 @@ def _handle_keep_optimized(handler) -> None:
                         opt_dict["Status"] = "OK"
                         opt_dict["OriginalPath"] = None
                         db.upsert(VideoEntry(**opt_dict))
-                    
+
                     db.remove(opt_abs)
                     db.remove(orig_abs)
-                    
+
                     # Cleanup empty review directory
                     try:
                         job_dir = os.path.dirname(orig_abs)
@@ -399,15 +416,16 @@ def _handle_discard_optimized(handler) -> None:
 
     try:
         import shutil
-        from arcade_scanner.models.video_entry import VideoEntry # lazy
-        
+
+        from arcade_scanner.models.video_entry import VideoEntry  # lazy
+
         params = parse_qs(urlparse(handler.path).query)
         path = unquote(params.get("path", [None])[0])
 
         if path:
             abs_path = os.path.abspath(path)
-            
-            # Review Mode Check: If this is an optimized file in a review folder, 
+
+            # Review Mode Check: If this is an optimized file in a review folder,
             # we must also restore the original file.
             entry = db.get(abs_path)
             if entry and entry.status == "REVIEW":
@@ -418,27 +436,29 @@ def _handle_discard_optimized(handler) -> None:
                     if v.status == "REVIEW" and os.path.dirname(v.file_path) == job_dir and "_original" in v.file_path:
                         orig_file = v
                         break
-                
+
                 if orig_file and orig_file.original_path:
                     print(f"⏪ Review Mode Discard: Restoring original to {orig_file.original_path}")
                     shutil.move(orig_file.file_path, orig_file.original_path)
-                    
+
                     # Restore DB entry
                     orig_dict = orig_file.model_dump(by_alias=True)
                     orig_dict["FilePath"] = orig_file.original_path
                     orig_dict["Status"] = "OK"
                     orig_dict["OriginalPath"] = None
                     db.upsert(VideoEntry(**orig_dict))
-                    
+
                     # Cleanup
-                    if os.path.exists(abs_path): os.remove(abs_path)
+                    if os.path.exists(abs_path):
+                        os.remove(abs_path)
                     db.remove(abs_path)
                     db.remove(orig_file.file_path)
-                    
+
                     try:
                         if os.path.exists(job_dir) and not os.listdir(job_dir):
                             os.rmdir(job_dir)
-                    except Exception: pass
+                    except Exception:
+                        pass
                 else:
                     # Just discard this file
                     if os.path.exists(abs_path):
@@ -449,7 +469,7 @@ def _handle_discard_optimized(handler) -> None:
                 if os.path.exists(abs_path):
                     os.remove(abs_path)
                     db.remove(abs_path)
-            
+
             db.save()
             _get_media_cache().invalidate()
 
@@ -622,7 +642,8 @@ def _handle_batch_compress(handler) -> None:
         ]
 
         if IS_WIN:
-            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            # CREATE_NEW_CONSOLE only exists in subprocess on Windows; guarded by IS_WIN.
+            subprocess.Popen(cmd_parts, creationflags=subprocess.CREATE_NEW_CONSOLE)  # type: ignore[attr-defined]
         else:
             safe_cmd = ' '.join(shlex.quote(str(p)) for p in cmd_parts)
             print(f"🚀 Launching Batch Controller: {len(validated_paths)} files")
@@ -637,43 +658,101 @@ def _handle_batch_compress(handler) -> None:
         handler.send_error(500)
 
 
-def _handle_rescan(handler) -> None:
+def _run_rescan_in_background(port: int) -> None:
+    """Scan + auto-tagging + report rebuild — body of the rescan thread."""
     import asyncio
-    import json
+
     from arcade_scanner.scanner import get_scanner_manager
     from arcade_scanner.templates.dashboard_template import generate_html_report
+
+    try:
+        mgr = get_scanner_manager()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(mgr.run_scan())
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+        try:
+            # Auto-Tagging-Hook — landet mit PR #34; bis dahin fehlt das Modul
+            from arcade_scanner.core.auto_tagger import run_post_scan_auto_tagging
+            run_post_scan_auto_tagging()
+        except ImportError:
+            pass
+
+        media_cache = _get_media_cache()
+        results = [e.model_dump(by_alias=True) for e in media_cache.get()]
+        media_cache.invalidate()
+        generate_html_report(results, config.report_file, server_port=port)
+        print("✅ Rescan complete.")
+    except Exception as e:
+        print(f"❌ Rescan failed: {e}")
+
+
+def _handle_rescan(handler) -> None:
+    """Start a background rescan (202) — no longer blocks its request thread,
+    which makes /api/scan/stop able to reach a running scan (ROADMAP item)."""
+    import json
+    import threading
+
+    from arcade_scanner.scanner import get_scanner_manager
 
     user_name = handler.get_current_user()
     if not user_name:
         handler.send_error(401, "Unauthorized")
         return
 
+    mgr = get_scanner_manager()
+    if mgr.is_scanning:
+        handler.send_error(409, "Scan already in progress")
+        return
+
     print("🔄 Scan requested via API...")
-    try:
-        mgr = get_scanner_manager()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            new_count = loop.run_until_complete(mgr.run_scan())
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+    port = handler.server.server_address[1]
+    t = threading.Thread(target=_run_rescan_in_background, args=(port,), daemon=True)
+    t.start()
 
-        media_cache = _get_media_cache()
-        port = handler.server.server_address[1]
-        results = [e.model_dump(by_alias=True) for e in media_cache.get()]
-        media_cache.invalidate()
-        generate_html_report(results, config.report_file, server_port=port)
+    handler.send_response(202)
+    handler.send_header("Content-type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps({"status": "started"}).encode())
 
-        handler.send_response(200)
-        handler.send_header("Content-type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps({"status": "complete", "count": new_count}).encode())
-        print("✅ Rescan complete.")
 
-    except Exception as e:
-        print(f"❌ Rescan failed: {e}")
-        handler.send_error(500, str(e))
+def _handle_scan_status(handler) -> None:
+    import json
+
+    from arcade_scanner.scanner import get_scanner_manager
+
+    if not handler.get_current_user():
+        handler.send_error(401, "Unauthorized")
+        return
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps(
+        {"is_scanning": bool(get_scanner_manager().is_scanning)}).encode())
+
+
+def _handle_scan_stop(handler) -> None:
+    import json
+
+    from arcade_scanner.scanner import get_scanner_manager
+
+    if not handler.get_current_user():
+        handler.send_error(401, "Unauthorized")
+        return
+    mgr = get_scanner_manager()
+    if not mgr.is_scanning:
+        handler.send_error(409, "No scan running")
+        return
+    mgr.stop()
+    print("⏹ Scan stop requested via API.")
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps({"status": "stopping"}).encode())
 
 
 def _handle_backup(handler) -> None:

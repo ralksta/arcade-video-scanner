@@ -1,15 +1,16 @@
 #!/Users/ralfo/git/arcade-video-scanner/.venv/bin/python3
 import argparse
-import sys
-import os
 import binascii
 import getpass
+import os
+import sys
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from arcade_scanner.database import user_db
 from arcade_scanner.models.user import User
+
 
 def list_users(args):
     users = user_db.get_all_users()
@@ -42,21 +43,21 @@ def add_user(args):
 
     salt = os.urandom(16)
     pwd_hash = user_db.hash_password(password, salt)
-    
+
     new_user = User(
         username=username,
         password_hash=binascii.hexlify(pwd_hash).decode('ascii'),
         salt=binascii.hexlify(salt).decode('ascii'),
         is_admin=args.admin
     )
-    
+
     user_db.add_user(new_user)
     print(f"✅ User '{username}' created successfully.")
 
 def change_password(args):
     username = args.username.strip()
     user = user_db.get_user(username)
-    
+
     if not user:
         print(f"❌ User '{username}' not found.")
         return
@@ -71,10 +72,10 @@ def change_password(args):
 
     salt = os.urandom(16)
     pwd_hash = user_db.hash_password(password, salt)
-    
+
     user.password_hash = binascii.hexlify(pwd_hash).decode('ascii')
     user.salt = binascii.hexlify(salt).decode('ascii')
-    
+
     user_db.add_user(user)
     print(f"✅ Password for '{username}' updated successfully.")
 

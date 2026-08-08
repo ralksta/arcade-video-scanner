@@ -1,37 +1,39 @@
+import json
 import os
 import socket
 import time
-import json
+
 from arcade_scanner.config import config
-from arcade_scanner.templates.theme import CURRENT_THEME, THEMES
+from arcade_scanner.templates.components import (
+    BATCH_BAR_COMPONENT,
+    CINEMA_MODAL_COMPONENT,
+    COLLECTION_MODAL_COMPONENT,
+    DUPLICATE_CHECKER_MODAL_COMPONENT,
+    FILTER_BAR_COMPONENT,
+    FILTER_PANEL_COMPONENT,
+    FOLDER_BROWSER_LEGEND_COMPONENT,
+    FOLDER_SIDEBAR_COMPONENT,
+    GIF_EXPORT_PANEL_COMPONENT,
+    HIDDEN_PATH_MODAL_COMPONENT,
+    LIST_VIEW_COMPONENT,
+    OPTIMIZE_PANEL_COMPONENT,
+    SAVED_VIEWS_COMPONENT,
+    SETTINGS_MODAL_COMPONENT,
+    SETUP_WIZARD_COMPONENT,
+    TAG_MANAGER_MODAL_COMPONENT,
+    TREEMAP_LEGEND_COMPONENT,
+)
+from arcade_scanner.templates.theme import CURRENT_THEME
 from arcade_scanner.templates.ui_components import (
     render_base_layout,
     render_header,
-    render_navigation
+    render_navigation,
 )
-from arcade_scanner.templates.components import (
-    FILTER_BAR_COMPONENT,
-    FILTER_PANEL_COMPONENT,
-    TAG_MANAGER_MODAL_COMPONENT,
-    COLLECTION_MODAL_COMPONENT,
-    HIDDEN_PATH_MODAL_COMPONENT,
-    SETUP_WIZARD_COMPONENT,
-    LIST_VIEW_COMPONENT,
-    OPTIMIZE_PANEL_COMPONENT,
-    GIF_EXPORT_PANEL_COMPONENT,
-    SETTINGS_MODAL_COMPONENT,
-    CINEMA_MODAL_COMPONENT,
-    DUPLICATE_CHECKER_MODAL_COMPONENT,
-    TREEMAP_LEGEND_COMPONENT,
-    FOLDER_BROWSER_LEGEND_COMPONENT,
-    BATCH_BAR_COMPONENT,
-    FOLDER_SIDEBAR_COMPONENT,
-    SAVED_VIEWS_COMPONENT
-)
+
 
 def generate_html_report(results, report_file, server_port=8000):
     total_mb = sum(r["Size_MB"] for r in results)
-    
+
     # Aggregate Folder Data
     folders_data = {}
     for r in results:
@@ -40,10 +42,10 @@ def generate_html_report(results, report_file, server_port=8000):
             folders_data[fdir] = {"count": 0, "size_mb": 0}
         folders_data[fdir]["count"] += 1
         folders_data[fdir]["size_mb"] += r["Size_MB"]
-    
+
     # Prepare JSON Data
     folders_json = json.dumps(folders_data)
-    
+
     # Strip user-specific data from static dump for multi-user support
     # (The frontend will hydrate this via /api/user/data)
     clean_results = []
@@ -56,17 +58,15 @@ def generate_html_report(results, report_file, server_port=8000):
         r_clean["hidden"] = False # aliased from vaulted
         r_clean["tags"] = []
         clean_results.append(r_clean)
-        
+
     user_settings_json = json.dumps(config.settings.model_dump())
-    
+
     # Logic for enabled state: Must be installed AND enabled in settings
     opt_avail_str = 'true' if config.optimizer_available else 'false'
     opt_enabled_str = 'true' if (config.optimizer_available and config.settings.enable_optimizer) else 'false'
-    
-    # Determine Active Theme
-    active_theme_name = config.settings.theme
-    active_theme = THEMES.get(active_theme_name, THEMES['arcade'])
-    
+
+    active_theme = CURRENT_THEME
+
     # 1. Prepare Header (Themed)
     header_html = render_header(
         active_theme,
@@ -74,7 +74,7 @@ def generate_html_report(results, report_file, server_port=8000):
         count=len(results),
         size_gb=f"{total_mb/1024:.1f}"
     )
-    
+
     # 2. Prepare Cinema Modal (Conditional Optimize Button)
     opt_btn_html = ""
     if config.optimizer_available and config.settings.enable_optimizer:
@@ -91,24 +91,24 @@ def generate_html_report(results, report_file, server_port=8000):
         """
 
     cinema_modal_html = CINEMA_MODAL_COMPONENT.format(opt_btn=opt_btn_html)
-    
+
     # 3. Assemble Main Content
     # Render Navigation using Theme
     nav_html = render_navigation(active_theme)
-    
+
     main_body_html = f"""
     {nav_html}
 
     {FOLDER_SIDEBAR_COMPONENT}
-    
+
     <!-- Desktop: Main Content Area (offset by sidebar width) -->
-    <div class="flex-1 flex flex-col md:ml-64 min-h-screen bg-arcade-bg relative overflow-x-hidden max-w-full">
+    <div class="flex-1 flex flex-col md:ml-[200px] min-h-screen bg-bg relative overflow-x-hidden max-w-full">
         {header_html}
-        
+
         {FILTER_BAR_COMPONENT}
 
         {SAVED_VIEWS_COMPONENT}
-        
+
         {TREEMAP_LEGEND_COMPONENT}
 
         {FOLDER_BROWSER_LEGEND_COMPONENT}
@@ -125,37 +125,37 @@ def generate_html_report(results, report_file, server_port=8000):
 
         <!-- Main Content Container with safe area padding -->
         <main class="flex-1 p-2 md:p-6 pb-[80px] md:pb-6 relative w-full overflow-x-hidden" id="mainContentArea">
-            
+
             <!-- Video Grid -->
             <div id="videoGrid" class="responsive-grid transition-opacity duration-300 overflow-hidden">
                 <!-- Skeleton cards shown while data loads -->
                 {''.join(['''
-                <div class="group relative w-full bg-arcade-bg rounded-xl overflow-hidden border border-black/8 dark:border-white/5 dark:bg-[#14141c] flex flex-col skeleton-card" aria-hidden="true">
-                    <div class="aspect-video bg-black/5 dark:bg-white/5 animate-pulse rounded-t-xl"></div>
-                    <div class="p-3 flex flex-col gap-2">
-                        <div class="h-3 bg-black/8 dark:bg-white/5 animate-pulse rounded w-3/4"></div>
-                        <div class="h-2 bg-black/6 dark:bg-white/5 animate-pulse rounded w-1/2"></div>
-                        <div class="h-0.5 bg-white/5 animate-pulse rounded w-full mt-2"></div>
+                <div class="group relative w-full bg-card rounded-ds-md overflow-hidden border border-line/60 flex flex-col skeleton-card" aria-hidden="true">
+                    <div class="aspect-video bg-white/5 animate-pulse"></div>
+                    <div class="px-[11px] py-2.5 flex flex-col gap-2">
+                        <div class="h-3 bg-white/5 animate-pulse rounded w-3/4"></div>
+                        <div class="h-2 bg-white/5 animate-pulse rounded w-1/2"></div>
+                        <div class="h-[3px] bg-white/5 animate-pulse rounded w-full mt-2"></div>
                     </div>
                 </div>''' for _ in range(8)])}
             </div>
-            
+
             <!-- List View -->
             {LIST_VIEW_COMPONENT}
-            
+
             <!-- Treemap Container -->
             <div id="treemapContainer" class="hidden h-[70vh] w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl"></div>
-            
+
             <!-- Loading Spinner -->
             <div id="loadingSentinel" class="h-24 flex items-center justify-center opacity-0 transition-opacity">
                 <span class="material-icons animate-spin text-arcade-cyan text-3xl">refresh</span>
             </div>
-            
+
         </main>
 
-        
+
     </div>
-    
+
     <!-- Modals & Overlays -->
     {cinema_modal_html}
     {DUPLICATE_CHECKER_MODAL_COMPONENT}
@@ -168,11 +168,11 @@ def generate_html_report(results, report_file, server_port=8000):
     {SETUP_WIZARD_COMPONENT}
     {HIDDEN_PATH_MODAL_COMPONENT}
     {BATCH_BAR_COMPONENT}
-    
+
     <!-- Hidden frame for form submissions if needed -->
     <iframe name='h_frame' style='display:none;'></iframe>
     """
-    
+
     # 4. Prepare Scripts
     scripts_html = f"""
         window.SERVER_PORT = {server_port};
@@ -182,17 +182,14 @@ def generate_html_report(results, report_file, server_port=8000):
         window.OPTIMIZER_AVAILABLE = {opt_avail_str};
         window.ENABLE_OPTIMIZER = {opt_enabled_str};
     """
-    
+
     full_scripts_block = f"""
     <script>
     {scripts_html}
     </script>
     """
-    
+
     external_scripts = f"""
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="/static/styles.css?v={int(time.time())}">
     <link rel="stylesheet" href="/static/timeline_scrubber.css?v={int(time.time())}">
     <script src="/static/store.js?v={int(time.time())}"></script>
@@ -202,7 +199,9 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
     <script src="/static/treemap.js?v={int(time.time())}"></script>
     <script src="/static/settings.js?v={int(time.time())}"></script>
+    <script src="/static/autotag.js?v={int(time.time())}"></script>
     <script src="/static/duplicates.js?v={int(time.time())}"></script>
+    <script src="/static/candidates.js?v={int(time.time())}"></script>
     <script src="/static/filter_engine.js?v={int(time.time())}"></script>
     <script src="/static/workspace.js?v={int(time.time())}"></script>
     <script src="/static/cards.js?v={int(time.time())}"></script>
@@ -217,13 +216,12 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/collections.js?v={int(time.time())}"></script>
     <script src="/static/context_menu.js?v={int(time.time())}"></script>
     """
-    
+
     # Combine content using Theme-aware Base Layout
     final_html = render_base_layout(
         active_theme,
         content=main_body_html + external_scripts,
         scripts=full_scripts_block,
-        active_theme_name=active_theme.name
     )
 
     with open(report_file, "w", encoding="utf-8") as f:

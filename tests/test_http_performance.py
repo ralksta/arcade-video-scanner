@@ -11,11 +11,9 @@ Contract tests for the HTTP performance layer:
    kept-alive connection makes the browser hang forever — this is the
    invariant that makes protocol_version = "HTTP/1.1" safe.
 """
+import email.utils
 import gzip
 import io
-import email.utils
-
-import pytest
 
 from arcade_scanner.server.response_helpers import (
     GZIP_MIN_SIZE,

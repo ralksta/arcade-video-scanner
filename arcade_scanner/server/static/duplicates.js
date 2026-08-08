@@ -294,7 +294,7 @@ function renderDuplicatesView() {
                                     ` : ''}
                                     
                                     <!-- Thumbnail -->
-                                    <div class="relative aspect-video bg-black cursor-pointer group" onclick="openCinema(this)" data-path="${file.path}">
+                                    <div class="relative aspect-video bg-black cursor-pointer group" onclick="openCinema(this)" data-path="${escapeHtml(file.path)}">
                                         <img src="${thumbSrc}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
@@ -302,12 +302,12 @@ function renderDuplicatesView() {
                                     </div>
                                     
                                     <div class="p-3 flex flex-col gap-2">
-                                        <div class="text-sm font-medium text-gray-200 truncate" title="${file.path}">
-                                            ${file.path.split(/[\\/]/).pop()}
+                                        <div class="text-sm font-medium text-gray-200 truncate" title="${escapeHtml(file.path)}">
+                                            ${escapeHtml(file.path.split(/[\\/]/).pop())}
                                         </div>
-                                        
-                                        <div class="text-xs text-gray-500 truncate" title="${file.path}">
-                                            ${file.path.split(/[\\/]/).slice(-3, -1).join('/')}
+
+                                        <div class="text-xs text-gray-500 truncate" title="${escapeHtml(file.path)}">
+                                            ${escapeHtml(file.path.split(/[\\/]/).slice(-3, -1).join('/'))}
                                         </div>
                                         
                                         <div class="flex items-center gap-2 text-[10px] text-gray-400 font-mono flex-wrap">
@@ -319,7 +319,7 @@ function renderDuplicatesView() {
                                         
                                         ${window.IS_LOCAL_ACCESS ? `
                                         <!-- Reveal in Finder Button (only on local access) -->
-                                        <button onclick="revealInFinder('${file.path.replace(/'/g, "\\'")}')"
+                                        <button onclick="revealInFinder('${escapeHtml(file.path.replace(/'/g, "\\'"))}')"
                                                 class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">folder_open</span>
                                             Reveal in Finder
@@ -327,7 +327,7 @@ function renderDuplicatesView() {
                                         ` : ''}
                                     </div>    
                                         <!-- Delete button for all files -->
-                                        <button onclick="deleteDuplicate('${encodeURIComponent(file.path)}')" 
+                                        <button onclick="deleteDuplicate(${idx}, ${fIdx})"
                                                 class="w-full py-2 rounded-lg ${isKeep ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 border border-orange-500/30' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30'} text-xs font-bold transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">delete</span>
                                             ${isKeep ? 'Delete (Recommended)' : 'Delete'}
@@ -344,11 +344,26 @@ function renderDuplicatesView() {
 }
 
 /**
- * Delete a duplicate file
- * @param {string} encodedPath - URL-encoded file path
+ * Delete a duplicate file.
+ *
+ * Adressiert wird über die Position in duplicateData, nicht über den Pfad:
+ * encodeURIComponent wirft auf Dateinamen mit ungültigen UTF-8-Bytes
+ * `URIError: URI malformed` (Python liefert sie via surrogateescape als
+ * einzelne Surrogate \udc80–\udcff), und weil der Aufruf in der Render-Schleife
+ * stand, riss eine einzige solche Datei die ganze Duplikat-Ansicht mit.
+ *
+ * @param {number} groupIdx - Index der Gruppe in duplicateData.groups
+ * @param {number} fileIdx  - Index der Datei in group.files
  */
-async function deleteDuplicate(encodedPath) {
-    const path = decodeURIComponent(encodedPath);
+async function deleteDuplicate(groupIdx, fileIdx) {
+    // Index sofort auflösen, bevor irgendetwas awaited wird: unten mutiert die
+    // Funktion duplicateData. Ein zweiter Klick während des laufenden Requests
+    // würde seinen Index sonst gegen bereits verschobene Daten auflösen und die
+    // falsche Datei löschen. Ab hier zählt nur noch der Pfad.
+    const file = duplicateData?.groups?.[groupIdx]?.files?.[fileIdx];
+    if (!file) return;
+
+    const path = file.path;
     const filename = path.split(/[\\/]/).pop();
 
     if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) {

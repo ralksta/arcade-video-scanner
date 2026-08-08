@@ -1,10 +1,11 @@
-import os
-import sys
 import json
+import os
 import socket
-from typing import List, Dict, Any, Optional
-from pydantic import Field, ConfigDict
-from pydantic_settings import BaseSettings
+import sys
+from typing import Any, Dict, List
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ==============================================================================
 # CONSTANTS & PATHS
@@ -102,8 +103,6 @@ DEFAULT_SETTINGS_JSON = {
     "enable_optimizer": True,
     "_comment_tags": "User-created tags for video categorization.",
     "available_tags": [],
-    "_comment_theme": "Application theme (arcade, professional, candy).",
-    "theme": "arcade",
     "_comment_sensitive_dirs": "List of paths considered sensitive (NSFW) to be hidden in safe mode.",
     "sensitive_dirs": [],
     "_comment_sensitive_tags": "List of tags considered sensitive (NSFW) to be hidden in safe mode.",
@@ -150,7 +149,6 @@ class AppSettings(BaseSettings):
     enable_optimizer: bool = Field(True)
     encoding_preset: str = Field("balanced")  # fast | balanced | best
 
-    theme: str = Field("arcade")
     enable_image_scanning: bool = Field(False)
     ffmpeg_path: str = Field("")
     ffprobe_path: str = Field("")
@@ -165,7 +163,7 @@ class AppSettings(BaseSettings):
     max_concurrent_image_scans: int = Field(5)
     enable_resource_watchdog: bool = Field(True)
 
-    model_config = ConfigDict(
+    model_config = SettingsConfigDict(
         env_prefix="ARCADE_",
         extra="ignore",
     )
@@ -186,7 +184,7 @@ class ConfigManager:
 
     def _load_settings(self) -> AppSettings:
         # Load from JSON if exists
-        file_data = {}
+        file_data: Dict[str, Any] = {}
         if os.path.exists(SETTINGS_FILE):
             try:
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -268,10 +266,10 @@ class ConfigManager:
         The scanner needs to know EVERYTHING it should watch.
         """
         targets = set()
-        
+
         # 1. Add Default Home if needed
-        # targets.add(HOME_DIR) 
-        
+        # targets.add(HOME_DIR)
+
         # 2. Add User Targets
         # We need to import user_db here to avoid circular init issues at top level if possible
         # Or better, verify if user_db is ready.
@@ -283,10 +281,10 @@ class ConfigManager:
                         targets.add(t)
         except ImportError:
             pass # Startup case
-            
+
         if not targets:
             targets.add(HOME_DIR)
-            
+
         return list(targets)
 
     @property
@@ -295,7 +293,7 @@ class ConfigManager:
         Returns unique exclude paths from ALL users + defaults.
         """
         excludes = set(self.default_exclusions) # Start with defaults!
-        
+
         try:
             from arcade_scanner.database.user_store import user_db
             for user in user_db.get_all_users():
@@ -304,7 +302,7 @@ class ConfigManager:
                         excludes.add(e)
         except ImportError:
             pass
-            
+
         return list(excludes)
 
     @property

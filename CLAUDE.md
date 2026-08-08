@@ -55,7 +55,7 @@ Some tests require `node` on PATH (JS syntax/contract tests shell out to `node -
 
 When you add/rename an element ID or a JS global, update both sides or these tests fail.
 
-**Data layer.** `arcade_scanner/database/`: `sqlite_store.py` is the main store (`db`), `user_store.py` holds accounts/sessions (PBKDF2), `json_store.py` is the legacy format migrated at startup. All data lives in `arcade_data/` (settings.json, SQLite DB, thumbnails). Multi-user isolation: the static HTML dump is stripped of per-user fields (favorite, hidden/vaulted, tags); the frontend hydrates them via `/api/user/data`.
+**Data layer.** `arcade_scanner/database/`: `sqlite_store.py` is the main store (`db`), `user_store.py` holds accounts/sessions (PBKDF2). A legacy `video_cache.json` is imported once at startup by `SQLiteStore._migrate_from_json` if present. All data lives in `arcade_data/` (settings.json, SQLite DB, thumbnails). Multi-user isolation: the static HTML dump is stripped of per-user fields (favorite, hidden/vaulted, tags); the frontend hydrates them via `/api/user/data`.
 
 **Scanner pipeline.** `arcade_scanner/scanner/` — `manager.py` orchestrates, `file_system.py` walks directories with exclusions, `media_probe.py` shells out to ffprobe, `video_inspector.py`/`image_inspector.py` build entries. Startup order in `main.py` matters: cached DB loads and the server starts *first* so the dashboard is usable immediately; scanning runs after.
 

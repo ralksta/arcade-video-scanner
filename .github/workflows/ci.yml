@@ -1,0 +1,21 @@
+name: CI
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ci:
+    uses: ralksta/ci-workflows/.github/workflows/python-ci.yml@main
+    with:
+      install: python -m pip install --upgrade pip && pip install -r requirements.txt && pip install -e ".[dev]"
+      # ruff is now clean (PR #30 took it 316 -> 0) -> blocking to prevent regression.
+      # mypy is now clean (131 -> 0) -> blocking to prevent regression.
+      lint: ruff check .
+      lint-blocking: true
+      typecheck: mypy arcade_scanner
+      typecheck-blocking: true
+      test: pytest

@@ -1,8 +1,10 @@
-import json
 import asyncio
-from typing import Dict, Any, Optional
-from ..models.video_entry import VideoEntry
+import json
+from typing import Any, Dict, Optional
+
 from ..config import config
+from ..models.video_entry import VideoEntry
+
 
 def _as_float(value, default: float = 0.0) -> float:
     """Parse an ffprobe number, tolerating the "N/A" it emits for unknowns."""
@@ -78,13 +80,13 @@ class MediaProbe:
         """
         try:
             raw_data = await self._run_ffprobe(filepath)
-            
+
             if not raw_data or "streams" not in raw_data or not raw_data["streams"]:
                 return None
             # Find video and audio streams
-            video_stream = next((s for s in raw_data["streams"] if s.get("codec_type") == "video"), {})
-            audio_stream = next((s for s in raw_data["streams"] if s.get("codec_type") == "audio"), {})
-            
+            video_stream: Dict[str, Any] = next((s for s in raw_data["streams"] if s.get("codec_type") == "video"), {})
+            audio_stream: Dict[str, Any] = next((s for s in raw_data["streams"] if s.get("codec_type") == "audio"), {})
+
             fmt = raw_data.get("format", {})
 
             # Safe extraction with defaults. ffprobe writes "N/A" for values it
@@ -117,7 +119,7 @@ class MediaProbe:
             # Audio Details
             audio_codec = audio_stream.get("codec_name", "unknown")
             audio_channels = _as_int(audio_stream.get("channels", 0))
-            
+
             # Container
             container = fmt.get("format_name", "unknown")
 
@@ -125,11 +127,11 @@ class MediaProbe:
             # We will refine this later with config injection, but for now defaults.
             # We rely on ffprobe returning valid metadata as the health check.
             # Deep decoding pass was removed to optimize scan speed.
-            status = "OK" 
-            
+            status = "OK"
+
             return VideoEntry(
-                FilePath=filepath,
-                Size_MB=round(size_mb, 2),
+                file_path=filepath,
+                size_mb=round(size_mb, 2),
                 Bitrate_Mbps=round(bitrate_bps / 1_000_000, 2),
                 Status=status,
                 codec=video_codec,
@@ -144,7 +146,7 @@ class MediaProbe:
                 PixelFormat=pixel_format,
                 FrameRate=round(fps, 2)
             )
-            
+
         except Exception:
             return None
 
