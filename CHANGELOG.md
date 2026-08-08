@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- **Duplikat-Scan: veraltete perceptual Hashes** (`.phash_cache.json`): Der Cache
+  war nur nach Dateipfad indiziert, ohne jede Angabe, aus welchem Dateizustand
+  der Hash stammt. Wurde ein Bild an Ort und Stelle geändert (Neu-Export,
+  Rotation, Rsync über denselben Pfad), lieferte der Cache weiterhin den alten
+  Hash — die Datei landete in einer Duplikatgruppe, die es nicht mehr gab, und
+  genau diese Gruppen bietet die UI zum Löschen an. Cache-Einträge tragen jetzt
+  `mtime_ns` + Dateigröße und werden bei Abweichung neu berechnet (Format v2).
+  Alte v1-Caches werden beim ersten Laden übernommen und mit dem aktuellen
+  Dateizustand gestempelt, statt eine komplette Neuberechnung zu erzwingen.
+  Das Schreiben läuft jetzt über write-then-rename, damit ein Absturz mitten im
+  Speichern nicht den ganzen Cache als kaputtes JSON verwirft.
 - **Duplikat-Scan brach sofort ab** (`'dict' object has no attribute 'file_path'`):
   Der OOM-Fix hatte `_media_cache` von `db.get_all()` auf `db.get_all_dicts()`
   umgestellt — API-Dicts mit UI-Aliasen (`FilePath`) statt `VideoEntry`-Modellen.

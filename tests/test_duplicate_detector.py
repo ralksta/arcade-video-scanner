@@ -46,9 +46,10 @@ def make_detector(tmp_path, hashes):
     for i, hash_str in enumerate(hashes):
         path = tmp_path / f"img_{i:03d}.jpg"
         path.write_bytes(b"\xff\xd8\xff\xd9")  # not a real JPEG; never decoded
-        detector._hash_cache[str(path)] = hash_str
+        detector._set_cached_hash(str(path), hash_str)
         images.append(FakeImage(str(path)))
 
+    detector._hash_cache_dirty = False  # keep _save_hash_cache a no-op
     return detector, images
 
 
@@ -192,3 +193,107 @@ def test_missing_files_are_skipped(tmp_path):
     groups = detector._find_image_duplicates_by_hash(images, threshold=5)
 
     assert groups == []
+
+
+# --- hash cache identity -----------------------------------------------------
+
+
+def test_cached_hash_is_reused_while_file_is_unchanged(tmp_path):
+    detector, images = make_detector(tmp_path, ["f0f0f0f0f0f0f0f0"])
+
+    assert detector._get_cached_hash(images[0].file_path) == "f0f0f0f0f0f0f0f0"
+
+
+def test_cached_hash_is_dropped_when_file_content_changes(tmp_path):
+    """An edited-in-place image must not keep serving its old hash.
+
+    A stale hash puts the file in the wrong duplicate group, and the UI offers
+    to delete members of that group — so this is a data-loss path, not just a
+    stale-cache annoyance.
+    """
+    detector, images = make_detector(tmp_path, ["f0f0f0f0f0f0f0f0"])
+    path = images[0].file_path
+
+    with open(path, "wb") as f:
+        f.write(b"\xff\xd8completely different bytes\xff\xd9")
+
+    assert detector._get_cached_hash(path) is None
+
+
+def test_cached_hash_is_dropped_when_only_mtime_changes(tmp_path):
+    """Same size, new mtime — still a re-hash, since the bytes may differ."""
+    detector, images = make_detector(tmp_path, ["f0f0f0f0f0f0f0f0"])
+    path = images[0].file_path
+
+    st = os.stat(path)
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
+
+    assert detector._get_cached_hash(path) is None
+
+
+def test_changed_file_is_regrouped_by_its_new_hash(tmp_path):
+    """End to end: a changed file drops out of the group its old hash implied."""
+    detector, images = make_detector(
+        tmp_path, ["f0f0f0f0f0f0f0f0", "f0f0f0f0f0f0f0f0"]
+    )
+    # Rewrite one file, then pin its new content to a distant hash — as a real
+    # re-hash of the changed bytes would.
+    path = images[1].file_path
+    with open(path, "wb") as f:
+        f.write(b"\xff\xd8other\xff\xd9")
+    detector._set_cached_hash(path, "0f0f0f0f0f0f0f0f")
+
+    groups = detector._find_image_duplicates_by_hash(images, threshold=5)
+
+    assert groups == []
+
+
+def test_legacy_flat_cache_is_migrated_and_stamped(tmp_path):
+    """v1 caches ({path: hash}) keep working instead of forcing a full re-hash."""
+    detector = DuplicateDetector()
+    path = tmp_path / "legacy.jpg"
+    path.write_bytes(b"\xff\xd8\xff\xd9")
+
+    entries, purged, migrated = detector._decode_hash_cache(
+        {str(path): "f0f0f0f0f0f0f0f0"}
+    )
+
+    st = os.stat(path)
+    assert entries == {str(path): ("f0f0f0f0f0f0f0f0", st.st_mtime_ns, st.st_size)}
+    assert (purged, migrated) == (0, 1)
+
+
+def test_decode_purges_orphans_and_malformed_entries(tmp_path):
+    detector = DuplicateDetector()
+    present = tmp_path / "present.jpg"
+    present.write_bytes(b"\xff\xd8\xff\xd9")
+    st = os.stat(present)
+
+    entries, purged, migrated = detector._decode_hash_cache({
+        "version": 2,
+        "entries": {
+            str(present): ["f0f0f0f0f0f0f0f0", st.st_mtime_ns, st.st_size],
+            str(tmp_path / "gone.jpg"): ["aaaaaaaaaaaaaaaa", 1, 2],
+            str(present) + ".bad": None,
+        },
+    })
+
+    assert list(entries) == [str(present)]
+    assert purged == 2
+    assert migrated == 0
+
+
+def test_cache_roundtrips_through_disk(tmp_path):
+    detector, images = make_detector(tmp_path, ["f0f0f0f0f0f0f0f0"])
+    detector._hash_cache_dirty = True
+    detector._save_hash_cache()
+
+    reloaded = DuplicateDetector()
+    reloaded._hash_cache_file = detector._hash_cache_file
+    import json
+    with open(detector._hash_cache_file) as f:
+        raw = json.load(f)
+    reloaded._hash_cache, _, _ = reloaded._decode_hash_cache(raw)
+
+    assert raw["version"] == DuplicateDetector.HASH_CACHE_VERSION
+    assert reloaded._get_cached_hash(images[0].file_path) == "f0f0f0f0f0f0f0f0"
