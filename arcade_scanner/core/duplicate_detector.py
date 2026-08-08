@@ -551,33 +551,24 @@ class DuplicateDetector:
     def _verify_by_content_sample(self, files: List) -> List[List]:
         """
         Verify potential duplicates by comparing content samples.
-        Falls back to visual hash for re-encoded videos.
-        Returns groups of files that have matching content.
+        Returns groups of files whose sampled bytes match.
+
+        Files that fail this check are simply not grouped here. They are not
+        lost: `_find_reencoded_video_duplicates` picks up everything the exact
+        pass left ungrouped and compares it by picture instead of by bytes.
+        That subsumes the single-frame fallback this method used to run inline
+        (`_verify_by_visual_hash`), which only ever saw files that already had
+        matching size, duration and resolution, sampled one frame instead of
+        three, and cached nothing between scans.
         """
-        # Calculate content hashes
         hash_map: Dict[str, List] = defaultdict(list)
-        unmatched = []
 
         for f in files:
-            path = f.file_path
-            content_hash = self._get_content_sample_hash(path)
+            content_hash = self._get_content_sample_hash(f.file_path)
             if content_hash:
                 hash_map[content_hash].append(f)
 
-        # Collect exact match groups
-        result_groups = [group for group in hash_map.values() if len(group) > 1]
-
-        # Collect files that didn't match by content hash
-        for group in hash_map.values():
-            if len(group) == 1:
-                unmatched.append(group[0])
-
-        # If we have unmatched files and imagehash is available, try visual matching
-        if len(unmatched) >= 2 and IMAGEHASH_AVAILABLE:
-            visual_groups = self._verify_by_visual_hash(unmatched)
-            result_groups.extend(visual_groups)
-
-        return result_groups
+        return [group for group in hash_map.values() if len(group) > 1]
 
     def _get_video_frame_hash(self, video_path: str, position_sec: float = 2.0) -> Optional[str]:
         """
@@ -632,64 +623,13 @@ class DuplicateDetector:
                 except OSError:
                     pass
 
-    def _verify_by_visual_hash(self, files: List, threshold: int = 8) -> List[List]:
-        """
-        Group files by visual similarity using frame extraction + perceptual hash.
-        Threshold: max hash difference to consider as duplicate (0=exact, higher=more lenient)
-        """
-        # Get visual hashes for all files
-        hash_data: List[Tuple[Any, Any]] = []  # (file, phash_obj)
-
-        for f in files:
-            path = f.file_path
-            duration = getattr(f, 'duration_sec', 0) if hasattr(f, 'duration_sec') else 0
-
-            # Sample frame from middle of video (or 2s in if short)
-            sample_pos = min(duration / 2, 2.0) if duration > 0 else 2.0
-
-            hash_str = self._get_video_frame_hash(path, sample_pos)
-            if hash_str:
-                try:
-                    phash_obj = imagehash.hex_to_hash(hash_str)
-                    hash_data.append((f, phash_obj))
-                except Exception:
-                    pass
-
-        # Group by similar hashes
-        used = set()
-        groups = []
-
-        for i, (file_a, hash_a) in enumerate(hash_data):
-            if i in used:
-                continue
-
-            similar = [file_a]
-            used.add(i)
-
-            for j, (file_b, hash_b) in enumerate(hash_data):
-                if j in used:
-                    continue
-
-                # Compare hashes
-                diff = hash_a - hash_b
-                if diff <= threshold:
-                    similar.append(file_b)
-                    used.add(j)
-
-            if len(similar) > 1:
-                groups.append(similar)
-
-        return groups
-
     # -- Re-encode detection --------------------------------------------------
     #
     # The exact pass above buckets videos by rounded size + duration +
     # resolution. A re-encoded copy (H.264 -> HEVC, 1080p -> 720p, different
-    # CRF) shares none of those, so it never reaches the same bucket -- and the
-    # visual-hash fallback only ever runs *inside* one bucket, where files
-    # already have identical size and resolution and there is nothing left for
-    # it to find. Re-encodes, the single most common kind of real duplicate in
-    # a transcoded library, were therefore invisible.
+    # CRF) shares none of those, so it never reaches the same bucket.
+    # Re-encodes, the single most common kind of real duplicate in a transcoded
+    # library, were therefore invisible.
     #
     # What does survive re-encoding is the picture itself and, to within about
     # a frame, the duration. So: bucket by duration, then compare perceptual

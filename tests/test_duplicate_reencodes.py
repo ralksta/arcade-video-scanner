@@ -296,6 +296,52 @@ def test_detect_reencodes_flag_disables_the_pass(tmp_path, monkeypatch):
     assert called == [1]
 
 
+# --- what the exact pass rejects must still reach this pass -------------------
+
+
+def test_content_verification_rejects_lookalike_videos(tmp_path):
+    """Same size/duration/resolution, different bytes — not duplicates."""
+    detector, videos = make_detector(tmp_path, [
+        (600.0, None, {"size_mb": 1.0, "width": 1920, "height": 1080}),
+        (600.0, None, {"size_mb": 1.0, "width": 1920, "height": 1080}),
+    ])
+    for i, v in enumerate(videos):
+        with open(v.file_path, "wb") as f:
+            f.write(bytes([i]) * 4096)
+
+    assert detector._find_video_duplicates(videos) == []
+
+
+def test_content_rejects_are_handed_to_the_reencode_pass(tmp_path):
+    """The property that makes the inline visual fallback redundant.
+
+    `_verify_by_content_sample` used to run its own one-frame visual check on
+    the files it could not match by bytes. Those files are exactly the ones the
+    exact pass leaves ungrouped, and the re-encode pass takes everything
+    ungrouped — with three sampled frames instead of one, and a cache. So the
+    inline fallback could only ever repeat, more weakly, work that now happens
+    anyway.
+    """
+    detector, videos = make_detector(tmp_path, [
+        (600.0, SIG_A, {"size_mb": 1.0, "width": 1920, "height": 1080}),
+        (600.0, SIG_A_NEAR, {"size_mb": 1.0, "width": 1920, "height": 1080}),
+    ])
+    for i, (v, signature) in enumerate(zip(videos, [SIG_A, SIG_A_NEAR])):
+        with open(v.file_path, "wb") as f:
+            f.write(bytes([i]) * 4096)  # differing bytes, identical metadata
+        # Re-seed: the rewrite changed mtime and size, which correctly
+        # invalidates the frame-signature cache entry from make_detector.
+        detector._video_hashes.set(v.file_path, signature)
+
+    exact = detector._find_video_duplicates(videos)
+    assert exact == [], "precondition: content sampling rejects the pair"
+
+    all_groups, _ = detector.find_all_duplicates(videos)
+
+    assert grouped(all_groups) == {frozenset({"vid_000.mp4", "vid_001.mp4"})}
+    assert all_groups[0].match_type == "reencode"
+
+
 # --- helpers -----------------------------------------------------------------
 
 
