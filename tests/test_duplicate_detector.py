@@ -5,15 +5,19 @@ These pin down the near-miss image matching behaviour of
 dirs; no real media library or arcade_data/ is touched.
 
 The detector is driven through its hash cache rather than through real images:
-`_ensure_hash_cache` returns early once `_hash_cache_file` is set, and
-`_save_hash_cache` returns early while the cache is not dirty, so a
-pre-populated `_hash_cache` lets a test choose exact phash values.
+`_StatValidatedHashCache.load()` returns early once `path` is set, and `save()`
+returns early while the cache is not dirty, so a pre-populated cache lets a test
+choose exact phash values without decoding anything.
 """
 import os
 
 import pytest
 
-from arcade_scanner.core.duplicate_detector import IMAGEHASH_AVAILABLE, DuplicateDetector
+from arcade_scanner.core.duplicate_detector import (
+    IMAGEHASH_AVAILABLE,
+    DuplicateDetector,
+    _StatValidatedHashCache,
+)
 
 pytestmark = pytest.mark.skipif(
     not IMAGEHASH_AVAILABLE, reason="imagehash/Pillow not installed"
@@ -40,16 +44,16 @@ def make_detector(tmp_path, hashes):
     detector = DuplicateDetector()
     # Point the cache at a tmp file so _ensure_hash_cache short-circuits and
     # nothing is ever read from or written to the real arcade_data/ dir.
-    detector._hash_cache_file = str(tmp_path / ".phash_cache.json")
+    detector._image_hashes.path = str(tmp_path / ".phash_cache.json")
 
     images = []
     for i, hash_str in enumerate(hashes):
         path = tmp_path / f"img_{i:03d}.jpg"
         path.write_bytes(b"\xff\xd8\xff\xd9")  # not a real JPEG; never decoded
-        detector._set_cached_hash(str(path), hash_str)
+        detector._image_hashes.set(str(path), hash_str)
         images.append(FakeImage(str(path)))
 
-    detector._hash_cache_dirty = False  # keep _save_hash_cache a no-op
+    detector._image_hashes.dirty = False  # keep save() a no-op
     return detector, images
 
 
@@ -201,7 +205,7 @@ def test_missing_files_are_skipped(tmp_path):
 def test_cached_hash_is_reused_while_file_is_unchanged(tmp_path):
     detector, images = make_detector(tmp_path, ["f0f0f0f0f0f0f0f0"])
 
-    assert detector._get_cached_hash(images[0].file_path) == "f0f0f0f0f0f0f0f0"
+    assert detector._image_hashes.get(images[0].file_path) == "f0f0f0f0f0f0f0f0"
 
 
 def test_cached_hash_is_dropped_when_file_content_changes(tmp_path):
@@ -217,7 +221,7 @@ def test_cached_hash_is_dropped_when_file_content_changes(tmp_path):
     with open(path, "wb") as f:
         f.write(b"\xff\xd8completely different bytes\xff\xd9")
 
-    assert detector._get_cached_hash(path) is None
+    assert detector._image_hashes.get(path) is None
 
 
 def test_cached_hash_is_dropped_when_only_mtime_changes(tmp_path):
@@ -228,7 +232,7 @@ def test_cached_hash_is_dropped_when_only_mtime_changes(tmp_path):
     st = os.stat(path)
     os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
 
-    assert detector._get_cached_hash(path) is None
+    assert detector._image_hashes.get(path) is None
 
 
 def test_changed_file_is_regrouped_by_its_new_hash(tmp_path):
@@ -241,7 +245,7 @@ def test_changed_file_is_regrouped_by_its_new_hash(tmp_path):
     path = images[1].file_path
     with open(path, "wb") as f:
         f.write(b"\xff\xd8other\xff\xd9")
-    detector._set_cached_hash(path, "0f0f0f0f0f0f0f0f")
+    detector._image_hashes.set(path, "0f0f0f0f0f0f0f0f")
 
     groups = detector._find_image_duplicates_by_hash(images, threshold=5)
 
@@ -254,7 +258,7 @@ def test_legacy_flat_cache_is_migrated_and_stamped(tmp_path):
     path = tmp_path / "legacy.jpg"
     path.write_bytes(b"\xff\xd8\xff\xd9")
 
-    entries, purged, migrated = detector._decode_hash_cache(
+    entries, purged, migrated = _StatValidatedHashCache.decode(
         {str(path): "f0f0f0f0f0f0f0f0"}
     )
 
@@ -269,7 +273,7 @@ def test_decode_purges_orphans_and_malformed_entries(tmp_path):
     present.write_bytes(b"\xff\xd8\xff\xd9")
     st = os.stat(present)
 
-    entries, purged, migrated = detector._decode_hash_cache({
+    entries, purged, migrated = _StatValidatedHashCache.decode({
         "version": 2,
         "entries": {
             str(present): ["f0f0f0f0f0f0f0f0", st.st_mtime_ns, st.st_size],
@@ -285,15 +289,16 @@ def test_decode_purges_orphans_and_malformed_entries(tmp_path):
 
 def test_cache_roundtrips_through_disk(tmp_path):
     detector, images = make_detector(tmp_path, ["f0f0f0f0f0f0f0f0"])
-    detector._hash_cache_dirty = True
-    detector._save_hash_cache()
+    detector._image_hashes.dirty = True
+    detector._image_hashes.save()
 
-    reloaded = DuplicateDetector()
-    reloaded._hash_cache_file = detector._hash_cache_file
     import json
-    with open(detector._hash_cache_file) as f:
+    with open(detector._image_hashes.path) as f:
         raw = json.load(f)
-    reloaded._hash_cache, _, _ = reloaded._decode_hash_cache(raw)
 
-    assert raw["version"] == DuplicateDetector.HASH_CACHE_VERSION
-    assert reloaded._get_cached_hash(images[0].file_path) == "f0f0f0f0f0f0f0f0"
+    reloaded = _StatValidatedHashCache(".phash_cache.json", "image hashes")
+    reloaded.path = detector._image_hashes.path
+    reloaded._entries, _, _ = _StatValidatedHashCache.decode(raw)
+
+    assert raw["version"] == _StatValidatedHashCache.VERSION
+    assert reloaded.get(images[0].file_path) == "f0f0f0f0f0f0f0f0"
