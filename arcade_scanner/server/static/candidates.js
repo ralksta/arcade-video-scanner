@@ -66,8 +66,14 @@ function _candHeader() {
     </div>`;
 }
 
+// Dateinamen dürfen nicht roh ins Markup: ein " oder < im Namen zerlegt sonst
+// das Attribut bzw. das Element.
+function _esc(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function _candRow(r, idx) {
-    const enc = encodeURIComponent(r.file_path);
     const name = r.file_path.split(/[/\\]/).pop();
     const checked = candState.selected.has(r.file_path) ? 'checked' : '';
     const confColors = { high: 'text-green-400', medium: 'text-yellow-400', low: 'text-gray-400' };
@@ -76,10 +82,10 @@ function _candRow(r, idx) {
                           : '<div class="w-24 h-14 rounded bg-white/10"></div>';
     return `
     <div id="cand-${idx}" class="col-span-full flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10">
-        <input type="checkbox" ${checked} onclick="toggleCandidateSelect('${enc}')">
-        <div class="cursor-pointer" onclick="openCinema(this)" data-path="${r.file_path}">${thumb}</div>
+        <input type="checkbox" ${checked} onclick="toggleCandidateSelect(${idx})">
+        <div class="cursor-pointer" onclick="openCinema(this)" data-path="${_esc(r.file_path)}">${thumb}</div>
         <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-medium">${name}</div>
+            <div class="truncate text-sm font-medium">${_esc(name)}</div>
             <div class="text-xs text-gray-400">${r.codec.toUpperCase()} · ${r.height}p · ${r.bitrate_mbps.toFixed(1)} Mbit/s · ${_fmtGB(r.size_mb)}</div>
             <div class="text-[11px] text-gray-500">${r.reason}</div>
         </div>
@@ -87,7 +93,7 @@ function _candRow(r, idx) {
             <div class="text-sm font-bold text-arcade-cyan">−${_fmtGB(r.estimated_saved_mb)}</div>
             <div class="text-[11px] ${confColors[r.confidence] || ''}">${r.estimated_saved_pct}% · ${confLabel}</div>
         </div>
-        <button onclick="queueCandidate('${enc}')"
+        <button onclick="queueCandidate(${idx})"
                 class="shrink-0 px-3 py-1.5 rounded text-xs font-bold bg-white/10 hover:bg-arcade-cyan/30">
             In Queue
         </button>
@@ -108,8 +114,16 @@ function setCandidatesCodec(codec) {
     renderCandidatesView();
 }
 
-function toggleCandidateSelect(encodedPath) {
-    const p = decodeURIComponent(encodedPath);
+// Übergeben wird der Index in candState.results, nicht der Pfad. Der Umweg über
+// encodeURIComponent(pfad) im onclick-Attribut war die Ursache für
+// "Kandidaten-Analyse fehlgeschlagen: URI malformed": Dateinamen mit ungültigen
+// UTF-8-Bytes kommen aus Pythons surrogateescape als einzelne Surrogate (\udc80–
+// \udcff) im JSON an, und encodeURIComponent wirft darauf URIError. Das passierte
+// beim Rendern, also riss eine einzige Datei die komplette Ansicht mit.
+function toggleCandidateSelect(idx) {
+    const r = candState.results[idx];
+    if (!r) return;
+    const p = r.file_path;
     if (candState.selected.has(p)) candState.selected.delete(p);
     else candState.selected.add(p);
     const btn = document.getElementById('candQueueSelectedBtn');
@@ -136,8 +150,9 @@ function _queuePaths(paths) {
     });
 }
 
-function queueCandidate(encodedPath) {
-    _queuePaths([decodeURIComponent(encodedPath)]);
+function queueCandidate(idx) {
+    const r = candState.results[idx];
+    if (r) _queuePaths([r.file_path]);
 }
 
 function queueSelectedCandidates() {

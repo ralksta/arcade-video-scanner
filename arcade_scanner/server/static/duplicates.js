@@ -327,7 +327,7 @@ function renderDuplicatesView() {
                                         ` : ''}
                                     </div>    
                                         <!-- Delete button for all files -->
-                                        <button onclick="deleteDuplicate('${encodeURIComponent(file.path)}')" 
+                                        <button onclick="deleteDuplicate(${idx}, ${fIdx})"
                                                 class="w-full py-2 rounded-lg ${isKeep ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 border border-orange-500/30' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30'} text-xs font-bold transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">delete</span>
                                             ${isKeep ? 'Delete (Recommended)' : 'Delete'}
@@ -344,11 +344,26 @@ function renderDuplicatesView() {
 }
 
 /**
- * Delete a duplicate file
- * @param {string} encodedPath - URL-encoded file path
+ * Delete a duplicate file.
+ *
+ * Adressiert wird über die Position in duplicateData, nicht über den Pfad:
+ * encodeURIComponent wirft auf Dateinamen mit ungültigen UTF-8-Bytes
+ * `URIError: URI malformed` (Python liefert sie via surrogateescape als
+ * einzelne Surrogate \udc80–\udcff), und weil der Aufruf in der Render-Schleife
+ * stand, riss eine einzige solche Datei die ganze Duplikat-Ansicht mit.
+ *
+ * @param {number} groupIdx - Index der Gruppe in duplicateData.groups
+ * @param {number} fileIdx  - Index der Datei in group.files
  */
-async function deleteDuplicate(encodedPath) {
-    const path = decodeURIComponent(encodedPath);
+async function deleteDuplicate(groupIdx, fileIdx) {
+    // Index sofort auflösen, bevor irgendetwas awaited wird: unten mutiert die
+    // Funktion duplicateData. Ein zweiter Klick während des laufenden Requests
+    // würde seinen Index sonst gegen bereits verschobene Daten auflösen und die
+    // falsche Datei löschen. Ab hier zählt nur noch der Pfad.
+    const file = duplicateData?.groups?.[groupIdx]?.files?.[fileIdx];
+    if (!file) return;
+
+    const path = file.path;
     const filename = path.split(/[\\/]/).pop();
 
     if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) {

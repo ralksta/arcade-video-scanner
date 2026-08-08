@@ -234,6 +234,46 @@ function discardOptimized(opt) {
 // This comment preserves the location for reference
 
 /**
+ * Optimize-Button einer Karte.
+ *
+ * Ausgelagert, weil der Nicht-Docker-Zweig den Pfad in eine URL schreibt und
+ * encodeURIComponent auf Dateinamen mit ungültigen UTF-8-Bytes `URIError: URI
+ * malformed` wirft (Pythons surrogateescape liefert sie als einzelne Surrogate).
+ * Inline in der Kartenvorlage hätte das die gesamte Grid-Ansicht mitgerissen.
+ * Lässt sich der Pfad nicht kodieren, wird der Button deaktiviert statt eine URL
+ * zu bauen, die der Server ohnehin nicht dekodieren kann.
+ *
+ * @param {Object} v - Video metadata object
+ * @returns {string} HTML für den Button
+ */
+function _optimizeButton(v) {
+    const cls = 'w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center ' +
+                'justify-center backdrop-blur text-white transition-all transform hover:scale-110';
+
+    if (window.IS_DOCKER) {
+        // Der Docker-Pfad reicht den Pfad als JS-String weiter, nicht als URL —
+        // hier gibt es kein Encoding-Problem.
+        return `
+                 <button class="${cls}" title="Queue for Mac" onclick="event.stopPropagation(); queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\'")}')">
+                    <span class="material-icons">cloud_upload</span>
+                 </button>`;
+    }
+
+    const enc = safeEncodePath(v.FilePath);
+    if (enc === null) {
+        return `
+                 <button class="${cls} opacity-40 cursor-not-allowed" disabled
+                         title="Optimieren nicht möglich: Der Dateiname enthält ungültige UTF-8-Bytes. Datei nach UTF-8 umbenennen.">
+                    <span class="material-icons">bolt</span>
+                 </button>`;
+    }
+    return `
+                 <button class="${cls}" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${enc}&audio=standard', 'h_frame')">
+                    <span class="material-icons">bolt</span>
+                 </button>`;
+}
+
+/**
  * Create a video/image card element for the grid or list view
  * Includes thumbnail, metadata badges, action buttons, and tag display
  *
@@ -313,10 +353,7 @@ function createVideoCard(v) {
                  <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
                     <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
-                  ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? `
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${window.IS_DOCKER ? 'Queue for Mac' : 'Optimize'}" onclick="event.stopPropagation(); ${window.IS_DOCKER ? `queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\\\'")}')` : `window.open('/compress?path=${encodeURIComponent(v.FilePath)}&audio=standard', 'h_frame')`}">
-                    <span class="material-icons">${window.IS_DOCKER ? 'cloud_upload' : 'bolt'}</span>
-                 </button>` : ''}
+                  ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? _optimizeButton(v) : ''}
              </div>
              
              <div class="absolute bottom-2 left-2 flex gap-1 flex-wrap pr-12 pointer-events-none">

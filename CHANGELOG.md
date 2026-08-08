@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Kandidaten-Ansicht: "URI malformed"**: Dateinamen mit ungültigen UTF-8-Bytes
+  (cp1252-Reste wie `ö`, `ü`, `'`) kommen über Pythons `surrogateescape` als
+  einzelne Surrogate im JSON an; `encodeURIComponent` wirft darauf `URIError`.
+  Da das beim Rendern passierte, riss eine einzige Datei die komplette Ansicht
+  mit. `candidates.js` übergibt jetzt den Ergebnis-Index statt des URL-kodierten
+  Pfads an die onclick-Handler. Das behebt nebenbei Dateinamen mit `'`, `"` oder
+  `<`, die das HTML-Attribut zerlegten — Anzeigetext und `data-path` werden
+  jetzt escaped.
+- **Optimize-Button (`engine.js`)**: derselbe `encodeURIComponent` steckte in der
+  Kartenvorlage und hätte die Grid-Ansicht mitgerissen (bislang verdeckt, weil
+  im Docker-Betrieb der `queueForRemoteEncode`-Zweig greift). Der Button ist
+  jetzt in `_optimizeButton()` ausgelagert; neu in `utils.js` ist
+  `safeEncodePath()`, das `URIError` abfängt und `null` liefert. Ist ein Pfad
+  nicht kodierbar, wird der Button deaktiviert samt Erklärung — bewusst kein
+  Reparaturversuch, da die Gegenstelle mit `unquote()` ohne
+  `errors='surrogateescape'` dekodiert und den Originalpfad ohnehin nicht
+  zurückgewinnen könnte.
+- **Duplikat-Ansicht: gleiche Ursache**: Der Löschen-Button in `duplicates.js`
+  hatte denselben `encodeURIComponent(file.path)` in der Render-Schleife.
+  `deleteDuplicate()` nimmt jetzt Gruppen- und Datei-Index und löst sie sofort
+  in den Pfad auf, bevor der Request läuft — sonst würde ein zweiter Klick
+  während des laufenden `fetch` seinen Index gegen bereits mutierte Daten
+  auflösen und die falsche Datei löschen.
+
 ### Added — Embedding Foundation (Ähnlichkeit Teil 1)
 - **GPU-Indexer** (`scripts/media_indexer.py`): berechnet CLIP-Embeddings
   (Default ViT-B-16, 12 Frames pro Video, Bilder 1 Frame) und schreibt sie in
