@@ -347,6 +347,9 @@ class DuplicateDetector:
     REENCODE_DURATION_TOLERANCE_SEC = 1.5
     # Max per-frame Hamming distance. Every sampled position must be within it.
     REENCODE_FRAME_THRESHOLD = 8
+    # Cache marker for a file that could not be decoded, so it is not retried
+    # on every scan. Not a valid hex hash, so it can never match a real one.
+    UNHASHABLE = "!"
 
     def __init__(self):
         self._group_counter = 0
@@ -366,27 +369,38 @@ class DuplicateDetector:
         Args:
             entries: List of VideoEntry objects from the database
             progress_callback: Optional callable(str, float) to report status and progress (0-100)
-            batch_size: Max number of images to process per batch (default 5000)
-            batch_offset: Starting offset for image processing (for pagination)
+            batch_size: Max number of images to *hash* per run (default 5000).
+                Comparison always covers the whole library — see below.
+            batch_offset: Legacy pagination cursor. Kept so existing callers and
+                the frontend's "scan next batch" button keep working; it no
+                longer slices the input, since batch progress is now tracked by
+                what the hash cache already holds.
             detect_reencodes: Also look for re-encoded copies of the same video
                 (different size/codec, same content). Costs ffmpeg frame
                 extractions on first run; cached afterwards.
 
         Returns:
             Tuple of (List of DuplicateGroup objects, has_more: bool indicating if more batches available)
+
+        Batching note: this used to slice the image list
+        (`all_images[offset:offset + size]`) and compare only within the slice.
+        Two copies of the same photo that happened to land on opposite sides of
+        a boundary — entries 4999 and 5001 — were therefore never compared to
+        each other, in any batch, ever. Worse, each run overwrote the group
+        cache with its own slice's results, so finishing batch 2 discarded
+        everything batch 1 had found.
+
+        Now the cap applies only to how many *new* hashes are computed per run.
+        Comparison always runs over every image whose hash is already known, so
+        each run returns a complete, global result that grows as more of the
+        library gets hashed.
         """
         # Separate by media type
         videos = [e for e in entries if getattr(e, 'media_type', 'video') == 'video']
-        all_images = [e for e in entries if getattr(e, 'media_type', 'video') == 'image']
-
-        # Apply batching to images (videos are usually fewer and faster to process)
-        total_images = len(all_images)
-        images = all_images[batch_offset:batch_offset + batch_size]
-        has_more = (batch_offset + batch_size) < total_images
+        images = [e for e in entries if getattr(e, 'media_type', 'video') == 'image']
 
         if progress_callback:
-            batch_info = f" (batch {batch_offset//batch_size + 1}, images {batch_offset+1}-{min(batch_offset+batch_size, total_images)} of {total_images})"
-            progress_callback(f"Starting duplicate scan{batch_info}", 5)
+            progress_callback(f"Starting duplicate scan ({len(images)} images)", 5)
 
         groups = []
 
@@ -406,15 +420,20 @@ class DuplicateDetector:
                 )
             )
 
-        # Find image duplicates (batched)
+        # Find image duplicates (hashing capped per run, comparison global)
         if progress_callback:
             progress_callback(f"Scanning image metadata ({len(images)} images)...", 80)
 
-        image_groups = self._find_image_duplicates(images, progress_callback)
+        image_groups, deferred = self._find_image_duplicates(
+            images, progress_callback, hash_budget=batch_size
+        )
         groups.extend(image_groups)
+        has_more = deferred > 0
 
         if progress_callback:
-            status = "Scan complete" + (" - more batches available" if has_more else "")
+            status = "Scan complete" + (
+                f" - {deferred} images still to hash" if has_more else ""
+            )
             progress_callback(status, 100)
 
         return groups, has_more
@@ -856,15 +875,22 @@ class DuplicateDetector:
 
         return round(score, 2)
 
-    def _find_image_duplicates(self, images: List, progress_callback=None) -> List[DuplicateGroup]:
+    def _find_image_duplicates(
+        self, images: List, progress_callback=None, hash_budget: Optional[int] = None
+    ) -> Tuple[List[DuplicateGroup], int]:
         """
         Find duplicate images.
         Uses perceptual hash if available, otherwise falls back to exact match.
+
+        Returns (groups, deferred) where `deferred` counts images left unhashed
+        because the budget ran out. The exact-match fallback needs no hashing,
+        so it always defers nothing.
         """
         if IMAGEHASH_AVAILABLE:
-            return self._find_image_duplicates_by_hash(images, progress_callback=progress_callback)
-        else:
-            return self._find_image_duplicates_by_exact(images)
+            return self._find_image_duplicates_by_hash(
+                images, progress_callback=progress_callback, hash_budget=hash_budget
+            )
+        return self._find_image_duplicates_by_exact(images), 0
 
     def _find_image_duplicates_by_exact(self, images: List) -> List[DuplicateGroup]:
         """Find duplicate images by exact size + resolution match."""
@@ -889,14 +915,28 @@ class DuplicateDetector:
 
         return groups
 
-    def _find_image_duplicates_by_hash(self, images: List, threshold: int = 5, progress_callback=None) -> List[DuplicateGroup]:
+    def _find_image_duplicates_by_hash(
+        self,
+        images: List,
+        threshold: int = 5,
+        progress_callback=None,
+        hash_budget: Optional[int] = None,
+    ) -> Tuple[List[DuplicateGroup], int]:
         """
         Find duplicate images using perceptual hash.
         Images with hash difference <= threshold are considered duplicates.
 
+        `hash_budget` caps how many *new* hashes this run computes; images past
+        it keep their place in the library and are simply not compared yet.
+        Comparison itself always covers every image with a known hash, so a
+        budget bounds one run's cost without ever splitting the search space.
+
+        Returns (groups, deferred_count).
+
         Performance optimizations:
         - Hash caching: reuses previously computed hashes from disk
-        - Hash bucketing: groups by exact hash first (O(n)), then near-miss via prefix buckets
+        - Hash bucketing: groups by exact hash first (O(n)), then near-miss via
+          a banded candidate index
         """
         import gc
 
@@ -908,6 +948,8 @@ class DuplicateDetector:
         total_images = len(images)
         cache_hits = 0
         cache_misses = 0
+        deferred = 0
+        budget = total_images if hash_budget is None else max(hash_budget, 0)
 
         for idx, img in enumerate(images):
             if progress_callback and idx % 200 == 0:
@@ -923,6 +965,12 @@ class DuplicateDetector:
 
             # Check cache first
             cached_hash_str = self._image_hashes.get(path, st)
+            if cached_hash_str == self.UNHASHABLE:
+                # Known-undecodable, and unchanged since we found that out.
+                # Without this the same broken files would be retried on every
+                # run, burning the budget and leaving `deferred` permanently
+                # above zero — an endless "more batches available".
+                continue
             if cached_hash_str:
                 try:
                     phash = imagehash.hex_to_hash(cached_hash_str)
@@ -931,6 +979,11 @@ class DuplicateDetector:
                     continue
                 except Exception:
                     pass  # Invalid cache entry, recompute
+
+            if budget <= 0:
+                deferred += 1
+                continue
+            budget -= 1
 
             # Cache miss — compute hash
             try:
@@ -942,6 +995,7 @@ class DuplicateDetector:
                     self._image_hashes.set(path, hash_str, st)
                     cache_misses += 1
             except Exception:
+                self._image_hashes.set(path, self.UNHASHABLE, st)
                 continue
 
             # Periodic GC for large libraries
@@ -952,7 +1006,11 @@ class DuplicateDetector:
         self._image_hashes.save()
 
         if progress_callback:
-            progress_callback(f"Hashed {len(hash_data)} images ({cache_hits} cached, {cache_misses} new)", 92)
+            progress_callback(
+                f"Hashed {len(hash_data)} images ({cache_hits} cached, {cache_misses} new"
+                + (f", {deferred} deferred" if deferred else "") + ")",
+                92,
+            )
 
         # Phase 2: Group by exact hash (O(n) — covers most true duplicates)
         exact_buckets: Dict[str, List] = defaultdict(list)
@@ -1015,7 +1073,7 @@ class DuplicateDetector:
                     group = self._create_image_group(similar, match_type="hash")
                     groups.append(group)
 
-        return groups
+        return groups, deferred
 
     def _create_image_group(self, images: List, match_type: str) -> DuplicateGroup:
         """Create a DuplicateGroup from a list of matching images."""
