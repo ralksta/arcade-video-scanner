@@ -21,6 +21,12 @@ All notable changes to this project will be documented in this file.
   `find_all_duplicates(..., detect_reencodes=False)`.
 
 ### Changed
+- **Redundanten visuellen Fallback im Video-Pass entfernt**:
+  `_verify_by_content_sample` startete für Dateien, die es nicht über Bytes
+  matchen konnte, eine eigene Ein-Frame-Prüfung. Diese Dateien sind genau die,
+  die der Exact-Pass ungruppiert lässt — und die übernimmt jetzt der
+  Re-Encode-Pass, mit drei Frames statt einem und mit Cache. Der Inline-Weg
+  konnte also nur schwächer wiederholen, was ohnehin passiert (~50 Zeilen weg).
 - **Bild-Hashing läuft parallel**: Das Dekodieren der Bilder ist die gesamte
   Kosten des ersten Duplikat-Scans, und PIL wie numpy geben dabei den GIL frei.
   Cache-Misses laufen jetzt über einen Thread-Pool (Threads = Kernzahl,
