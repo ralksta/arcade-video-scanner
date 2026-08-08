@@ -19,6 +19,11 @@ All notable changes to this project will be documented in this file.
   Karten-Hover ist ein ruhiger Border-Lift statt eines mehrfarbigen Glows.
   Die Theme-Auswahl in den Einstellungen und das `theme`-Setting entfallen —
   Light/Dark bleibt über den Header-Toggle erhalten.
+- **Login-Screen auf dem Design System**: Der letzte Screen auf der alten
+  Arcade-Palette (Pink `#DE1A58`, Gold-Hover, lila Hintergrund) nutzt jetzt
+  Flächen, Accent, Radien und Typografie aus dem Token-Set, mit Accent-Dot
+  und Wortmarke wie in der App-Topbar. Der animierte Starfield-Canvas ist
+  entfallen. Formular, Auth-Logik und Fehlerbehandlung sind unverändert.
 - **Cinema-Player, Duplicate-Checker und Settings nach Design-System-Spec**:
   Der Player hat jetzt ein Top-Overlay (Dateiname + Mono-Metadaten), eine
   rechte Action-Rail aus runden 44px-Buttons — neutral bis auf die eine
