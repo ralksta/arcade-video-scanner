@@ -49,6 +49,7 @@ _COLUMNS = [
     ("imported_at", "INTEGER DEFAULT 0"),
     ("mtime", "INTEGER DEFAULT 0"),
     ("original_path", "TEXT DEFAULT ''"),
+    ("optimized_at", "INTEGER DEFAULT 0"),
 ]
 
 
@@ -147,6 +148,12 @@ class SQLiteStore:
             conn.execute("ALTER TABLE media ADD COLUMN original_path TEXT DEFAULT ''")
         except Exception:
             pass # Already exists
+
+        # Migration: optimized_at marks files already processed by the optimizer
+        try:
+            conn.execute("ALTER TABLE media ADD COLUMN optimized_at INTEGER DEFAULT 0")
+        except Exception:
+            pass  # Already exists
 
         # Encoding queue for remote optimization
         conn.execute("""
@@ -314,6 +321,16 @@ class SQLiteStore:
                 (limit,)
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_active_queue_paths(self) -> set[str]:
+        """file_paths of jobs currently pending or being processed."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute(
+                "SELECT file_path FROM encoding_queue "
+                "WHERE status IN ('pending', 'downloading', 'encoding', 'uploading')"
+            )
+            return {self._decode_safe_path(row["file_path"]) for row in cursor}
 
     def cancel_job(self, job_id: int) -> bool:
         """Cancel a pending or active job. Returns True if cancelled."""
@@ -604,6 +621,7 @@ class SQLiteStore:
             "imported_at": row["imported_at"] or 0,
             "mtime": row["mtime"] or 0,
             "OriginalPath": row["original_path"] or "",
+            "optimized_at": row["optimized_at"] or 0,
         }
 
     def _entry_to_tuple(self, entry: VideoEntry) -> tuple:
@@ -636,6 +654,7 @@ class SQLiteStore:
             entry.imported_at or 0,
             entry.mtime or 0,
             entry.original_path or "",
+            entry.optimized_at or 0,
         )
 
     def _asset_to_video_entry(self, entry) -> VideoEntry:
@@ -664,6 +683,7 @@ class SQLiteStore:
             imported_at=entry.imported_at,
             mtime=entry.mtime,
             original_path=entry.original_path,
+            optimized_at=entry.optimized_at,
         )
 
     def _migrate_from_json(self) -> None:

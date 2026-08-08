@@ -438,3 +438,51 @@ class TestAutoTagApplied:
     def test_empty_mark_is_noop(self, store):
         store.mark_auto_tag_applied("alice", "r1", [])
         assert store.get_auto_tag_applied("alice", "r1") == set()
+
+
+def test_optimized_at_roundtrip(store):
+    from arcade_scanner.models.video_entry import VideoEntry
+    e = VideoEntry(file_path="/lib/a.mp4", size_mb=10.0, optimized_at=1723000000)
+    store.upsert(e)
+    got = store.get("/lib/a.mp4")
+    assert got is not None
+    assert got.optimized_at == 1723000000
+
+
+def test_optimized_at_defaults_to_zero(store):
+    from arcade_scanner.models.video_entry import VideoEntry
+    store.upsert(VideoEntry(file_path="/lib/b.mp4", size_mb=10.0))
+    got = store.get("/lib/b.mp4")
+    assert got is not None
+    assert got.optimized_at == 0
+
+
+def test_get_active_queue_paths(store):
+    from arcade_scanner.models.video_entry import VideoEntry
+    store.upsert(VideoEntry(file_path="/lib/q.mp4", size_mb=10.0))
+    job_id = store.queue_encode("/lib/q.mp4", size_bytes=1, target_codec="hevc")
+    assert job_id is not None
+    assert store.get_active_queue_paths() == {"/lib/q.mp4"}
+    store.update_job_status(job_id, "done")
+    assert store.get_active_queue_paths() == set()
+
+
+def test_optimized_at_migration_on_existing_db(patch_config, tmp_path):
+    """A pre-existing DB without the column gets it via ALTER TABLE on open."""
+    import sqlite3
+
+    from arcade_scanner.database.sqlite_store import _COLUMNS, SQLiteStore
+    db_file = tmp_path / "media_library.db"
+    legacy_cols = ", ".join(
+        f"{name} {typedef}" for name, typedef in _COLUMNS if name != "optimized_at")
+    conn = sqlite3.connect(db_file)
+    conn.execute(f"CREATE TABLE media ({legacy_cols})")
+    conn.execute("INSERT INTO media (file_path, size_mb) VALUES ('/lib/old.mp4', 5.0)")
+    conn.commit()
+    conn.close()
+
+    s = SQLiteStore()
+    s._ensure_connection()
+    entry = s.get("/lib/old.mp4")
+    assert entry is not None
+    assert entry.optimized_at == 0

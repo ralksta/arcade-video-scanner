@@ -171,6 +171,7 @@ def render_navigation(theme: BaseTheme) -> str:
     {nav_btn("m-optimized", "setWorkspaceMode('optimized')", "offline_bolt", "Review", "arcade-cyan")}
     {nav_btn("m-vault", "setWorkspaceMode('vault')", "archive", "Vault", "arcade-magenta")}
     {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplicates", "purple")}
+    {nav_btn("m-candidates", "setWorkspaceMode('candidates')", "savings", "Kandidaten", "arcade-gold")}
 
     <!-- Smart Collections Section -->
     <div class="mt-4 border-t border-black/5 dark:border-white/5 pt-3">

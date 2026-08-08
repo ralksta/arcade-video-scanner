@@ -35,6 +35,8 @@ DYNAMIC_IDS = {
     "toast-",
     # Von autotag.js dynamisch erzeugte Regel-Zeilen:
     "atrule-",
+    # Von candidates.js dynamisch erzeugte IDs:
+    "cand-", "candidatesHeader", "candQueueSelectedBtn",
 }
 
 # IDs, die in externen Libraries oder conditionalem HTML sind (kein False-Positive)
