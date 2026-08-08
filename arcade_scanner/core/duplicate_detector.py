@@ -1052,25 +1052,34 @@ class DuplicateDetector:
                 values.append(value)
                 index.add(idx, value)
 
-            used_remaining = set()
-            for i, (h_i, p_i, img_i) in enumerate(remaining):
-                if i in used_remaining:
-                    continue
-
-                similar = [img_i]
-                used_remaining.add(i)
-
+            # Union-Find rather than the greedy "claim and move on" pass this
+            # replaces. Greedy consumed a match into the first group that
+            # reached it, so a third image near *that* one but not near the
+            # group's anchor was left ungrouped and reported as unique: with
+            # A~B and A~C but B!~C, whichever of B/C lost the race simply
+            # vanished from the results. Which one lost depended on iteration
+            # order, so the same library could yield different answers.
+            #
+            # The trade-off is that near-duplicates now chain transitively (A~B,
+            # B~C puts A and C in one group even if A!~C). At threshold 5 over
+            # 64 bits that needs a genuine gradient of near-identical images,
+            # and grouping those together is the answer a user expects anyway —
+            # unlike silently dropping one.
+            uf = _UnionFind(len(remaining))
+            for i in range(len(remaining)):
                 # Sorted for deterministic grouping across runs.
                 for j in sorted(index.candidates(values[i])):
-                    if j == i or j in used_remaining:
-                        continue
+                    if j <= i:
+                        continue  # Each pair once; union is symmetric
                     # Banding only narrows the field; the real distance decides.
                     if _hamming(values[i], values[j]) <= threshold:
-                        similar.append(remaining[j][2])
-                        used_remaining.add(j)
+                        uf.union(i, j)
 
-                if len(similar) > 1:
-                    group = self._create_image_group(similar, match_type="hash")
+            for members in uf.clusters():
+                if len(members) > 1:
+                    group = self._create_image_group(
+                        [remaining[i][2] for i in members], match_type="hash"
+                    )
                     groups.append(group)
 
         return groups, deferred
