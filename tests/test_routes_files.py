@@ -91,6 +91,7 @@ def _stub_scanner_manager():
         return 0
 
     manager.run_scan = no_scan
+    manager.is_scanning = False  # MagicMock default is truthy → 409-Guard griffe
     return manager
 
 
@@ -112,6 +113,7 @@ def run_route(handler, fake_db=None, path_allowed=True, exists=True):
                return_value=exists), \
          patch("arcade_scanner.scanner.get_scanner_manager",
                return_value=_stub_scanner_manager()), \
+         patch("arcade_scanner.server.routes.files._run_rescan_in_background"), \
          patch("arcade_scanner.templates.dashboard_template.generate_html_report"), \
          patch("arcade_scanner.server.routes.files.subprocess.run") as run:
         handled = files.handle_get(handler)
@@ -134,6 +136,8 @@ ROUTES = [
     "/batch_favorite?paths=/media/a.mp4",
     "/batch_compress?paths=/media/a.mp4",
     "/api/rescan",
+    "/api/scan/status",
+    "/api/scan/stop",
     "/api/backup",
 ]
 
@@ -278,3 +282,95 @@ class TestMarkOptimized:
         _, db, _, _ = run_route(handler)
         assert db.upserted == []
         assert handler.status == 204
+
+    def test_existing_entry_gets_optimized_timestamp(self):
+        entry = VideoEntry(FilePath="/media/a.mp4", Size_MB=10.0, Status="HIGH")
+        db = FakeDB([entry])
+        handler = FakeHandler("/api/mark_optimized?path=/media/a.mp4")
+
+        run_route(handler, fake_db=db)
+
+        assert db.upserted[0].status == "OK"
+        assert db.upserted[0].optimized_at > 0
+        assert handler.status == 204
+
+    def test_new_entry_gets_optimized_timestamp(self):
+        db = FakeDB()
+        handler = FakeHandler("/api/mark_optimized?path=/media/new.mp4")
+
+        with patch("arcade_scanner.server.routes.files.os.path.getsize",
+                   return_value=5 * 1024 * 1024):
+            run_route(handler, fake_db=db)
+
+        assert db.upserted[0].optimized_at > 0
+
+
+# ---------------------------------------------------------------------------
+# /api/rescan (background) + /api/scan/status + /api/scan/stop
+# ---------------------------------------------------------------------------
+
+def run_scan_route(handler, is_scanning=False):
+    """Like run_route, but with a controllable scanner manager."""
+    manager = _stub_scanner_manager()
+    manager.is_scanning = is_scanning
+    with patch("arcade_scanner.scanner.get_scanner_manager", return_value=manager), \
+         patch("arcade_scanner.server.routes.files._run_rescan_in_background") as bg:
+        handled = files.handle_get(handler)
+    return handled, manager, bg
+
+
+class TestScanControl:
+    def test_rescan_starts_background_and_returns_202(self):
+        handler = FakeHandler("/api/rescan")
+        handled, _, bg = run_scan_route(handler)
+        assert handled is True
+        assert handler.status == 202
+        assert handler.body == {"status": "started"}
+        bg.assert_called_once()
+
+    def test_rescan_conflicts_while_scanning(self):
+        handler = FakeHandler("/api/rescan")
+        handled, _, bg = run_scan_route(handler, is_scanning=True)
+        assert handled is True
+        assert handler.error == 409
+        bg.assert_not_called()
+
+    def test_rescan_requires_session(self):
+        handler = FakeHandler("/api/rescan", user=None)
+        handled, _, bg = run_scan_route(handler)
+        assert handled is True
+        assert handler.error == 401
+        bg.assert_not_called()
+
+    def test_status_reports_scanning_flag(self):
+        handler = FakeHandler("/api/scan/status")
+        handled, _, _ = run_scan_route(handler, is_scanning=True)
+        assert handled is True
+        assert handler.body == {"is_scanning": True}
+
+    def test_status_requires_session(self):
+        handler = FakeHandler("/api/scan/status", user=None)
+        handled, *_ = run_scan_route(handler)
+        assert handled is True
+        assert handler.error == 401
+
+    def test_stop_signals_running_scan(self):
+        handler = FakeHandler("/api/scan/stop")
+        handled, manager, _ = run_scan_route(handler, is_scanning=True)
+        assert handled is True
+        assert handler.body == {"status": "stopping"}
+        manager.stop.assert_called_once()
+
+    def test_stop_without_scan_conflicts(self):
+        handler = FakeHandler("/api/scan/stop")
+        handled, manager, _ = run_scan_route(handler)
+        assert handled is True
+        assert handler.error == 409
+        manager.stop.assert_not_called()
+
+    def test_stop_requires_session(self):
+        handler = FakeHandler("/api/scan/stop", user=None)
+        handled, manager, _ = run_scan_route(handler)
+        assert handled is True
+        assert handler.error == 401
+        manager.stop.assert_not_called()

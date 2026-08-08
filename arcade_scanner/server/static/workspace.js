@@ -63,7 +63,8 @@ function setWorkspaceMode(mode, preserveCollection = false) {
             optimized: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
             review: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
             vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' },
-            duplicates: { accent: '#a855f7', bg: 'rgba(168, 85, 247, 0.05)' }
+            duplicates: { accent: '#a855f7', bg: 'rgba(168, 85, 247, 0.05)' },
+            candidates: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' }
         };
         const colors = wsColors[mode] || wsColors.lobby;
         const wsIndicator = document.querySelector('.workspace-indicator');
@@ -86,8 +87,8 @@ function setWorkspaceMode(mode, preserveCollection = false) {
             treemap.classList.add('animating');
         }
 
-        // Special handling for duplicates mode
-        if (mode === 'duplicates') {
+        // Special handling for duplicates/candidates modes
+        if (mode === 'duplicates' || mode === 'candidates') {
             // Ensure grid is visible (might be hidden from treemap mode)
             const videoGrid = document.getElementById('videoGrid');
             const treemapContainer = document.getElementById('treemapContainer');
@@ -96,9 +97,10 @@ function setWorkspaceMode(mode, preserveCollection = false) {
             if (treemapContainer) treemapContainer.style.display = 'none';
             if (loadingSentinel) loadingSentinel.style.display = 'none';
 
-            renderDuplicatesView();
+            if (mode === 'duplicates') renderDuplicatesView();
+            else renderCandidatesView();
         } else {
-            // Restore sentinel for infinite scroll (may have been hidden by duplicates mode)
+            // Restore sentinel for infinite scroll (may have been hidden by duplicates/candidates mode)
             const loadingSentinel = document.getElementById('loadingSentinel');
             if (loadingSentinel) loadingSentinel.style.display = '';
 
@@ -323,6 +325,7 @@ function updateURL() {
         else if (workspaceMode === 'favorites') path = '/favorites';
         else if (workspaceMode === 'vault') path = '/vault';
         else if (workspaceMode === 'duplicates') path = '/duplicates';
+        else if (workspaceMode === 'candidates') path = '/candidates';
         else if (path.startsWith('/collections/')) { } // Keep existing path for collections
         else path = '/lobby';
 
@@ -371,6 +374,7 @@ function loadFromURL() {
     else if (path === '/review') mode = 'optimized';
     else if (path === '/vault') mode = 'vault';
     else if (path === '/duplicates') mode = 'duplicates';
+    else if (path === '/candidates') mode = 'candidates';
     else if (path === '/treeview') {
         mode = 'lobby';
         layout = 'treemap';

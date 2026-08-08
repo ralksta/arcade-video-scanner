@@ -85,6 +85,9 @@ class UserVideoData(BaseModel):
     # Smart Collections
     smart_collections: List[Dict[str, Any]] = Field(default_factory=_get_default_smart_collections, description="User defined smart collections")
 
+    # Auto-Tagging Rules: {"id", "name", "tag", "criteria", "enabled"}
+    auto_tag_rules: List[Dict[str, Any]] = Field(default_factory=list, description="Rules that auto-apply a tag to matching files after each scan")
+
     # Scan Paths
     scan_targets: List[str] = Field(default_factory=list, description="User specific scan directories")
     exclude_paths: List[str] = Field(default_factory=list, description="User specific exclusion patterns")

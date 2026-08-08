@@ -88,6 +88,9 @@ def run_scanner(args_list=None):
             ))
             print()  # Newline after scan completion
 
+            from arcade_scanner.core.auto_tagger import run_post_scan_auto_tagging
+            run_post_scan_auto_tagging()
+
             # Regenerate report with fresh data
             results = [e.model_dump(by_alias=True) for e in db.get_all()]
             generate_html_report(results, config.report_file, server_port=port)

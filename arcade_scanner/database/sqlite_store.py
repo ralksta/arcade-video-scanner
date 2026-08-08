@@ -49,6 +49,7 @@ _COLUMNS = [
     ("imported_at", "INTEGER DEFAULT 0"),
     ("mtime", "INTEGER DEFAULT 0"),
     ("original_path", "TEXT DEFAULT ''"),
+    ("optimized_at", "INTEGER DEFAULT 0"),
 ]
 
 
@@ -148,6 +149,12 @@ class SQLiteStore:
         except Exception:
             pass # Already exists
 
+        # Migration: optimized_at marks files already processed by the optimizer
+        try:
+            conn.execute("ALTER TABLE media ADD COLUMN optimized_at INTEGER DEFAULT 0")
+        except Exception:
+            pass  # Already exists
+
         # Encoding queue for remote optimization
         conn.execute("""
             CREATE TABLE IF NOT EXISTS encoding_queue (
@@ -189,6 +196,17 @@ class SQLiteStore:
                 ts_sec      REAL NOT NULL,
                 vector      BLOB NOT NULL,
                 PRIMARY KEY (file_path, frame_index)
+            )
+        """)
+
+        # Auto-tagging apply-once bookkeeping (spec: apply-once semantics —
+        # a manually removed tag is never re-applied by its rule)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS auto_tag_applied (
+                username  TEXT NOT NULL,
+                rule_id   TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                PRIMARY KEY (username, rule_id, file_path)
             )
         """)
 
@@ -253,6 +271,39 @@ class SQLiteStore:
                 self.delete_embedding(path)
                 removed += 1
         return removed
+    # ------------------------------------------------------------------
+    # Auto-Tagging bookkeeping
+    # ------------------------------------------------------------------
+
+    def get_auto_tag_applied(self, username: str, rule_id: str) -> set[str]:
+        """file_paths a rule has already been applied to for this user."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute(
+                "SELECT file_path FROM auto_tag_applied WHERE username = ? AND rule_id = ?",
+                (username, rule_id),
+            )
+            return {self._decode_safe_path(row["file_path"]) for row in cursor}
+
+    def mark_auto_tag_applied(self, username: str, rule_id: str, file_paths: list[str]) -> None:
+        """Record applied (user, rule, path) triples. Idempotent."""
+        if not file_paths:
+            return
+        conn = self._ensure_connection()
+        with self._write_lock:
+            conn.executemany(
+                "INSERT OR IGNORE INTO auto_tag_applied (username, rule_id, file_path) VALUES (?, ?, ?)",
+                [(username, rule_id, self._get_safe_path(p)) for p in file_paths],
+            )
+
+    def clear_auto_tag_applied(self, username: str, rule_id: str) -> None:
+        """Drop a rule's bookkeeping (rule deleted)."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            conn.execute(
+                "DELETE FROM auto_tag_applied WHERE username = ? AND rule_id = ?",
+                (username, rule_id),
+            )
 
     # ------------------------------------------------------------------
     # Encoding Queue methods
@@ -353,6 +404,16 @@ class SQLiteStore:
                 (limit,)
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_active_queue_paths(self) -> set[str]:
+        """file_paths of jobs currently pending or being processed."""
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute(
+                "SELECT file_path FROM encoding_queue "
+                "WHERE status IN ('pending', 'downloading', 'encoding', 'uploading')"
+            )
+            return {self._decode_safe_path(row["file_path"]) for row in cursor}
 
     def cancel_job(self, job_id: int) -> bool:
         """Cancel a pending or active job. Returns True if cancelled."""
@@ -643,6 +704,7 @@ class SQLiteStore:
             "imported_at": row["imported_at"] or 0,
             "mtime": row["mtime"] or 0,
             "OriginalPath": row["original_path"] or "",
+            "optimized_at": row["optimized_at"] or 0,
         }
 
     def _entry_to_tuple(self, entry: VideoEntry) -> tuple:
@@ -675,6 +737,7 @@ class SQLiteStore:
             entry.imported_at or 0,
             entry.mtime or 0,
             entry.original_path or "",
+            entry.optimized_at or 0,
         )
 
     def _asset_to_video_entry(self, entry) -> VideoEntry:
@@ -703,6 +766,7 @@ class SQLiteStore:
             imported_at=entry.imported_at,
             mtime=entry.mtime,
             original_path=entry.original_path,
+            optimized_at=entry.optimized_at,
         )
 
     def _migrate_from_json(self) -> None:

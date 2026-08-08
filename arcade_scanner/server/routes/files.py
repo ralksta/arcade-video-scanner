@@ -9,6 +9,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -94,6 +95,16 @@ def handle_get(handler) -> bool:
     # /api/rescan
     if path == "/api/rescan":
         _handle_rescan(handler)
+        return True
+
+    # /api/scan/status
+    if path == "/api/scan/status":
+        _handle_scan_status(handler)
+        return True
+
+    # /api/scan/stop
+    if path == "/api/scan/stop":
+        _handle_scan_stop(handler)
         return True
 
     # /api/backup
@@ -197,9 +208,11 @@ def _handle_mark_optimized(handler) -> None:
             handler.send_error(403, "Forbidden - Path not in scan directories")
             return
 
+        now = int(time.time())
         entry = db.get(abs_path)
         if entry:
             entry.status = "OK"
+            entry.optimized_at = now
         else:
             size_mb = 0.0
             try:
@@ -207,7 +220,8 @@ def _handle_mark_optimized(handler) -> None:
                     size_mb = os.path.getsize(abs_path) / (1024 * 1024)
             except OSError as e:
                 print(f"⚠️ Could not stat file {abs_path}: {e}")
-            entry = VideoEntry(file_path=abs_path, size_mb=size_mb, Status="OK")
+            entry = VideoEntry(file_path=abs_path, size_mb=size_mb, Status="OK",
+                               optimized_at=now)
         db.upsert(entry)
         db.save()
         _get_media_cache().invalidate()
@@ -644,44 +658,101 @@ def _handle_batch_compress(handler) -> None:
         handler.send_error(500)
 
 
-def _handle_rescan(handler) -> None:
+def _run_rescan_in_background(port: int) -> None:
+    """Scan + auto-tagging + report rebuild — body of the rescan thread."""
     import asyncio
-    import json
 
     from arcade_scanner.scanner import get_scanner_manager
     from arcade_scanner.templates.dashboard_template import generate_html_report
+
+    try:
+        mgr = get_scanner_manager()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(mgr.run_scan())
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+        try:
+            # Auto-Tagging-Hook — landet mit PR #34; bis dahin fehlt das Modul
+            from arcade_scanner.core.auto_tagger import run_post_scan_auto_tagging
+            run_post_scan_auto_tagging()
+        except ImportError:
+            pass
+
+        media_cache = _get_media_cache()
+        results = [e.model_dump(by_alias=True) for e in media_cache.get()]
+        media_cache.invalidate()
+        generate_html_report(results, config.report_file, server_port=port)
+        print("✅ Rescan complete.")
+    except Exception as e:
+        print(f"❌ Rescan failed: {e}")
+
+
+def _handle_rescan(handler) -> None:
+    """Start a background rescan (202) — no longer blocks its request thread,
+    which makes /api/scan/stop able to reach a running scan (ROADMAP item)."""
+    import json
+    import threading
+
+    from arcade_scanner.scanner import get_scanner_manager
 
     user_name = handler.get_current_user()
     if not user_name:
         handler.send_error(401, "Unauthorized")
         return
 
+    mgr = get_scanner_manager()
+    if mgr.is_scanning:
+        handler.send_error(409, "Scan already in progress")
+        return
+
     print("🔄 Scan requested via API...")
-    try:
-        mgr = get_scanner_manager()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            new_count = loop.run_until_complete(mgr.run_scan())
-        finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+    port = handler.server.server_address[1]
+    t = threading.Thread(target=_run_rescan_in_background, args=(port,), daemon=True)
+    t.start()
 
-        media_cache = _get_media_cache()
-        port = handler.server.server_address[1]
-        results = [e.model_dump(by_alias=True) for e in media_cache.get()]
-        media_cache.invalidate()
-        generate_html_report(results, config.report_file, server_port=port)
+    handler.send_response(202)
+    handler.send_header("Content-type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps({"status": "started"}).encode())
 
-        handler.send_response(200)
-        handler.send_header("Content-type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps({"status": "complete", "count": new_count}).encode())
-        print("✅ Rescan complete.")
 
-    except Exception as e:
-        print(f"❌ Rescan failed: {e}")
-        handler.send_error(500, str(e))
+def _handle_scan_status(handler) -> None:
+    import json
+
+    from arcade_scanner.scanner import get_scanner_manager
+
+    if not handler.get_current_user():
+        handler.send_error(401, "Unauthorized")
+        return
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps(
+        {"is_scanning": bool(get_scanner_manager().is_scanning)}).encode())
+
+
+def _handle_scan_stop(handler) -> None:
+    import json
+
+    from arcade_scanner.scanner import get_scanner_manager
+
+    if not handler.get_current_user():
+        handler.send_error(401, "Unauthorized")
+        return
+    mgr = get_scanner_manager()
+    if not mgr.is_scanning:
+        handler.send_error(409, "No scan running")
+        return
+    mgr.stop()
+    print("⏹ Scan stop requested via API.")
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.end_headers()
+    handler.wfile.write(json.dumps({"status": "stopping"}).encode())
 
 
 def _handle_backup(handler) -> None:
