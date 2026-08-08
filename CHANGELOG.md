@@ -19,6 +19,21 @@ All notable changes to this project will be documented in this file.
   Karten-Hover ist ein ruhiger Border-Lift statt eines mehrfarbigen Glows.
   Die Theme-Auswahl in den Einstellungen und das `theme`-Setting entfallen —
   Light/Dark bleibt über den Header-Toggle erhalten.
+- **Cinema-Player, Duplicate-Checker und Settings nach Design-System-Spec**:
+  Der Player hat jetzt ein Top-Overlay (Dateiname + Mono-Metadaten), eine
+  rechte Action-Rail aus runden 44px-Buttons — neutral bis auf die eine
+  Primäraktion (Optimize) — und eine eigene Transport-Leiste mit
+  3px-Scrubber, Mono-Timestamps und hervorgehobenem Play-Button anstelle der
+  nativen Video-Controls. Der Duplicate-Checker zeigt zwei gleichwertige
+  Spalten mit einer fixen 120px-Entscheidungsspalte (Größendelta, Keep,
+  Discard); die Empfehlung bekommt eine einzelne Accent-Kontur um die
+  Vorschau statt eines flächigen Farbwashs. Das Settings-Panel nutzt die
+  Sidebar-Nav-Optik (Accent-Tint + 3px-Indikator), Mono-Readout-Blöcke für
+  Verzeichnislisten und 38×22-Toggle-Switches.
+
+### Fixed
+- Duplicate-Checker und Settings-Dialog lagen mit `z-index` unter der
+  Sidebar (`z-100`) und wurden von ihr überlappt.
 
 ### Added
 - **Duplikat-Scan findet re-encodete Videos**: Der bisherige Video-Pass gruppiert

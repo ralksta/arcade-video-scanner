@@ -660,49 +660,9 @@ html {
     letter-spacing: 2px;
 }
 
-.cinema-actions {
-    position: absolute;
-    right: 3%;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    z-index: calc(var(--z-modal) + 1);
-}
-
-.cinema-action-btn {
-    background: rgba(20, 1, 35, 0.95);
-    border: 2px solid var(--glass-border);
-    border-radius: 12px;
-    width: 48px;
-    height: 48px;
-    padding: 0;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: inherit;
-    transition: all 0.3s;
-    backdrop-filter: blur(10px);
-}
-
-.cinema-action-btn:hover {
-    background: var(--pink);
-    border-color: var(--pink);
-    transform: scale(1.1);
-    box-shadow: 0 5px 20px rgb(var(--ds-accent-rgb) / 0.4);
-}
-
-.cinema-action-btn .material-icons {
-    font-size: 24px;
-}
-
-/* Hide button labels, show only icons */
-.cinema-action-btn span:not(.material-icons) {
-    display: none;
-}
+/* .cinema-actions / .cinema-action-btn: Layout und Optik kommen jetzt aus
+   dem Design-System-Block am Dateiende (.cinema-rail-*). Die Klasse
+   .cinema-action-btn bleibt nur noch JS-Hook fuer Favorit/Vault-Zustand. */
 
 .cinema-info-btn {
     position: absolute;
@@ -804,17 +764,19 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg);
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--magenta);
+    background: var(--ds-hairline-strong);
     border-radius: 5px;
-    border: 2px solid var(--bg);
+    border: 3px solid transparent;
+    background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--pink);
+    background: var(--ds-text-muted);
+    background-clip: padding-box;
 }
 
 /* --- LAYOUTS --- */
@@ -2065,16 +2027,14 @@ html {
         z-index: var(--z-toast);
     }
 
-    /* Ensure buttons are reachable on mobile */
+    /* Rail auf Mobile enger stellen; die Labels entfallen dort */
     .cinema-actions {
-        right: 2%;
+        right: 8px;
         gap: 10px;
     }
 
-    .cinema-action-btn {
-        width: 44px;
-        height: 44px;
-        background: rgba(0, 0, 0, 0.9);
+    .cinema-rail-label {
+        display: none;
     }
 
     /* Ensure close button is easy to hit */
@@ -2890,4 +2850,201 @@ html {
 /* outer container slight warmth */
 :root:not(.dark) #settingsModal .settings-container {
     background-color: #ffffff !important;
+}
+
+/* === CINEMA PLAYER (Design System) ===
+   Liegt hier statt im Template, weil CINEMA_MODAL_COMPONENT durch
+   str.format() laeuft und CSS-Klammern dort kollidieren. */
+.cinema-overlay-top {
+    background: linear-gradient(180deg, rgba(0,0,0,0.6), transparent);
+}
+.cinema-overlay-bottom {
+    background: linear-gradient(0deg, rgba(0,0,0,0.75), transparent);
+}
+
+/* Action-Rail */
+.cinema-rail-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.cinema-rail-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+.cinema-rail-icon .material-icons { font-size: 20px; }
+.cinema-rail-btn:hover .cinema-rail-icon { background: rgba(255,255,255,0.16); }
+.cinema-rail-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+}
+.cinema-rail-btn:hover .cinema-rail-label { color: #fff; }
+
+/* Genau EINE Primaeraktion traegt den Accent */
+.cinema-rail-btn.is-primary .cinema-rail-icon {
+    background: rgb(var(--ds-accent-rgb) / 0.18);
+    border-color: rgb(var(--ds-accent-rgb) / 0.45);
+    color: var(--ds-accent-tint);
+}
+.cinema-rail-btn.is-primary:hover .cinema-rail-icon {
+    background: rgb(var(--ds-accent-rgb) / 0.3);
+}
+.cinema-rail-btn.is-primary .cinema-rail-label { color: var(--ds-accent-tint); }
+
+/* Aktiver Zustand (Favorit gesetzt / im Vault) */
+.cinema-rail-btn.is-active .cinema-rail-icon { color: var(--ds-bitrate); }
+
+/* Transport */
+.cinema-transport-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    opacity: .9;
+    transition: opacity .15s ease;
+}
+.cinema-transport-btn:hover { opacity: 1; }
+
+/* Scrubber: 3px Track, Accent-Fill */
+.cinema-scrub {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.25);
+    cursor: pointer;
+    outline: none;
+}
+.cinema-scrub::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--ds-accent-tint);
+    border: none;
+}
+.cinema-scrub::-moz-range-thumb {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--ds-accent-tint);
+    border: none;
+}
+
+/* === SETTINGS PANEL (Design System) === */
+
+/* Nav-Row spiegelt das Sidebar-Pattern: Accent-Tint + 3px-Indikator */
+#settingsModal .settings-nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ds-text-label);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color .15s ease, color .15s ease;
+}
+#settingsModal .settings-nav-item:hover {
+    background: var(--ds-fill-soft);
+    color: var(--ds-text);
+}
+#settingsModal .settings-nav-item.active {
+    background: rgb(var(--ds-accent-rgb) / 0.12);
+    color: var(--ds-text);
+    font-weight: 600;
+}
+#settingsModal .settings-nav-indicator {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 15px;
+    border-radius: 0 2px 2px 0;
+    background: var(--ds-accent);
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+#settingsModal .settings-nav-item.active .settings-nav-indicator { opacity: 1; }
+#settingsModal .settings-nav-item.active .material-icons { color: var(--ds-accent-tint); }
+
+/* Gruppierte Einstellungen liegen auf einer Karte */
+.ds-settings-card {
+    background: var(--ds-surface);
+    border: 1px solid var(--ds-hairline-strong);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+/* Mono-Readout-Bloecke (Verzeichnislisten, Exclusions) */
+.ds-textarea {
+    background: var(--ds-surface);
+    border: 1px solid var(--ds-hairline-strong);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: var(--ds-font-mono);
+    font-size: 12.5px;
+    color: var(--ds-text-body);
+    resize: none;
+    transition: border-color .15s ease;
+}
+.ds-textarea:focus {
+    outline: none;
+    border-color: var(--ds-accent);
+}
+.ds-textarea::placeholder { color: var(--ds-text-muted); }
+
+/* Toggle-Switch 38x22 — an den sr-only Peer-Input gekoppelt */
+.ds-peer-switch {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    border-radius: 11px;
+    background: var(--ds-hairline-strong);
+    flex-shrink: 0;
+    transition: background-color .18s ease;
+}
+.ds-peer-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #8a8a94;
+    transition: transform .18s ease, background-color .18s ease;
+}
+.peer:checked ~ .ds-peer-switch,
+.peer:checked + .ds-peer-switch {
+    background: var(--ds-accent);
+}
+.peer:checked ~ .ds-peer-switch::after,
+.peer:checked + .ds-peer-switch::after {
+    transform: translateX(16px);
+    background: #fff;
 }

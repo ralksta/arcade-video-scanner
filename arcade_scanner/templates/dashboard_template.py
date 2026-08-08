@@ -78,15 +78,11 @@ def generate_html_report(results, report_file, server_port=8000):
     # 2. Prepare Cinema Modal (Conditional Optimize Button)
     opt_btn_html = ""
     if config.optimizer_available and config.settings.enable_optimizer:
+        # Die einzige Primaeraktion der Rail — traegt als einzige den Accent.
         opt_btn_html = """
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaOptimize()" title="Optimize Video [O]" aria-label="Optimize this video">
-            <div class="w-12 h-12 rounded-xl bg-arcade-cyan/12 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/35 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-cyan/10">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-cyan group-hover:text-cyan-300 transition-colors">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fill-opacity="0.15"/>
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-            </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-cyan/75 group-hover:text-arcade-cyan transition-colors">Optimize</span>
+        <button class="cinema-rail-btn is-primary" onclick="cinemaOptimize()" title="Optimize Video [O]" aria-label="Optimize this video">
+            <span class="cinema-rail-icon"><span class="material-icons">bolt</span></span>
+            <span class="cinema-rail-label">Optimize</span>
         </button>
         """
 
