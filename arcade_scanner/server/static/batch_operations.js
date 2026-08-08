@@ -42,7 +42,7 @@ function updateBatchSelection() {
             const warningSpan = document.createElement('span');
             warningSpan.id = 'batchSkipWarning';
             warningSpan.className = 'batch-skip-warning';
-            warningSpan.style.cssText = 'color: #F4B342; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;';
+            warningSpan.style.cssText = 'color: var(--ds-bitrate); font-size: 0.85rem; display: flex; align-items: center; gap: 4px;';
             const countSpan = document.getElementById('batchCount');
             if (countSpan && countSpan.parentElement) {
                 countSpan.parentElement.insertAdjacentElement('afterend', warningSpan);

@@ -75,11 +75,8 @@ function setDateFilter(val) {
     dateFilter = val;
     // Update active class
     document.querySelectorAll('[data-filter="date"]').forEach(btn => {
+        // Aktiver Chip haengt allein an .active — die Optik kommt aus .ds-chip.
         btn.classList.toggle('active', btn.dataset.value === val);
-        // Update border color
-        btn.style.borderColor = btn.dataset.value === val ? 'rgba(0, 255, 208, 0.5)' : 'rgba(255, 255, 255, 0.1)';
-        btn.style.background = btn.dataset.value === val ? 'rgba(0, 255, 208, 0.15)' : 'rgba(255, 255, 255, 0.05)';
-        btn.style.color = btn.dataset.value === val ? '#00ffd0' : '#9ca3af';
     });
     filterAndSort();
 }

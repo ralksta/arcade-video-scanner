@@ -461,7 +461,7 @@ function setupTreemapInteraction() {
                 const isHevc = (video.codec || '').includes('hevc') || (video.codec || '').includes('h265');
                 const isAv1  = (video.codec || '').includes('av1') || (video.codec || '').includes('av01');
                 const codecLabel = isHevc
-                    ? '<span style="color:#00ffd0;font-weight:bold;">HEVC</span>'
+                    ? '<span style="color:var(--ds-hevc);font-weight:bold;">HEVC</span>'
                     : isAv1
                         ? '<span style="color:#c4b5fd;font-weight:bold;">AV1</span>'
                         : (video.codec || 'Unknown').toUpperCase();

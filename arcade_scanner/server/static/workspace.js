@@ -56,22 +56,8 @@ function setWorkspaceMode(mode, preserveCollection = false) {
         if (mode === 'vault') document.body.classList.add('vault-mode');
         else document.body.classList.remove('vault-mode');
 
-        // Update workspace indicator bar with actual colors
-        const wsColors = {
-            lobby: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
-            favorites: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' },
-            optimized: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
-            review: { accent: '#00ffd0', bg: 'rgba(0, 255, 208, 0.05)' },
-            vault: { accent: '#8F0177', bg: 'rgba(143, 1, 119, 0.05)' },
-            duplicates: { accent: '#a855f7', bg: 'rgba(168, 85, 247, 0.05)' },
-            candidates: { accent: '#F4B342', bg: 'rgba(244, 179, 66, 0.05)' }
-        };
-        const colors = wsColors[mode] || wsColors.lobby;
-        const wsIndicator = document.querySelector('.workspace-indicator');
-        if (wsIndicator) {
-            wsIndicator.style.borderBottomColor = colors.accent;
-            wsIndicator.style.backgroundColor = colors.bg;
-        }
+        // Design System: alle Workspaces teilen sich EINEN Accent. Der Indikator
+        // wird komplett ueber CSS-Tokens gestylt — kein Inline-Farb-Mapping mehr.
 
         // Add animation class
         const grid = document.getElementById('videoGrid');
