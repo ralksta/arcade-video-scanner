@@ -4,7 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Duplikat-Scan findet re-encodete Videos**: Der bisherige Video-Pass gruppiert
+  nach gerundeter Größe + Dauer + Auflösung. Eine transkodierte Kopie (H.264 →
+  HEVC, 1080p → 720p, anderer CRF) teilt keinen dieser Werte und landete damit
+  nie im selben Bucket — und der visuelle Fallback lief nur *innerhalb* eines
+  Buckets, wo alle Dateien ohnehin schon identische Größe und Auflösung haben.
+  Genau der häufigste echte Duplikat-Fall in einer transkodierten Bibliothek war
+  also unsichtbar. Neuer zweiter Pass: Bucketing nach Dauer (±1,5 s), dann
+  Vergleich perceptueller Hashes von drei Frames bei 25/50/75 % der Laufzeit.
+  Gruppiert wird nur, wenn *alle* Positionen passen — ein gemeinsamer Vorspann
+  reicht nicht, sonst würde eine ganze Serienstaffel zusammenfallen.
+  Gruppen erscheinen als `match_type: "reencode"` mit 75 % Confidence.
+  Frame-Signaturen werden in `.vframe_cache.json` gecacht; gehasht werden nur
+  Videos, die überhaupt einen Dauer-Nachbarn haben. Abschaltbar über
+  `find_all_duplicates(..., detect_reencodes=False)`.
+
 ### Fixed
+- **Duplikat-Scan empfahl bei Re-Encodes die falsche Datei zum Behalten**:
+  `_calculate_video_quality_score` vergibt +20 Punkte für moderne Codecs. Beim
+  Abwägen zwischen byte-identischen Kopien ist das richtig, in einer
+  Re-Encode-Gruppe genau falsch: die HEVC-Datei ist dort das verkleinerte
+  Derivat des H.264-Originals. Der Codec-Bonus entfällt jetzt für
+  `reencode`-Gruppen; Auflösung und Bitrate entscheiden.
+- **Duplikat-Scan ließ temporäre Frame-Dateien liegen**: Schlug der
+  ffmpeg-Aufruf in `_get_video_frame_hash` fehl oder lief in den Timeout, blieb
+  die per `NamedTemporaryFile(delete=False)` angelegte Datei in `/tmp` zurück —
+  über einen langen Scan mit vielen kaputten Dateien summiert sich das. Cleanup
+  läuft jetzt im `finally`.
 - **Duplikat-Scan: veraltete perceptual Hashes** (`.phash_cache.json`): Der Cache
   war nur nach Dateipfad indiziert, ohne jede Angabe, aus welchem Dateizustand
   der Hash stammt. Wurde ein Bild an Ort und Stelle geändert (Neu-Export,

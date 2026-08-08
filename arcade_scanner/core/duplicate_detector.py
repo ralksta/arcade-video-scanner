@@ -148,63 +148,66 @@ class _BandedHashIndex:
         return found
 
 
-class DuplicateDetector:
+class _StatValidatedHashCache:
+    """Disk-backed `path -> hash` cache that notices when a file changes.
+
+    Each entry carries the mtime and size the hash was computed from, so a file
+    replaced in place (re-export, rotation, rsync over the same path) is
+    re-hashed instead of silently keeping a hash that no longer describes it.
+
+    The stored value is opaque to this class — the image pass keeps a single
+    phash there, the video pass keeps a joined multi-frame signature.
     """
-    Detects duplicate media files using various strategies.
 
-    Videos: Exact match on size + duration + resolution
-    Images: Perceptual hash (if imagehash available) or exact size + resolution
+    # Bumped whenever the on-disk layout changes.
+    VERSION = 2
 
-    Performance:
-    - Perceptual hashes are cached to disk across scans
-    - Hash bucketing eliminates O(n²) comparisons
-    """
+    def __init__(self, filename: str, label: str):
+        self._filename = filename
+        self._label = label
+        self._entries: Dict[str, Tuple[str, int, int]] = {}
+        self.dirty = False
+        self.path: Optional[str] = None  # Resolved lazily on first load
 
-    # Bumped whenever the on-disk cache layout changes.
-    HASH_CACHE_VERSION = 2
+    def __len__(self) -> int:
+        return len(self._entries)
 
-    def __init__(self):
-        self._group_counter = 0
-        # filepath -> (phash hex string, mtime_ns, size_bytes)
-        self._hash_cache: Dict[str, Tuple[str, int, int]] = {}
-        self._hash_cache_dirty = False
-        self._hash_cache_file = None  # Set lazily
-
-    def _ensure_hash_cache(self):
-        """Load hash cache from disk on first use."""
-        if self._hash_cache_file is not None:
-            return  # Already loaded
+    def load(self) -> None:
+        """Load from disk on first use; a no-op once `path` is set."""
+        if self.path is not None:
+            return
 
         import json
 
         from ..config import config
 
-        self._hash_cache_file = os.path.join(config.hidden_data_dir, ".phash_cache.json")
+        self.path = os.path.join(config.hidden_data_dir, self._filename)
         try:
-            if os.path.exists(self._hash_cache_file):
-                with open(self._hash_cache_file, 'r') as f:
+            if os.path.exists(self.path):
+                with open(self.path, 'r') as f:
                     raw = json.load(f)
-                self._hash_cache, purged, migrated = self._decode_hash_cache(raw)
+                self._entries, purged, migrated = self.decode(raw)
                 if purged or migrated:
-                    self._hash_cache_dirty = True
+                    self.dirty = True
                 notes = []
                 if purged:
                     notes.append(f"purged {purged} orphans")
                 if migrated:
                     notes.append(f"migrated {migrated} legacy entries")
-                print(f"📦 Loaded {len(self._hash_cache)} cached image hashes" +
+                print(f"📦 Loaded {len(self._entries)} cached {self._label}" +
                       (f" ({', '.join(notes)})" if notes else ""))
         except Exception as e:
-            print(f"⚠️ Could not load hash cache: {e}")
-            self._hash_cache = {}
+            print(f"⚠️ Could not load {self._label} cache: {e}")
+            self._entries = {}
 
-    def _decode_hash_cache(self, raw) -> Tuple[Dict[str, Tuple[str, int, int]], int, int]:
-        """Parse an on-disk cache payload into the in-memory form.
+    @staticmethod
+    def decode(raw) -> Tuple[Dict[str, Tuple[str, int, int]], int, int]:
+        """Parse an on-disk payload into the in-memory form.
 
         Returns (entries, purged_count, migrated_count). Entries whose file no
         longer exists are dropped here so the cache does not grow forever.
 
-        Version 1 stored a bare `{path: phash}` map with no way to tell whether
+        Version 1 stored a bare `{path: hash}` map with no way to tell whether
         the file had changed since, so an edited-in-place image kept serving the
         old hash — and a wrong hash means a wrong duplicate group, which the UI
         offers to delete. Those legacy entries are stamped with the file's
@@ -238,36 +241,36 @@ class DuplicateDetector:
 
         return entries, purged, migrated
 
-    def _save_hash_cache(self):
-        """Persist hash cache to disk."""
-        if not self._hash_cache_dirty or not self._hash_cache_file:
+    def save(self) -> None:
+        """Persist to disk, unless nothing changed."""
+        if not self.dirty or not self.path:
             return
 
         import json
         try:
-            os.makedirs(os.path.dirname(self._hash_cache_file), exist_ok=True)
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
             payload = {
-                "version": self.HASH_CACHE_VERSION,
-                "entries": {p: list(v) for p, v in self._hash_cache.items()},
+                "version": self.VERSION,
+                "entries": {p: list(v) for p, v in self._entries.items()},
             }
             # Write-then-rename: a crash mid-write would otherwise leave a
             # truncated JSON file that the next run silently discards whole.
-            tmp_path = f"{self._hash_cache_file}.tmp"
+            tmp_path = f"{self.path}.tmp"
             with open(tmp_path, 'w') as f:
                 json.dump(payload, f)
-            os.replace(tmp_path, self._hash_cache_file)
-            print(f"💾 Saved {len(self._hash_cache)} image hashes to cache")
-            self._hash_cache_dirty = False
+            os.replace(tmp_path, self.path)
+            print(f"💾 Saved {len(self._entries)} {self._label} to cache")
+            self.dirty = False
         except Exception as e:
-            print(f"⚠️ Could not save hash cache: {e}")
+            print(f"⚠️ Could not save {self._label} cache: {e}")
 
-    def _get_cached_hash(self, filepath: str, st: Optional[os.stat_result] = None) -> Optional[str]:
-        """Get a cached phash for a file, or None if absent or stale.
+    def get(self, filepath: str, st: Optional[os.stat_result] = None) -> Optional[str]:
+        """Cached hash for a file, or None if absent or stale.
 
         `st` is the caller's already-taken stat of the file; the hash is only
         reused when mtime and size still match what was hashed.
         """
-        entry = self._hash_cache.get(filepath)
+        entry = self._entries.get(filepath)
         if entry is None:
             return None
 
@@ -282,21 +285,81 @@ class DuplicateDetector:
             return None
         return hash_str
 
-    def _set_cached_hash(self, filepath: str, hash_str: str, st: Optional[os.stat_result] = None):
-        """Store a phash together with the file identity it was computed from."""
+    def set(self, filepath: str, hash_str: str, st: Optional[os.stat_result] = None) -> None:
+        """Store a hash together with the file identity it was computed from."""
         if st is None:
             try:
                 st = os.stat(filepath)
             except OSError:
                 return
-        self._hash_cache[filepath] = (hash_str, st.st_mtime_ns, st.st_size)
-        self._hash_cache_dirty = True
+        self._entries[filepath] = (hash_str, st.st_mtime_ns, st.st_size)
+        self.dirty = True
+
+
+class _UnionFind:
+    """Disjoint-set over integer indices, for order-independent clustering."""
+
+    __slots__ = ("_parent",)
+
+    def __init__(self, n: int):
+        self._parent = list(range(n))
+
+    def find(self, x: int) -> int:
+        root = x
+        while self._parent[root] != root:
+            root = self._parent[root]
+        while self._parent[x] != root:  # Path compression
+            self._parent[x], x = root, self._parent[x]
+        return root
+
+    def union(self, a: int, b: int) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self._parent[max(ra, rb)] = min(ra, rb)
+
+    def clusters(self) -> List[List[int]]:
+        """Members grouped by root, each cluster and the whole list sorted."""
+        buckets: Dict[int, List[int]] = defaultdict(list)
+        for i in range(len(self._parent)):
+            buckets[self.find(i)].append(i)
+        return [sorted(members) for _, members in sorted(buckets.items())]
+
+
+class DuplicateDetector:
+    """
+    Detects duplicate media files using various strategies.
+
+    Videos: Exact match on size + duration + resolution, plus a second pass that
+            catches re-encodes (same content, different size/codec/resolution)
+    Images: Perceptual hash (if imagehash available) or exact size + resolution
+
+    Performance:
+    - Perceptual hashes are cached to disk across scans
+    - Hash bucketing eliminates O(n²) comparisons
+    """
+
+    # Frame positions sampled for the re-encode pass, as fractions of duration.
+    # Spread out on purpose: a single early frame is often a black frame or a
+    # studio logo, which matches across completely unrelated videos.
+    REENCODE_FRAME_POSITIONS = (0.25, 0.5, 0.75)
+    # How far two durations may drift and still be considered the same content.
+    # Re-encodes land within a frame or two; container padding adds a bit more.
+    REENCODE_DURATION_TOLERANCE_SEC = 1.5
+    # Max per-frame Hamming distance. Every sampled position must be within it.
+    REENCODE_FRAME_THRESHOLD = 8
+
+    def __init__(self):
+        self._group_counter = 0
+        self._image_hashes = _StatValidatedHashCache(".phash_cache.json", "image hashes")
+        self._video_hashes = _StatValidatedHashCache(
+            ".vframe_cache.json", "video frame signatures"
+        )
 
     def _generate_group_id(self) -> str:
         self._group_counter += 1
         return f"dup_{self._group_counter:04d}"
 
-    def find_all_duplicates(self, entries: List, progress_callback=None, batch_size: int = 5000, batch_offset: int = 0) -> Tuple[List[DuplicateGroup], bool]:
+    def find_all_duplicates(self, entries: List, progress_callback=None, batch_size: int = 5000, batch_offset: int = 0, detect_reencodes: bool = True) -> Tuple[List[DuplicateGroup], bool]:
         """
         Find duplicates in the media library with batching support.
 
@@ -305,6 +368,9 @@ class DuplicateDetector:
             progress_callback: Optional callable(str, float) to report status and progress (0-100)
             batch_size: Max number of images to process per batch (default 5000)
             batch_offset: Starting offset for image processing (for pagination)
+            detect_reencodes: Also look for re-encoded copies of the same video
+                (different size/codec, same content). Costs ffmpeg frame
+                extractions on first run; cached afterwards.
 
         Returns:
             Tuple of (List of DuplicateGroup objects, has_more: bool indicating if more batches available)
@@ -330,6 +396,15 @@ class DuplicateDetector:
 
         video_groups = self._find_video_duplicates(videos, progress_callback)
         groups.extend(video_groups)
+
+        # Second video pass: copies that were re-encoded, so no metadata matches
+        if detect_reencodes:
+            already_grouped = {f.path for g in video_groups for f in g.files}
+            groups.extend(
+                self._find_reencoded_video_duplicates(
+                    videos, already_grouped, progress_callback
+                )
+            )
 
         # Find image duplicates (batched)
         if progress_callback:
@@ -458,6 +533,7 @@ class DuplicateDetector:
         if not IMAGEHASH_AVAILABLE:
             return None
 
+        temp_path = None
         try:
             # Create temp file for extracted frame
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
@@ -486,16 +562,18 @@ class DuplicateDetector:
                 phash = imagehash.phash(img)
                 hash_str = str(phash)
 
-            # Cleanup
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
-
             return hash_str
 
         except Exception:
             return None
+        finally:
+            # Always clean up: on an ffmpeg failure or timeout the old code left
+            # the (empty) temp file behind, filling /tmp over a long scan.
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     def _verify_by_visual_hash(self, files: List, threshold: int = 8) -> List[List]:
         """
@@ -546,12 +624,167 @@ class DuplicateDetector:
 
         return groups
 
-    def _create_video_group(self, videos: List) -> DuplicateGroup:
+    # -- Re-encode detection --------------------------------------------------
+    #
+    # The exact pass above buckets videos by rounded size + duration +
+    # resolution. A re-encoded copy (H.264 -> HEVC, 1080p -> 720p, different
+    # CRF) shares none of those, so it never reaches the same bucket -- and the
+    # visual-hash fallback only ever runs *inside* one bucket, where files
+    # already have identical size and resolution and there is nothing left for
+    # it to find. Re-encodes, the single most common kind of real duplicate in
+    # a transcoded library, were therefore invisible.
+    #
+    # What does survive re-encoding is the picture itself and, to within about
+    # a frame, the duration. So: bucket by duration, then compare perceptual
+    # hashes of frames sampled at the same *relative* positions.
+
+    def _video_frame_signature(self, video) -> Optional[str]:
+        """Perceptual hashes of several frames of one video, ':'-joined.
+
+        Cached on disk keyed by path + mtime + size, because each miss costs one
+        ffmpeg invocation per sampled position.
+        """
+        path = getattr(video, 'file_path', '')
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+
+        cached = self._video_hashes.get(path, st)
+        if cached:
+            return cached
+
+        duration = getattr(video, 'duration_sec', 0) or 0
+        if duration <= 0:
+            return None
+
+        hashes = []
+        for fraction in self.REENCODE_FRAME_POSITIONS:
+            hash_str = self._get_video_frame_hash(path, duration * fraction)
+            if not hash_str:
+                return None  # A partial signature would compare unequal lengths
+            hashes.append(hash_str)
+
+        signature = ":".join(hashes)
+        self._video_hashes.set(path, signature, st)
+        return signature
+
+    @staticmethod
+    def _signatures_match(sig_a: str, sig_b: str, threshold: int) -> bool:
+        """True when *every* sampled frame is within the Hamming threshold.
+
+        Requiring all positions rather than a majority is what keeps episodes of
+        the same series apart: they share an intro, not a whole runtime.
+        """
+        frames_a = sig_a.split(":")
+        frames_b = sig_b.split(":")
+        if len(frames_a) != len(frames_b):
+            return False
+        try:
+            return all(
+                _hamming(int(a, 16), int(b, 16)) <= threshold
+                for a, b in zip(frames_a, frames_b)
+            )
+        except ValueError:
+            return False
+
+    def _duration_candidate_pairs(self, videos: List) -> List[Tuple[int, int]]:
+        """Index pairs whose durations are close enough to be the same content.
+
+        Sweeps the duration-sorted list, so this is O(n log n) plus the pairs
+        actually emitted -- not an all-pairs comparison.
+        """
+        order = sorted(
+            range(len(videos)),
+            key=lambda i: (getattr(videos[i], 'duration_sec', 0) or 0, videos[i].file_path),
+        )
+        tolerance = self.REENCODE_DURATION_TOLERANCE_SEC
+
+        pairs = []
+        for a in range(len(order)):
+            dur_a = getattr(videos[order[a]], 'duration_sec', 0) or 0
+            if dur_a <= 0:
+                continue
+            for b in range(a + 1, len(order)):
+                dur_b = getattr(videos[order[b]], 'duration_sec', 0) or 0
+                if dur_b - dur_a > tolerance:
+                    break  # Sorted: everything further out is further away
+                pairs.append((order[a], order[b]))
+        return pairs
+
+    def _find_reencoded_video_duplicates(
+        self, videos: List, skip_paths: Set[str], progress_callback=None
+    ) -> List[DuplicateGroup]:
+        """Group videos that hold the same content at different encodings."""
+        if not IMAGEHASH_AVAILABLE:
+            return []
+
+        candidates = [
+            v for v in videos
+            if v.file_path not in skip_paths and (getattr(v, 'duration_sec', 0) or 0) > 0
+        ]
+        if len(candidates) < 2:
+            return []
+
+        pairs = self._duration_candidate_pairs(candidates)
+        if not pairs:
+            return []
+
+        # Only videos that actually have a duration neighbour get hashed; a file
+        # with a unique runtime can have no re-encode twin, so paying for three
+        # ffmpeg seeks on it would be pure waste.
+        needed = sorted({i for pair in pairs for i in pair})
+        self._video_hashes.load()
+
+        signatures: Dict[int, str] = {}
+        for done, idx in enumerate(needed):
+            if progress_callback and done % 25 == 0:
+                pct = 55 + (done / len(needed)) * 20  # 55-75% range
+                progress_callback(
+                    f"Checking video {done}/{len(needed)} for re-encoded copies", pct
+                )
+            signature = self._video_frame_signature(candidates[idx])
+            if signature:
+                signatures[idx] = signature
+        self._video_hashes.save()
+
+        # Union-Find: whether A and B end up together must not depend on the
+        # order the pairs happen to be visited in.
+        uf = _UnionFind(len(candidates))
+        for i, j in pairs:
+            sig_i, sig_j = signatures.get(i), signatures.get(j)
+            if sig_i and sig_j and self._signatures_match(
+                sig_i, sig_j, self.REENCODE_FRAME_THRESHOLD
+            ):
+                uf.union(i, j)
+
+        groups = []
+        for members in uf.clusters():
+            if len(members) > 1:
+                groups.append(
+                    self._create_video_group(
+                        [candidates[i] for i in members],
+                        match_type="reencode",
+                        confidence=0.75,
+                    )
+                )
+        return groups
+
+    def _create_video_group(
+        self, videos: List, match_type: str = "exact", confidence: float = 0.95
+    ) -> DuplicateGroup:
         """Create a DuplicateGroup from a list of matching videos."""
         dup_files = []
 
+        # Within a re-encode group the codec says nothing about which copy is
+        # the source — the HEVC file is usually the *lossy* derivative of the
+        # H.264 original, so its +20 codec bonus would recommend keeping exactly
+        # the copy the user wants to drop. Resolution and bitrate still do carry
+        # that signal, so only the codec term is dropped.
+        codec_bonus = match_type != "reencode"
+
         for v in videos:
-            quality_score = self._calculate_video_quality_score(v)
+            quality_score = self._calculate_video_quality_score(v, codec_bonus=codec_bonus)
             dup_file = DuplicateFile(
                 path=v.file_path,
                 size_mb=v.size_mb,
@@ -576,18 +809,22 @@ class DuplicateDetector:
 
         return DuplicateGroup(
             group_id=self._generate_group_id(),
-            match_type="exact",
+            match_type=match_type,
             media_type="video",
-            confidence=0.95,
+            confidence=confidence,
             files=dup_files,
             recommended_keep=dup_files[0].path if dup_files else "",
             potential_savings_mb=round(savings, 2),
         )
 
-    def _calculate_video_quality_score(self, video) -> float:
+    def _calculate_video_quality_score(self, video, codec_bonus: bool = True) -> float:
         """
         Calculate a quality score for a video.
         Higher score = better quality = should keep.
+
+        `codec_bonus` rewards modern codecs — right when picking between
+        byte-identical copies, wrong when picking between re-encodes, where the
+        efficient codec marks the lossy derivative rather than the source.
         """
         score = 0.0
 
@@ -609,7 +846,7 @@ class DuplicateDetector:
             score += 5
 
         # Codec contribution (0-20 points)
-        codec = getattr(video, 'codec', '').lower()
+        codec = getattr(video, 'codec', '').lower() if codec_bonus else ''
         if 'hevc' in codec or 'h265' in codec or 'x265' in codec:
             score += 20  # Modern efficient codec
         elif 'h264' in codec or 'avc' in codec or 'x264' in codec:
@@ -664,7 +901,7 @@ class DuplicateDetector:
         import gc
 
         # Load hash cache from disk
-        self._ensure_hash_cache()
+        self._image_hashes.load()
 
         # Phase 1: Compute/retrieve hashes with progress tracking
         hash_data: List[Tuple[str, 'imagehash.ImageHash', Any]] = []
@@ -685,7 +922,7 @@ class DuplicateDetector:
                 continue
 
             # Check cache first
-            cached_hash_str = self._get_cached_hash(path, st)
+            cached_hash_str = self._image_hashes.get(path, st)
             if cached_hash_str:
                 try:
                     phash = imagehash.hex_to_hash(cached_hash_str)
@@ -702,7 +939,7 @@ class DuplicateDetector:
                     phash = imagehash.phash(hash_img)
                     hash_str = str(phash)
                     hash_data.append((hash_str, phash, img))
-                    self._set_cached_hash(path, hash_str, st)
+                    self._image_hashes.set(path, hash_str, st)
                     cache_misses += 1
             except Exception:
                 continue
@@ -712,7 +949,7 @@ class DuplicateDetector:
                 gc.collect()
 
         # Save updated cache to disk
-        self._save_hash_cache()
+        self._image_hashes.save()
 
         if progress_callback:
             progress_callback(f"Hashed {len(hash_data)} images ({cache_hits} cached, {cache_misses} new)", 92)
