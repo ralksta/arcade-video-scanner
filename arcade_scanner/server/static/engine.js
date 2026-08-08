@@ -39,16 +39,51 @@ function renderUI(reset, scrollToTop = false) {
     }
 
     if (reset) {
+        // A reset render drops back to a single batch, so the page collapses and
+        // the browser snaps to the top. Remember how far we were scrolled and how
+        // many batches were on screen, so we can rebuild the same view.
+        const prevRendered = renderedCount;
+        const prevScrollY = window.scrollY;
+
         grid.innerHTML = '';
         renderedCount = 0;
 
         // Only scroll to top when explicitly requested (e.g., workspace change)
-        // This prevents scroll-jumping when filtering/sorting
+        // This prevents scroll-jumping when filtering/sorting/deleting
         if (scrollToTop) {
             window.scrollTo({ top: 0, behavior: 'instant' });
+            renderNextBatch();
+            return;
         }
+
+        // Restore the previous amount of cards, then the scroll offset.
+        const target = Math.min(prevRendered, filteredVideos.length);
+        do {
+            renderNextBatch();
+        } while (renderedCount < target);
+
+        restoreScrollPosition(prevScrollY);
+        return;
     }
     renderNextBatch();
+}
+
+/**
+ * Restore a previously captured vertical scroll offset after a reset render.
+ * Runs twice (now + next frame) because card heights settle only after layout.
+ *
+ * @param {number} y - Scroll offset in pixels
+ */
+function restoreScrollPosition(y) {
+    if (!y) return;
+
+    const apply = () => {
+        const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo({ top: Math.min(y, maxY), behavior: 'instant' });
+    };
+
+    apply();
+    requestAnimationFrame(apply);
 }
 
 /**

@@ -37,6 +37,12 @@ All notable changes to this project will be documented in this file.
   Verzeichnislisten und 38×22-Toggle-Switches.
 
 ### Fixed
+- **Kein Scroll-Sprung mehr nach dem Löschen im Grid.** Jedes Neurendern des
+  Grids (Löschen, Favorit, Tag-Änderung, Filter) fiel auf einen einzigen
+  40er-Batch zurück; die Seite schrumpfte und der Browser sprang nach oben.
+  `renderUI()` baut jetzt so viele Batches wieder auf, wie vorher sichtbar
+  waren, und stellt die Scroll-Position wieder her — außer bei explizitem
+  `scrollToTop` (z. B. Workspace-Wechsel).
 - **Remote-Encoding (Mac-Worker) wieder zuverlässig.** Der Worker meldet sich
   jetzt selbst neu an, wenn die Session abläuft — bisher lief er nach jedem
   Server-Neustart endlos in `401`, weil Sessions nur im RAM liegen und
