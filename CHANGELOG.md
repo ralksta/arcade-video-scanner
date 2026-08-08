@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
+- **Duplikat-Scan brach sofort ab** (`'dict' object has no attribute 'file_path'`):
+  Der OOM-Fix hatte `_media_cache` von `db.get_all()` auf `db.get_all_dicts()`
+  umgestellt — API-Dicts mit UI-Aliasen (`FilePath`) statt `VideoEntry`-Modellen.
+  Der `DuplicateDetector` arbeitet aber durchgängig attributbasiert
+  (`v.file_path`, `v.size_mb`, `media_type`), sodass der Scan-Target-Filter
+  stolperte, sobald ein Benutzer Scan-Ziele gesetzt hatte. Der Duplikat-Pfad
+  holt die Einträge jetzt wieder über `db.get_all()`.
+  Der stille Teil war der gefährlichere: `getattr(dict, 'media_type', 'video')`
+  liefert **immer** `'video'`, Bilder wären also nie als Bilder erkannt und nie
+  verglichen worden — ohne Fehlermeldung. Neuer Contract-Test
+  `test_duplicate_scan_entry_contract.py` hält beide Fälle fest.
 - **Kandidaten-Ansicht: "URI malformed"**: Dateinamen mit ungültigen UTF-8-Bytes
   (cp1252-Reste wie `ö`, `ü`, `'`) kommen über Pythons `surrogateescape` als
   einzelne Surrogate im JSON an; `encodeURIComponent` wirft darauf `URIError`.

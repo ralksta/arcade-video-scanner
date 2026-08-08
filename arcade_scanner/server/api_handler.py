@@ -195,7 +195,13 @@ def background_duplicate_scan(
             _dup_mgr.update_state(message=msg, progress=int(pct))
 
         detector = DuplicateDetector()
-        all_videos = _media_cache.get()
+        # Bewusst db.get_all() statt _media_cache.get(): der Cache liefert seit
+        # dem OOM-Fix API-Dicts mit UI-Aliasen ("FilePath"), der DuplicateDetector
+        # arbeitet aber durchgängig objektbasiert (v.file_path, v.size_mb,
+        # media_type). Mit Dicts crasht der Filter unten, und selbst ohne ihn
+        # liefe der Detector still falsch: getattr(dict, 'media_type', 'video')
+        # ergibt immer 'video', Bilder würden nie als Bilder erkannt.
+        all_videos = db.get_all()
         print(f"🔍 Duplicate scan: {len(all_videos)} total files in database")
 
         if user_scan_targets:
