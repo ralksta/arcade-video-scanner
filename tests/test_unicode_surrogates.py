@@ -198,7 +198,10 @@ def test_candidates_view_renders_surrogate_paths():
     reicht deshalb den Ergebnis-Index an die onclick-Handler, nicht den
     URL-kodierten Pfad.
     """
-    result = _run_view_js(["candidates.js"], """
+    # utils.js muss mit geladen werden: candidates.js nutzt das dort definierte
+    # globale escapeHtml() — im Browser über window, hier über den gemeinsamen
+    # VM-Kontext. Ohne die Datei testet man eine Umgebung, die es nicht gibt.
+    result = _run_view_js(["utils.js", "candidates.js"], """
         const mk = p => ({ file_path: p, codec: 'h264', height: 1080,
             bitrate_mbps: 8.5, size_mb: 2048, reason: 'test',
             estimated_saved_mb: 900, estimated_saved_pct: 44,

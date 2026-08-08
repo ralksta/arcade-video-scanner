@@ -66,13 +66,6 @@ function _candHeader() {
     </div>`;
 }
 
-// Dateinamen dürfen nicht roh ins Markup: ein " oder < im Namen zerlegt sonst
-// das Attribut bzw. das Element.
-function _esc(s) {
-    return String(s).replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
 function _candRow(r, idx) {
     const name = r.file_path.split(/[/\\]/).pop();
     const checked = candState.selected.has(r.file_path) ? 'checked' : '';
@@ -83,11 +76,11 @@ function _candRow(r, idx) {
     return `
     <div id="cand-${idx}" class="col-span-full flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10">
         <input type="checkbox" ${checked} onclick="toggleCandidateSelect(${idx})">
-        <div class="cursor-pointer" onclick="openCinema(this)" data-path="${_esc(r.file_path)}">${thumb}</div>
+        <div class="cursor-pointer" onclick="openCinema(this)" data-path="${escapeHtml(r.file_path)}">${thumb}</div>
         <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-medium">${_esc(name)}</div>
+            <div class="truncate text-sm font-medium">${escapeHtml(name)}</div>
             <div class="text-xs text-gray-400">${r.codec.toUpperCase()} · ${r.height}p · ${r.bitrate_mbps.toFixed(1)} Mbit/s · ${_fmtGB(r.size_mb)}</div>
-            <div class="text-[11px] text-gray-500">${r.reason}</div>
+            <div class="text-[11px] text-gray-500">${escapeHtml(r.reason)}</div>
         </div>
         <div class="text-right shrink-0">
             <div class="text-sm font-bold text-arcade-cyan">−${_fmtGB(r.estimated_saved_mb)}</div>
