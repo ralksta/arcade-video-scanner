@@ -34,6 +34,11 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Duplicate-Checker und Settings-Dialog lagen mit `z-index` unter der
   Sidebar (`z-100`) und wurden von ihr überlappt.
+- Reste der alten Palette, die per Inline-Style bzw. hartkodiertem Hex an den
+  CSS-Tokens vorbeiliefen: `setWorkspaceMode()` hat der Filterleiste bei jedem
+  Workspace-Wechsel eine Cyan/Gold/Magenta-Border plus Farb-Tint zugewiesen und
+  damit die neutrale Hairline überschrieben; dazu der aktive Datums-Chip, der
+  Hover der Folder-Cards, das HEVC-Label im Treemap und der Batch-Warnhinweis.
 
 ### Added
 - **Duplikat-Scan findet re-encodete Videos**: Der bisherige Video-Pass gruppiert
