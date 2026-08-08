@@ -8,8 +8,6 @@ it here — the restore lands separately with PR #33.
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from arcade_scanner.server.routes import tags
 
 
@@ -73,14 +71,9 @@ def test_unrelated_path_not_handled():
     assert tags.handle_post(FakeHandler("/api/other", body={})) is False
 
 
-@pytest.mark.xfail(
-    reason="MAX_REQUEST_SIZE-Reexport aus api_handler wurde von cf62272 entfernt "
-           "(ruff-Cleanup) — tags._get_deps() wirft ImportError, /api/tags "
-           "antwortet auf dev mit 404. Fix (Restore + Regressionstest) kommt mit "
-           "PR #33; dieser Test wird danach grün und der Marker entfernt.",
-    strict=False,
-)
 def test_get_tags_with_session_returns_definitions():
+    # Grün seit PR #33 den MAX_REQUEST_SIZE-Reexport wiederhergestellt hat
+    # (cf62272 hatte ihn entfernt und /api/tags damit auf 404 gelegt).
     h = FakeHandler("/api/tags")
     assert tags.handle_get(h) is True
     assert h.status == 200
