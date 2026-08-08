@@ -20,6 +20,15 @@ All notable changes to this project will be documented in this file.
   Videos, die überhaupt einen Dauer-Nachbarn haben. Abschaltbar über
   `find_all_duplicates(..., detect_reencodes=False)`.
 
+### Changed
+- **Bild-Hashing läuft parallel**: Das Dekodieren der Bilder ist die gesamte
+  Kosten des ersten Duplikat-Scans, und PIL wie numpy geben dabei den GIL frei.
+  Cache-Misses laufen jetzt über einen Thread-Pool (Threads = Kernzahl,
+  gedeckelt bei 8). Gemessen auf 4 Kernen: 300 Bilder à 1600×1200 in 2,0 s statt
+  6,2 s (3,0×), bei identischer Gruppierung. Nebenbei entfällt pro Bild ein
+  `imagehash.hex_to_hash` — das Objekt wurde durch beide Vergleichsphasen
+  gereicht, aber nie gelesen (verglichen wird auf `int(hash, 16)`).
+
 ### Fixed
 - **Bild-Duplikate fielen aus dem Ergebnis, wenn eine Gruppe ihren Partner
   zuerst beanspruchte**: Der Near-Miss-Pass war greedy — wer einmal in einer
