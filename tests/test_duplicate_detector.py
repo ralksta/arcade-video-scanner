@@ -298,7 +298,6 @@ def test_changed_file_is_regrouped_by_its_new_hash(tmp_path):
 
 def test_legacy_flat_cache_is_migrated_and_stamped(tmp_path):
     """v1 caches ({path: hash}) keep working instead of forcing a full re-hash."""
-    detector = DuplicateDetector()
     path = tmp_path / "legacy.jpg"
     path.write_bytes(b"\xff\xd8\xff\xd9")
 
@@ -312,7 +311,6 @@ def test_legacy_flat_cache_is_migrated_and_stamped(tmp_path):
 
 
 def test_decode_purges_orphans_and_malformed_entries(tmp_path):
-    detector = DuplicateDetector()
     present = tmp_path / "present.jpg"
     present.write_bytes(b"\xff\xd8\xff\xd9")
     st = os.stat(present)
