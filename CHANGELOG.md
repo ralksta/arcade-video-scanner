@@ -21,6 +21,17 @@ All notable changes to this project will be documented in this file.
   `find_all_duplicates(..., detect_reencodes=False)`.
 
 ### Fixed
+- **Bild-Duplikate fielen aus dem Ergebnis, wenn eine Gruppe ihren Partner
+  zuerst beanspruchte**: Der Near-Miss-Pass war greedy — wer einmal in einer
+  Gruppe steckte, war für alle weiteren Vergleiche verbraucht. Bei A~B und A~C,
+  aber B!~C, verschwand je nach Reihenfolge B oder C komplett aus dem Ergebnis
+  und wurde als eindeutig gemeldet. Welches von beiden, hing an der
+  Iterationsreihenfolge, dieselbe Bibliothek konnte also unterschiedliche
+  Antworten liefern. Clustering läuft jetzt über Union-Find: jedes Paar
+  innerhalb der Schwelle landet garantiert in derselben Gruppe. Preis dafür ist
+  transitives Ketten (A~B, B~C ergibt eine Gruppe, auch wenn A!~C) — bei
+  Schwelle 5 über 64 Bit braucht das einen echten Verlauf fast identischer
+  Bilder, und die zusammen zu zeigen ist ohnehin die erwartete Antwort.
 - **Duplikat-Scan fand keine Duplikate über Batch-Grenzen hinweg**: Die
   Bild-Batches waren echte Slices (`all_images[offset:offset+size]`), und
   verglichen wurde nur *innerhalb* eines Slices. Zwei Kopien desselben Fotos auf

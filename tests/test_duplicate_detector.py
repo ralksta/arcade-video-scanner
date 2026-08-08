@@ -130,13 +130,19 @@ def test_threshold_zero_skips_near_miss_pass(tmp_path):
 
 
 def test_matches_brute_force_on_random_hashes(tmp_path):
-    """Candidate search must find exactly what an all-pairs scan would find.
+    """Candidate search must find everything an all-pairs scan would find.
 
-    This is the general form of the head/tail asymmetry above: for random
-    hashes, every pair the detector groups must be within the threshold, and
-    every pair within the threshold must end up in *some* group together --
-    unless one of them was already consumed by an earlier group (the grouping
-    pass is greedy, and this test pins that down rather than fighting it).
+    This is the general form of the head/tail asymmetry above. Two properties,
+    both stated against a brute-force reference:
+
+    - Completeness: every pair within the threshold lands in the *same* group.
+      The greedy pass this replaced could only promise that at least one of the
+      two ended up grouped somewhere -- with A~B and A~C but B!~C, whichever of
+      B/C lost the race was reported as unique, and which one lost depended on
+      iteration order.
+    - Soundness: a group is not arbitrary. Members chain transitively, so two
+      members may sit further apart than the threshold, but every member has to
+      be within it of *some* other member of its own group.
     """
     import random
 
@@ -165,26 +171,64 @@ def test_matches_brute_force_on_random_hashes(tmp_path):
     parsed = [imagehash.hex_to_hash(h) for h in hashes]
     grouped = grouped_paths(groups)
 
-    # Every grouped pair really is within the threshold.
     index_of = {f"img_{i:03d}.jpg": i for i in range(len(hashes))}
+
+    # Soundness: nobody is in a group they have no near neighbour in.
     for group in grouped:
         members = sorted(index_of[name] for name in group)
-        anchor = members[0]
-        for other in members[1:]:
-            assert parsed[anchor] - parsed[other] <= threshold, (
-                f"grouped {anchor} and {other} at distance "
-                f"{parsed[anchor] - parsed[other]} > {threshold}"
-            )
+        for member in members:
+            assert any(
+                other != member and parsed[member] - parsed[other] <= threshold
+                for other in members
+            ), f"{member} was grouped without a single neighbour within {threshold}"
 
-    # No near pair is missed outright: for every brute-force pair, at least one
-    # of the two must have landed in a group.
-    in_a_group = {name for group in grouped for name in group}
+    # Completeness: every brute-force near pair shares a group.
+    group_of = {
+        index_of[name]: gid for gid, group in enumerate(grouped) for name in group
+    }
     for a in range(len(hashes)):
         for b in range(a + 1, len(hashes)):
             if parsed[a] - parsed[b] <= threshold:
-                assert (
-                    f"img_{a:03d}.jpg" in in_a_group or f"img_{b:03d}.jpg" in in_a_group
-                ), f"pair ({a}, {b}) at distance {parsed[a] - parsed[b]} was dropped entirely"
+                assert group_of.get(a) is not None and group_of.get(a) == group_of.get(b), (
+                    f"pair ({a}, {b}) at distance {parsed[a] - parsed[b]} "
+                    f"did not end up in the same group"
+                )
+
+
+def test_third_near_match_is_not_dropped(tmp_path):
+    """A near-duplicate must not vanish because a group claimed its match first.
+
+    Distances here: B–A = 5, A–C = 5, B–C = 10. With the input in this order,
+    the greedy pass anchored on B, pulled in A (within 5), marked both used,
+    and then found nothing left for C — which was within the threshold of A and
+    should have been reported. C was silently listed as unique instead.
+    """
+    hash_a = "0000000000000000"
+    hash_b = "000000000000001f"  # 5 bits from A
+    hash_c = "0000000000001f00"  # 5 bits from A, 10 from B
+
+    detector, images = make_detector(tmp_path, [hash_b, hash_a, hash_c])
+
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
+
+    assert grouped_paths(groups) == {
+        frozenset({"img_000.jpg", "img_001.jpg", "img_002.jpg"})
+    }
+
+
+def test_grouping_does_not_depend_on_input_order(tmp_path):
+    """The same three images must group the same way however they arrive."""
+    hashes = ["0000000000000000", "000000000000001f", "0000000000001f00"]
+
+    results = []
+    for run, order in enumerate([[0, 1, 2], [2, 1, 0], [1, 0, 2]]):
+        run_dir = tmp_path / f"run{run}"
+        run_dir.mkdir()
+        detector, images = make_detector(run_dir, [hashes[i] for i in order])
+        groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
+        results.append(sorted(len(g.files) for g in groups))
+
+    assert results == [[3], [3], [3]]
 
 
 def test_missing_files_are_skipped(tmp_path):
