@@ -220,9 +220,17 @@ def background_duplicate_scan(
         )
         print(f"🔍 Found {len(results)} duplicate groups (has_more: {has_more})")
 
+        # Replacing the cache wholesale is correct: a run's result now covers
+        # every image with a known hash, not just its own slice, so each run is
+        # a superset of the last. (While batches were slices, this line quietly
+        # threw away everything the previous batch had found.)
         _dup_mgr.cache = [g.to_dict() for g in results]
         _dup_mgr.update_state(
             has_more=has_more,
+            # An opaque continuation token, no longer a list index — the
+            # detector tracks progress by what its hash cache already holds.
+            # It only has to stay non-zero, because loadDuplicates() treats
+            # offset 0 as "show cached results" instead of "scan again".
             next_offset=batch_offset + 5000 if has_more else 0,
         )
         save_duplicate_cache()

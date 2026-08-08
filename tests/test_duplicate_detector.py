@@ -42,8 +42,8 @@ def make_detector(tmp_path, hashes):
     entry. Returns (detector, [FakeImage, ...]) in the same order.
     """
     detector = DuplicateDetector()
-    # Point the cache at a tmp file so _ensure_hash_cache short-circuits and
-    # nothing is ever read from or written to the real arcade_data/ dir.
+    # Point the cache at a tmp file so load() short-circuits and nothing is
+    # ever read from or written to the real arcade_data/ dir.
     detector._image_hashes.path = str(tmp_path / ".phash_cache.json")
 
     images = []
@@ -71,7 +71,7 @@ def test_identical_hashes_are_grouped(tmp_path):
         tmp_path, ["f0f0f0f0f0f0f0f0", "f0f0f0f0f0f0f0f0", "0123456789abcdef"]
     )
 
-    groups = detector._find_image_duplicates_by_hash(images, threshold=5)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
 
     assert grouped_paths(groups) == {frozenset({"img_000.jpg", "img_001.jpg"})}
 
@@ -86,7 +86,7 @@ def test_near_miss_in_hash_tail_is_grouped(tmp_path):
         tmp_path, ["0000000000000000", "0000000000000001"]
     )
 
-    groups = detector._find_image_duplicates_by_hash(images, threshold=5)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
 
     assert grouped_paths(groups) == {frozenset({"img_000.jpg", "img_001.jpg"})}
 
@@ -102,7 +102,7 @@ def test_near_miss_in_hash_head_is_grouped(tmp_path):
         tmp_path, ["0000000000000000", "8000000000000000"]
     )
 
-    groups = detector._find_image_duplicates_by_hash(images, threshold=5)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
 
     assert grouped_paths(groups) == {frozenset({"img_000.jpg", "img_001.jpg"})}
 
@@ -113,7 +113,7 @@ def test_distant_hashes_are_not_grouped(tmp_path):
         tmp_path, ["0000000000000000", "ffffffffffffffff"]
     )
 
-    groups = detector._find_image_duplicates_by_hash(images, threshold=5)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
 
     assert groups == []
 
@@ -124,7 +124,7 @@ def test_threshold_zero_skips_near_miss_pass(tmp_path):
         tmp_path, ["0000000000000000", "0000000000000001"]
     )
 
-    groups = detector._find_image_duplicates_by_hash(images, threshold=0)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=0)
 
     assert groups == []
 
@@ -160,7 +160,7 @@ def test_matches_brute_force_on_random_hashes(tmp_path):
     rng.shuffle(hashes)
 
     detector, images = make_detector(tmp_path, hashes)
-    groups = detector._find_image_duplicates_by_hash(images, threshold=threshold)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=threshold)
 
     parsed = [imagehash.hex_to_hash(h) for h in hashes]
     grouped = grouped_paths(groups)
@@ -194,7 +194,7 @@ def test_missing_files_are_skipped(tmp_path):
     )
     os.remove(images[1].file_path)
 
-    groups = detector._find_image_duplicates_by_hash(images, threshold=5)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
 
     assert groups == []
 
@@ -247,7 +247,7 @@ def test_changed_file_is_regrouped_by_its_new_hash(tmp_path):
         f.write(b"\xff\xd8other\xff\xd9")
     detector._image_hashes.set(path, "0f0f0f0f0f0f0f0f")
 
-    groups = detector._find_image_duplicates_by_hash(images, threshold=5)
+    groups, _ = detector._find_image_duplicates_by_hash(images, threshold=5)
 
     assert groups == []
 

@@ -21,6 +21,21 @@ All notable changes to this project will be documented in this file.
   `find_all_duplicates(..., detect_reencodes=False)`.
 
 ### Fixed
+- **Duplikat-Scan fand keine Duplikate über Batch-Grenzen hinweg**: Die
+  Bild-Batches waren echte Slices (`all_images[offset:offset+size]`), und
+  verglichen wurde nur *innerhalb* eines Slices. Zwei Kopien desselben Fotos auf
+  gegenüberliegenden Seiten einer Grenze — Eintrag 4999 und 5001 — wurden damit
+  in keinem einzigen Batch je miteinander verglichen. Zusätzlich überschrieb
+  jeder Lauf den Gruppen-Cache mit seinem eigenen Slice-Ergebnis, Batch 2 warf
+  also alles weg, was Batch 1 gefunden hatte. Das Limit begrenzt jetzt nur noch,
+  wie viele *neue* Hashes ein Lauf berechnet; verglichen wird immer über die
+  gesamte Bibliothek. Jeder Lauf liefert damit ein vollständiges Ergebnis, das
+  mit jedem weiteren Batch wächst.
+- **Nicht dekodierbare Bilder wurden bei jedem Scan neu versucht**: Fehlschläge
+  hinterließen keine Spur im Cache. Mit dem neuen Batch-Modell hätte das zu
+  einem endlosen "weitere Batches verfügbar" geführt. Sie werden jetzt markiert
+  (stat-validiert wie jeder andere Eintrag, eine reparierte Datei wird also
+  wieder versucht).
 - **Duplikat-Scan empfahl bei Re-Encodes die falsche Datei zum Behalten**:
   `_calculate_video_quality_score` vergibt +20 Punkte für moderne Codecs. Beim
   Abwägen zwischen byte-identischen Kopien ist das richtig, in einer
