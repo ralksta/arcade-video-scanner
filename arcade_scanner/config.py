@@ -49,6 +49,9 @@ STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # Security Constants
 MAX_REQUEST_SIZE = 1024 * 1024  # 1 MB limit for API requests
+# Encoded videos come back from the remote worker as one raw body, so they need
+# their own (much larger) ceiling — see routes/queue.py /api/queue/upload.
+MAX_UPLOAD_SIZE = 64 * 1024 * 1024 * 1024  # 64 GB
 ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg']
 ALLOWED_THUMBNAIL_PREFIX = "thumb_"
 

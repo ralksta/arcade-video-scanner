@@ -14,6 +14,7 @@ POST-Endpunkte:
   /api/queue/add        → Job zur Queue hinzufügen
   /api/queue/cancel     → Job abbrechen
   /api/queue/upload?    → optimierte Datei hochladen
+  /api/queue/progress   → Worker-Heartbeat (Fortschritt/Phase/ETA)
   /api/queue/complete   → Job als erledigt markieren
   /api/export/gif       → GIF-Konvertierung starten
 """
@@ -31,7 +32,8 @@ import uuid
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from arcade_scanner.config import config
+from arcade_scanner.config import MAX_UPLOAD_SIZE, config
+from arcade_scanner.core.media_replace import atomic_replace, verify_media_integrity
 from arcade_scanner.database import db
 from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 from arcade_scanner.server.api_handler import _media_cache
@@ -45,6 +47,62 @@ from arcade_scanner.server.response_helpers import (
 # ---------------------------------------------------------------------------
 
 GIF_JOBS: dict[str, dict] = {}
+
+
+# ---------------------------------------------------------------------------
+# Upload-Helfer für den Remote-Worker
+# ---------------------------------------------------------------------------
+
+def _unlink_quiet(path: str) -> None:
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
+def _receive_upload(handler, dest_path: str, content_len: int) -> int:
+    """Stream the request body to disk. Returns the number of bytes written.
+
+    A short count means the connection died mid-upload — the caller must not
+    treat that as a finished encode.
+    """
+    written = 0
+    with open(dest_path, "wb") as out:
+        while written < content_len:
+            chunk = handler.rfile.read(min(8192, content_len - written))
+            if not chunk:
+                break
+            out.write(chunk)
+            written += len(chunk)
+    return written
+
+
+def _replace_media_entry(original_path: str, new_path: str, codec: str) -> None:
+    """Carry the original's metadata over to the file that replaced it.
+
+    Mirrors the review-mode bookkeeping below: the path is the primary key, so
+    the old row has to go before the new one can be written.
+    """
+    import time
+
+    orig_entry = db.get(original_path)
+    if not orig_entry:
+        return
+
+    entry_dict = orig_entry.model_dump(by_alias=True)
+    db.remove(original_path)
+
+    entry_dict["FilePath"] = new_path
+    entry_dict["Size_MB"] = os.path.getsize(new_path) / (1024 * 1024)
+    entry_dict["Status"] = "OK"
+    entry_dict["Bitrate_Mbps"] = 0  # Rescan/analyze fills this in again
+    entry_dict["codec"] = codec
+    entry_dict["optimized_at"] = int(time.time())
+    entry_dict["OriginalPath"] = None
+
+    from arcade_scanner.models.video_entry import VideoEntry
+    db.upsert(VideoEntry(**entry_dict))
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +292,9 @@ def handle_get(handler) -> bool:
         try:
             params = parse_qs(urlparse(path).query)
             job_id = int(params.get("job_id", [0])[0])
-            cancelled = db.is_job_cancelled(job_id) if job_id else False
+            # A job that no longer exists counts as cancelled — otherwise the
+            # worker keeps encoding for a row the user already deleted.
+            cancelled = (db.is_job_cancelled(job_id) or db.get_job(job_id) is None) if job_id else False
             send_json(handler, {"cancelled": cancelled})
         except Exception as e:
             handler.send_error(500, str(e))
@@ -252,8 +312,7 @@ def handle_get(handler) -> bool:
                 handler.send_error(400, "Missing job_id")
                 return True
 
-            jobs = db.get_queue_status(limit=100)
-            job = next((j for j in jobs if j["id"] == job_id), None)
+            job = db.get_job(job_id)
             if not job:
                 handler.send_error(404, "Job not found")
                 return True
@@ -461,8 +520,7 @@ def handle_post(handler) -> bool:
                 handler.send_error(400, "Missing job_id")
                 return True
 
-            jobs = db.get_queue_status(limit=100)
-            job = next((j for j in jobs if j["id"] == job_id), None)
+            job = db.get_job(job_id)
             if not job:
                 handler.send_error(404, "Job not found")
                 return True
@@ -471,6 +529,48 @@ def handle_post(handler) -> bool:
             orig_stem = Path(original_path).stem
             orig_ext = Path(original_path).suffix
             orig_dir = os.path.dirname(original_path)
+
+            content_len = int(handler.headers.get("Content-Length", 0))
+            if content_len <= 0:
+                handler.send_error(400, "Missing Content-Length")
+                return True
+            # An encode should never exceed its source by much; the hard cap
+            # keeps a bogus header from filling the media disk.
+            limit = min(int(job.get("size_bytes") or 0) * 2 or MAX_UPLOAD_SIZE, MAX_UPLOAD_SIZE)
+            if content_len > limit:
+                db.update_job_status(job_id, "failed",
+                                     result_message=f"Upload too large ({content_len} > {limit})")
+                handler.send_error(413, "Upload too large")
+                return True
+
+            # Receive next to the original so the later os.replace stays atomic.
+            part_path = os.path.join(orig_dir, f".{orig_stem}.job{job_id}.part")
+            received = _receive_upload(handler, part_path, content_len)
+            if received != content_len:
+                _unlink_quiet(part_path)
+                db.update_job_status(
+                    job_id, "failed",
+                    result_message=f"Upload truncated ({received}/{content_len} bytes)")
+                handler.send_error(400, "Upload truncated")
+                return True
+
+            # Never let a corrupt encode replace or shadow the original.
+            expected_duration = 0.0
+            try:
+                orig_meta = db.get(original_path)
+                expected_duration = float(getattr(orig_meta, "duration_sec", 0) or 0)
+            except Exception:
+                pass
+            ok, reason = verify_media_integrity(Path(part_path), expected_duration)
+            if not ok:
+                _unlink_quiet(part_path)
+                db.update_job_status(job_id, "failed",
+                                     result_message=f"Integrity check failed: {reason}")
+                print(f"❌ Upload for job {job_id} rejected: {reason}")
+                send_json(handler, {"success": False, "error": reason})
+                return True
+
+            orig_size = os.path.getsize(original_path) if os.path.exists(original_path) else 0
 
             if config.settings.enable_review_mode:
                 # Review Mode: Move both files to a dedicated folder
@@ -487,20 +587,12 @@ def handle_post(handler) -> bool:
                 target_orig_path = os.path.join(review_job_dir, f"{orig_stem}_original{orig_ext}")
                 opt_path = os.path.join(review_job_dir, f"{orig_stem}_optimized.mp4")
 
-                # 1. Save uploaded optimized file
-                content_len = int(handler.headers.get("Content-Length", 0))
-                with open(opt_path, "wb") as out:
-                    remaining = content_len
-                    while remaining > 0:
-                        chunk = handler.rfile.read(min(8192, remaining))
-                        if not chunk:
-                            break
-                        out.write(chunk)
-                        remaining -= len(chunk)
+                # 1. Move the verified upload into the review folder
+                import shutil
+                shutil.move(part_path, opt_path)
 
                 # 2. Move original file
                 if os.path.exists(original_path):
-                    import shutil
                     shutil.move(original_path, target_orig_path)
 
                     # 3. Update Database for original
@@ -532,20 +624,17 @@ def handle_post(handler) -> bool:
                 else:
                     print(f"⚠️ Original file not found at {original_path}, skipping move.")
             else:
-                # Standard Mode: Overwrite in source directory
-                opt_path = os.path.join(orig_dir, f"{orig_stem}_opt.mp4")
-                content_len = int(handler.headers.get("Content-Length", 0))
-                with open(opt_path, "wb") as out:
-                    remaining = content_len
-                    while remaining > 0:
-                        chunk = handler.rfile.read(min(8192, remaining))
-                        if not chunk:
-                            break
-                        out.write(chunk)
-                        remaining -= len(chunk)
+                # Standard Mode: the optimized file takes the original's place.
+                opt_path = str(Path(original_path).with_suffix(".mp4"))
+                atomic_replace(Path(part_path), Path(opt_path))
+                # A .mkv source becomes .mp4, so the old file survives the replace.
+                if opt_path != original_path:
+                    _unlink_quiet(original_path)
+                _replace_media_entry(original_path, opt_path, job.get("target_codec") or "hevc")
 
             opt_size = os.path.getsize(opt_path)
-            orig_size = os.path.getsize(original_path) if not config.settings.enable_review_mode and os.path.exists(original_path) else (os.path.getsize(target_orig_path) if config.settings.enable_review_mode and os.path.exists(target_orig_path) else 0)
+            if config.settings.enable_review_mode and os.path.exists(target_orig_path):
+                orig_size = os.path.getsize(target_orig_path)
             saved = orig_size - opt_size
 
             db.update_job_status(
@@ -572,6 +661,29 @@ def handle_post(handler) -> bool:
             handler.send_error(500, str(e))
         return True
 
+    # POST /api/queue/progress
+    if path == "/api/queue/progress":
+        user_name = require_auth(handler)
+        if user_name is None:
+            return True
+        try:
+            content_len = int(handler.headers.get("Content-Length", 0))
+            data = json.loads(handler.rfile.read(content_len))
+            job_id = int(data.get("job_id", 0))
+            alive = db.update_job_progress(
+                job_id,
+                progress_pct=float(data.get("progress_pct", 0) or 0),
+                eta_seconds=int(data.get("eta_seconds", 0) or 0),
+                phase=str(data.get("phase", "")),
+            )
+            # Doubles as the cancel channel: no row updated means the job is
+            # cancelled or gone, and the worker should stop.
+            send_json(handler, {"success": alive, "cancelled": not alive})
+        except Exception as e:
+            print(f"❌ Error in queue/progress: {e}")
+            handler.send_error(500, str(e))
+        return True
+
     # POST /api/queue/complete
     if path == "/api/queue/complete":
         user_name = require_auth(handler)
@@ -583,10 +695,14 @@ def handle_post(handler) -> bool:
             job_id = int(data.get("job_id", 0))
             status = data.get("status", "done")
             message = data.get("message", "")
-            saved_bytes = int(data.get("saved_bytes", 0))
-            db.update_job_status(job_id, status, result_message=message, saved_bytes=saved_bytes)
+            extra = {"result_message": message}
+            # Intermediate reports carry no savings — writing a default 0 here
+            # would wipe the real number on every status change.
+            if "saved_bytes" in data:
+                extra["saved_bytes"] = int(data.get("saved_bytes") or 0)
+            applied = db.update_job_status(job_id, status, guard_active=True, **extra)
             print(f"📋 Job {job_id} completed: {status} — {message}")
-            send_json(handler, {"success": True})
+            send_json(handler, {"success": applied, "cancelled": not applied})
         except Exception as e:
             print(f"❌ Error in queue/complete: {e}")
             handler.send_error(500, str(e))

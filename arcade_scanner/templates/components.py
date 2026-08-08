@@ -1997,20 +1997,22 @@ SETTINGS_MODAL_COMPONENT = """
                                     <tr class="border-b border-white/5 text-gray-500 text-xs uppercase tracking-wider">
                                         <th class="text-left px-4 py-3">Status</th>
                                         <th class="text-left px-4 py-3">File</th>
+                                        <th class="text-left px-4 py-3">Progress</th>
+                                        <th class="text-left px-4 py-3 hidden lg:table-cell">Worker</th>
                                         <th class="text-left px-4 py-3 hidden md:table-cell">Queued</th>
                                         <th class="text-left px-4 py-3 hidden md:table-cell">Result</th>
                                         <th class="text-right px-4 py-3">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="queueTableBody">
-                                    <tr><td colspan="5" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>
+                                    <tr><td colspan="7" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>
                                 </tbody>
                             </table>
                         </div>
 
                         <div class="ds-settings-card flex gap-3 text-[12px] text-body-text">
                             <span class="material-icons text-text-muted text-lg">info</span>
-                            <div>Start the Mac worker with: <code class="px-2 py-0.5 bg-surface rounded text-accent">python3 mac_worker.py --server http://&lt;ip&gt;:8000 --user admin</code></div>
+                            <div>Start the Mac worker with: <code class="px-2 py-0.5 bg-surface rounded text-accent">python3 scripts/mac_worker.py --server http://&lt;ip&gt;:8000 --user admin --password &lt;pw&gt;</code><br>Credentials are required — the queue API rejects anonymous workers.</div>
                         </div>
                     </section>
                 </div>

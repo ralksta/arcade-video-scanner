@@ -875,6 +875,9 @@ window.importSettings = importSettings;
 
 // --- REMOTE QUEUE STATUS ---
 let _queuePollInterval = null;
+let _queuePollMs = 0;
+
+const QUEUE_ACTIVE_STATES = ['pending', 'downloading', 'encoding', 'uploading'];
 
 async function loadQueueStatus() {
     try {
@@ -885,9 +888,12 @@ async function loadQueueStatus() {
         if (!tbody) return;
 
         if (!jobs.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>';
+            _retuneQueuePolling(false);
             return;
         }
+
+        _retuneQueuePolling(jobs.some(j => QUEUE_ACTIVE_STATES.includes(j.status)));
 
         const statusBadge = (s) => {
             const map = {
@@ -910,13 +916,40 @@ async function loadQueueStatus() {
             return `${Math.floor(diff / 3600)}h ago`;
         };
 
+        const eta = (secs) => {
+            if (!secs || secs <= 0) return '';
+            if (secs < 60) return ` · ${secs}s left`;
+            if (secs < 3600) return ` · ${Math.round(secs / 60)}m left`;
+            return ` · ${(secs / 3600).toFixed(1)}h left`;
+        };
+
+        // Percentages are per encode pass — the quality search restarts the bar
+        // several times, which is what the phase label explains.
+        const progressCell = (j) => {
+            if (!QUEUE_ACTIVE_STATES.includes(j.status)) {
+                return j.saved_bytes > 0
+                    ? `<span class="text-xs text-green-400">−${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB</span>`
+                    : '<span class="text-xs text-gray-600">—</span>';
+            }
+            const pct = Math.max(0, Math.min(100, Number(j.progress_pct) || 0));
+            const phase = j.phase || j.status;
+            return `<div class="min-w-[120px]">
+                        <div class="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                            <div class="h-full bg-accent transition-all" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="text-[10px] text-gray-500 mt-1 truncate">${escapeHtml(phase)} ${Math.round(pct)}%${eta(j.eta_seconds)}</div>
+                    </div>`;
+        };
+
         tbody.innerHTML = jobs.map(j => `
             <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
                 <td class="px-4 py-3">${statusBadge(j.status)}</td>
-                <td class="px-4 py-3 text-white text-xs font-mono truncate max-w-[200px]" title="${j.file_path}">${j.file_path.split(/[\\/]/).pop()}</td>
+                <td class="px-4 py-3 text-white text-xs font-mono truncate max-w-[200px]" title="${escapeHtml(j.file_path)}">${escapeHtml(j.file_path.split(/[\\/]/).pop())}</td>
+                <td class="px-4 py-3">${progressCell(j)}</td>
+                <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">${escapeHtml(j.worker_id || '—')}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">${timeAgo(j.created_at)}</td>
-                <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">${j.result_message || (j.saved_bytes > 0 ? `Saved ${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB` : '—')}</td>
-                <td class="px-4 py-3 text-right">${['pending', 'downloading', 'encoding'].includes(j.status) ? `<button onclick="cancelQueueJob(${j.id})" class="text-xs text-red-400 hover:text-red-300 transition-colors">Cancel</button>` : ''}</td>
+                <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">${escapeHtml(j.result_message || (j.saved_bytes > 0 ? `Saved ${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB` : '—'))}</td>
+                <td class="px-4 py-3 text-right">${QUEUE_ACTIVE_STATES.includes(j.status) ? `<button onclick="cancelQueueJob(${j.id})" class="text-xs text-red-400 hover:text-red-300 transition-colors">Cancel</button>` : ''}</td>
             </tr>
         `).join('');
     } catch (e) {
@@ -937,16 +970,29 @@ async function cancelQueueJob(jobId) {
     }
 }
 
+// Fast enough to watch a progress bar move, slow enough to stay quiet when
+// nothing is running.
+function _retuneQueuePolling(hasActiveJobs) {
+    if (!_queuePollInterval) return;
+    const wanted = hasActiveJobs ? 2000 : 10000;
+    if (wanted === _queuePollMs) return;
+    clearInterval(_queuePollInterval);
+    _queuePollMs = wanted;
+    _queuePollInterval = setInterval(loadQueueStatus, wanted);
+}
+
 // Start polling when queue section is visible
 function startQueuePolling() {
     if (_queuePollInterval) return;
+    _queuePollMs = 2000;
+    _queuePollInterval = setInterval(loadQueueStatus, _queuePollMs);
     loadQueueStatus();
-    _queuePollInterval = setInterval(loadQueueStatus, 5000);
 }
 
 function stopQueuePolling() {
     if (_queuePollInterval) clearInterval(_queuePollInterval);
     _queuePollInterval = null;
+    _queuePollMs = 0;
 }
 
 // Hook into settings nav to start/stop polling
