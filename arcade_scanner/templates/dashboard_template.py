@@ -23,7 +23,7 @@ from arcade_scanner.templates.components import (
     TAG_MANAGER_MODAL_COMPONENT,
     TREEMAP_LEGEND_COMPONENT,
 )
-from arcade_scanner.templates.theme import THEMES
+from arcade_scanner.templates.theme import CURRENT_THEME
 from arcade_scanner.templates.ui_components import (
     render_base_layout,
     render_header,
@@ -65,9 +65,7 @@ def generate_html_report(results, report_file, server_port=8000):
     opt_avail_str = 'true' if config.optimizer_available else 'false'
     opt_enabled_str = 'true' if (config.optimizer_available and config.settings.enable_optimizer) else 'false'
 
-    # Determine Active Theme
-    active_theme_name = config.settings.theme
-    active_theme = THEMES.get(active_theme_name, THEMES['arcade'])
+    active_theme = CURRENT_THEME
 
     # 1. Prepare Header (Themed)
     header_html = render_header(
@@ -104,7 +102,7 @@ def generate_html_report(results, report_file, server_port=8000):
     {FOLDER_SIDEBAR_COMPONENT}
 
     <!-- Desktop: Main Content Area (offset by sidebar width) -->
-    <div class="flex-1 flex flex-col md:ml-64 min-h-screen bg-arcade-bg relative overflow-x-hidden max-w-full">
+    <div class="flex-1 flex flex-col md:ml-[200px] min-h-screen bg-bg relative overflow-x-hidden max-w-full">
         {header_html}
 
         {FILTER_BAR_COMPONENT}
@@ -132,12 +130,12 @@ def generate_html_report(results, report_file, server_port=8000):
             <div id="videoGrid" class="responsive-grid transition-opacity duration-300 overflow-hidden">
                 <!-- Skeleton cards shown while data loads -->
                 {''.join(['''
-                <div class="group relative w-full bg-arcade-bg rounded-xl overflow-hidden border border-black/8 dark:border-white/5 dark:bg-[#14141c] flex flex-col skeleton-card" aria-hidden="true">
-                    <div class="aspect-video bg-black/5 dark:bg-white/5 animate-pulse rounded-t-xl"></div>
-                    <div class="p-3 flex flex-col gap-2">
-                        <div class="h-3 bg-black/8 dark:bg-white/5 animate-pulse rounded w-3/4"></div>
-                        <div class="h-2 bg-black/6 dark:bg-white/5 animate-pulse rounded w-1/2"></div>
-                        <div class="h-0.5 bg-white/5 animate-pulse rounded w-full mt-2"></div>
+                <div class="group relative w-full bg-card rounded-ds-md overflow-hidden border border-line/60 flex flex-col skeleton-card" aria-hidden="true">
+                    <div class="aspect-video bg-white/5 animate-pulse"></div>
+                    <div class="px-[11px] py-2.5 flex flex-col gap-2">
+                        <div class="h-3 bg-white/5 animate-pulse rounded w-3/4"></div>
+                        <div class="h-2 bg-white/5 animate-pulse rounded w-1/2"></div>
+                        <div class="h-[3px] bg-white/5 animate-pulse rounded w-full mt-2"></div>
                     </div>
                 </div>''' for _ in range(8)])}
             </div>
@@ -192,9 +190,6 @@ def generate_html_report(results, report_file, server_port=8000):
     """
 
     external_scripts = f"""
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="/static/styles.css?v={int(time.time())}">
     <link rel="stylesheet" href="/static/timeline_scrubber.css?v={int(time.time())}">
     <script src="/static/store.js?v={int(time.time())}"></script>
@@ -227,7 +222,6 @@ def generate_html_report(results, report_file, server_port=8000):
         active_theme,
         content=main_body_html + external_scripts,
         scripts=full_scripts_block,
-        active_theme_name=active_theme.name
     )
 
     with open(report_file, "w", encoding="utf-8") as f:

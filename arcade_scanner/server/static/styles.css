@@ -1,36 +1,40 @@
 :root {
-    /* === MODERN RETRO FUSION PALETTE === */
-    --deep-purple: #1a0530;
-    --magenta: #8F0177;
-    --pink: #DE1A58;
-    --gold: #F4B342;
-    --cyan: #00ffd0;
-    --amber: #ffaa00;
-    --bg: #090012;
+    /* === DESIGN SYSTEM ===
+       Die Basis-Tokens (--ds-*) kommen aus templates/theme.py und werden im
+       <head> injiziert. Die Variablen hier sind Aliase, damit bestehende Regeln
+       automatisch die neue Palette erben: EIN Accent (Magenta), semantische
+       Farben nur fuer Badges/Readouts. */
+    --deep-purple: var(--ds-surface-2, #1a1a24);
+    --magenta: var(--ds-accent, #c4179f);
+    --pink: var(--ds-accent-hover, #e34fc0);
+    --gold: var(--ds-bitrate, #f2b544);
+    --cyan: var(--ds-accent, #c4179f);
+    --amber: var(--ds-bitrate, #f2b544);
+    --bg: var(--ds-bg, #0b0b10);
 
-    /* GLASSMORPHISM */
-    --glass: rgba(255, 255, 255, 0.06);
-    --glass-hover: rgba(255, 255, 255, 0.12);
-    --glass-active: rgba(255, 255, 255, 0.18);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-blur: blur(20px) saturate(180%);
+    /* SURFACES */
+    --glass: var(--ds-fill, rgba(255, 255, 255, 0.06));
+    --glass-hover: rgba(255, 255, 255, 0.10);
+    --glass-active: rgba(255, 255, 255, 0.14);
+    --glass-border: var(--ds-hairline-strong, rgba(255, 255, 255, 0.12));
+    --glass-blur: blur(20px);
 
     /* SEMANTIC COLORS */
-    --action: var(--cyan);
-    --warning: var(--pink);
-    --highlight: var(--gold);
-    --action-glow: rgba(0, 255, 208, 0.25);
-    --warning-glow: rgba(222, 26, 88, 0.25);
-    --highlight-glow: rgba(244, 179, 66, 0.25);
+    --action: var(--ds-accent, #c4179f);
+    --warning: var(--ds-danger, #f36969);
+    --highlight: var(--ds-bitrate, #f2b544);
+    --action-glow: rgba(196, 23, 159, 0.25);
+    --warning-glow: rgba(243, 105, 105, 0.25);
+    --highlight-glow: rgba(242, 181, 68, 0.25);
 
     /* LEGACY COMPAT */
-    --accent: var(--pink);
-    --accent-glow: rgba(222, 26, 88, 0.5);
+    --accent: var(--ds-accent, #c4179f);
+    --accent-glow: rgba(196, 23, 159, 0.45);
 
-    /* SPACING & RADIUS */
-    --radius-sm: 8px;
-    --radius-md: 14px;
-    --radius-lg: 20px;
+    /* SPACING & RADIUS (Design-System-Skala) */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
     --radius-pill: 9999px;
 
     /* Z-INDEX SCALE */
@@ -67,71 +71,34 @@
     box-sizing: border-box;
 }
 
-body.vault-mode {
-    --accent: var(--cyan);
-    --accent-glow: rgba(0, 255, 208, 0.6);
-    --magenta: #014d8f;
-    --pink: var(--cyan);
-}
-
-/* === WORKSPACE-SPECIFIC ACCENT COLORS === */
-body[data-workspace="lobby"] {
-    --ws-accent: var(--cyan);
-    --ws-accent-glow: rgba(0, 255, 208, 0.25);
-    --ws-bg-tint: rgba(0, 255, 208, 0.02);
-}
-
-body[data-workspace="favorites"] {
-    --ws-accent: var(--gold);
-    --ws-accent-glow: rgba(244, 179, 66, 0.25);
-    --ws-bg-tint: rgba(244, 179, 66, 0.03);
-}
-
-body[data-workspace="optimized"],
-body[data-workspace="review"] {
-    --ws-accent: var(--cyan);
-    --ws-accent-glow: rgba(0, 255, 208, 0.25);
-    --ws-bg-tint: rgba(0, 255, 208, 0.02);
-}
-
-body[data-workspace="vault"] {
-    --ws-accent: var(--magenta);
-    --ws-accent-glow: rgba(143, 1, 119, 0.25);
-    --ws-bg-tint: rgba(143, 1, 119, 0.04);
+/* === WORKSPACES ===
+   Design System: alle Workspaces teilen sich EINEN Accent. Die frueheren
+   pro-Workspace-Farben (cyan/gold/magenta) sind bewusst entfallen. */
+body[data-workspace] {
+    --ws-accent: var(--ds-accent, #c4179f);
+    --ws-accent-glow: rgba(196, 23, 159, 0.25);
+    --ws-bg-tint: transparent;
 }
 
 /* Workspace indicator bar */
 .workspace-indicator {
-    border-bottom: 2px solid var(--ws-accent, var(--cyan));
-    background: var(--ws-bg-tint, transparent);
-    transition: border-color 0.3s, background 0.3s;
+    border-bottom: 1px solid var(--ds-hairline, rgba(255, 255, 255, 0.08));
+    background: transparent;
 }
 
-/* Monospace: Fira Code for all numeric/code data */
+/* Monospace: System-Mono-Stack fuer alle Zahlen/Pfade/Codecs */
 .font-mono, code, kbd, pre, [style*="tabular-nums"] {
-    font-family: 'Fira Code', 'SF Mono', 'Fira Mono', monospace;
+    font-family: var(--ds-font-mono);
+    font-variant-numeric: tabular-nums;
 }
 
-/* Sidebar nav active state — theme-aware */
+/* Sidebar nav active state: Accent-Tint + 3px-Indikator, kein Glow */
 .nav-item.active {
-    background: rgba(0, 0, 0, 0.06);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-}
-
-/* Dark mode: invert to white glow */
-.dark .nav-item.active {
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    background: rgb(var(--ds-accent-rgb) / 0.12);
 }
 
 .nav-item.active .nav-indicator {
     opacity: 1 !important;
-    box-shadow: 0 0 8px currentColor;
-}
-
-.nav-item.active svg {
-    opacity: 1 !important;
-    filter: drop-shadow(0 0 4px currentColor);
 }
 
 /* Context Menu background utilities */
@@ -255,7 +222,7 @@ html {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     filter: drop-shadow(0 0 20px var(--gold));
-    text-shadow: 0 0 30px rgba(244, 179, 66, 0.5);
+    text-shadow: 0 0 30px rgb(var(--ds-bitrate-rgb) / 0.5);
 }
 
 .glitch-wrapper {
@@ -300,7 +267,7 @@ html {
     color: var(--gold);
     text-transform: uppercase;
     font-size: 0.8rem;
-    box-shadow: 0 0 10px rgba(244, 179, 66, 0.3);
+    box-shadow: 0 0 10px rgb(var(--ds-bitrate-rgb) / 0.3);
 }
 
 /* --- DASHBOARD UI --- */
@@ -545,7 +512,7 @@ html {
 /* Gold Action Style */
 .filter-btn.action-btn:hover {
     border-color: var(--gold);
-    box-shadow: 0 0 15px rgba(244, 179, 66, 0.3);
+    box-shadow: 0 0 15px rgb(var(--ds-bitrate-rgb) / 0.3);
 }
 
 #statusSelect,
@@ -725,7 +692,7 @@ html {
     background: var(--pink);
     border-color: var(--pink);
     transform: scale(1.1);
-    box-shadow: 0 5px 20px rgba(222, 26, 88, 0.4);
+    box-shadow: 0 5px 20px rgb(var(--ds-accent-rgb) / 0.4);
 }
 
 .cinema-action-btn .material-icons {
@@ -1078,40 +1045,34 @@ html {
 
 .favorite-btn {
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.4);
-    transition: 0.3s;
+    color: rgba(255, 255, 255, 0.65);
+    transition: color .15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    height: 24px;
-    width: 24px;
+    height: 28px;
+    width: 28px;
 }
 
-.favorite-btn:hover {
-    color: var(--gold);
-    transform: scale(1.15);
-}
-
+.favorite-btn:hover,
 .favorite-btn.active {
-    color: var(--gold);
-    filter: drop-shadow(0 0 12px var(--gold));
+    color: var(--ds-bitrate);
 }
 
 .favorite-btn .material-icons {
-    font-size: 26px;
+    font-size: 18px;
 }
 
 .content-card:hover {
     transform: translateY(-5px);
     border-color: var(--pink);
-    box-shadow: 0 10px 30px rgba(222, 26, 88, 0.15);
+    box-shadow: 0 10px 30px rgb(var(--ds-accent-rgb) / 0.15);
     background: var(--surface-glass, rgba(255, 255, 255, 0.95));
 }
 
 .dark .content-card:hover {
     background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 10px 30px rgba(222, 26, 88, 0.2);
+    box-shadow: 0 10px 30px rgb(var(--ds-accent-rgb) / 0.2);
 }
 
 .card-media {
@@ -1228,14 +1189,14 @@ html {
     }
 
     50% {
-        box-shadow: 0 0 25px rgba(222, 26, 88, 0.5), inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+        box-shadow: 0 0 25px rgb(var(--ds-accent-rgb) / 0.5), inset 0 -2px 0 rgba(0, 0, 0, 0.2);
     }
 }
 
 .badge.ok {
-    background: rgba(0, 255, 208, 0.15);
+    background: rgb(var(--ds-accent-rgb) / 0.15);
     color: var(--action);
-    border: 1px solid rgba(0, 255, 208, 0.3);
+    border: 1px solid rgb(var(--ds-accent-rgb) / 0.3);
 }
 
 .badge.hevc {
@@ -1382,7 +1343,7 @@ html {
 
 .folder-item.active {
     border-color: var(--gold);
-    background: rgba(244, 179, 66, 0.1);
+    background: rgb(var(--ds-bitrate-rgb) / 0.1);
 }
 
 .folder-name {
@@ -1435,7 +1396,7 @@ html {
 .folder-card:hover {
     transform: translateY(-5px);
     border-color: var(--cyan);
-    box-shadow: 0 10px 40px rgba(0, 255, 208, 0.15);
+    box-shadow: 0 10px 40px rgb(var(--ds-accent-rgb) / 0.15);
 }
 
 .folder-card-mosaic {
@@ -1502,7 +1463,7 @@ html {
     transition: opacity 0.2s;
     z-index: var(--z-modal);
     border: 1px solid var(--pink);
-    box-shadow: 0 4px 20px rgba(222, 26, 88, 0.4);
+    box-shadow: 0 4px 20px rgb(var(--ds-accent-rgb) / 0.4);
     font-size: 0.9rem;
     line-height: 1.6;
     max-width: 300px;
@@ -1697,7 +1658,7 @@ html {
 .settings-section textarea:focus,
 .settings-section input[type="number"]:focus {
     border-color: var(--gold);
-    box-shadow: 0 0 10px rgba(244, 179, 66, 0.2);
+    box-shadow: 0 0 10px rgb(var(--ds-bitrate-rgb) / 0.2);
 }
 
 .settings-hint {
@@ -1721,8 +1682,8 @@ html {
     align-items: center;
     gap: 10px;
     padding: 12px 15px;
-    background: rgba(244, 179, 66, 0.1);
-    border: 1px solid rgba(244, 179, 66, 0.3);
+    background: rgb(var(--ds-bitrate-rgb) / 0.1);
+    border: 1px solid rgb(var(--ds-bitrate-rgb) / 0.3);
     border-radius: 10px;
     color: var(--gold);
     font-size: 0.85rem;
@@ -2237,7 +2198,7 @@ html {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(0, 255, 208, 0.15);
+    background: rgb(var(--ds-accent-rgb) / 0.15);
     opacity: 0;
     transition: opacity 0.2s;
     pointer-events: none;
@@ -2261,7 +2222,7 @@ html {
     transition: opacity 0.2s, transform 0.2s;
     pointer-events: none;
     z-index: var(--z-base);
-    text-shadow: 0 0 20px rgba(0, 255, 208, 0.5);
+    text-shadow: 0 0 20px rgb(var(--ds-accent-rgb) / 0.5);
 }
 
 #videoGrid.selection-mode .video-card-container:hover .card-media::before {
@@ -2332,9 +2293,9 @@ html {
 }
 
 .cinema-tag-chip.active {
-    background: rgba(var(--tag-color-rgb, 0, 255, 208), 0.2);
-    border-color: var(--tag-color, #00ffd0);
-    color: var(--tag-color, #00ffd0);
+    background: rgba(var(--tag-color-rgb, 196, 23, 159), 0.2);
+    border-color: var(--tag-color, var(--ds-accent));
+    color: var(--tag-color, var(--ds-accent));
 }
 
 .cinema-tag-chip .tag-dot {

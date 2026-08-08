@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Einheitliches Design System**: Die drei Themes (Arcade/Professional/Candy)
+  sind durch *ein* dark-first Theme mit genau einem Brand-Accent (Magenta
+  `#c4179f`) ersetzt. Semantische Farben (HEVC-Türkis, AV1-Violett,
+  Bitrate-Gold, Optimized-Grün, Danger-Rot) sind ausschließlich Badges und
+  Zahlen-Readouts vorbehalten — kein Gold/Cyan/Magenta-Freistil mehr über Nav,
+  Buttons und Karten hinweg. Typografie: Inter für UI, System-Mono-Stack
+  (tabular-nums) für Größen, Bitraten, Pfade, Codecs und Timestamps.
+  Neue Token-Ebene `--ds-*` (Flächen, Accent, Semantik, Spacing 4–48,
+  Radius 4–10) in `templates/theme.py`, plus Komponentenklassen für Buttons,
+  Chips, Badges und Toggles. Header, Sidebar (200 px, 3px-Accent-Indikator),
+  Filterleiste, Video-Karten und Batch-Toolbar sind auf die Spec umgebaut;
+  Karten-Hover ist ein ruhiger Border-Lift statt eines mehrfarbigen Glows.
+  Die Theme-Auswahl in den Einstellungen und das `theme`-Setting entfallen —
+  Light/Dark bleibt über den Header-Toggle erhalten.
+
 ### Added
 - **Duplikat-Scan findet re-encodete Videos**: Der bisherige Video-Pass gruppiert
   nach gerundeter Größe + Dauer + Auflösung. Eine transkodierte Kopie (H.264 →

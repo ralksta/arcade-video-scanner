@@ -634,56 +634,48 @@ FOLDER_BROWSER_LEGEND_COMPONENT = """
 
 
 BATCH_BAR_COMPONENT = """
-<!-- Batch Action Bar -->
-<div id="batchBar" class="fixed bottom-20 md:bottom-8 left-1/2 md:left-[calc(50%+128px)] z-50 bg-[#0d0d14] border-2 border-arcade-cyan/30 rounded-2xl animate-glow-pulse glow-cyan px-4 py-2.5 flex items-center gap-2 transition-transform duration-300" style="transform: translateX(-50%) translateY(8rem);">
+<!-- Batch Action Bar: schwebende Pill, neutrale Aktionen, nur Delete faerbig -->
+<div id="batchBar" class="fixed bottom-20 md:bottom-8 left-1/2 md:left-[calc(50%+100px)] z-50 w-fit bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md px-4 py-2.5 flex items-center gap-3.5 transition-transform duration-300 shadow-[0_8px_28px_rgba(0,0,0,0.45)]" style="transform: translateX(-50%) translateY(8rem);">
     <!-- Active class 'translate-y-0' handled by JS -->
 
-    <!-- Select All Button -->
-    <button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-gray-300 hover:bg-white/10 hover:text-white transition-all" onclick="selectAllVisible()">
-        <span class="material-icons text-sm">select_all</span>
-        All
+    <span class="text-[12px] font-semibold text-text-main whitespace-nowrap"><span id="batchCount">0</span> selected</span>
+
+    <div class="h-5 w-px bg-[var(--ds-hairline-strong)]"></div>
+
+    <button class="batch-action-btn" onclick="selectAllVisible()">
+        <span class="material-icons text-[16px]">select_all</span>
+        <span>All</span>
     </button>
 
-    <div class="h-8 w-px bg-white/10"></div>
-
-    <span class="text-base font-bold text-white whitespace-nowrap"><span id="batchCount" class="text-arcade-cyan text-lg">0</span> Selected</span>
-
-    <div class="h-8 w-px bg-white/10"></div>
-
-    <!-- TAG Button -->
-    <button class="batch-action-btn" style="--btn-color: #a855f7" onclick="openBatchTagModal()">
-        <span class="material-icons text-base">label</span>
-        <span>TAG</span>
+    <button class="batch-action-btn" onclick="triggerBatchFavorite(true)">
+        <span class="material-icons text-[16px]">star</span>
+        <span>Favorite</span>
     </button>
 
-    <!-- OPTIMIZE Button -->
-    <button class="batch-action-btn" style="--btn-color: #00ffd0" onclick="triggerBatchCompress()">
-        <span class="material-icons text-base">bolt</span>
-        <span>OPTIMIZE</span>
+    <button class="batch-action-btn" onclick="triggerBatchHide(true)">
+        <span class="material-icons text-[16px]">archive</span>
+        <span>Vault</span>
     </button>
 
-    <!-- FAV Button -->
-    <button class="batch-action-btn" style="--btn-color: #F4B342" onclick="triggerBatchFavorite(true)">
-        <span class="material-icons text-base">star</span>
-        <span>FAV</span>
+    <button class="batch-action-btn" onclick="openBatchTagModal()">
+        <span class="material-icons text-[16px]">label</span>
+        <span>Tag</span>
     </button>
 
-    <!-- VAULT Button -->
-    <button class="batch-action-btn" style="--btn-color: #DE1A58" onclick="triggerBatchHide(true)">
-        <span class="material-icons text-base">archive</span>
-        <span>VAULT</span>
+    <button class="batch-action-btn" onclick="triggerBatchCompress()">
+        <span class="material-icons text-[16px]">bolt</span>
+        <span>Optimize</span>
     </button>
 
-    <!-- DELETE Button -->
-    <button class="batch-action-btn" style="--btn-color: #EF4444" onclick="triggerBatchDelete()">
-        <span class="material-icons text-base">delete_forever</span>
-        <span>DELETE</span>
+    <button class="batch-action-btn batch-action-danger" onclick="triggerBatchDelete()">
+        <span class="material-icons text-[16px]">delete</span>
+        <span>Delete</span>
     </button>
 
-    <div class="h-8 w-px bg-white/10"></div>
+    <div class="h-5 w-px bg-[var(--ds-hairline-strong)]"></div>
 
-    <button class="text-gray-400 hover:text-white transition-colors p-1" onclick="clearSelection()" title="Clear Selection">
-        <span class="material-icons text-xl">close</span>
+    <button class="text-text-muted hover:text-text-main transition-colors" onclick="clearSelection()" title="Clear Selection">
+        <span class="material-icons text-[18px]">close</span>
     </button>
 </div>
 
@@ -691,22 +683,19 @@ BATCH_BAR_COMPONENT = """
 .batch-action-btn {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
-    padding: 0.5rem 0.875rem;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--btn-color, white);
-    background: color-mix(in srgb, var(--btn-color, white) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--btn-color, white) 30%, transparent);
-    transition: all 0.2s;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ds-text-body);
+    background: transparent;
+    border: none;
     cursor: pointer;
+    white-space: nowrap;
+    transition: color .15s ease;
 }
-.batch-action-btn:hover {
-    background: color-mix(in srgb, var(--btn-color, white) 25%, transparent);
-    color: white;
-    transform: translateY(-1px);
-}
+.batch-action-btn:hover { color: var(--ds-text); }
+.batch-action-danger { color: var(--ds-danger); }
+.batch-action-danger:hover { color: var(--ds-danger); opacity: .8; }
 </style>
 """
 
@@ -1905,20 +1894,14 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-magenta">palette</span>
-                                Theme
+                                <span class="material-icons text-lg text-accent">palette</span>
+                                Appearance
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Customize the visual style.</p>
+                            <p class="text-sm text-gray-500 mt-1">Arcade Scanner nutzt ein einheitliches Design System.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
-                            <label class="block text-xs text-gray-400 mb-1">Color Paradigm</label>
-                            <select id="settingsTheme" onchange="markSettingsUnsaved()" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none">
-                                <option value="arcade">Arcade (Neon)</option>
-                                <option value="professional">Professional (Clean)</option>
-                                <option value="candy">Candy (Pastel)</option>
-                            </select>
-                            <p class="text-xs text-gray-500">Use the header toggle (Sun/Moon) to switch between Light/Dark mode for any theme.</p>
+                        <div class="bg-surface rounded-ds-md p-4 border border-white/10">
+                            <p class="text-xs text-gray-500">Light/Dark schaltest du oben rechts in der Kopfzeile (Sonne/Mond) um.</p>
                         </div>
                     </section>
 
@@ -2200,73 +2183,74 @@ SETTINGS_MODAL_COMPONENT = """
 
 
 FILTER_BAR_COMPONENT = """
-<!-- Filter Bar (Simplified with Unified Filter Panel) -->
-<div class="workspace-indicator sticky top-[34px] md:top-16 z-30 bg-arcade-bg/95 backdrop-blur border-b-2 px-2 md:px-6 py-2 flex flex-col md:flex-row gap-3 md:items-center justify-between transition-all duration-300 overflow-x-hidden" style="border-color: var(--ws-accent, var(--cyan)); background: var(--ws-bg-tint, transparent);">
+<!-- Filter Bar -->
+<div class="workspace-indicator sticky top-[46px] md:top-[52px] z-30 bg-bg px-2 md:px-[22px] py-3 flex flex-col md:flex-row gap-3 md:items-center justify-between overflow-x-hidden">
     <!-- Search Input -->
     <div class="w-full md:w-80 lg:w-96 relative flex-shrink min-w-0">
-        <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-[18px]">search</span>
-        <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Search..." class="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-arcade-cyan/50 focus:bg-black/10 dark:focus:bg-white/10 transition-all placeholder-gray-500 dark:placeholder-gray-600">
+        <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">search</span>
+        <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Search files..."
+               class="w-full bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] rounded-ds-sm pl-10 pr-4 py-2 text-[13px] text-text-main placeholder-text-muted focus:outline-none focus:border-accent transition-colors">
     </div>
 
-    <!-- Filter Controls (Simplified) -->
+    <!-- Filter Controls -->
     <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide flex-shrink-0">
         <!-- Unified Filters Button -->
-        <button id="openFiltersBtn" onclick="openFilterPanel()" class="flex items-center gap-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full px-4 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/10 hover:text-black dark:hover:text-white hover:border-arcade-cyan/50 transition-all">
+        <button id="openFiltersBtn" onclick="openFilterPanel()" class="ds-chip flex items-center gap-2">
             <span class="material-icons text-[16px]">tune</span>
             <span>Filters</span>
-            <span id="filterBadge" class="hidden bg-arcade-cyan text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">0</span>
+            <span id="filterBadge" class="hidden bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] min-w-[18px] text-center">0</span>
         </button>
 
-        <!-- Sort Dropdown (kept for quick access) -->
-        <div class="relative group">
-            <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[16px] pointer-events-none group-hover:text-arcade-cyan transition-colors">sort</span>
-            <select id="sortSelect" onchange="setSort(this.value)" class="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full pl-9 pr-4 py-1.5 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:border-arcade-cyan/50 appearance-none min-w-[140px] cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
-                <option value="bitrate">Bitrate ↓</option>
-                <option value="size">Size ↓</option>
-                <option value="runtime">Runtime ↓</option>
-                <option value="date">Date ↓</option>
+        <!-- Sort Dropdown -->
+        <div class="relative">
+            <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px] pointer-events-none">sort</span>
+            <select id="sortSelect" onchange="setSort(this.value)" class="ds-chip pl-9 pr-4 appearance-none min-w-[140px]">
+                <option value="bitrate">Sort: bitrate</option>
+                <option value="size">Sort: size</option>
+                <option value="runtime">Sort: runtime</option>
+                <option value="date">Sort: date</option>
             </select>
         </div>
 
         <!-- View Toggles & Grid Scale -->
-        <div class="hidden md:flex items-center bg-black/5 dark:bg-white/5 rounded-lg p-0.5 ml-2 border border-black/5 dark:border-white/5">
+        <div class="hidden md:flex items-center bg-[var(--ds-fill-soft)] rounded-ds-sm p-0.5 border border-[var(--ds-hairline-strong)]">
             <!-- Grid Scale Slider -->
-            <div class="flex items-center gap-1.5 px-2 mr-1 border-r border-black/10 dark:border-white/10 group" id="gridScaleContainer">
-                <span class="material-icons text-[14px] text-gray-500/70 group-hover:text-arcade-cyan transition-colors">photo_size_select_small</span>
-                <input type="range" id="gridScaleSlider" min="150" max="500" value="240" step="10" oninput="updateGridScale(this.value)" class="w-16 h-1 bg-black/10 dark:bg-white/10 rounded-full appearance-none cursor-pointer">
-                <span class="material-icons text-[16px] text-gray-500/70 group-hover:text-arcade-cyan transition-colors">photo_size_select_large</span>
+            <div class="flex items-center gap-1.5 px-2 mr-1 border-r border-[var(--ds-hairline-strong)]" id="gridScaleContainer">
+                <span class="material-icons text-[14px] text-text-muted">photo_size_select_small</span>
+                <input type="range" id="gridScaleSlider" min="150" max="500" value="240" step="10" oninput="updateGridScale(this.value)" class="w-16 h-1 bg-[var(--ds-hairline-strong)] rounded-full appearance-none cursor-pointer accent-accent">
+                <span class="material-icons text-[16px] text-text-muted">photo_size_select_large</span>
             </div>
 
-            <button id="viewToggleGrid" onclick="setLayout('grid')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Grid View">
+            <button id="viewToggleGrid" onclick="setLayout('grid')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Grid View">
                 <span class="material-icons text-[18px]">grid_view</span>
             </button>
-            <button id="viewToggleList" onclick="setLayout('list')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="List View">
+            <button id="viewToggleList" onclick="setLayout('list')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="List View">
                  <span class="material-icons text-[18px]">view_list</span>
             </button>
-            <button id="viewToggleTreemap" onclick="setLayout('treemap')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Tree View">
+            <button id="viewToggleTreemap" onclick="setLayout('treemap')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Tree View">
                 <span class="material-icons text-[18px]">account_tree</span>
             </button>
-            <button id="viewToggleFolder" onclick="setLayout('folderbrowser')" class="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors" title="Folder Browser">
+            <button id="viewToggleFolder" onclick="setLayout('folderbrowser')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Folder Browser">
                 <span class="material-icons text-[18px]">folder</span>
             </button>
         </div>
 
-        <button id="refreshBtn" onclick="rescanLibrary()" class="bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white p-2 rounded-full transition-colors flex items-center justify-center flex-shrink-0" title="Rescan Library">
+        <button id="refreshBtn" onclick="rescanLibrary()" class="p-2 rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors flex items-center justify-center flex-shrink-0" title="Rescan Library">
             <span class="material-icons text-[18px]">refresh</span>
         </button>
-        <button id="stopScanBtn" onclick="stopScan()" class="hidden bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 p-2 rounded-full transition-colors flex items-center justify-center flex-shrink-0" title="Scan stoppen">
+        <button id="stopScanBtn" onclick="stopScan()" class="hidden p-2 rounded-ds-sm border border-danger/40 text-danger hover:bg-danger/10 transition-colors flex items-center justify-center flex-shrink-0" title="Scan stoppen">
             <span class="material-icons text-[18px]">stop</span>
         </button>
     </div>
 </div>
 
 <!-- Active Filters Row (shows when filters are active) -->
-<div id="activeFiltersRow" class="hidden sticky top-[82px] md:top-[80px] z-20 bg-arcade-bg/90 backdrop-blur px-2 md:px-6 py-2 border-b border-black/5 dark:border-white/5 flex flex-wrap items-center gap-2">
-    <span class="text-xs text-gray-500 font-medium">Active:</span>
+<div id="activeFiltersRow" class="hidden sticky top-[100px] md:top-[110px] z-20 bg-bg px-2 md:px-[22px] py-2 border-b border-line/60 flex flex-wrap items-center gap-2">
+    <span class="ds-eyebrow">Active</span>
     <div id="activeFilterChips" class="flex flex-wrap gap-1.5">
         <!-- Chips injected by JS -->
     </div>
-    <button onclick="resetFilters()" class="ml-auto text-xs text-gray-500 hover:text-arcade-pink transition-colors">Clear all</button>
+    <button onclick="resetFilters()" class="ml-auto text-[12px] text-text-muted hover:text-accent-tint transition-colors">Clear all</button>
 </div>
 """
 

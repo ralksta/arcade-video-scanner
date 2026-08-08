@@ -36,7 +36,6 @@ async function openSettings() {
         document.getElementById('settingsSensitiveCollections').value = (data.sensitive_collections || []).join('\n');
 
         // New Features
-        document.getElementById('settingsTheme').value = data.theme || 'arcade';
         const optimizerCheckbox = document.getElementById('settingsOptimizer');
         if (optimizerCheckbox) optimizerCheckbox.checked = data.enable_optimizer !== false;
 
@@ -141,7 +140,6 @@ async function saveSettings() {
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
         encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
-        theme: document.getElementById('settingsTheme').value || 'arcade',
         precompute_thumbnails: document.getElementById('settingsPrecomputeThumbs')?.checked ?? true,
         verbose_scanning: document.getElementById('settingsVerboseScanning')?.checked || false
     };
@@ -163,11 +161,6 @@ async function saveSettings() {
             // Hide unsaved indicator
             const unsavedIndicator = document.getElementById('unsavedIndicator');
             if (unsavedIndicator) unsavedIndicator.style.opacity = '0';
-
-            // Update Theme immediately
-            const newTheme = document.getElementById('settingsTheme').value;
-            if (newTheme) document.documentElement.setAttribute('data-theme', newTheme);
-
 
             // Show success toast
             showSettingsToast();

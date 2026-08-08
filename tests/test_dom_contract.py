@@ -237,20 +237,20 @@ class TestCssVariableContracts:
         defined = self._get_defined_vars(content)
         used = self._get_used_vars(content)
 
+        # Design-System-Tokens werden zur Laufzeit via render_theme_css()
+        # (templates/theme.py) in den <head> injiziert — sie zaehlen als definiert.
+        from arcade_scanner.templates.theme import render_theme_css
+
+        theme_tokens = self._get_defined_vars(render_theme_css())
+
         # Browser-native + Tailwind Variablen die OK sind
         KNOWN_EXTERNALS = {
-            # Tailwind design tokens (aus tailwind.config)
-            "arcade-cyan", "arcade-gold", "arcade-magenta", "arcade-bg",
-            "arcade-pink", "arcade-purple",
             # safe-area (iOS)
             "safe-area-inset-top", "safe-area-inset-bottom",
             "safe-area-inset-left", "safe-area-inset-right",
-            # Theme-Variablen — zur Laufzeit via render_theme_css() (templates/theme.py)
-            # in den <head> injiziert, wie die arcade-* Tokens oben
-            "surface-glass", "text-main", "text-muted",
         }
 
-        missing = used - defined - KNOWN_EXTERNALS
+        missing = used - defined - theme_tokens - KNOWN_EXTERNALS
         assert not missing, (
             "Diese CSS-Variablen werden per var() verwendet,\n"
             "sind aber NICHT in styles.css definiert (silent fail — wird leer dargestellt):\n"

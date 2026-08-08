@@ -103,8 +103,6 @@ DEFAULT_SETTINGS_JSON = {
     "enable_optimizer": True,
     "_comment_tags": "User-created tags for video categorization.",
     "available_tags": [],
-    "_comment_theme": "Application theme (arcade, professional, candy).",
-    "theme": "arcade",
     "_comment_sensitive_dirs": "List of paths considered sensitive (NSFW) to be hidden in safe mode.",
     "sensitive_dirs": [],
     "_comment_sensitive_tags": "List of tags considered sensitive (NSFW) to be hidden in safe mode.",
@@ -151,7 +149,6 @@ class AppSettings(BaseSettings):
     enable_optimizer: bool = Field(True)
     encoding_preset: str = Field("balanced")  # fast | balanced | best
 
-    theme: str = Field("arcade")
     enable_image_scanning: bool = Field(False)
     ffmpeg_path: str = Field("")
     ffprobe_path: str = Field("")
