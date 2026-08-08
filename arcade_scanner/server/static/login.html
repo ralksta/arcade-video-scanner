@@ -5,93 +5,123 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arcade Scanner Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Design-System-Tokens. Diese Seite wird standalone ausgeliefert (ohne
+           den <head> aus templates/ui_components.py) und muss die Werte daher
+           selbst mitbringen. Quelle der Wahrheit bleibt templates/theme.py —
+           tests/test_login_tokens.py haelt beide Seiten deckungsgleich. */
+        :root {
+            --ds-bg: #0b0b10;
+            --ds-surface: #15151d;
+            --ds-border: #2a2a35;
+            --ds-text: #f2f2f5;
+            --ds-text-muted: #6b6b76;
+            --ds-accent: #c4179f;
+            --ds-accent-hover: #e34fc0;
+            --ds-danger: #f36969;
+            --ds-hairline-strong: rgba(255,255,255,0.12);
+            color-scheme: dark;
+        }
+
         body {
-            background-color: #0d011a;
-            color: #eee;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--ds-bg);
+            color: var(--ds-text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            overflow: hidden;
-        }
-
-        #starfield {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+            -webkit-font-smoothing: antialiased;
         }
 
         .login-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 40px;
-            border-radius: 20px;
+            background: var(--ds-surface);
+            border: 1px solid var(--ds-hairline-strong);
+            padding: 32px;
+            border-radius: 10px;
             width: 100%;
             max-width: 320px;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
-            text-align: center;
+        }
+
+        .wordmark {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .wordmark-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 2px;
+            background: var(--ds-accent);
         }
 
         h1 {
-            color: #DE1A58;
-            /* Arcade Pink */
-            margin-bottom: 30px;
-            font-size: 24px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            margin: 0;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            color: var(--ds-text);
         }
 
-        input {
+        .subtitle {
+            font-size: 12px;
+            color: var(--ds-text-muted);
+            margin: 0 0 20px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
             width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            color: white;
+            padding: 9px 12px;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--ds-hairline-strong);
+            border-radius: 6px;
+            color: var(--ds-text);
             box-sizing: border-box;
-            font-size: 16px;
+            font-family: inherit;
+            font-size: 13px;
+            transition: border-color .15s ease;
         }
 
-        input:focus {
+        input::placeholder {
+            color: var(--ds-text-muted);
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
             outline: none;
-            border-color: #DE1A58;
-            box-shadow: 0 0 10px rgba(222, 26, 88, 0.3);
+            border-color: var(--ds-accent);
         }
 
         button {
             width: 100%;
-            padding: 12px;
-            background: #DE1A58;
+            padding: 9px 16px;
+            background: var(--ds-accent);
             border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
+            border-radius: 6px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            transition: 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            transition: background-color .15s ease;
         }
 
         button:hover {
-            background: #F4B342;
-            /* Arcade Gold */
-            color: #000;
+            background: var(--ds-accent-hover);
         }
 
         .error {
-            color: #ff4444;
-            margin-top: 15px;
-            font-size: 14px;
+            color: var(--ds-danger);
+            margin-top: 12px;
+            font-size: 12px;
             display: none;
         }
 
@@ -99,34 +129,40 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 15px;
-            text-align: left;
+            margin-bottom: 14px;
         }
 
         .remember-row input[type="checkbox"] {
-            width: 16px;
-            min-width: 16px;
-            height: 16px;
+            width: 15px;
+            min-width: 15px;
+            height: 15px;
             padding: 0;
             margin: 0;
-            accent-color: #DE1A58;
+            accent-color: var(--ds-accent);
             cursor: pointer;
         }
 
         .remember-row label {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            color: var(--ds-text-muted);
             cursor: pointer;
             user-select: none;
+        }
+
+        :focus-visible {
+            outline: 2px solid rgba(196,23,159,0.7);
+            outline-offset: 2px;
         }
     </style>
 </head>
 
 <body>
-    <canvas id="starfield"></canvas>
-
     <div class="login-card">
-        <h1>Arcade Login</h1>
+        <div class="wordmark">
+            <span class="wordmark-dot"></span>
+            <h1>Arcade Scanner</h1>
+        </div>
+        <p class="subtitle">Sign in to your library.</p>
 
         <form id="loginForm">
             <input type="text" id="username" placeholder="Username" required autocomplete="username">
@@ -135,29 +171,12 @@
                 <input type="checkbox" id="rememberMe" checked>
                 <label for="rememberMe">Remember me (30 days)</label>
             </div>
-            <button type="submit">Enter Arcade</button>
+            <button type="submit">Sign in</button>
         </form>
         <div id="errorMsg" class="error">Invalid credentials</div>
     </div>
 
     <script>
-        // Starfield
-        const canvas = document.getElementById('starfield');
-        const ctx = canvas.getContext('2d');
-        let stars = [];
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
-        for (let i = 0; i < 100; i++) stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 2 });
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#fff';
-            stars.forEach(s => {
-                ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2); ctx.fill();
-            });
-            requestAnimationFrame(animate);
-        }
-        animate();
-
         // Login Logic
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
