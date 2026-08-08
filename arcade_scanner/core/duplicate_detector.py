@@ -160,9 +160,13 @@ class DuplicateDetector:
     - Hash bucketing eliminates O(n²) comparisons
     """
 
+    # Bumped whenever the on-disk cache layout changes.
+    HASH_CACHE_VERSION = 2
+
     def __init__(self):
         self._group_counter = 0
-        self._hash_cache: Dict[str, str] = {}  # filepath -> phash hex string
+        # filepath -> (phash hex string, mtime_ns, size_bytes)
+        self._hash_cache: Dict[str, Tuple[str, int, int]] = {}
         self._hash_cache_dirty = False
         self._hash_cache_file = None  # Set lazily
 
@@ -180,16 +184,59 @@ class DuplicateDetector:
             if os.path.exists(self._hash_cache_file):
                 with open(self._hash_cache_file, 'r') as f:
                     raw = json.load(f)
-                    # Validate: only keep entries where file still exists
-                    self._hash_cache = {k: v for k, v in raw.items() if os.path.exists(k)}
-                    purged = len(raw) - len(self._hash_cache)
-                    if purged > 0:
-                        self._hash_cache_dirty = True
-                    print(f"📦 Loaded {len(self._hash_cache)} cached image hashes" +
-                          (f" (purged {purged} orphans)" if purged else ""))
+                self._hash_cache, purged, migrated = self._decode_hash_cache(raw)
+                if purged or migrated:
+                    self._hash_cache_dirty = True
+                notes = []
+                if purged:
+                    notes.append(f"purged {purged} orphans")
+                if migrated:
+                    notes.append(f"migrated {migrated} legacy entries")
+                print(f"📦 Loaded {len(self._hash_cache)} cached image hashes" +
+                      (f" ({', '.join(notes)})" if notes else ""))
         except Exception as e:
             print(f"⚠️ Could not load hash cache: {e}")
             self._hash_cache = {}
+
+    def _decode_hash_cache(self, raw) -> Tuple[Dict[str, Tuple[str, int, int]], int, int]:
+        """Parse an on-disk cache payload into the in-memory form.
+
+        Returns (entries, purged_count, migrated_count). Entries whose file no
+        longer exists are dropped here so the cache does not grow forever.
+
+        Version 1 stored a bare `{path: phash}` map with no way to tell whether
+        the file had changed since, so an edited-in-place image kept serving the
+        old hash — and a wrong hash means a wrong duplicate group, which the UI
+        offers to delete. Those legacy entries are stamped with the file's
+        *current* mtime/size on first load rather than thrown away: re-hashing a
+        six-figure library on upgrade would cost hours, and from that point on
+        every further change is caught.
+        """
+        entries: Dict[str, Tuple[str, int, int]] = {}
+        purged = 0
+        migrated = 0
+
+        if isinstance(raw, dict) and "entries" in raw:
+            items = raw.get("entries") or {}
+        else:
+            items = raw or {}  # Legacy v1: flat {path: hash}
+
+        for path, value in items.items():
+            try:
+                st = os.stat(path)
+            except OSError:
+                purged += 1
+                continue
+
+            if isinstance(value, str):
+                entries[path] = (value, st.st_mtime_ns, st.st_size)
+                migrated += 1
+            elif isinstance(value, (list, tuple)) and len(value) == 3:
+                entries[path] = (str(value[0]), int(value[1]), int(value[2]))
+            else:
+                purged += 1
+
+        return entries, purged, migrated
 
     def _save_hash_cache(self):
         """Persist hash cache to disk."""
@@ -199,20 +246,50 @@ class DuplicateDetector:
         import json
         try:
             os.makedirs(os.path.dirname(self._hash_cache_file), exist_ok=True)
-            with open(self._hash_cache_file, 'w') as f:
-                json.dump(self._hash_cache, f)
+            payload = {
+                "version": self.HASH_CACHE_VERSION,
+                "entries": {p: list(v) for p, v in self._hash_cache.items()},
+            }
+            # Write-then-rename: a crash mid-write would otherwise leave a
+            # truncated JSON file that the next run silently discards whole.
+            tmp_path = f"{self._hash_cache_file}.tmp"
+            with open(tmp_path, 'w') as f:
+                json.dump(payload, f)
+            os.replace(tmp_path, self._hash_cache_file)
             print(f"💾 Saved {len(self._hash_cache)} image hashes to cache")
             self._hash_cache_dirty = False
         except Exception as e:
             print(f"⚠️ Could not save hash cache: {e}")
 
-    def _get_cached_hash(self, filepath: str) -> Optional[str]:
-        """Get a cached phash for a file, or None if not cached."""
-        return self._hash_cache.get(filepath)
+    def _get_cached_hash(self, filepath: str, st: Optional[os.stat_result] = None) -> Optional[str]:
+        """Get a cached phash for a file, or None if absent or stale.
 
-    def _set_cached_hash(self, filepath: str, hash_str: str):
-        """Store a phash in the cache."""
-        self._hash_cache[filepath] = hash_str
+        `st` is the caller's already-taken stat of the file; the hash is only
+        reused when mtime and size still match what was hashed.
+        """
+        entry = self._hash_cache.get(filepath)
+        if entry is None:
+            return None
+
+        hash_str, mtime_ns, size = entry
+        if st is None:
+            try:
+                st = os.stat(filepath)
+            except OSError:
+                return None
+
+        if st.st_mtime_ns != mtime_ns or st.st_size != size:
+            return None
+        return hash_str
+
+    def _set_cached_hash(self, filepath: str, hash_str: str, st: Optional[os.stat_result] = None):
+        """Store a phash together with the file identity it was computed from."""
+        if st is None:
+            try:
+                st = os.stat(filepath)
+            except OSError:
+                return
+        self._hash_cache[filepath] = (hash_str, st.st_mtime_ns, st.st_size)
         self._hash_cache_dirty = True
 
     def _generate_group_id(self) -> str:
@@ -601,11 +678,14 @@ class DuplicateDetector:
                 progress_callback(f"Hashing image {idx}/{total_images} (cache: {cache_hits} hits)", pct)
 
             path = img.file_path
-            if not os.path.exists(path):
+            # One stat serves both the existence check and cache validation.
+            try:
+                st = os.stat(path)
+            except OSError:
                 continue
 
             # Check cache first
-            cached_hash_str = self._get_cached_hash(path)
+            cached_hash_str = self._get_cached_hash(path, st)
             if cached_hash_str:
                 try:
                     phash = imagehash.hex_to_hash(cached_hash_str)
@@ -622,7 +702,7 @@ class DuplicateDetector:
                     phash = imagehash.phash(hash_img)
                     hash_str = str(phash)
                     hash_data.append((hash_str, phash, img))
-                    self._set_cached_hash(path, hash_str)
+                    self._set_cached_hash(path, hash_str, st)
                     cache_misses += 1
             except Exception:
                 continue
