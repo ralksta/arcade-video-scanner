@@ -741,6 +741,58 @@ function renderDuplicateCheckerGroup(groupIndex) {
 
     // Render File B
     renderDuplicateFile('B', fileB, fileB.path === recommendedPath);
+
+    // Die Entscheidungsspalte handelt immer auf der Empfehlung
+    window.duplicateCheckerState.recommendedSide =
+        (fileB.path === recommendedPath && fileA.path !== recommendedPath) ? 'B' : 'A';
+    renderDuplicateDelta(fileA, fileB, window.duplicateCheckerState.recommendedSide);
+}
+
+/**
+ * Show how much space keeping the recommended file saves.
+ * Negative percentage = the discarded copy is larger.
+ *
+ * @param {Object} fileA
+ * @param {Object} fileB
+ * @param {string} recommendedSide - 'A' or 'B'
+ */
+function renderDuplicateDelta(fileA, fileB, recommendedSide) {
+    const el = document.getElementById('dupSizeDelta');
+    if (!el) return;
+
+    const keep = recommendedSide === 'B' ? fileB : fileA;
+    const drop = recommendedSide === 'B' ? fileA : fileB;
+    const keepSize = keep.size_mb || 0;
+    const dropSize = drop.size_mb || 0;
+
+    if (!dropSize || keep === drop) {
+        el.textContent = '--';
+        el.classList.remove('text-optimized', 'text-bitrate');
+        el.classList.add('text-text-muted');
+        return;
+    }
+
+    // Positiv = die behaltene Datei ist kleiner (Ersparnis)
+    const pct = Math.round(((dropSize - keepSize) / dropSize) * 100);
+    el.textContent = `${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%`;
+    el.classList.remove('text-text-muted');
+    el.classList.toggle('text-optimized', pct >= 0);
+    el.classList.toggle('text-bitrate', pct < 0);
+}
+
+/**
+ * Keep the recommended file (discards the other copy)
+ */
+function keepRecommendedDuplicate() {
+    keepDuplicateFile(window.duplicateCheckerState?.recommendedSide || 'A');
+}
+
+/**
+ * Discard the recommended file — i.e. keep the other copy instead
+ */
+function discardRecommendedDuplicate() {
+    const rec = window.duplicateCheckerState?.recommendedSide || 'A';
+    keepDuplicateFile(rec === 'A' ? 'B' : 'A');
 }
 
 /**
@@ -775,6 +827,10 @@ function renderDuplicateFile(side, file, isRecommended) {
     const bitrate = file.bitrate_mbps ? file.bitrate_mbps.toFixed(1) + ' Mbps' : '--';
     document.getElementById(`dupFile${side}Bitrate`).textContent = bitrate;
 
+    // Codec-Label in der Kopfzeile der Spalte
+    const codecEl = document.getElementById(`dupFile${side}Codec`);
+    if (codecEl) codecEl.textContent = (file.codec || '').toUpperCase();
+
     // Show/hide recommended badge
     const badge = document.getElementById(`dupFile${side}Badge`);
     if (isRecommended) {
@@ -783,14 +839,12 @@ function renderDuplicateFile(side, file, isRecommended) {
         badge.classList.add('hidden');
     }
 
-    // Highlight recommended panel
-    const panel = document.getElementById(`dupFile${side}`);
-    if (isRecommended) {
-        panel.classList.add('border-green-500/50', 'bg-green-500/5');
-        panel.classList.remove('border-white/10', 'bg-white/[0.02]');
-    } else {
-        panel.classList.remove('border-green-500/50', 'bg-green-500/5');
-        panel.classList.add('border-white/10', 'bg-white/[0.02]');
+    // Empfehlung bekommt eine einzelne Accent-Kontur um die Vorschau —
+    // kein flaechiger Farbwash ueber die ganze Spalte.
+    const preview = document.getElementById(`dupFile${side}Preview`);
+    if (preview) {
+        preview.classList.toggle('border-accent', isRecommended);
+        preview.classList.toggle('border-transparent', !isRecommended);
     }
 }
 

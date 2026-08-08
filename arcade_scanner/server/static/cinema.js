@@ -108,6 +108,9 @@ function openCinema(container) {
     modal.classList.add('active');
 
     // Update UI components
+    initCinemaTransport();
+    updateCinemaMeta();
+    updateCinemaTransport();
     updateCinemaButtons();
     updateCinemaInfo();
     updateCinemaTags();
@@ -204,6 +207,153 @@ function navigateCinema(direction) {
     }
 }
 
+// --- TRANSPORT ---
+// Eigener Transport statt der nativen Controls, damit die Bedienleiste dem
+// Design System folgt (3px-Scrubber mit Accent-Fill, Mono-Timestamps,
+// hervorgehobener Play-Button). Die Tastatur-Shortcuts bleiben unveraendert.
+
+let _cinemaTransportReady = false;
+let _cinemaScrubbing = false;
+
+/**
+ * Format seconds as MM:SS (or H:MM:SS past an hour) for the transport readouts
+ * @param {number} sec
+ * @returns {string}
+ */
+function formatCinemaTime(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = Math.floor(sec % 60);
+    const mm = String(m).padStart(2, '0');
+    const ss = String(s).padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/**
+ * Bind the transport controls to the video element. Idempotent — the listeners
+ * are attached once and survive src changes when navigating the playlist.
+ */
+function initCinemaTransport() {
+    if (_cinemaTransportReady) return;
+
+    const video = document.getElementById('cinemaVideo');
+    const scrub = document.getElementById('cinemaScrub');
+    if (!video || !scrub) return;
+
+    video.addEventListener('timeupdate', () => {
+        if (!_cinemaScrubbing) updateCinemaTransport();
+    });
+    video.addEventListener('loadedmetadata', updateCinemaTransport);
+    video.addEventListener('play', updateCinemaTransport);
+    video.addEventListener('pause', updateCinemaTransport);
+    video.addEventListener('volumechange', updateCinemaTransport);
+
+    // Waehrend des Ziehens nicht gegen den Nutzer zurueckschreiben
+    scrub.addEventListener('pointerdown', () => { _cinemaScrubbing = true; });
+    scrub.addEventListener('input', () => {
+        if (!isFinite(video.duration) || !video.duration) return;
+        video.currentTime = (scrub.value / 1000) * video.duration;
+        const cur = document.getElementById('cinemaTimeCur');
+        if (cur) cur.textContent = formatCinemaTime(video.currentTime);
+        const pct = (scrub.value / 10).toFixed(2);
+        scrub.style.background =
+            `linear-gradient(90deg, var(--ds-accent-tint) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
+    });
+    const endScrub = () => { _cinemaScrubbing = false; };
+    scrub.addEventListener('pointerup', endScrub);
+    scrub.addEventListener('change', endScrub);
+
+    _cinemaTransportReady = true;
+}
+
+/**
+ * Push the current playback state into the transport UI
+ */
+function updateCinemaTransport() {
+    const video = document.getElementById('cinemaVideo');
+    const bar = document.getElementById('cinemaBottomBar');
+    if (!video || !bar) return;
+
+    // Bilder und SOURCE-Dateien haben keine Wiedergabe — Leiste ausblenden
+    const playable = !video.classList.contains('hidden');
+    bar.style.display = playable ? 'flex' : 'none';
+    if (!playable) return;
+
+    const dur = isFinite(video.duration) ? video.duration : 0;
+    const scrub = document.getElementById('cinemaScrub');
+    if (scrub) {
+        if (!_cinemaScrubbing) {
+            scrub.value = dur ? Math.round((video.currentTime / dur) * 1000) : 0;
+        }
+        // Ein natives range-Input faerbt den zurueckgelegten Teil nicht selbst —
+        // der Fill kommt als harter Farbstopp im Track-Hintergrund.
+        const pct = (scrub.value / 10).toFixed(2);
+        scrub.style.background =
+            `linear-gradient(90deg, var(--ds-accent-tint) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
+    }
+
+    const cur = document.getElementById('cinemaTimeCur');
+    if (cur) cur.textContent = formatCinemaTime(video.currentTime);
+    const total = document.getElementById('cinemaTimeDur');
+    if (total) total.textContent = formatCinemaTime(dur);
+
+    const playIcon = document.querySelector('#cinemaPlayBtn .material-icons');
+    if (playIcon) playIcon.textContent = video.paused ? 'play_arrow' : 'pause';
+
+    const muteIcon = document.querySelector('#cinemaMuteBtn .material-icons');
+    if (muteIcon) muteIcon.textContent = (video.muted || video.volume === 0) ? 'volume_off' : 'volume_up';
+}
+
+/**
+ * Fill the mono metadata line under the filename (resolution, codec, bitrate)
+ */
+function updateCinemaMeta() {
+    const meta = document.getElementById('cinemaMeta');
+    if (!meta) return;
+
+    const v = currentCinemaVideo;
+    if (!v) { meta.textContent = ''; return; }
+
+    const parts = [];
+    if (v.Width && v.Height) parts.push(`${v.Width}x${v.Height}`);
+    if (v.codec) parts.push(String(v.codec).toUpperCase());
+    if (v.media_type === 'video' && v.Bitrate_Mbps) parts.push(`${v.Bitrate_Mbps.toFixed(1)} Mbps`);
+    else if (v.Size_MB) parts.push(`${v.Size_MB.toFixed(0)} MB`);
+    meta.textContent = parts.join('  ·  ');
+}
+
+/**
+ * Toggle playback of the current video
+ */
+function cinemaTogglePlay() {
+    const video = document.getElementById('cinemaVideo');
+    if (!video || video.classList.contains('hidden')) return;
+    if (video.paused) video.play(); else video.pause();
+}
+
+/**
+ * Toggle mute on the current video
+ */
+function cinemaToggleMute() {
+    const video = document.getElementById('cinemaVideo');
+    if (!video) return;
+    video.muted = !video.muted;
+}
+
+/**
+ * Toggle fullscreen for the cinema modal
+ */
+function cinemaToggleFullscreen() {
+    const modal = document.getElementById('cinemaModal');
+    if (!modal) return;
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    } else if (modal.requestFullscreen) {
+        modal.requestFullscreen();
+    }
+}
+
 // --- KEYBOARD HANDLER ---
 
 /**
@@ -246,13 +396,9 @@ function cinemaKeyHandler(e) {
         e.preventDefault();
         const video = document.getElementById('cinemaVideo');
         if (video && !video.classList.contains('hidden')) {
-            if (video.paused) {
-                video.play();
-                showCinemaToast('▶ Play');
-            } else {
-                video.pause();
-                showCinemaToast('⏸ Pause');
-            }
+            const wasPaused = video.paused;
+            cinemaTogglePlay();
+            showCinemaToast(wasPaused ? '▶ Play' : '⏸ Pause');
         }
 
     } else if (key === 'f') {
@@ -364,13 +510,15 @@ function updateCinemaButtons() {
 
     const favBtn = document.querySelector('.cinema-action-btn[onclick="cinemaFavorite()"]');
     if (favBtn) {
-        favBtn.style.opacity = currentCinemaVideo.favorite ? '0.6' : '1';
+        favBtn.classList.toggle('is-active', !!currentCinemaVideo.favorite);
         favBtn.title = currentCinemaVideo.favorite ? 'Already a Favorite' : 'Add to Favorites';
+        const icon = document.getElementById('cinemaFavIcon');
+        if (icon) icon.textContent = currentCinemaVideo.favorite ? 'star' : 'star_border';
     }
 
     const vaultBtn = document.querySelector('.cinema-action-btn[onclick="cinemaVault()"]');
     if (vaultBtn) {
-        vaultBtn.style.opacity = currentCinemaVideo.hidden ? '0.6' : '1';
+        vaultBtn.classList.toggle('is-active', !!currentCinemaVideo.hidden);
         vaultBtn.title = currentCinemaVideo.hidden ? 'Already in Vault' : 'Move to Vault';
     }
 }

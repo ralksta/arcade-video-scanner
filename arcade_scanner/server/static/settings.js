@@ -314,17 +314,10 @@ function initSettingsNavigation() {
             const sectionId = item.dataset.section;
             if (!sectionId) return;
 
-            // Update active nav item and indicator
-            navItems.forEach(nav => {
-                nav.classList.remove('active', 'text-white', 'bg-white/5');
-                nav.classList.add('text-gray-400');
-                const indicator = nav.querySelector('.active-indicator');
-                if (indicator) indicator.classList.add('opacity-0');
-            });
-            item.classList.add('active', 'text-white', 'bg-white/5');
-            item.classList.remove('text-gray-400');
-            const activeIndicator = item.querySelector('.active-indicator');
-            if (activeIndicator) activeIndicator.classList.remove('opacity-0');
+            // Aktiver Zustand haengt allein an .active — Tint und
+            // Accent-Indikator kommen aus der CSS-Regel (styles.css).
+            navItems.forEach(nav => nav.classList.remove('active'));
+            item.classList.add('active');
 
             // Show corresponding content - toggle hidden class
             contentSections.forEach(section => {
@@ -347,14 +340,7 @@ function initSettingsNavigation() {
         });
     });
 
-    // Set initial active state
-    const initialActive = settingsModal.querySelector('.settings-nav-item.active');
-    if (initialActive) {
-        const indicator = initialActive.querySelector('.active-indicator');
-        if (indicator) indicator.classList.remove('opacity-0');
-        initialActive.classList.add('text-white', 'bg-white/5');
-        initialActive.classList.remove('text-gray-400');
-    }
+    // Der initiale Zustand steht bereits im Markup (.settings-nav-item.active).
 }
 
 /**

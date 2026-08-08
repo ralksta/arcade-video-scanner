@@ -258,318 +258,213 @@ GIF_EXPORT_PANEL_COMPONENT = """
 """
 
 CINEMA_MODAL_COMPONENT = """
-<!-- Cinema Modal (Tailwind) -->
-<div id="cinemaModal" class="fixed inset-0 z-50 bg-black opacity-0 pointer-events-none transition-opacity duration-500 flex flex-col justify-center items-center">
+<!-- Cinema Player -->
+<div id="cinemaModal" class="fixed inset-0 z-50 bg-black opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col justify-center items-center">
     <!-- Active class 'opacity-100 pointer-events-auto' toggled by JS -->
 
-    <button class="absolute top-4 right-4 text-white/50 hover:text-white z-50 p-2" onclick="closeCinema()">
-        <span class="material-icons text-4xl">close</span>
-    </button>
+    <video id="cinemaVideo" preload="metadata" class="max-w-full max-h-full w-auto h-auto outline-none"></video>
 
-    <h2 id="cinemaTitle" class="absolute top-6 left-0 right-0 text-center text-white/80 font-light tracking-[4px] text-lg uppercase pointer-events-none z-40 drop-shadow-lg transition-transform duration-500">Movie Player</h2>
+    <img id="cinemaImage" class="hidden max-w-full max-h-full w-auto h-auto object-contain" src="">
 
-    <video id="cinemaVideo" controls preload="metadata" class="max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg outline-none transition-all duration-500 origin-bottom"></video>
-
-    <img id="cinemaImage" class="hidden max-w-full max-h-[80vh] w-auto h-auto shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-lg object-contain transition-all duration-500 origin-bottom" src="">
-
-    <div id="cinemaSourceMessage" class="hidden flex-col items-center justify-center bg-black/60 backdrop-blur-md rounded-2xl p-8 border border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.15)] text-center animate-glow-pulse glow-purple max-w-md w-full mx-4 z-40">
-        <span class="material-icons text-purple-400 text-6xl mb-4">movie_filter</span>
-        <h3 class="text-white text-xl font-bold tracking-widest mb-2">SOURCE MEDIA</h3>
-        <p class="text-gray-400 text-sm mb-6 leading-relaxed">This high-bitrate file exceeds streaming limits and is preserved in raw quality.</p>
-        <div class="flex gap-4 w-full">
-            <button onclick="cinemaLocate()" class="flex-1 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
-                <span class="material-icons text-[18px]">folder_open</span> LOCATE
+    <div id="cinemaSourceMessage" class="hidden flex-col items-center justify-center bg-surface rounded-ds-md p-8 border border-[var(--ds-hairline-strong)] text-center max-w-md w-full mx-4 z-40">
+        <span class="material-icons text-accent-tint text-5xl mb-4">movie_filter</span>
+        <h3 class="text-white text-lg font-semibold mb-2">Source media</h3>
+        <p class="text-body-text text-[13px] mb-6 leading-relaxed">This high-bitrate file exceeds streaming limits and is preserved in raw quality.</p>
+        <div class="flex gap-3 w-full">
+            <button onclick="cinemaLocate()" class="ds-btn ds-btn-secondary flex-1">
+                <span class="material-icons text-[18px]">folder_open</span> Locate
             </button>
-            <a id="cinemaDownloadBtn" href="" download class="flex-1 py-3 px-4 bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-white border border-purple-500/50 hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] rounded-xl font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2">
-                <span class="material-icons text-[18px]">download</span> DOWNLOAD
+            <a id="cinemaDownloadBtn" href="" download class="ds-btn ds-btn-primary flex-1">
+                <span class="material-icons text-[18px]">download</span> Download
             </a>
         </div>
     </div>
 
-    <div id="cinemaInfoPanel" class="absolute top-20 right-4 w-80 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-4 transform translate-x-[120%] transition-transform duration-300 z-40 text-sm text-gray-300 animate-glow-pulse glow-cyan">
-        <div class="flex items-center gap-2 mb-3 text-white font-bold border-b border-white/10 pb-2">
-            <span class="material-icons text-sm">info</span>
+    <!-- Top overlay: Dateiname + Mono-Metadaten links, Close rechts -->
+    <div class="cinema-overlay-top absolute top-0 left-0 right-0 px-5 pt-4 pb-10 z-40 flex items-start justify-between gap-4 pointer-events-none">
+        <div class="min-w-0 pointer-events-auto">
+            <h2 id="cinemaTitle" class="text-[13px] font-semibold text-white truncate">Movie Player</h2>
+            <div id="cinemaMeta" class="text-[11px] font-mono text-white/55 truncate mt-0.5"></div>
+        </div>
+        <button class="pointer-events-auto text-white/80 hover:text-white transition-colors flex-shrink-0" onclick="closeCinema()" title="Close [Esc]">
+            <span class="material-icons text-[22px]">close</span>
+        </button>
+    </div>
+
+    <div id="cinemaInfoPanel" class="absolute top-20 right-[92px] w-80 bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md p-4 transform translate-x-[140%] transition-transform duration-300 z-40 text-sm text-body-text">
+        <div class="flex items-center gap-2 mb-3 text-white font-semibold border-b border-[var(--ds-hairline-strong)] pb-2">
+            <span class="material-icons text-[16px]">info</span>
             <span>Technical Details</span>
         </div>
         <div id="cinemaInfoContent" class="space-y-2 text-xs font-mono"></div>
     </div>
 
     <!-- Assigned Tags Display (Visible List with Remove X) -->
-    <div id="cinemaAssignedTags" class="absolute top-20 left-4 max-w-sm flex flex-wrap gap-2 z-40 pointer-events-auto">
+    <div id="cinemaAssignedTags" class="absolute top-16 left-5 max-w-sm flex flex-wrap gap-2 z-40 pointer-events-auto">
         <!-- Populated by JS -->
     </div>
 
-    <!-- Tag Picker Dropdown (appears above the Tags button) -->
-    <div id="cinemaTagPanel" class="hidden absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 rounded-xl p-3 z-50 min-w-[200px] max-w-[320px] animate-glow-pulse glow-cyan">
-        <div class="flex items-center gap-2 mb-2 text-white/80 text-xs border-b border-white/10 pb-2">
-            <span class="material-icons text-sm text-arcade-cyan">label</span>
-            <span class="font-semibold uppercase tracking-wide">Assign Tags</span>
+    <!-- Tag Picker Dropdown -->
+    <div id="cinemaTagPanel" class="hidden absolute top-1/2 right-[92px] -translate-y-1/2 bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md p-3 z-50 min-w-[200px] max-w-[320px]">
+        <div class="flex items-center gap-2 mb-2 pb-2 border-b border-[var(--ds-hairline-strong)]">
+            <span class="material-icons text-[16px] text-accent-tint">label</span>
+            <span class="ds-eyebrow">Assign Tags</span>
         </div>
         <div id="cinemaTagPicker" class="flex flex-wrap gap-1.5">
             <!-- Populated by JS -->
         </div>
     </div>
 
-    <div id="cinemaActions" class="cinema-actions absolute bottom-8 flex gap-3 z-40">
+    <!-- Rechte Action-Rail: neutrale Buttons, Accent nur fuer die Primaeraktion -->
+    <div id="cinemaActions" class="cinema-actions absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-3.5 z-40">
 
-        <!-- Info Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="toggleCinemaInfo()" title="Technical Details [I]">
-            <div class="w-12 h-12 rounded-xl bg-white/8 backdrop-blur-sm flex items-center justify-center border border-white/15 group-hover:bg-white/18 group-hover:border-white/35 group-hover:scale-110 transition-all shadow-lg">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300 group-hover:text-white transition-colors">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="16" x2="12" y2="12"/>
-                    <line x1="12" y1="8" x2="12.01" y2="8"/>
-                </svg>
-            </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-gray-500 group-hover:text-white transition-colors">Info</span>
+        <button class="cinema-rail-btn" onclick="toggleCinemaInfo()" title="Technical Details [I]">
+            <span class="cinema-rail-icon"><span class="material-icons">info_outline</span></span>
+            <span class="cinema-rail-label">Info</span>
         </button>
 
-        <!-- Locate Button -->
-        <button id="cinemaLocateBtn" class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaLocate()" title="Show in Finder">
-            <div class="w-12 h-12 rounded-xl bg-white/8 backdrop-blur-sm flex items-center justify-center border border-white/15 group-hover:bg-white/18 group-hover:border-white/35 group-hover:scale-110 transition-all shadow-lg">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300 group-hover:text-white transition-colors">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    <polyline points="12 12 17 12 17 17"/>
-                    <line x1="14" y1="10" x2="17" y2="7"/>
-                </svg>
-            </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-gray-500 group-hover:text-white transition-colors">Locate</span>
+        <button id="cinemaLocateBtn" class="cinema-rail-btn" onclick="cinemaLocate()" title="Show in Finder">
+            <span class="cinema-rail-icon"><span class="material-icons">folder_open</span></span>
+            <span class="cinema-rail-label">Locate</span>
         </button>
 
-        <!-- Visual Separator -->
-        <div class="w-px h-12 bg-white/8 self-start mt-0.5"></div>
-
-        <!-- Favorite Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaFavorite()" title="Toggle Favorite [F]">
-            <div class="w-12 h-12 rounded-xl bg-arcade-gold/12 backdrop-blur-sm flex items-center justify-center border border-arcade-gold/35 group-hover:bg-arcade-gold/25 group-hover:border-arcade-gold/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-gold/10">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-gold group-hover:text-yellow-300 transition-colors" id="cinemaFavIcon">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-            </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-gold/75 group-hover:text-arcade-gold transition-colors">Favorite</span>
+        <button class="cinema-rail-btn cinema-action-btn" onclick="cinemaFavorite()" title="Toggle Favorite [F]">
+            <span class="cinema-rail-icon"><span class="material-icons" id="cinemaFavIcon">star_border</span></span>
+            <span class="cinema-rail-label">Favorite</span>
         </button>
 
-        <!-- Tags Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="toggleCinemaTagPanel()" title="Manage Tags">
-            <div class="w-12 h-12 rounded-xl bg-arcade-cyan/12 backdrop-blur-sm flex items-center justify-center border border-arcade-cyan/35 group-hover:bg-arcade-cyan/25 group-hover:border-arcade-cyan/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-cyan/10">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-cyan group-hover:text-cyan-300 transition-colors">
-                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                    <line x1="7" y1="7" x2="7.01" y2="7"/>
-                </svg>
-            </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-cyan/75 group-hover:text-arcade-cyan transition-colors">Tags</span>
+        <button class="cinema-rail-btn" onclick="toggleCinemaTagPanel()" title="Manage Tags">
+            <span class="cinema-rail-icon"><span class="material-icons">label</span></span>
+            <span class="cinema-rail-label">Tags</span>
         </button>
 
-        <!-- Vault Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group" onclick="cinemaVault()" title="Move to Vault [V]">
-            <div class="w-12 h-12 rounded-xl bg-arcade-magenta/12 backdrop-blur-sm flex items-center justify-center border border-arcade-magenta/35 group-hover:bg-arcade-magenta/25 group-hover:border-arcade-magenta/65 group-hover:scale-110 transition-all shadow-lg shadow-arcade-magenta/10">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-arcade-magenta group-hover:text-pink-400 transition-colors">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    <circle cx="12" cy="16" r="1" fill="currentColor"/>
-                </svg>
-            </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-arcade-magenta/75 group-hover:text-arcade-magenta transition-colors">Vault</span>
+        <button class="cinema-rail-btn cinema-action-btn" onclick="cinemaVault()" title="Move to Vault [V]">
+            <span class="cinema-rail-icon"><span class="material-icons">archive</span></span>
+            <span class="cinema-rail-label">Vault</span>
         </button>
 
-        <!-- Visual Separator -->
-        <div class="w-px h-12 bg-white/8 self-start mt-0.5"></div>
-
-        <!-- GIF Export Button -->
-        <button class="flex flex-col items-center gap-1.5 transition-all group cinema-action-btn" onclick="cinemaExportGif()" title="Export as GIF [G]">
-            <div class="w-12 h-12 rounded-xl bg-purple-500/12 backdrop-blur-sm flex items-center justify-center border border-purple-500/35 group-hover:bg-purple-500/25 group-hover:border-purple-500/65 group-hover:scale-110 transition-all shadow-lg shadow-purple-500/10">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-purple-400 group-hover:text-purple-300 transition-colors">
-                    <rect x="2" y="2" width="20" height="20" rx="3"/>
-                    <path d="M9 12h3v2.5a2.5 2.5 0 0 1-5 0v-5a2.5 2.5 0 0 1 5 0"/>
-                    <line x1="14" y1="8" x2="14" y2="16"/>
-                    <line x1="17" y1="8" x2="19" y2="8"/>
-                    <line x1="17" y1="12" x2="19" y2="12"/>
-                </svg>
-            </div>
-            <span class="text-[9px] font-semibold tracking-wider uppercase text-purple-400/75 group-hover:text-purple-400 transition-colors">GIF</span>
+        <button class="cinema-rail-btn" onclick="cinemaExportGif()" title="Export as GIF [G]">
+            <span class="cinema-rail-icon"><span class="material-icons">gif_box</span></span>
+            <span class="cinema-rail-label">GIF</span>
         </button>
 
         {opt_btn}
+    </div>
+
+    <!-- Bottom overlay: Scrubber + Transport -->
+    <div id="cinemaBottomBar" class="cinema-overlay-bottom absolute bottom-0 left-0 right-0 px-5 pb-4 pt-12 z-40 flex flex-col gap-2">
+        <div class="flex items-center gap-3">
+            <span id="cinemaTimeCur" class="text-[11px] font-mono text-white/70 w-[42px] text-right">00:00</span>
+            <input type="range" id="cinemaScrub" class="cinema-scrub flex-1" min="0" max="1000" value="0" step="1" aria-label="Seek">
+            <span id="cinemaTimeDur" class="text-[11px] font-mono text-white/70 w-[42px]">00:00</span>
+        </div>
+        <div class="flex items-center gap-5">
+            <button id="cinemaPrevBtn" class="cinema-transport-btn" onclick="navigateCinema(-1)" title="Previous [left arrow]">
+                <span class="material-icons text-[20px]">skip_previous</span>
+            </button>
+            <button id="cinemaPlayBtn" class="cinema-transport-btn" onclick="cinemaTogglePlay()" title="Play / Pause [Space]">
+                <span class="material-icons text-[34px]">play_arrow</span>
+            </button>
+            <button id="cinemaNextBtn" class="cinema-transport-btn" onclick="navigateCinema(1)" title="Next [right arrow]">
+                <span class="material-icons text-[20px]">skip_next</span>
+            </button>
+            <button id="cinemaMuteBtn" class="cinema-transport-btn" onclick="cinemaToggleMute()" title="Mute">
+                <span class="material-icons text-[22px]">volume_up</span>
+            </button>
+            <button id="cinemaFsBtn" class="cinema-transport-btn ml-auto" onclick="cinemaToggleFullscreen()" title="Fullscreen">
+                <span class="material-icons text-[22px]">fullscreen</span>
+            </button>
+        </div>
     </div>
 </div>
 """
 
 
 DUPLICATE_CHECKER_MODAL_COMPONENT = """
-<!-- Duplicate Checker Fullscreen Modal -->
-<div id="duplicateCheckerModal" class="fixed inset-0 z-50 bg-black opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col">
+<!-- Duplicate Checker: zwei gleichwertige Spalten + fixe Entscheidungsspalte -->
+<div id="duplicateCheckerModal" class="fixed inset-0 z-[120] bg-bg opacity-0 pointer-events-none transition-opacity duration-300 flex flex-col">
     <!-- Active class 'opacity-100 pointer-events-auto' toggled by JS -->
 
-    <!-- Close Button -->
-    <button class="absolute top-6 right-6 text-white/50 hover:text-white z-50 p-2 transition-colors" onclick="closeDuplicateChecker()">
-        <span class="material-icons text-4xl">close</span>
-    </button>
-
-    <!-- Header: Group Counter -->
-    <div class="absolute top-6 left-0 right-0 text-center z-40">
-        <div class="text-white/60 text-sm font-mono mb-1">DUPLICATE GROUP</div>
-        <div class="text-white text-2xl font-bold tracking-wider">
-            <span id="dupCheckerCurrentGroup">1</span> / <span id="dupCheckerTotalGroups">0</span>
+    <!-- Kopfzeile -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-line/60">
+        <div class="flex items-baseline gap-3">
+            <span class="ds-eyebrow">Duplicate group</span>
+            <span class="font-mono text-[13px] text-text-main">
+                <span id="dupCheckerCurrentGroup">1</span> / <span id="dupCheckerTotalGroups">0</span>
+            </span>
+            <span class="text-[12px] text-text-muted" id="dupCheckerGroupInfo">
+                2 duplicate candidates
+            </span>
         </div>
-        <div class="text-purple-400 text-xs mt-1" id="dupCheckerGroupInfo">
-            2 duplicate candidates • Qualify diff: 0.0 pts
-        </div>
-    </div>
-
-    <!-- Main Comparison Area -->
-    <div class="flex-1 flex items-center justify-center px-8 py-24">
-        <div class="grid grid-cols-2 gap-8 w-full max-w-7xl">
-
-            <!-- File A (Left) -->
-            <div id="dupFileA" class="duplicate-file-panel flex flex-col gap-4 p-6 rounded-2xl border-2 border-white/10 bg-white/[0.02] transition-all hover:border-purple-400/50 hover:scale-[1.02]">
-                <!-- Label -->
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <div class="w-10 h-10 rounded-full bg-purple-500/20 border-2 border-purple-500/50 flex items-center justify-center">
-                            <span class="text-purple-400 font-bold text-lg">A</span>
-                        </div>
-                        <span class="text-white/60 text-sm font-semibold uppercase tracking-wide">Candidate A</span>
-                    </div>
-                    <div id="dupFileABadge" class="hidden px-3 py-1 rounded-full bg-green-500/20 border border-green-500/50 text-green-400 text-xs font-bold uppercase">
-                        ✓ Higher Quality
-                    </div>
-                </div>
-
-                <!-- Thumbnail -->
-                <div class="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="previewDuplicateFile('A')">
-                    <img id="dupFileAThumb" src="" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">
-                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-icons text-white text-4xl drop-shadow-lg">play_circle</span>
-                    </div>
-                </div>
-
-                <!-- Filename -->
-                <div class="text-white font-medium text-sm truncate" id="dupFileAName" title="">filename_a.mp4</div>
-
-                <!-- Metadata Grid -->
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">Quality Score</div>
-                        <div id="dupFileAQuality" class="text-purple-400 font-bold text-lg">213.8</div>
-                    </div>
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">File Size</div>
-                        <div id="dupFileASize" class="text-white font-mono">0.79 MB</div>
-                    </div>
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">Resolution</div>
-                        <div id="dupFileARes" class="text-white font-mono">1436×1436</div>
-                    </div>
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">Bitrate</div>
-                        <div id="dupFileABitrate" class="text-white font-mono">--</div>
-                    </div>
-                </div>
-
-                <!-- Action Button -->
-                <button onclick="keepDuplicateFile('A')" class="w-full py-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border-2 border-purple-500/50 hover:border-purple-500 text-purple-400 hover:text-white font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group">
-                    <span class="material-icons">check_circle</span>
-                    <span>Keep A</span>
-                    <span class="text-xs opacity-60 group-hover:opacity-100">(Press 1 or ←)</span>
-                </button>
-            </div>
-
-            <!-- File B (Right) -->
-            <div id="dupFileB" class="duplicate-file-panel flex flex-col gap-4 p-6 rounded-2xl border-2 border-white/10 bg-white/[0.02] transition-all hover:border-purple-400/50 hover:scale-[1.02]">
-                <!-- Label -->
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <div class="w-10 h-10 rounded-full bg-purple-500/20 border-2 border-purple-500/50 flex items-center justify-center">
-                            <span class="text-purple-400 font-bold text-lg">B</span>
-                        </div>
-                        <span class="text-white/60 text-sm font-semibold uppercase tracking-wide">Candidate B</span>
-                    </div>
-                    <div id="dupFileBBadge" class="hidden px-3 py-1 rounded-full bg-green-500/20 border border-green-500/50 text-green-400 text-xs font-bold uppercase">
-                        ✓ Higher Quality
-                    </div>
-                </div>
-
-                <!-- Thumbnail -->
-                <div class="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="previewDuplicateFile('B')">
-                    <img id="dupFileBThumb" src="" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity">
-                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-icons text-white text-4xl drop-shadow-lg">play_circle</span>
-                    </div>
-                </div>
-
-                <!-- Filename -->
-                <div class="text-white font-medium text-sm truncate" id="dupFileBName" title="">filename_b.mp4</div>
-
-                <!-- Metadata Grid -->
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">Quality Score</div>
-                        <div id="dupFileBQuality" class="text-purple-400 font-bold text-lg">213.8</div>
-                    </div>
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">File Size</div>
-                        <div id="dupFileBSize" class="text-white font-mono">0.79 MB</div>
-                    </div>
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">Resolution</div>
-                        <div id="dupFileBRes" class="text-white font-mono">1436×1436</div>
-                    </div>
-                    <div class="bg-white/5 rounded-lg p-2">
-                        <div class="text-gray-500 mb-1">Bitrate</div>
-                        <div id="dupFileBBitrate" class="text-white font-mono">--</div>
-                    </div>
-                </div>
-
-                <!-- Action Button -->
-                <button onclick="keepDuplicateFile('B')" class="w-full py-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border-2 border-purple-500/50 hover:border-purple-500 text-purple-400 hover:text-white font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group">
-                    <span class="material-icons">check_circle</span>
-                    <span>Keep B</span>
-                    <span class="text-xs opacity-60 group-hover:opacity-100">(Press 2 or →)</span>
-                </button>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- Bottom Action Bar -->
-    <div class="absolute bottom-8 left-0 right-0 flex items-center justify-center gap-4 z-40">
-        <!-- Skip Button -->
-        <button onclick="skipDuplicateGroup()" class="px-6 py-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/20 hover:border-white/40 text-white/60 hover:text-white font-semibold text-sm transition-all flex items-center gap-2">
-            <span class="material-icons text-lg">skip_next</span>
-            <span>Skip</span>
-            <span class="text-xs opacity-60">(S or Space)</span>
-        </button>
-
-        <!-- Any is Fine Button -->
-        <button onclick="markAnyIsFine()" class="px-6 py-3 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 hover:border-green-500 text-green-400 hover:text-white font-semibold text-sm transition-all flex items-center gap-2">
-            <span class="material-icons text-lg">done_all</span>
-            <span>Any is Fine</span>
-            <span class="text-xs opacity-60">(A)</span>
+        <button class="text-text-muted hover:text-text-main transition-colors" onclick="closeDuplicateChecker()" title="Close [Esc]">
+            <span class="material-icons text-[22px]">close</span>
         </button>
     </div>
 
-    <!-- Keyboard Shortcuts Legend -->
-    <div class="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl px-6 py-3 z-30">
-        <div class="flex items-center gap-6 text-xs text-white/60">
-            <div class="flex items-center gap-2">
-                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">1</kbd>
-                <span>Keep A</span>
+    <!-- Vergleich -->
+    <div class="flex-1 flex items-center justify-center px-6 py-8 overflow-auto">
+        <div class="w-full max-w-6xl">
+            <div class="flex items-start gap-6">
+
+                <!-- File A -->
+                <div id="dupFileA" class="flex-1 min-w-0 flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <span class="ds-eyebrow">File A</span>
+                        <span class="ds-eyebrow" id="dupFileACodec"></span>
+                    </div>
+                    <div id="dupFileAPreview" class="relative aspect-video bg-black rounded-ds-md overflow-hidden cursor-pointer group border-[1.5px] border-transparent" onclick="previewDuplicateFile('A')">
+                        <img id="dupFileAThumb" src="" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span class="material-icons text-white text-4xl">play_circle</span>
+                        </div>
+                        <span id="dupFileABadge" class="hidden ds-badge ds-badge-accent absolute bottom-1.5 left-1.5">Recommended</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 font-mono text-[11px] text-label">
+                        <span class="truncate" id="dupFileAName" title="">filename_a.mp4</span>
+                        <span id="dupFileASize" class="flex-shrink-0">0.79 MB</span>
+                    </div>
+                    <div class="font-mono text-[11px] text-text-muted truncate">
+                        <span id="dupFileARes">--</span> &middot; <span id="dupFileABitrate">--</span> &middot; Q <span id="dupFileAQuality">--</span>
+                    </div>
+                </div>
+
+                <!-- Entscheidungsspalte -->
+                <div class="w-[120px] flex-shrink-0 flex flex-col items-stretch gap-2.5 pt-6">
+                    <div id="dupSizeDelta" class="font-mono text-[22px] font-extrabold text-optimized text-center leading-none">--</div>
+                    <button id="dupKeepBtn" onclick="keepRecommendedDuplicate()" class="ds-btn ds-btn-primary w-full">Keep</button>
+                    <button id="dupDiscardBtn" onclick="discardRecommendedDuplicate()" class="ds-btn ds-btn-secondary w-full">Discard</button>
+                </div>
+
+                <!-- File B -->
+                <div id="dupFileB" class="flex-1 min-w-0 flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <span class="ds-eyebrow">File B</span>
+                        <span class="ds-eyebrow" id="dupFileBCodec"></span>
+                    </div>
+                    <div id="dupFileBPreview" class="relative aspect-video bg-black rounded-ds-md overflow-hidden cursor-pointer group border-[1.5px] border-transparent" onclick="previewDuplicateFile('B')">
+                        <img id="dupFileBThumb" src="" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span class="material-icons text-white text-4xl">play_circle</span>
+                        </div>
+                        <span id="dupFileBBadge" class="hidden ds-badge ds-badge-accent absolute bottom-1.5 left-1.5">Recommended</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 font-mono text-[11px] text-label">
+                        <span class="truncate" id="dupFileBName" title="">filename_b.mp4</span>
+                        <span id="dupFileBSize" class="flex-shrink-0">0.79 MB</span>
+                    </div>
+                    <div class="font-mono text-[11px] text-text-muted truncate">
+                        <span id="dupFileBRes">--</span> &middot; <span id="dupFileBBitrate">--</span> &middot; Q <span id="dupFileBQuality">--</span>
+                    </div>
+                </div>
+
             </div>
-            <div class="flex items-center gap-2">
-                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">2</kbd>
-                <span>Keep B</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">S</kbd>
-                <span>Skip</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">A</kbd>
-                <span>Auto</span>
-            </div>
-            <div class="flex items-center gap-2">
-                <kbd class="px-2 py-1 bg-white/10 rounded font-mono font-bold text-white">ESC</kbd>
-                <span>Exit</span>
+
+            <!-- Tastatur-Hinweis + Zusatzaktionen -->
+            <div class="mt-6 flex items-center gap-5 font-mono text-[11px] text-text-muted">
+                <span>&larr; keep A</span>
+                <span>&rarr; keep B</span>
+                <button onclick="skipDuplicateGroup()" class="hover:text-text-main transition-colors">space skip</button>
+                <button onclick="markAnyIsFine()" class="hover:text-text-main transition-colors">A auto-keep</button>
             </div>
         </div>
     </div>
@@ -1600,77 +1495,70 @@ SETUP_WIZARD_COMPONENT = """
 """
 
 SETTINGS_MODAL_COMPONENT = """
-<div id="settingsModal" class="hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
-    <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-arcade-bg dark:bg-[#1a1a24] rounded-2xl animate-glow-pulse glow-cyan flex flex-col md:flex-row overflow-hidden border border-black/10 dark:border-white/10 transform scale-95 transition-transform duration-300">
+<div id="settingsModal" class="hidden fixed inset-0 z-[120] bg-black/70 opacity-0 transition-opacity duration-300 flex items-center justify-center p-4 md:p-8">
+    <div class="settings-container w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[85vh] bg-bg rounded-ds-lg flex flex-col md:flex-row overflow-hidden border border-[var(--ds-hairline-strong)] transform scale-95 transition-transform duration-300">
 
-        <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-56 bg-[#f1f3f5] dark:bg-[#12121a] border-b md:border-b-0 md:border-r border-black/10 dark:border-white/5 flex md:flex-col shrink-0">
-            <div class="p-4 md:p-5 flex items-center gap-3 border-b border-black/8 dark:border-white/5 md:border-none">
-                <span class="material-icons text-arcade-gold text-xl">settings</span>
-                <h2 class="font-semibold tracking-wide text-lg text-text-main dark:text-white">Settings</h2>
+        <!-- Linke Navigation: spiegelt das Sidebar-Pattern -->
+        <aside class="w-full md:w-[200px] bg-header border-b md:border-b-0 md:border-r border-line/60 flex md:flex-col shrink-0">
+            <div class="px-4 py-4 flex items-center gap-2.5 md:border-b md:border-line/60">
+                <span class="material-icons text-accent text-[18px]">settings</span>
+                <h2 class="font-bold text-[14px] text-text-main">Settings</h2>
             </div>
 
-            <nav class="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:px-3 md:py-2 gap-1">
-                <button class="settings-nav-item active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="scanning">
-                    <span class="material-icons text-lg">folder_open</span>
+            <nav class="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:px-3 md:py-3 gap-0.5">
+                <button class="settings-nav-item active" data-section="scanning">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">folder_open</span>
                     <span class="hidden md:inline">Scanning</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="performance">
-                    <span class="material-icons text-lg">speed</span>
+                <button class="settings-nav-item" data-section="performance">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">speed</span>
                     <span class="hidden md:inline">Performance</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="interface">
-                    <span class="material-icons text-lg">palette</span>
+                <button class="settings-nav-item" data-section="interface">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">palette</span>
                     <span class="hidden md:inline">Interface</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-
-                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
-
-                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="storage">
-                    <span class="material-icons text-lg">storage</span>
+                <button class="settings-nav-item" data-section="storage">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">storage</span>
                     <span class="hidden md:inline">Storage</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
-                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="privacy">
-                    <span class="material-icons text-lg">security</span>
+                <button class="settings-nav-item" data-section="privacy">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">security</span>
                     <span class="hidden md:inline">Privacy</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
-                 <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="backup">
-                    <span class="material-icons text-lg">save</span>
-                    <span class="hidden md:inline">Backup & Restore</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
+                <button class="settings-nav-item" data-section="backup">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">save</span>
+                    <span class="hidden md:inline">Backup &amp; Restore</span>
                 </button>
-                <div class="w-px h-6 md:w-full md:h-px bg-white/10 md:my-2 mx-2 md:mx-0"></div>
-                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="queue">
-                    <span class="material-icons text-lg">cloud_sync</span>
+                <button class="settings-nav-item" data-section="queue">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">cloud_sync</span>
                     <span class="hidden md:inline">Remote Queue</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
-                <button class="settings-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap relative" data-section="autotagging">
-                    <span class="material-icons text-lg">sell</span>
+                <button class="settings-nav-item" data-section="autotagging">
+                    <span class="settings-nav-indicator"></span>
+                    <span class="material-icons text-[18px]">sell</span>
                     <span class="hidden md:inline">Auto-Tagging</span>
-                    <div class="active-indicator absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-arcade-cyan rounded-r opacity-0 transition-opacity"></div>
                 </button>
             </nav>
         </aside>
 
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col min-w-0 bg-arcade-bg dark:bg-[#1a1a24]">
+        <!-- Inhalt -->
+        <main class="flex-1 flex flex-col min-w-0 bg-bg">
 
-            <!-- Header -->
-            <header class="p-5 md:p-6 border-b border-white/5 flex justify-between items-center">
+            <header class="px-[26px] py-[18px] border-b border-line/60 flex justify-between items-start">
                 <div>
-                    <h1 id="section-title" class="text-xl md:text-2xl font-bold text-white">Scanning</h1>
-                    <p id="section-subtitle" class="text-sm text-gray-500 mt-0.5">Configure video library scanning</p>
+                    <h1 id="section-title" class="text-[16px] font-bold text-text-main">Scanning</h1>
+                    <p id="section-subtitle" class="text-[12px] text-text-muted mt-0.5">Configure video library scanning</p>
                 </div>
-                <button class="text-gray-500 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-lg" title="Close (ESC)" onclick="closeSettings()">
-                    <span class="material-icons">close</span>
+                <button class="text-text-muted hover:text-text-main transition-colors" title="Close (ESC)" onclick="closeSettings()">
+                    <span class="material-icons text-[22px]">close</span>
                 </button>
             </header>
 
@@ -1681,16 +1569,16 @@ SETTINGS_MODAL_COMPONENT = """
                 <div class="content-section active space-y-6" id="content-scanning">
                     <section class="space-y-3">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-cyan">folder</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">folder</span>
                                 Scan Directories
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Paths to scan for video files. One per line.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Paths to scan for video files. One per line.</p>
                         </div>
-                        <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsTargets" placeholder="/Users/username/Videos" rows="4" oninput="markSettingsUnsaved()"></textarea>
+                        <textarea class="w-full ds-textarea" id="settingsTargets" placeholder="/Users/username/Videos" rows="4" oninput="markSettingsUnsaved()"></textarea>
 
-                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-3 text-sm text-blue-300">
-                             <span class="material-icons text-blue-400 text-lg">info</span>
+                        <div class="ds-settings-card flex gap-3 text-[12px] text-body-text">
+                             <span class="material-icons text-text-muted text-lg">info</span>
                              <div>
                                  <strong>Default:</strong> Home directory
                                  <span id="defaultTargetsHint" class="opacity-70 text-xs block mt-0.5"></span>
@@ -1700,40 +1588,40 @@ SETTINGS_MODAL_COMPONENT = """
 
                     <section class="space-y-3">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
                                 <span class="material-icons text-lg text-gray-400">block</span>
                                 System Exclusions
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Default paths excluded from scanning.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Default paths excluded from scanning.</p>
                         </div>
-                        <div id="defaultExclusionsContainer" class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-2 max-h-48 overflow-y-auto">
+                        <div id="defaultExclusionsContainer" class="ds-settings-card space-y-2 max-h-48 overflow-y-auto">
                             <!-- Populated by JS -->
                         </div>
                     </section>
 
                     <section class="space-y-3">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-pink">remove_circle</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">remove_circle</span>
                                 Custom Exclusions
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Additional paths to exclude.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Additional paths to exclude.</p>
                         </div>
-                        <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsExcludes" placeholder="/Volumes/Backup" rows="2" oninput="markSettingsUnsaved()"></textarea>
+                        <textarea class="w-full ds-textarea" id="settingsExcludes" placeholder="/Volumes/Backup" rows="2" oninput="markSettingsUnsaved()"></textarea>
                     </section>
 
                     <section class="space-y-3">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
                                 <span class="material-icons text-lg text-gray-400">notes</span>
                                 Logging
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Control terminal output density during scans.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Control terminal output density during scans.</p>
                         </div>
-                        <label class="flex items-center gap-3 cursor-pointer select-none group bg-black/30 p-4 rounded-xl border border-white/5 hover:border-arcade-cyan/30 transition-all">
+                        <label class="flex items-center gap-3 cursor-pointer select-none group bg-surface p-4 rounded-xl border border-white/5 hover:border-[var(--ds-hairline-strong)] transition-all">
                             <div class="relative inline-flex items-center">
                                 <input type="checkbox" id="settingsVerboseScanning" class="sr-only peer" onchange="markSettingsUnsaved()">
-                                <div class="w-11 h-6 bg-gray-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-arcade-cyan/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-arcade-cyan"></div>
+                                <div class="ds-peer-switch"></div>
                             </div>
                             <div>
                                 <span class="text-white font-medium">Verbose Scanning Logs</span>
@@ -1747,14 +1635,14 @@ SETTINGS_MODAL_COMPONENT = """
                 <div class="content-section hidden space-y-6" id="content-performance">
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-gold">straighten</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">straighten</span>
                                 File Size Threshold
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Ignore videos smaller than this size.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Ignore videos smaller than this size.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Minimum Size</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Files below this are skipped</div>
@@ -1776,14 +1664,14 @@ SETTINGS_MODAL_COMPONENT = """
 
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-cyan">image</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">image</span>
                                 Image Size Threshold
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Ignore images smaller than this. Filters out tiny icons/thumbnails.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Ignore images smaller than this. Filters out tiny icons/thumbnails.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Minimum Size</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Images below this are skipped</div>
@@ -1805,14 +1693,14 @@ SETTINGS_MODAL_COMPONENT = """
 
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-pink">local_fire_department</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">local_fire_department</span>
                                 Bitrate Classification
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Videos above this are marked as HIGH bitrate.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Videos above this are marked as HIGH bitrate.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Bitrate Threshold</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Default: 15,000 kbps</div>
@@ -1834,32 +1722,32 @@ SETTINGS_MODAL_COMPONENT = """
 
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-cyan">speed</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">speed</span>
                                 Thumbnail Pre-computation
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Generate thumbnails during scan to prevent lag while scrolling.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Generate thumbnails during scan to prevent lag while scrolling.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Pre-compute Thumbnails</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Highly recommended for NAS users.</div>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="settingsPrecomputeThumbs" class="sr-only peer" onchange="markSettingsUnsaved()">
-                                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-arcade-cyan"></div>
+                                <div class="ds-peer-switch"></div>
                             </label>
                         </div>
                     </section>
 
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-gold">tune</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">tune</span>
                                 Encoding Quality
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Trade-off between encoding speed and output file size. Best quality takes longer but shrinks files more.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Trade-off between encoding speed and output file size. Best quality takes longer but shrinks files more.</p>
                         </div>
 
                         <div class="grid grid-cols-3 gap-2" id="encodingPresetGroup">
@@ -1893,11 +1781,11 @@ SETTINGS_MODAL_COMPONENT = """
                 <div class="content-section hidden space-y-6" id="content-interface">
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
                                 <span class="material-icons text-lg text-accent">palette</span>
                                 Appearance
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Arcade Scanner nutzt ein einheitliches Design System.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Arcade Scanner nutzt ein einheitliches Design System.</p>
                         </div>
 
                         <div class="bg-surface rounded-ds-md p-4 border border-white/10">
@@ -1907,35 +1795,35 @@ SETTINGS_MODAL_COMPONENT = """
 
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
                                 <span class="material-icons text-lg text-arcade-magenta">auto_awesome</span>
                                 Visual Features
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Customize the dashboard experience.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Customize the dashboard experience.</p>
                         </div>
 
 
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Video Optimizer</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Enable video compression features <span class="text-amber-400">(restart required)</span></div>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="settingsOptimizer" class="sr-only peer" checked onchange="markSettingsUnsaved()">
-                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-gold"></div>
+                                <div class="ds-peer-switch"></div>
                             </label>
                         </div>
 
                         <!-- INCLUDE PHOTOS -->
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Include Photos</div>
-                                <div class="text-xs text-gray-500 mt-0.5">Include <span class="text-arcade-cyan">.jpg, .png, .gif</span> etc. in library</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Include <span class="text-accent">.jpg, .png, .gif</span> etc. in library</div>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="settingsScanImages" class="sr-only peer" onchange="onIncludePhotosChange(this)">
-                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-arcade-cyan"></div>
+                                <div class="ds-peer-switch"></div>
                             </label>
                         </div>
 
@@ -1969,23 +1857,23 @@ SETTINGS_MODAL_COMPONENT = """
                 <div class="content-section hidden space-y-6" id="content-storage">
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-cyan">pie_chart</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">pie_chart</span>
                                 Cache Statistics
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Disk space used by generated assets.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Disk space used by generated assets.</p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
-                            <div class="bg-black/40 p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
+                            <div class="bg-surface p-4 rounded-xl border border-white/5 flex flex-col items-center gap-2">
                                 <span class="material-icons text-gray-500 text-2xl">image</span>
                                 <span class="text-xs text-gray-500 uppercase tracking-wider">Thumbnails</span>
                                 <span class="text-lg font-mono text-white" id="statThumbnails">—</span>
                             </div>
-                            <div class="bg-black/40 p-4 rounded-xl border border-arcade-cyan/30 flex flex-col items-center gap-2">
-                                <span class="material-icons text-arcade-cyan text-2xl">storage</span>
+                            <div class="bg-surface p-4 rounded-xl border border-accent/30 flex flex-col items-center gap-2">
+                                <span class="material-icons text-accent text-2xl">storage</span>
                                 <span class="text-xs text-gray-500 uppercase tracking-wider">Total</span>
-                                <span class="text-lg font-mono text-arcade-cyan" id="statTotal">—</span>
+                                <span class="text-lg font-mono text-accent" id="statTotal">—</span>
                             </div>
                         </div>
 
@@ -2001,40 +1889,40 @@ SETTINGS_MODAL_COMPONENT = """
                 <div class="content-section hidden space-y-6" id="content-privacy">
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-cyan">shield</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">shield</span>
                                 Safe Mode Configuration
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Define what content is hidden when Safe Mode is enabled.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Define what content is hidden when Safe Mode is enabled.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Enable Safe Mode</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Hide sensitive content based on tags and directories</div>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="settingsSafeMode" class="sr-only peer" onchange="markSettingsUnsaved()">
-                                <div class="w-12 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-arcade-cyan/30 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:shadow-md after:transition-all peer-checked:bg-green-500"></div>
+                                <div class="ds-peer-switch"></div>
                             </label>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
+                        <div class="ds-settings-card space-y-4">
                             <div>
                                 <label class="block text-xs font-medium text-white mb-2">Sensitive Directories</label>
-                                <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsSensitiveDirs" placeholder="/path/to/private" rows="3" oninput="markSettingsUnsaved()"></textarea>
+                                <textarea class="w-full ds-textarea" id="settingsSensitiveDirs" placeholder="/path/to/private" rows="3" oninput="markSettingsUnsaved()"></textarea>
                                 <p class="text-xs text-gray-500 mt-1">One absolute path per line. Files in these folders will be hidden.</p>
                             </div>
 
                             <div>
                                 <label class="block text-xs font-medium text-white mb-2">Sensitive Tags</label>
-                                <input type="text" id="settingsSensitiveTags" placeholder="nsfw, adult" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-arcade-cyan/50 focus:outline-none" oninput="markSettingsUnsaved()">
+                                <input type="text" id="settingsSensitiveTags" placeholder="nsfw, adult" class="w-full bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-accent focus:outline-none" oninput="markSettingsUnsaved()">
                                 <p class="text-xs text-gray-500 mt-1">Comma separated list of tags to hide.</p>
                             </div>
 
                             <div>
                                 <label class="block text-xs font-medium text-white mb-2">Sensitive Collections</label>
-                                <textarea class="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-gray-300 font-mono focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all resize-none placeholder-gray-600" id="settingsSensitiveCollections" placeholder="My Private Collection" rows="3" oninput="markSettingsUnsaved()"></textarea>
+                                <textarea class="w-full ds-textarea" id="settingsSensitiveCollections" placeholder="My Private Collection" rows="3" oninput="markSettingsUnsaved()"></textarea>
                                 <p class="text-xs text-gray-500 mt-1">One collection name per line. These collections will be hidden from the sidebar.</p>
                             </div>
                         </div>
@@ -2045,14 +1933,14 @@ SETTINGS_MODAL_COMPONENT = """
                 <div class="content-section hidden space-y-6" id="content-backup">
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-cyan">cloud_download</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">cloud_download</span>
                                 Export Settings
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Download your current configuration, including collections and tags.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Download your current configuration, including collections and tags.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl p-4 border border-white/5 flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
                             <div class="flex-1">
                                 <div class="text-white font-medium text-sm">Backup Configuration</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Saves as arcade_settings_backup.json</div>
@@ -2066,20 +1954,20 @@ SETTINGS_MODAL_COMPONENT = """
 
                     <section class="space-y-4">
                          <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-pink">cloud_upload</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">cloud_upload</span>
                                 Import Settings
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Restore configuration from a backup file. Existing settings will be overwritten.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Restore configuration from a backup file. Existing settings will be overwritten.</p>
                         </div>
 
-                         <div class="bg-black/30 rounded-xl p-4 border border-white/5 space-y-4">
+                         <div class="ds-settings-card space-y-4">
                             <div class="flex items-center gap-4">
                                 <div class="flex-1">
                                     <label class="block text-sm font-medium text-white mb-1">Select Backup File</label>
                                     <input type="file" id="settingsImportFile" accept=".json" class="block w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer">
                                 </div>
-                                <button onclick="importSettings()" class="px-4 py-2 bg-arcade-cyan/20 hover:bg-arcade-cyan/30 text-arcade-cyan rounded-lg text-sm font-medium transition-colors border border-arcade-cyan/30 flex items-center gap-2 h-[38px] mt-6">
+                                <button onclick="importSettings()" class="px-4 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-lg text-sm font-medium transition-colors border border-accent/30 flex items-center gap-2 h-[38px] mt-6">
                                     <span class="material-icons text-sm">upload</span>
                                     Restore
                                 </button>
@@ -2096,14 +1984,14 @@ SETTINGS_MODAL_COMPONENT = """
                 <div class="content-section hidden space-y-6" id="content-queue">
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-cyan">cloud_sync</span>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">cloud_sync</span>
                                 Encoding Queue
                             </h3>
-                            <p class="text-sm text-gray-500 mt-1">Files queued for remote Mac encoding. The Mac worker polls for pending jobs.</p>
+                            <p class="text-[12px] text-text-muted mt-1">Files queued for remote Mac encoding. The Mac worker polls for pending jobs.</p>
                         </div>
 
-                        <div class="bg-black/30 rounded-xl border border-white/5 overflow-hidden">
+                        <div class="bg-surface rounded-xl border border-white/5 overflow-hidden">
                             <table class="w-full text-sm">
                                 <thead>
                                     <tr class="border-b border-white/5 text-gray-500 text-xs uppercase tracking-wider">
@@ -2120,9 +2008,9 @@ SETTINGS_MODAL_COMPONENT = """
                             </table>
                         </div>
 
-                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex gap-3 text-sm text-blue-300">
-                            <span class="material-icons text-blue-400 text-lg">info</span>
-                            <div>Start the Mac worker with: <code class="px-2 py-0.5 bg-black/40 rounded text-arcade-cyan">python3 mac_worker.py --server http://&lt;ip&gt;:8000 --user admin</code></div>
+                        <div class="ds-settings-card flex gap-3 text-[12px] text-body-text">
+                            <span class="material-icons text-text-muted text-lg">info</span>
+                            <div>Start the Mac worker with: <code class="px-2 py-0.5 bg-surface rounded text-accent">python3 mac_worker.py --server http://&lt;ip&gt;:8000 --user admin</code></div>
                         </div>
                     </section>
                 </div>
@@ -2131,14 +2019,14 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div class="flex items-center justify-between">
                             <div>
-                                <h3 class="text-base font-medium text-white flex items-center gap-2">
-                                    <span class="material-icons text-lg text-arcade-cyan">sell</span>
+                                <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                    <span class="material-icons text-lg text-accent">sell</span>
                                     Auto-Tagging-Regeln
                                 </h3>
-                                <p class="text-sm text-gray-500 mt-1">Regeln vergeben ihr Tag automatisch nach jedem Scan. Anlegen im Collection-Editor ("Als Regel").</p>
+                                <p class="text-[12px] text-text-muted mt-1">Regeln vergeben ihr Tag automatisch nach jedem Scan. Anlegen im Collection-Editor ("Als Regel").</p>
                             </div>
                             <button id="autotagRunBtn" onclick="runAutoTagRules()"
-                                    class="px-3 py-1.5 rounded-lg text-xs font-bold bg-arcade-cyan/20 text-arcade-cyan hover:bg-arcade-cyan/30 transition-colors">
+                                    class="px-3 py-1.5 rounded-lg text-xs font-bold bg-accent/20 text-accent hover:bg-accent/30 transition-colors">
                                 Jetzt ausführen
                             </button>
                         </div>
@@ -2157,7 +2045,7 @@ SETTINGS_MODAL_COMPONENT = """
                 </div>
                 <div class="flex gap-3">
                     <button class="px-4 py-2 rounded-lg text-sm font-medium text-text-muted dark:text-gray-400 hover:text-text-main dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all" onclick="closeSettings()">Cancel</button>
-                    <button id="saveSettingsBtn" class="px-5 py-2 rounded-lg text-sm font-bold text-black bg-arcade-cyan hover:bg-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-arcade-cyan/20 transition-all flex items-center gap-2" onclick="saveSettings()">
+                    <button id="saveSettingsBtn" class="px-5 py-2 rounded-lg text-sm font-bold text-black bg-accent hover:bg-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-accent/20 transition-all flex items-center gap-2" onclick="saveSettings()">
                         <span class="material-icons text-lg save-icon">save</span>
                         <svg class="animate-spin h-4 w-4 save-spinner hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
