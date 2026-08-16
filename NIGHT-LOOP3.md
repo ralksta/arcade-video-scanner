@@ -158,10 +158,25 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
       `test_probe*.py`, `test_ui.js`, `test_puppeteer.js` und `run_fix.py` im
       Wurzelverzeichnis — die sehen aus wie Tests, laufen aber nicht mit der
       Suite. Dazu die acht vorbestehenden Ruff-Fehler.
+      - [x] Ad-hoc-Skripte nach `scripts/adhoc/` verschoben (nicht gelöscht) —
+            beim Einsammeln durch pytest hätten sie die echte DB migriert
+      - [x] `.ipk` (15 MB Binärpaket) aus Git entfernt, Datei bleibt lokal
+      - Befund: `._*`, `screenlog.0` und `*_back*` standen bereits in
+        `.gitignore` — sie liegen nur lokal, nicht im Repository
+      - [ ] Die acht vorbestehenden Ruff-Fehler
 
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 27 (Loop G, Ad-hoc-Skripte)** — Was wie Aufräumen aussah, war
+  wieder ein Sicherheitsthema: fünf Skripte im Wurzelverzeichnis mit
+  `test_`-Präfix, die beim Import die echte Datenbank öffnen. Nachgewiesen, dass
+  schon `pytest --collect-only` genügt — „collected 0 items" und die Datenbank
+  war migriert. Geschützt hat bisher nur `testpaths = ["tests"]`. Verschoben
+  statt gelöscht: es sind die Diagnosewerkzeuge des Entwicklers, sie lagen nur
+  am falschen Ort. Nebenbefund: die vermuteten Altlasten `._*`, `screenlog.0`
+  und `*_back*` standen längst in `.gitignore` — sie liegen nur lokal.
 
 - **Iteration 26 (Loop F, Datentrennung)** — Die Trennung ist besser gebaut,
   als ich erwartet hatte: `/api/settings` mischt sieben Felder sauber pro Nutzer
