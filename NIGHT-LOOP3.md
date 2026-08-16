@@ -175,7 +175,7 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
 Beide Themen haben sich in dieser Nacht schon zufällig als ergiebig erwiesen —
 jetzt systematisch.
 
-- [ ] **Loop H — Behauptungen der Doku gegen den Code prüfen**
+- [x] **Loop H — Behauptungen der Doku gegen den Code prüfen** — ausgereizt
       Genau diese Frage fand das `FOLDERS_DATA`-Leck: `CLAUDE.md` beschrieb einen
       Trennungs-Mechanismus, den es so nicht mehr gab. Und der Abhängigkeits-
       Wächter entstand aus derselben Frage. Weitere Kandidaten:
@@ -188,7 +188,9 @@ jetzt systematisch.
       - [x] README: Zusage „100% locally" traf nicht zu — Dashboard lädt
         Tailwind und Schriften von CDNs. Zusage präzisiert, Beseitigung
         dokumentiert (`dev-docs/external-resources.md`)
-      - [ ] `ROADMAP.md`: erledigte Punkte ohne Haken
+      - [x] `ROADMAP.md` geprüft: keine offenen Haken mehr (die zwei fehlenden
+        heute Nacht gesetzt), alle 9 Dateiverweise und 4 Endpunkte stimmen —
+        `client.js` wird korrekt als *ehemalige* Datei genannt
 
 - [ ] **Loop I — Tests, die nichts prüfen**
       Heute Nacht zweimal zufällig gefunden: ein `pytest.skip`, das nach einer
