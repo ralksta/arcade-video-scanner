@@ -3,6 +3,7 @@ import http.server
 import json
 import mimetypes
 import os
+import re
 import ssl
 import threading
 import time
@@ -35,6 +36,20 @@ from arcade_scanner.core.proxy_resolver import (
 )
 from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
+
+
+_TOKEN_QUERY_RE = re.compile(r"([?&]token=)[^&\s\"]+")
+
+
+def _redact_tokens(value):
+    """Ersetzt den Wert eines ``token``-Query-Parameters durch REDACTED.
+
+    Greift auf jedem Argument, das in die Zugriffszeile wandert. Nicht-Strings
+    bleiben unverändert, damit die Formatierung nicht bricht.
+    """
+    if not isinstance(value, str):
+        return value
+    return _TOKEN_QUERY_RE.sub(r"\1REDACTED", value)
 
 
 class _MediaCache:
@@ -373,7 +388,19 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, format, *args):
-        """Override to suppress noisy requests (static files, thumbnails, polling)."""
+        """Override to suppress noisy requests (static files, thumbnails, polling).
+
+        Maskiert außerdem Sitzungs-Token in der Anfrage-URL. ``<video>``-Tags
+        können keinen Authorization-Header senden, deshalb akzeptiert
+        ``/stream`` den Token als Query-Parameter — es ist derselbe Token wie im
+        Cookie, also voller Kontozugriff, 30 Tage gültig.
+
+        Diese Zeilen wurden bisher nur dann unterdrückt, wenn
+        ``verbose_scanning`` ausgeschaltet war. Wer die Diagnose einschaltet,
+        schrieb damit ab sofort bei jedem Videoabruf ein gültiges Zugangs-Token
+        ins Log — eine harmlos klingende Option mit unerwarteter Folge. Maskiert
+        wird jetzt immer; der Pfad bleibt sichtbar, der Diagnosewert also auch.
+        """
         try:
             path = getattr(self, 'path', None)
 
@@ -391,7 +418,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # Never let logging crash the request
             pass
 
-        super().log_message(format, *args)
+        super().log_message(format, *(_redact_tokens(a) for a in args))
 
     def get_current_user(self):
         """Returns the username from the session cookie, Authorization header, query parameter, or None."""

@@ -157,6 +157,17 @@ All notable changes to this project will be documented in this file.
   Der Cache hängt am Medien-Cache und verfällt mit ihm — auch bei den beiden
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
+### Security
+- **Sitzungs-Token landeten im Zugriffslog, sobald man die Diagnose einschaltet.**
+  `<video>`-Tags können keinen `Authorization`-Header senden, deshalb nimmt
+  `/stream` den Token als Query-Parameter entgegen — es ist derselbe Token wie
+  im Cookie, also voller Kontozugriff. Die Log-Zeilen dazu wurden bisher nur
+  unterdrückt, solange `verbose_scanning` **aus** war. Wer die Option
+  einschaltete, schrieb ab dem Moment bei jedem Videoabruf ein gültiges
+  Zugangs-Token mit — also genau dann, wenn man Logs typischerweise
+  weiterreicht, um Hilfe zu bekommen. Der Token wird jetzt unabhängig von jeder
+  Einstellung maskiert; Pfad und Statuscode bleiben lesbar.
+
 ### Fixed
 - **TV-Client: Server-Adresse war an neun Stellen fest verdrahtet.**
   `http://192.168.2.183:8000` stand in `MainPanel.js`, `LoginPanel.js` und

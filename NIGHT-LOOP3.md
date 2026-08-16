@@ -133,8 +133,9 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
       (`FOLDERS_DATA` mit fremden Ordnerpfaden im gemeinsamen Dump) — gefunden
       nur, weil ich zufällig einen Test für eine Doku-Zusage schrieb. Das
       verdient eine gezielte Durchsicht:
-      - Sitzungs-Token: der TV-Client hängt ihn als `&token=` an die Stream-URL.
-        Query-Parameter landen in Server-Logs, Proxy-Logs und Verläufen.
+      - [x] Sitzungs-Token im Log: `/stream`-Zeilen wurden nur unterdrückt,
+        solange `verbose_scanning` aus war — die Diagnose-Option schrieb also
+        gültige Zugangs-Token mit. Wird jetzt immer maskiert.
       - Pfad-Prüfungen: `sanitize_path`, `validate_filename`, Thumbnail-Pfade —
         greifen sie überall, wo Pfade aus Requests kommen?
       - `/api/debug/dump`: was steht da drin, und wer darf es sehen?
@@ -154,6 +155,14 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 22 (Loop F, Token im Log)** — Der Token als Query-Parameter ist
+  eine bewusste Entscheidung (Video-Tags können keinen Header senden) und für
+  sich vertretbar. Der Fehler lag darin, dass die Gegenmaßnahme an einer
+  Einstellung hing: `/stream` wurde nur unterdrückt, solange die Diagnose aus
+  war. Eine harmlos klingende Option schaltete damit das Mitschreiben von
+  Zugangsdaten ein — und zwar genau in der Situation, in der man Logs
+  weitergibt. Lehre: Schutz darf nicht von einer Komfort-Einstellung abhängen.
 
 - **Iteration 21 (Loop E, Feldnamen und Adressen)** — Nach dem `Status`-Fehler
   systematisch alle Feldzugriffe des TV-Clients gegen die API-Antwort geprüft:
