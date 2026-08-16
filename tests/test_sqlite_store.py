@@ -48,11 +48,17 @@ class TestSchema:
         assert cur.fetchone() is not None
 
     def test_indexes_created(self, store):
+        """Nur die Indizes, die eine Abfrage auch benutzt.
+
+        Details und Messwerte in tests/test_media_indexes.py — idx_status,
+        idx_codec und idx_size_mb standen früher hier, wurden aber von keinem
+        Query-Plan je angefasst.
+        """
         cur = store._conn.execute(
             "SELECT name FROM sqlite_master WHERE type='index'"
         )
         index_names = {row[0] for row in cur.fetchall()}
-        for expected in ("idx_status", "idx_codec", "idx_size_mb", "idx_mtime"):
+        for expected in ("idx_mtime", "idx_media_type", "idx_thumb"):
             assert expected in index_names, f"Missing index: {expected}"
 
 

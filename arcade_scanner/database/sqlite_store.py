@@ -133,15 +133,30 @@ class SQLiteStore:
         cols = ", ".join(f"{name} {typedef}" for name, typedef in _COLUMNS)
         conn.execute(f"CREATE TABLE IF NOT EXISTS media ({cols})")
 
-        # Performance indexes for common filter/sort queries
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON media(status)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_codec ON media(codec)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_size_mb ON media(size_mb)")
+        # Indizes für die drei Abfragen, die auf media tatsächlich filtern
+        # bzw. sortieren. Per EXPLAIN QUERY PLAN gegen die reale Bibliothek
+        # geprüft — file_path deckt SQLite selbst über sqlite_autoindex ab:
+        #   WHERE thumb = ?                  → idx_thumb
+        #   ORDER BY mtime DESC LIMIT/OFFSET → idx_mtime
+        #   DELETE WHERE media_type='image'  → idx_media_type
         conn.execute("CREATE INDEX IF NOT EXISTS idx_mtime ON media(mtime)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_favorite ON media(favorite)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_vaulted ON media(vaulted)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_thumb ON media(thumb)")
+
+        # Entfernt: idx_status, idx_codec, idx_size_mb, idx_favorite, idx_vaulted.
+        #
+        # Sie waren für „common filter/sort queries" angelegt — nur filtert und
+        # sortiert das Frontend selbst: der Server liefert über /api/videos alle
+        # Zeilen aus, es gibt kein SQL, das diese Spalten in WHERE oder ORDER BY
+        # verwendet. Kein Query-Plan hat sie je angefasst, bezahlt wurden sie
+        # trotzdem bei jedem Upsert. An der realen Bibliothek gemessen: 2000
+        # Upserts 47 ms statt 16 ms, Datei 5,58 MB statt 3,48 MB.
+        #
+        # Sollte je serverseitig gefiltert werden (etwa paginierte Suche), gehört
+        # der passende Index zusammen mit dieser Abfrage wieder hierher.
+        for obsolete in ("idx_status", "idx_codec", "idx_size_mb",
+                         "idx_favorite", "idx_vaulted"):
+            conn.execute(f"DROP INDEX IF EXISTS {obsolete}")
 
         # Migration: Add original_path to media table if it doesn't exist
         try:

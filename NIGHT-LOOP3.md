@@ -51,7 +51,8 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
       - [x] `/api/videos`-Antwort-Cache: ~105 ms CPU/Request gespart
       - Messwerte: `SELECT *` 40 ms · `_row_to_api_dict` 68 ms · `json.dumps` 42 ms ·
         `gzip(6)` 54 ms (→ 0,56 MB) · Filterschleife 10,5 ms
-      - [ ] Indizes prüfen: 8 Stück auf `media`, aber keiner auf `file_path`-Präfix
+      - [x] Indizes: 5 von 8 wurden von keinem Query-Plan benutzt, entfernt.
+            Schreiben 66% schneller, DB 38% kleiner
       - [x] Caching-Header geprüft: Thumbnails (`max-age=604800` + 304) und
             Static (`no-cache` + 304 + gzip) waren korrekt — der Fehler lag im
             Cache-Buster `?v={int(time.time())}`, der alles entwertete
@@ -70,6 +71,20 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 7 (Loop B, Indizes)** — 5 von 8 Indizes auf `media` waren reine
+  Schreiblast. Lehre: der Kommentar über ihnen („common filter/sort queries")
+  beschrieb eine Absicht, keine Abfrage — `EXPLAIN QUERY PLAN` hat es in einer
+  Minute geklärt.
+
+  **ACHTUNG für Ralf:** Beim Verifizieren habe ich `arcade_scanner.server.api_handler`
+  importiert. Dieses Modul öffnet beim Import über das Singleton `db` die echte
+  `arcade_data/media_library.db` und führt `_create_table()` aus — die Migration
+  lief dadurch bereits auf der Produktivdatenbank (23:25). Daten unverändert:
+  8788 Einträge, 18 Queue-Jobs, alle Tabellen und Spalten intakt; entfernt wurden
+  nur die fünf Indizes, also genau das, was beim nächsten Start ohnehin passiert
+  wäre. Konsequenz für den weiteren Nachtlauf: keine App-Module mehr importieren,
+  um etwas zu prüfen — nur noch auf Kopien in der Scratchpad-Umgebung arbeiten.
 
 - **Iteration 6 (Loop B, Cache-Buster)** — Die Header waren alle richtig
   gesetzt; entwertet wurde der Cache eine Ebene höher, in der URL. Lehre: bei

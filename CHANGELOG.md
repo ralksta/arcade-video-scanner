@@ -83,6 +83,16 @@ All notable changes to this project will be documented in this file.
   on a remote NVENC machine, reading originals only).
 
 ### Performance
+- **Fünf ungenutzte Indizes auf `media` entfernt.** Die Tabelle trug acht
+  Indizes, angelegt für „common filter/sort queries" — gefiltert und sortiert
+  wird aber im Frontend: der Server liefert über `/api/videos` alle Zeilen aus,
+  und kein SQL im Projekt verwendet `status`, `codec`, `size_mb`, `favorite`
+  oder `vaulted` in einem WHERE oder ORDER BY. Per `EXPLAIN QUERY PLAN` gegen
+  die reale Bibliothek geprüft: kein Plan hat sie je angefasst, bezahlt wurden
+  sie bei jedem Upsert. Gemessen: 2000 Upserts in 16 ms statt 47 ms, Datei
+  3,48 MB statt 5,58 MB. Bestehende Datenbanken werden beim Öffnen migriert.
+  Die drei verbliebenen Indizes (`idx_mtime`, `idx_media_type`, `idx_thumb`)
+  sind jeweils einer konkreten Abfrage zugeordnet und per Test daran gepinnt.
 - **Browser-Cache für statische Assets wieder wirksam.** Die 28 Script- und
   Link-Tags trugen `?v={int(time.time())}` — für jede Datei denselben Wert, neu
   bei jeder Neugenerierung des HTML-Reports (nach jedem Scan, jeder
