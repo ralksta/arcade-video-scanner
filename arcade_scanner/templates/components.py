@@ -9,11 +9,11 @@ OPTIMIZE_PANEL_COMPONENT = """
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-ink/10 pb-2">
         <h3 class="text-text-main font-bold text-base flex items-center gap-2">
-            <span class="material-icons text-arcade-cyan text-[18px]">tune</span>
+            <span class="material-icons text-arcade-cyan text-[18px]" aria-hidden="true">tune</span>
             Video Optimization
         </h3>
         <button class="w-7 h-7 rounded-full flex items-center justify-center bg-ink/5 hover:bg-ink/10 text-gray-400 hover:text-text-main transition-all group" onclick="closeOptimize()" title="Close">
-            <span class="material-icons text-[16px] group-hover:rotate-90 transition-transform">close</span>
+            <span class="material-icons text-[16px] group-hover:rotate-90 transition-transform" aria-hidden="true">close</span>
         </button>
     </div>
 
@@ -24,7 +24,7 @@ OPTIMIZE_PANEL_COMPONENT = """
         <div class="bg-ink/[0.03] hover:bg-ink/[0.05] rounded-xl border border-ink/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Codec Target</div>
-                <span class="material-icons text-[14px] text-gray-500">memory</span>
+                <span class="material-icons text-[14px] text-gray-500" aria-hidden="true">memory</span>
             </div>
             <div class="flex bg-ink/5 rounded-lg p-1 w-full">
                 <div class="flex-1 py-1 text-center text-[12px] cursor-pointer rounded-md text-text-main bg-ink/10 shadow-sm transition-all" id="optCodecHevc" data-codec-btn="hevc" onclick="setOptCodec('hevc')">HEVC</div>
@@ -38,7 +38,7 @@ OPTIMIZE_PANEL_COMPONENT = """
         <div class="bg-ink/[0.03] hover:bg-ink/[0.05] rounded-xl border border-ink/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Video Stream</div>
-                <span class="material-icons text-[14px] text-gray-500">movie</span>
+                <span class="material-icons text-[14px] text-gray-500" aria-hidden="true">movie</span>
             </div>
             <div class="flex bg-ink/5 rounded-lg p-1 w-full">
                 <div class="flex-1 py-1 text-center text-[12px] cursor-pointer rounded-md text-text-main bg-ink/10 shadow-sm transition-all" id="optVideoCompress" onclick="setOptVideo('compress')">Compress</div>
@@ -51,7 +51,7 @@ OPTIMIZE_PANEL_COMPONENT = """
         <div class="bg-ink/[0.03] hover:bg-ink/[0.05] rounded-xl border border-ink/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Audio Stream</div>
-                <span class="material-icons text-[14px] text-gray-500">multitrack_audio</span>
+                <span class="material-icons text-[14px] text-gray-500" aria-hidden="true">multitrack_audio</span>
             </div>
             <div class="flex bg-ink/5 rounded-lg p-1 w-full">
                 <div class="flex-1 py-1 text-center text-[12px] cursor-pointer rounded-md text-text-main bg-ink/10 shadow-sm transition-all" id="optAudioEnhanced" onclick="setOptAudio('enhanced')">Enhanced</div>
@@ -64,7 +64,7 @@ OPTIMIZE_PANEL_COMPONENT = """
         <div class="bg-ink/[0.03] hover:bg-ink/[0.05] rounded-xl border border-ink/5 p-2.5 flex flex-col justify-center transition-colors">
             <div class="flex items-center justify-between mb-1">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Target Quality</div>
-                <span class="material-icons text-[14px] text-gray-500">high_quality</span>
+                <span class="material-icons text-[14px] text-gray-500" aria-hidden="true">high_quality</span>
             </div>
             <div class="flex items-center gap-3">
                 <input type="number" class="bg-ink/5 border border-ink/10 text-arcade-cyan font-bold px-2 py-1 rounded-lg font-mono text-center w-[60px] text-[13px] focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30" id="optQuality" placeholder="Auto">
@@ -84,21 +84,21 @@ OPTIMIZE_PANEL_COMPONENT = """
 
             <div class="flex items-center justify-between relative z-10 hidden md:flex">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                    <span class="material-icons text-[14px]">content_cut</span> Trim
+                    <span class="material-icons text-[14px]" aria-hidden="true">content_cut</span> Trim
                 </div>
 
                 <div class="flex items-center gap-1.5">
                     <input type="text" class="bg-ink/5 border border-ink/10 text-text-main px-2 py-0.5 text-xs rounded-md font-mono text-center w-[75px] focus:border-arcade-cyan focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all" id="optTrimStart" placeholder="00:00:00">
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-ink/10 rounded-md text-gray-400 hover:bg-ink/10 hover:text-arcade-cyan transition-colors" onclick="setTrimFromHead('start')" title="Set Start from playhead">
-                        <span class="material-icons text-[12px]">arrow_downward</span>
+                        <span class="material-icons text-[12px]" aria-hidden="true">arrow_downward</span>
                     </button>
                     <div class="text-gray-600 font-mono text-[10px] mx-1">-</div>
                     <input type="text" class="bg-ink/5 border border-ink/10 text-text-main px-2 py-0.5 text-xs rounded-md font-mono text-center w-[75px] focus:border-arcade-cyan focus:outline-none focus:ring-1 focus:ring-arcade-cyan/30 transition-all" id="optTrimEnd" placeholder="END">
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-ink/10 rounded-md text-gray-400 hover:bg-ink/10 hover:text-arcade-cyan transition-colors" onclick="setTrimFromHead('end')" title="Set End from playhead">
-                        <span class="material-icons text-[12px]">arrow_downward</span>
+                        <span class="material-icons text-[12px]" aria-hidden="true">arrow_downward</span>
                     </button>
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-ink/10 rounded-md text-red-400/70 hover:bg-red-400/10 hover:text-red-400 hover:border-red-400/30 transition-colors ml-1" onclick="clearTrim()" title="Clear Trim">
-                        <span class="material-icons text-[12px]">close</span>
+                        <span class="material-icons text-[12px]" aria-hidden="true">close</span>
                     </button>
                 </div>
             </div>
@@ -113,7 +113,7 @@ OPTIMIZE_PANEL_COMPONENT = """
                 Cancel
             </button>
             <button class="btn-glitch px-5 py-2 rounded-xl text-sm font-bold cursor-pointer text-[#000] bg-arcade-cyan hover:bg-white transition-all duration-300 shadow-[0_0_15px_rgba(0,255,208,0.3)] hover:shadow-[0_0_25px_rgba(0,255,208,0.5)] transform hover:-translate-y-0.5 flex items-center justify-center gap-1.5" onclick="triggerOptimization()">
-                <span class="material-icons text-[16px]">bolt</span> START
+                <span class="material-icons text-[16px]" aria-hidden="true">bolt</span> START
             </button>
         </div>
     </div>
@@ -128,11 +128,11 @@ GIF_EXPORT_PANEL_COMPONENT = """
     <!-- Header -->
     <div class="flex items-center justify-between border-b border-ink/10 pb-2">
         <h3 class="text-text-main font-bold text-base flex items-center gap-2">
-            <span class="material-icons text-purple-400 text-[18px]">gif</span>
+            <span class="material-icons text-purple-400 text-[18px]" aria-hidden="true">gif</span>
             Export GIF
         </h3>
         <button class="w-7 h-7 rounded-full flex items-center justify-center bg-ink/5 hover:bg-ink/10 text-gray-400 hover:text-text-main transition-all group" onclick="closeGifExport()" title="Close">
-            <span class="material-icons text-[16px] group-hover:rotate-90 transition-transform">close</span>
+            <span class="material-icons text-[16px] group-hover:rotate-90 transition-transform" aria-hidden="true">close</span>
         </button>
     </div>
 
@@ -158,7 +158,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
         <div class="bg-ink/[0.03] hover:bg-ink/[0.05] rounded-xl border border-ink/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">FPS</div>
-                <span class="material-icons text-[14px] text-gray-500">speed</span>
+                <span class="material-icons text-[14px] text-gray-500" aria-hidden="true">speed</span>
             </div>
             <div class="flex bg-ink/5 rounded-lg p-1 w-full overflow-x-auto scroller-hide">
                 <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-gray-400 hover:text-text-main transition-all" id="gifFps10" onclick="setGifFps(10)">10</div>
@@ -173,7 +173,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
         <div class="bg-ink/[0.03] hover:bg-ink/[0.05] rounded-xl border border-ink/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Loop</div>
-                <span class="material-icons text-[14px] text-gray-500">loop</span>
+                <span class="material-icons text-[14px] text-gray-500" aria-hidden="true">loop</span>
             </div>
             <div class="flex bg-ink/5 rounded-lg p-1 w-full">
                 <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-text-main bg-ink/10 shadow-sm transition-all" id="gifLoop0" onclick="setGifLoop(0)" title="Loop forever">inf</div>
@@ -186,7 +186,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
         <div class="bg-ink/[0.03] hover:bg-ink/[0.05] rounded-xl border border-ink/5 p-2.5 flex flex-col gap-2 transition-colors">
             <div class="flex items-center justify-between">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Speed</div>
-                <span class="material-icons text-[14px] text-gray-500">fast_forward</span>
+                <span class="material-icons text-[14px] text-gray-500" aria-hidden="true">fast_forward</span>
             </div>
             <div class="flex bg-ink/5 rounded-lg p-1 w-full">
                 <div class="flex-1 py-1 px-1 text-center text-[12px] cursor-pointer rounded-md text-gray-400 hover:text-text-main transition-all" id="gifSpeed0_5" onclick="setGifSpeed(0.5)" title="Slow motion">0.5x</div>
@@ -219,7 +219,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
 
             <div class="flex items-center justify-between relative z-10 hidden md:flex">
                 <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                    <span class="material-icons text-[14px]">content_cut</span> Trim
+                    <span class="material-icons text-[14px]" aria-hidden="true">content_cut</span> Trim
                 </div>
 
                 <div class="flex items-center gap-1.5">
@@ -227,15 +227,15 @@ GIF_EXPORT_PANEL_COMPONENT = """
 
                     <input type="text" class="bg-ink/5 border border-ink/10 text-text-main px-2 py-0.5 text-xs rounded-md font-mono text-center w-[75px] focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400/30 transition-all" id="gifTrimStart" placeholder="00:00:00" oninput="updateGifEstimate()">
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-ink/10 rounded-md text-gray-400 hover:bg-ink/10 hover:text-purple-400 transition-colors" onclick="setGifTrimFromHead('start')" title="Set Start from playhead">
-                        <span class="material-icons text-[12px]">arrow_downward</span>
+                        <span class="material-icons text-[12px]" aria-hidden="true">arrow_downward</span>
                     </button>
                     <div class="text-gray-600 font-mono text-[10px] mx-1">-</div>
                     <input type="text" class="bg-ink/5 border border-ink/10 text-text-main px-2 py-0.5 text-xs rounded-md font-mono text-center w-[75px] focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-400/30 transition-all" id="gifTrimEnd" placeholder="END" oninput="updateGifEstimate()">
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-ink/10 rounded-md text-gray-400 hover:bg-ink/10 hover:text-purple-400 transition-colors" onclick="setGifTrimFromHead('end')" title="Set End from playhead">
-                        <span class="material-icons text-[12px]">arrow_downward</span>
+                        <span class="material-icons text-[12px]" aria-hidden="true">arrow_downward</span>
                     </button>
                     <button class="w-[24px] h-[24px] flex items-center justify-center border border-ink/10 rounded-md text-red-400/70 hover:bg-red-400/10 hover:text-red-400 hover:border-red-400/30 transition-colors ml-1" onclick="clearGifTrim()" title="Clear Trim">
-                        <span class="material-icons text-[12px]">close</span>
+                        <span class="material-icons text-[12px]" aria-hidden="true">close</span>
                     </button>
                 </div>
             </div>
@@ -250,7 +250,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
                 Cancel
             </button>
             <button class="btn-glitch px-5 py-2 rounded-xl text-sm font-bold cursor-pointer text-[#000] bg-purple-500 hover:bg-white transition-all duration-300 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] transform hover:-translate-y-0.5 flex items-center justify-center gap-1.5" onclick="triggerGifExport()">
-                <span class="material-icons text-[16px]">gif</span> EXPORT
+                <span class="material-icons text-[16px]" aria-hidden="true">gif</span> EXPORT
             </button>
         </div>
     </div>
@@ -267,15 +267,15 @@ CINEMA_MODAL_COMPONENT = """
     <img id="cinemaImage" class="hidden max-w-full max-h-full w-auto h-auto object-contain" src="">
 
     <div id="cinemaSourceMessage" class="hidden flex-col items-center justify-center bg-surface rounded-ds-md p-8 border border-[var(--ds-hairline-strong)] text-center max-w-md w-full mx-4 z-40">
-        <span class="material-icons text-accent-tint text-5xl mb-4">movie_filter</span>
+        <span class="material-icons text-accent-tint text-5xl mb-4" aria-hidden="true">movie_filter</span>
         <h3 class="text-text-main text-lg font-semibold mb-2">Source media</h3>
         <p class="text-body-text text-[13px] mb-6 leading-relaxed">This high-bitrate file exceeds streaming limits and is preserved in raw quality.</p>
         <div class="flex gap-3 w-full">
             <button onclick="cinemaLocate()" class="ds-btn ds-btn-secondary flex-1">
-                <span class="material-icons text-[18px]">folder_open</span> Locate
+                <span class="material-icons text-[18px]" aria-hidden="true">folder_open</span> Locate
             </button>
             <a id="cinemaDownloadBtn" href="" download class="ds-btn ds-btn-primary flex-1">
-                <span class="material-icons text-[18px]">download</span> Download
+                <span class="material-icons text-[18px]" aria-hidden="true">download</span> Download
             </a>
         </div>
     </div>
@@ -287,13 +287,13 @@ CINEMA_MODAL_COMPONENT = """
             <div id="cinemaMeta" class="text-[11px] font-mono text-white/55 truncate mt-0.5"></div>
         </div>
         <button class="pointer-events-auto text-white/80 hover:text-white transition-colors flex-shrink-0" onclick="closeCinema()" title="Close [Esc]">
-            <span class="material-icons text-[22px]">close</span>
+            <span class="material-icons text-[22px]" aria-hidden="true">close</span>
         </button>
     </div>
 
     <div id="cinemaInfoPanel" class="absolute top-20 right-[92px] w-80 bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md p-4 transform translate-x-[140%] transition-transform duration-300 z-40 text-sm text-body-text">
         <div class="flex items-center gap-2 mb-3 text-text-main font-semibold border-b border-[var(--ds-hairline-strong)] pb-2">
-            <span class="material-icons text-[16px]">info</span>
+            <span class="material-icons text-[16px]" aria-hidden="true">info</span>
             <span>Technical Details</span>
         </div>
         <div id="cinemaInfoContent" class="space-y-2 text-xs font-mono"></div>
@@ -307,7 +307,7 @@ CINEMA_MODAL_COMPONENT = """
     <!-- Tag Picker Dropdown -->
     <div id="cinemaTagPanel" class="hidden absolute top-1/2 right-[92px] -translate-y-1/2 bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md p-3 z-50 min-w-[200px] max-w-[320px]">
         <div class="flex items-center gap-2 mb-2 pb-2 border-b border-[var(--ds-hairline-strong)]">
-            <span class="material-icons text-[16px] text-accent-tint">label</span>
+            <span class="material-icons text-[16px] text-accent-tint" aria-hidden="true">label</span>
             <span class="ds-eyebrow">Assign Tags</span>
         </div>
         <div id="cinemaTagPicker" class="flex flex-wrap gap-1.5">
@@ -319,32 +319,32 @@ CINEMA_MODAL_COMPONENT = """
     <div id="cinemaActions" class="cinema-actions absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-3.5 z-40">
 
         <button class="cinema-rail-btn" onclick="toggleCinemaInfo()" title="Technical Details [I]">
-            <span class="cinema-rail-icon"><span class="material-icons">info_outline</span></span>
+            <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">info_outline</span></span>
             <span class="cinema-rail-label">Info</span>
         </button>
 
         <button id="cinemaLocateBtn" class="cinema-rail-btn" onclick="cinemaLocate()" title="Show in Finder">
-            <span class="cinema-rail-icon"><span class="material-icons">folder_open</span></span>
+            <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">folder_open</span></span>
             <span class="cinema-rail-label">Locate</span>
         </button>
 
         <button class="cinema-rail-btn cinema-action-btn" onclick="cinemaFavorite()" title="Toggle Favorite [F]">
-            <span class="cinema-rail-icon"><span class="material-icons" id="cinemaFavIcon">star_border</span></span>
+            <span class="cinema-rail-icon"><span class="material-icons" id="cinemaFavIcon" aria-hidden="true">star_border</span></span>
             <span class="cinema-rail-label">Favorite</span>
         </button>
 
         <button class="cinema-rail-btn" onclick="toggleCinemaTagPanel()" title="Manage Tags">
-            <span class="cinema-rail-icon"><span class="material-icons">label</span></span>
+            <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">label</span></span>
             <span class="cinema-rail-label">Tags</span>
         </button>
 
         <button class="cinema-rail-btn cinema-action-btn" onclick="cinemaVault()" title="Move to Vault [V]">
-            <span class="cinema-rail-icon"><span class="material-icons">archive</span></span>
+            <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">archive</span></span>
             <span class="cinema-rail-label">Vault</span>
         </button>
 
         <button class="cinema-rail-btn" onclick="cinemaExportGif()" title="Export as GIF [G]">
-            <span class="cinema-rail-icon"><span class="material-icons">gif_box</span></span>
+            <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">gif_box</span></span>
             <span class="cinema-rail-label">GIF</span>
         </button>
 
@@ -360,19 +360,19 @@ CINEMA_MODAL_COMPONENT = """
         </div>
         <div class="flex items-center gap-5">
             <button id="cinemaPrevBtn" class="cinema-transport-btn" onclick="navigateCinema(-1)" title="Previous [left arrow]">
-                <span class="material-icons text-[20px]">skip_previous</span>
+                <span class="material-icons text-[20px]" aria-hidden="true">skip_previous</span>
             </button>
             <button id="cinemaPlayBtn" class="cinema-transport-btn" onclick="cinemaTogglePlay()" title="Play / Pause [Space]">
-                <span class="material-icons text-[34px]">play_arrow</span>
+                <span class="material-icons text-[34px]" aria-hidden="true">play_arrow</span>
             </button>
             <button id="cinemaNextBtn" class="cinema-transport-btn" onclick="navigateCinema(1)" title="Next [right arrow]">
-                <span class="material-icons text-[20px]">skip_next</span>
+                <span class="material-icons text-[20px]" aria-hidden="true">skip_next</span>
             </button>
             <button id="cinemaMuteBtn" class="cinema-transport-btn" onclick="cinemaToggleMute()" title="Mute">
-                <span class="material-icons text-[22px]">volume_up</span>
+                <span class="material-icons text-[22px]" aria-hidden="true">volume_up</span>
             </button>
             <button id="cinemaFsBtn" class="cinema-transport-btn ml-auto" onclick="cinemaToggleFullscreen()" title="Fullscreen">
-                <span class="material-icons text-[22px]">fullscreen</span>
+                <span class="material-icons text-[22px]" aria-hidden="true">fullscreen</span>
             </button>
         </div>
     </div>
@@ -397,7 +397,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
             </span>
         </div>
         <button class="text-text-muted hover:text-text-main transition-colors" onclick="closeDuplicateChecker()" title="Close [Esc]">
-            <span class="material-icons text-[22px]">close</span>
+            <span class="material-icons text-[22px]" aria-hidden="true">close</span>
         </button>
     </div>
 
@@ -415,7 +415,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                     <div id="dupFileAPreview" class="relative aspect-video bg-black rounded-ds-md overflow-hidden cursor-pointer group border-[1.5px] border-transparent" onclick="previewDuplicateFile('A')">
                         <img id="dupFileAThumb" src="" class="w-full h-full object-cover">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span class="material-icons text-white text-4xl">play_circle</span>
+                            <span class="material-icons text-white text-4xl" aria-hidden="true">play_circle</span>
                         </div>
                         <span id="dupFileABadge" class="hidden ds-badge ds-badge-accent absolute bottom-1.5 left-1.5">Recommended</span>
                     </div>
@@ -444,7 +444,7 @@ DUPLICATE_CHECKER_MODAL_COMPONENT = """
                     <div id="dupFileBPreview" class="relative aspect-video bg-black rounded-ds-md overflow-hidden cursor-pointer group border-[1.5px] border-transparent" onclick="previewDuplicateFile('B')">
                         <img id="dupFileBThumb" src="" class="w-full h-full object-cover">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span class="material-icons text-white text-4xl">play_circle</span>
+                            <span class="material-icons text-white text-4xl" aria-hidden="true">play_circle</span>
                         </div>
                         <span id="dupFileBBadge" class="hidden ds-badge ds-badge-accent absolute bottom-1.5 left-1.5">Recommended</span>
                     </div>
@@ -476,7 +476,7 @@ TREEMAP_LEGEND_COMPONENT = """
 <div id="treemapLegend" class="hidden w-full bg-arcade-bg/95 border-b border-ink/5 py-2">
     <div class="w-full px-4 flex items-center justify-between">
         <button id="treemapBackBtn" class="hidden items-center gap-2 text-sm text-gray-400 hover:text-text-main" onclick="treemapZoomOut()">
-            <span class="material-icons text-base">arrow_back</span> BACK
+            <span class="material-icons text-base" aria-hidden="true">arrow_back</span> BACK
         </button>
 
         <div class="flex items-center gap-4 text-xs font-mono text-gray-500">
@@ -507,13 +507,13 @@ FOLDER_BROWSER_LEGEND_COMPONENT = """
     <div class="w-full px-4 flex items-center justify-between">
         <!-- Back Button -->
         <button id="folderBrowserBackBtn" class="hidden items-center gap-2 text-sm text-gray-400 hover:text-text-main transition-colors flex-shrink-0" onclick="folderBrowserBack()">
-            <span class="material-icons text-base">arrow_back</span>
+            <span class="material-icons text-base" aria-hidden="true">arrow_back</span>
             <span class="hidden md:inline">BACK</span>
         </button>
 
         <!-- Breadcrumb Navigation -->
         <div class="flex items-center gap-2 text-sm flex-1 min-w-0 ml-2 md:ml-4 overflow-x-auto">
-            <span class="material-icons text-arcade-cyan text-base flex-shrink-0">folder</span>
+            <span class="material-icons text-arcade-cyan text-base flex-shrink-0" aria-hidden="true">folder</span>
             <div id="folderBreadcrumb" class="flex items-center gap-1 font-mono flex-nowrap whitespace-nowrap">
                 <!-- Populated by JS -->
             </div>
@@ -521,7 +521,7 @@ FOLDER_BROWSER_LEGEND_COMPONENT = """
 
         <!-- Videos Here Link -->
         <div id="folderVideosHereLink" class="hidden items-center gap-2 text-sm text-arcade-cyan hover:text-text-main cursor-pointer transition-colors flex-shrink-0 ml-2" onclick="toggleFolderBrowserVideos()">
-            <span class="material-icons text-base">play_circle</span>
+            <span class="material-icons text-base" aria-hidden="true">play_circle</span>
             <span id="folderVideosHereCount" class="hidden md:inline">0 videos here</span>
         </div>
     </div>
@@ -539,39 +539,39 @@ BATCH_BAR_COMPONENT = """
     <div class="h-5 w-px bg-[var(--ds-hairline-strong)]"></div>
 
     <button class="batch-action-btn" onclick="selectAllVisible()">
-        <span class="material-icons text-[16px]">select_all</span>
+        <span class="material-icons text-[16px]" aria-hidden="true">select_all</span>
         <span>All</span>
     </button>
 
     <button class="batch-action-btn" onclick="triggerBatchFavorite(true)">
-        <span class="material-icons text-[16px]">star</span>
+        <span class="material-icons text-[16px]" aria-hidden="true">star</span>
         <span>Favorite</span>
     </button>
 
     <button class="batch-action-btn" onclick="triggerBatchHide(true)">
-        <span class="material-icons text-[16px]">archive</span>
+        <span class="material-icons text-[16px]" aria-hidden="true">archive</span>
         <span>Vault</span>
     </button>
 
     <button class="batch-action-btn" onclick="openBatchTagModal()">
-        <span class="material-icons text-[16px]">label</span>
+        <span class="material-icons text-[16px]" aria-hidden="true">label</span>
         <span>Tag</span>
     </button>
 
     <button class="batch-action-btn" onclick="triggerBatchCompress()">
-        <span class="material-icons text-[16px]">bolt</span>
+        <span class="material-icons text-[16px]" aria-hidden="true">bolt</span>
         <span>Optimize</span>
     </button>
 
     <button class="batch-action-btn batch-action-danger" onclick="triggerBatchDelete()">
-        <span class="material-icons text-[16px]">delete</span>
+        <span class="material-icons text-[16px]" aria-hidden="true">delete</span>
         <span>Delete</span>
     </button>
 
     <div class="h-5 w-px bg-[var(--ds-hairline-strong)]"></div>
 
     <button class="text-text-muted hover:text-text-main transition-colors" onclick="clearSelection()" title="Clear Selection">
-        <span class="material-icons text-[18px]">close</span>
+        <span class="material-icons text-[18px]" aria-hidden="true">close</span>
     </button>
 </div>
 
@@ -603,8 +603,8 @@ FOLDER_SIDEBAR_COMPONENT = """
 
     <div class="p-4 border-b border-ink/10 flex items-center justify-between">
         <h3 class="font-bold text-text-main tracking-wider">FOLDERS</h3>
-        <button class="text-gray-400 hover:text-text-main" onclick="toggleFolderSidebar()">
-            <span class="material-icons">close</span>
+        <button class="text-gray-400 hover:text-text-main" onclick="toggleFolderSidebar()" aria-label="Ordner-Seitenleiste schließen">
+            <span class="material-icons" aria-hidden="true">close</span>
         </button>
     </div>
 
@@ -634,12 +634,12 @@ FILTER_PANEL_COMPONENT = """
         <!-- Header -->
         <div class="p-4 border-b border-ink/5 flex items-center justify-between shrink-0">
             <div class="flex items-center gap-3">
-                <span class="material-icons text-arcade-cyan">tune</span>
+                <span class="material-icons text-arcade-cyan" aria-hidden="true">tune</span>
                 <h2 class="font-semibold text-text-main">Filters</h2>
                 <span id="filterPanelCount" class="text-xs text-gray-500">(0 active)</span>
             </div>
-            <button onclick="closeFilterPanel()" class="text-gray-500 hover:text-text-main p-1">
-                <span class="material-icons">close</span>
+            <button onclick="closeFilterPanel()" class="text-gray-500 hover:text-text-main p-1" aria-label="Filter schließen">
+                <span class="material-icons" aria-hidden="true">close</span>
             </button>
         </div>
 
@@ -728,7 +728,7 @@ FILTER_PANEL_COMPONENT = """
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest">Tags</h3>
                     <button onclick="openTagManager()" class="text-xs text-arcade-cyan hover:text-accent-hover flex items-center gap-1">
-                        <span class="material-icons text-sm">add</span> Manage
+                        <span class="material-icons text-sm" aria-hidden="true">add</span> Manage
                     </button>
                 </div>
                 <div id="filterTagsList" class="flex flex-wrap gap-2">
@@ -740,7 +740,7 @@ FILTER_PANEL_COMPONENT = """
                 <label class="flex items-center gap-2 mt-4 cursor-pointer group">
                     <input type="checkbox" id="filterUntaggedOnly" onchange="toggleUntaggedFilter()" class="sr-only peer">
                     <div class="w-5 h-5 rounded border border-ink/20 flex items-center justify-center peer-checked:bg-arcade-cyan peer-checked:border-arcade-cyan transition-colors">
-                        <span class="material-icons text-sm text-white opacity-0 peer-checked:opacity-100">check</span>
+                        <span class="material-icons text-sm text-white opacity-0 peer-checked:opacity-100" aria-hidden="true">check</span>
                     </div>
                     <span class="text-sm text-gray-400 group-hover:text-text-main transition-colors">Show untagged only</span>
                 </label>
@@ -831,11 +831,11 @@ TAG_MANAGER_MODAL_COMPONENT = """
         <!-- Header -->
         <div class="p-4 border-b border-ink/5 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="material-icons text-arcade-gold">label</span>
+                <span class="material-icons text-arcade-gold" aria-hidden="true">label</span>
                 <h2 class="font-semibold text-text-main">Manage Tags</h2>
             </div>
-            <button onclick="closeTagManager()" class="text-gray-500 hover:text-text-main p-1">
-                <span class="material-icons">close</span>
+            <button onclick="closeTagManager()" class="text-gray-500 hover:text-text-main p-1" aria-label="Tag-Verwaltung schließen">
+                <span class="material-icons" aria-hidden="true">close</span>
             </button>
         </div>
 
@@ -905,12 +905,12 @@ COLLECTION_MODAL_COMPONENT = """
         <!-- Header -->
         <div class="p-4 border-b border-ink/5 flex items-center justify-between shrink-0">
             <div class="flex items-center gap-3">
-                <span class="material-icons text-arcade-cyan">auto_awesome</span>
+                <span class="material-icons text-arcade-cyan" aria-hidden="true">auto_awesome</span>
                 <h2 id="collectionModalTitle" class="font-semibold text-text-main">New Collection</h2>
                 <span class="text-xs text-gray-600 ml-2 hidden sm:inline">Press <kbd class="px-1 py-0.5 bg-ink/5 rounded text-[10px]">ESC</kbd> to close</span>
             </div>
             <button onclick="closeCollectionModal()" class="text-gray-500 hover:text-text-main p-1 hover:bg-ink/5 rounded transition-colors" aria-label="Close dialog">
-                <span class="material-icons">close</span>
+                <span class="material-icons" aria-hidden="true">close</span>
             </button>
         </div>
 
@@ -929,19 +929,19 @@ COLLECTION_MODAL_COMPONENT = """
                         <button id="collectionIconBtn" onclick="toggleCollectionIconPicker()"
                                 class="w-10 h-10 rounded-lg border border-ink/10 flex items-center justify-center hover:border-arcade-cyan/30 hover:bg-ink/5 transition-colors bg-black/40"
                                 aria-label="Choose icon">
-                            <span class="material-icons text-arcade-cyan" id="selectedCollectionIcon">folder_special</span>
+                            <span class="material-icons text-arcade-cyan" id="selectedCollectionIcon" aria-hidden="true">folder_special</span>
                         </button>
                         <div id="collectionIconPicker" class="hidden absolute right-0 top-12 bg-[#1a1a24] border border-ink/10 rounded-lg p-2 shadow-xl z-10 grid grid-cols-5 gap-1 w-48">
-                            <button onclick="selectCollectionIcon('movie')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Movie icon"><span class="material-icons text-sm">movie</span></button>
-                            <button onclick="selectCollectionIcon('photo_library')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Photo library icon"><span class="material-icons text-sm">photo_library</span></button>
-                            <button onclick="selectCollectionIcon('folder_special')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Special folder icon"><span class="material-icons text-sm">folder_special</span></button>
-                            <button onclick="selectCollectionIcon('star')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Star icon"><span class="material-icons text-sm">star</span></button>
-                            <button onclick="selectCollectionIcon('favorite')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Favorite icon"><span class="material-icons text-sm">favorite</span></button>
-                            <button onclick="selectCollectionIcon('bolt')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Bolt icon"><span class="material-icons text-sm">bolt</span></button>
-                            <button onclick="selectCollectionIcon('whatshot')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Hot icon"><span class="material-icons text-sm">whatshot</span></button>
-                            <button onclick="selectCollectionIcon('visibility')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Visibility icon"><span class="material-icons text-sm">visibility</span></button>
-                            <button onclick="selectCollectionIcon('schedule')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Schedule icon"><span class="material-icons text-sm">schedule</span></button>
-                            <button onclick="selectCollectionIcon('category')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Category icon"><span class="material-icons text-sm">category</span></button>
+                            <button onclick="selectCollectionIcon('movie')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Movie icon"><span class="material-icons text-sm" aria-hidden="true">movie</span></button>
+                            <button onclick="selectCollectionIcon('photo_library')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Photo library icon"><span class="material-icons text-sm" aria-hidden="true">photo_library</span></button>
+                            <button onclick="selectCollectionIcon('folder_special')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Special folder icon"><span class="material-icons text-sm" aria-hidden="true">folder_special</span></button>
+                            <button onclick="selectCollectionIcon('star')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Star icon"><span class="material-icons text-sm" aria-hidden="true">star</span></button>
+                            <button onclick="selectCollectionIcon('favorite')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Favorite icon"><span class="material-icons text-sm" aria-hidden="true">favorite</span></button>
+                            <button onclick="selectCollectionIcon('bolt')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Bolt icon"><span class="material-icons text-sm" aria-hidden="true">bolt</span></button>
+                            <button onclick="selectCollectionIcon('whatshot')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Hot icon"><span class="material-icons text-sm" aria-hidden="true">whatshot</span></button>
+                            <button onclick="selectCollectionIcon('visibility')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Visibility icon"><span class="material-icons text-sm" aria-hidden="true">visibility</span></button>
+                            <button onclick="selectCollectionIcon('schedule')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Schedule icon"><span class="material-icons text-sm" aria-hidden="true">schedule</span></button>
+                            <button onclick="selectCollectionIcon('category')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Category icon"><span class="material-icons text-sm" aria-hidden="true">category</span></button>
                         </div>
                     </div>
 
@@ -987,7 +987,7 @@ COLLECTION_MODAL_COMPONENT = """
                                 class="px-3 py-1.5 text-arcade-cyan hover:text-accent-hover border border-ink/10 rounded-lg hover:border-arcade-cyan/30 hover:bg-arcade-cyan/5 transition-colors"
                                 title="Add new category"
                                 aria-label="Add new category">
-                            <span class="material-icons text-sm">add</span>
+                            <span class="material-icons text-sm" aria-hidden="true">add</span>
                         </button>
                     </div>
                 </div>
@@ -1003,7 +1003,7 @@ COLLECTION_MODAL_COMPONENT = """
                             aria-expanded="false"
                             aria-controls="propertiesPanel">
                         <div class="flex items-center gap-2">
-                            <span class="material-icons text-sm text-gray-400 group-hover:text-arcade-cyan transition-all duration-200" id="propertiesChevron">expand_more</span>
+                            <span class="material-icons text-sm text-gray-400 group-hover:text-arcade-cyan transition-all duration-200" id="propertiesChevron" aria-hidden="true">expand_more</span>
                             <span class="text-sm font-medium text-gray-300 group-hover:text-text-main transition-colors">Properties</span>
                             <span class="text-xs text-gray-500">Media Type, Status, Format...</span>
                         </div>
@@ -1017,10 +1017,10 @@ COLLECTION_MODAL_COMPONENT = """
                                 <label class="text-xs text-gray-400 mb-1.5 block">Media Type</label>
                                 <div class="flex flex-wrap gap-1.5">
                                     <button class="filter-chip" data-filter="media_type" data-value="video" onclick="toggleSmartFilterChip(this)" aria-pressed="false">
-                                        <span class="material-icons text-xs">movie</span>Videos
+                                        <span class="material-icons text-xs" aria-hidden="true">movie</span>Videos
                                     </button>
                                     <button class="filter-chip" data-filter="media_type" data-value="image" onclick="toggleSmartFilterChip(this)" aria-pressed="false">
-                                        <span class="material-icons text-xs">image</span>Images
+                                        <span class="material-icons text-xs" aria-hidden="true">image</span>Images
                                     </button>
                                 </div>
                             </div>
@@ -1038,7 +1038,7 @@ COLLECTION_MODAL_COMPONENT = """
                             <!-- Advanced Technical Filters (Collapsible) -->
                             <details class="group/details">
                                 <summary class="cursor-pointer text-xs text-arcade-cyan hover:text-accent-hover flex items-center gap-1 py-1.5 list-none select-none">
-                                    <span class="material-icons text-xs group-open/details:rotate-90 transition-transform">chevron_right</span>
+                                    <span class="material-icons text-xs group-open/details:rotate-90 transition-transform" aria-hidden="true">chevron_right</span>
                                     Advanced technical filters
                                 </summary>
                                 <div class="mt-3 space-y-3 pl-4 border-l-2 border-ink/5">
@@ -1070,13 +1070,13 @@ COLLECTION_MODAL_COMPONENT = """
                                         <label class="text-xs text-gray-400 mb-1.5 block">Orientation</label>
                                         <div class="flex flex-wrap gap-1.5">
                                             <button class="filter-chip" data-filter="orientation" data-value="landscape" onclick="toggleSmartFilterChip(this)" aria-pressed="false">
-                                                <span class="material-icons text-xs">crop_landscape</span>Landscape
+                                                <span class="material-icons text-xs" aria-hidden="true">crop_landscape</span>Landscape
                                             </button>
                                             <button class="filter-chip" data-filter="orientation" data-value="portrait" onclick="toggleSmartFilterChip(this)" aria-pressed="false">
-                                                <span class="material-icons text-xs">crop_portrait</span>Portrait
+                                                <span class="material-icons text-xs" aria-hidden="true">crop_portrait</span>Portrait
                                             </button>
                                             <button class="filter-chip" data-filter="orientation" data-value="square" onclick="toggleSmartFilterChip(this)" aria-pressed="false">
-                                                <span class="material-icons text-xs">crop_square</span>Square
+                                                <span class="material-icons text-xs" aria-hidden="true">crop_square</span>Square
                                             </button>
                                         </div>
                                     </div>
@@ -1098,7 +1098,7 @@ COLLECTION_MODAL_COMPONENT = """
                                         <!-- RAW formats (nested collapse) -->
                                         <details class="group/raw">
                                             <summary class="cursor-pointer text-xs text-gray-400 hover:text-arcade-cyan flex items-center gap-1 py-1 list-none select-none">
-                                                <span class="material-icons text-xs group-open/raw:rotate-90 transition-transform">chevron_right</span>
+                                                <span class="material-icons text-xs group-open/raw:rotate-90 transition-transform" aria-hidden="true">chevron_right</span>
                                                 RAW formats
                                             </summary>
                                             <div class="flex flex-wrap gap-1.5 mt-2 pl-4">
@@ -1123,7 +1123,7 @@ COLLECTION_MODAL_COMPONENT = """
                             aria-expanded="false"
                             aria-controls="metadataPanel">
                         <div class="flex items-center gap-2">
-                            <span class="material-icons text-sm text-gray-400 group-hover:text-arcade-cyan transition-all duration-200" id="metadataChevron">expand_more</span>
+                            <span class="material-icons text-sm text-gray-400 group-hover:text-arcade-cyan transition-all duration-200" id="metadataChevron" aria-hidden="true">expand_more</span>
                             <span class="text-sm font-medium text-gray-300 group-hover:text-text-main transition-colors">Content & Metadata</span>
                             <span class="text-xs text-gray-500">Date, Size, Favorites, Tags...</span>
                         </div>
@@ -1219,11 +1219,11 @@ COLLECTION_MODAL_COMPONENT = """
         <div class="p-4 border-t border-ink/5 flex items-center justify-between shrink-0 bg-[#0a0a12]">
             <div class="flex items-center gap-3">
                 <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-arcade-cyan/10 text-arcade-cyan text-sm font-medium">
-                    <span class="material-icons text-sm" id="matchCountIcon">movie</span>
+                    <span class="material-icons text-sm" id="matchCountIcon" aria-hidden="true">movie</span>
                     <span id="matchCountNumber">0</span> <span id="matchCountLabel">items</span>
                 </span>
                 <button id="deleteCollectionBtn" onclick="deleteCurrentCollection()" class="hidden text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 px-2 py-1 rounded transition-colors">
-                    <span class="material-icons text-sm align-middle mr-1">delete</span>Delete
+                    <span class="material-icons text-sm align-middle mr-1" aria-hidden="true">delete</span>Delete
                 </button>
                 <div class="flex items-center gap-2">
                     <input id="autoTagName" type="text" placeholder="auto-tag…"
@@ -1335,7 +1335,7 @@ HIDDEN_PATH_MODAL_COMPONENT = """
 
         <!-- Header -->
         <div class="p-4 border-b border-ink/5 flex items-center gap-3">
-            <span class="material-icons text-amber-400">folder_off</span>
+            <span class="material-icons text-amber-400" aria-hidden="true">folder_off</span>
             <h2 class="font-semibold text-text-main">File in Hidden Folder</h2>
         </div>
 
@@ -1354,14 +1354,14 @@ HIDDEN_PATH_MODAL_COMPONENT = """
 
             <!-- Copy Button -->
             <button onclick="copyHiddenPath()" class="w-full py-2.5 rounded-lg bg-arcade-cyan/10 text-arcade-cyan hover:bg-arcade-cyan/20 border border-arcade-cyan/30 text-sm font-medium transition-all flex items-center justify-center gap-2">
-                <span class="material-icons text-sm" id="copyPathIcon">content_copy</span>
+                <span class="material-icons text-sm" id="copyPathIcon" aria-hidden="true">content_copy</span>
                 <span id="copyPathText">Copy Path to Clipboard</span>
             </button>
 
             <!-- Finder Tip -->
             <div class="bg-amber-500/10 rounded-lg p-3 border border-amber-500/20">
                 <div class="flex items-start gap-2">
-                    <span class="material-icons text-amber-400 text-sm mt-0.5">lightbulb</span>
+                    <span class="material-icons text-amber-400 text-sm mt-0.5" aria-hidden="true">lightbulb</span>
                     <div class="text-xs text-amber-200/80">
                         <strong class="text-amber-300">Tip:</strong> In Finder, press
                         <kbd class="px-1.5 py-0.5 bg-ink/10 rounded text-[10px] mx-0.5">Cmd</kbd>+<kbd class="px-1.5 py-0.5 bg-ink/10 rounded text-[10px] mx-0.5">Shift</kbd>+<kbd class="px-1.5 py-0.5 bg-ink/10 rounded text-[10px] mx-0.5">.</kbd>
@@ -1394,12 +1394,12 @@ SHORTCUTS_MODAL_COMPONENT = """
 
         <!-- Header -->
         <div class="p-4 border-b border-line flex items-center gap-3">
-            <span class="material-icons text-accent-tint">keyboard</span>
+            <span class="material-icons text-accent-tint" aria-hidden="true">keyboard</span>
             <h2 id="shortcutsTitle" class="font-semibold text-text-main flex-1">Tastaturkürzel</h2>
             <button id="shortcutsCloseBtn" onclick="closeShortcutsHelp()"
                     class="p-1 rounded-ds-sm text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors"
                     aria-label="Hilfe schließen">
-                <span class="material-icons text-[20px]">close</span>
+                <span class="material-icons text-[20px]" aria-hidden="true">close</span>
             </button>
         </div>
 
@@ -1441,7 +1441,7 @@ SETUP_WIZARD_COMPONENT = """
         <!-- Welcome Header -->
         <div class="text-center mb-8">
             <div class="inline-block p-4 bg-arcade-cyan/10 rounded-full mb-4">
-                <span class="material-icons text-6xl text-arcade-cyan">rocket_launch</span>
+                <span class="material-icons text-6xl text-arcade-cyan" aria-hidden="true">rocket_launch</span>
             </div>
             <h1 class="text-4xl font-bold text-text-main mb-2">Welcome to Arcade Media Scanner!</h1>
             <p class="text-gray-400 text-lg">Let's configure your media library in just a few steps</p>
@@ -1549,49 +1549,49 @@ SETTINGS_MODAL_COMPONENT = """
         <!-- Linke Navigation: spiegelt das Sidebar-Pattern -->
         <aside class="w-full md:w-[200px] bg-header border-b md:border-b-0 md:border-r border-line/60 flex md:flex-col shrink-0">
             <div class="px-4 py-4 flex items-center gap-2.5 md:border-b md:border-line/60">
-                <span class="material-icons text-accent text-[18px]">settings</span>
+                <span class="material-icons text-accent text-[18px]" aria-hidden="true">settings</span>
                 <h2 class="font-bold text-[14px] text-text-main">Settings</h2>
             </div>
 
             <nav class="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:px-3 md:py-3 gap-0.5">
                 <button class="settings-nav-item active" data-section="scanning">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">folder_open</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">folder_open</span>
                     <span class="hidden md:inline">Scanning</span>
                 </button>
                 <button class="settings-nav-item" data-section="performance">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">speed</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">speed</span>
                     <span class="hidden md:inline">Performance</span>
                 </button>
                 <button class="settings-nav-item" data-section="interface">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">palette</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">palette</span>
                     <span class="hidden md:inline">Interface</span>
                 </button>
                 <button class="settings-nav-item" data-section="storage">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">storage</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">storage</span>
                     <span class="hidden md:inline">Storage</span>
                 </button>
                 <button class="settings-nav-item" data-section="privacy">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">security</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">security</span>
                     <span class="hidden md:inline">Privacy</span>
                 </button>
                 <button class="settings-nav-item" data-section="backup">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">save</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">save</span>
                     <span class="hidden md:inline">Backup &amp; Restore</span>
                 </button>
                 <button class="settings-nav-item" data-section="queue">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">cloud_sync</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">cloud_sync</span>
                     <span class="hidden md:inline">Remote Queue</span>
                 </button>
                 <button class="settings-nav-item" data-section="autotagging">
                     <span class="settings-nav-indicator"></span>
-                    <span class="material-icons text-[18px]">sell</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">sell</span>
                     <span class="hidden md:inline">Auto-Tagging</span>
                 </button>
             </nav>
@@ -1606,7 +1606,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <p id="section-subtitle" class="text-[12px] text-text-muted mt-0.5">Configure video library scanning</p>
                 </div>
                 <button class="text-text-muted hover:text-text-main transition-colors" title="Close (ESC)" onclick="closeSettings()">
-                    <span class="material-icons text-[22px]">close</span>
+                    <span class="material-icons text-[22px]" aria-hidden="true">close</span>
                 </button>
             </header>
 
@@ -1618,7 +1618,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-3">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">folder</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">folder</span>
                                 Scan Directories
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Paths to scan for video files. One per line.</p>
@@ -1626,7 +1626,7 @@ SETTINGS_MODAL_COMPONENT = """
                         <textarea class="w-full ds-textarea" id="settingsTargets" placeholder="/Users/username/Videos" rows="4" oninput="markSettingsUnsaved()"></textarea>
 
                         <div class="ds-settings-card flex gap-3 text-[12px] text-body-text">
-                             <span class="material-icons text-text-muted text-lg">info</span>
+                             <span class="material-icons text-text-muted text-lg" aria-hidden="true">info</span>
                              <div>
                                  <strong>Default:</strong> Home directory
                                  <span id="defaultTargetsHint" class="opacity-70 text-xs block mt-0.5"></span>
@@ -1637,7 +1637,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-3">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-gray-400">block</span>
+                                <span class="material-icons text-lg text-gray-400" aria-hidden="true">block</span>
                                 System Exclusions
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Default paths excluded from scanning.</p>
@@ -1650,7 +1650,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-3">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">remove_circle</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">remove_circle</span>
                                 Custom Exclusions
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Additional paths to exclude.</p>
@@ -1661,7 +1661,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-3">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-gray-400">notes</span>
+                                <span class="material-icons text-lg text-gray-400" aria-hidden="true">notes</span>
                                 Logging
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Control terminal output density during scans.</p>
@@ -1684,7 +1684,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">straighten</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">straighten</span>
                                 File Size Threshold
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Ignore videos smaller than this size.</p>
@@ -1696,15 +1696,15 @@ SETTINGS_MODAL_COMPONENT = """
                                 <div class="text-xs text-gray-500 mt-0.5">Files below this are skipped</div>
                             </div>
                             <div class="flex items-center gap-2 bg-ink/5 rounded-lg border border-ink/10 p-1">
-                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', -10)">
-                                    <span class="material-icons text-lg">remove</span>
+                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', -10)" aria-label="Mindestgröße Video verringern">
+                                    <span class="material-icons text-lg" aria-hidden="true">remove</span>
                                 </button>
                                 <div class="flex items-center gap-1">
                                     <input type="number" id="settingsMinSize" value="100" min="1" class="bg-transparent text-text-main font-mono text-center w-14 focus:outline-none" oninput="markSettingsUnsaved()">
                                     <span class="text-gray-500 text-sm">MB</span>
                                 </div>
-                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', 10)">
-                                    <span class="material-icons text-lg">add</span>
+                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinSize', 10)" aria-label="Mindestgröße Video erhöhen">
+                                    <span class="material-icons text-lg" aria-hidden="true">add</span>
                                 </button>
                             </div>
                         </div>
@@ -1713,7 +1713,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">image</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">image</span>
                                 Image Size Threshold
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Ignore images smaller than this. Filters out tiny icons/thumbnails.</p>
@@ -1725,15 +1725,15 @@ SETTINGS_MODAL_COMPONENT = """
                                 <div class="text-xs text-gray-500 mt-0.5">Images below this are skipped</div>
                             </div>
                             <div class="flex items-center gap-2 bg-ink/5 rounded-lg border border-ink/10 p-1">
-                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinImageSize', -50)">
-                                    <span class="material-icons text-lg">remove</span>
+                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinImageSize', -50)" aria-label="Mindestgröße Bild verringern">
+                                    <span class="material-icons text-lg" aria-hidden="true">remove</span>
                                 </button>
                                 <div class="flex items-center gap-1">
                                     <input type="number" id="settingsMinImageSize" value="100" min="0" max="5000" step="50" class="bg-transparent text-text-main font-mono text-center w-14 focus:outline-none" oninput="markSettingsUnsaved()">
                                     <span class="text-gray-500 text-sm">KB</span>
                                 </div>
-                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinImageSize', 50)">
-                                    <span class="material-icons text-lg">add</span>
+                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsMinImageSize', 50)" aria-label="Mindestgröße Bild erhöhen">
+                                    <span class="material-icons text-lg" aria-hidden="true">add</span>
                                 </button>
                             </div>
                         </div>
@@ -1742,7 +1742,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">local_fire_department</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">local_fire_department</span>
                                 Bitrate Classification
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Videos above this are marked as HIGH bitrate.</p>
@@ -1754,15 +1754,15 @@ SETTINGS_MODAL_COMPONENT = """
                                 <div class="text-xs text-gray-500 mt-0.5">Default: 15,000 kbps</div>
                             </div>
                             <div class="flex items-center gap-2 bg-ink/5 rounded-lg border border-ink/10 p-1">
-                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', -1000)">
-                                    <span class="material-icons text-lg">remove</span>
+                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', -1000)" aria-label="Bitraten-Schwelle verringern">
+                                    <span class="material-icons text-lg" aria-hidden="true">remove</span>
                                 </button>
                                 <div class="flex items-center gap-1">
                                     <input type="number" id="settingsBitrate" value="15000" min="1000" class="bg-transparent text-text-main font-mono text-center w-20 focus:outline-none" oninput="markSettingsUnsaved()">
                                     <span class="text-gray-500 text-sm">kbps</span>
                                 </div>
-                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', 1000)">
-                                    <span class="material-icons text-lg">add</span>
+                                <button class="w-9 h-9 rounded-md hover:bg-ink/10 text-gray-400 hover:text-text-main flex items-center justify-center transition-colors" onclick="adjustSettingsNumber('settingsBitrate', 1000)" aria-label="Bitraten-Schwelle erhöhen">
+                                    <span class="material-icons text-lg" aria-hidden="true">add</span>
                                 </button>
                             </div>
                         </div>
@@ -1771,7 +1771,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">speed</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">speed</span>
                                 Thumbnail Pre-computation
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Generate thumbnails during scan to prevent lag while scrolling.</p>
@@ -1792,7 +1792,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">travel_explore</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">travel_explore</span>
                                 Proxy Streaming
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Serve a smaller copy when streaming from outside your LAN, so high-bitrate originals stay playable on the road. Originals are never modified.</p>
@@ -1819,7 +1819,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">tune</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">tune</span>
                                 Encoding Quality
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Trade-off between encoding speed and output file size. Best quality takes longer but shrinks files more.</p>
@@ -1829,21 +1829,21 @@ SETTINGS_MODAL_COMPONENT = """
                             <button type="button" onclick="selectEncodingPreset('fast')" id="preset-fast"
                                 data-value="fast"
                                 class="encoding-preset-btn flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all cursor-pointer">
-                                <span class="material-icons text-2xl text-gray-400 transition-colors">bolt</span>
+                                <span class="material-icons text-2xl text-gray-400 transition-colors" aria-hidden="true">bolt</span>
                                 <span class="preset-label text-sm font-medium text-gray-300 transition-colors">Fast</span>
                                 <span class="text-xs text-gray-500 text-center leading-tight">Quickest · bigger files</span>
                             </button>
                             <button type="button" onclick="selectEncodingPreset('balanced')" id="preset-balanced"
                                 data-value="balanced"
                                 class="encoding-preset-btn flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all cursor-pointer">
-                                <span class="material-icons text-2xl text-gray-400 transition-colors">balance</span>
+                                <span class="material-icons text-2xl text-gray-400 transition-colors" aria-hidden="true">balance</span>
                                 <span class="preset-label text-sm font-medium text-gray-300 transition-colors">Balanced</span>
                                 <span class="text-xs text-gray-500 text-center leading-tight">Default · good mix</span>
                             </button>
                             <button type="button" onclick="selectEncodingPreset('best')" id="preset-best"
                                 data-value="best"
                                 class="encoding-preset-btn flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all cursor-pointer">
-                                <span class="material-icons text-2xl text-gray-400 transition-colors">workspace_premium</span>
+                                <span class="material-icons text-2xl text-gray-400 transition-colors" aria-hidden="true">workspace_premium</span>
                                 <span class="preset-label text-sm font-medium text-gray-300 transition-colors">Best</span>
                                 <span class="text-xs text-gray-500 text-center leading-tight">Smallest files · slow</span>
                             </button>
@@ -1857,7 +1857,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">palette</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">palette</span>
                                 Appearance
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Arcade Scanner nutzt ein einheitliches Design System.</p>
@@ -1871,7 +1871,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-arcade-magenta">auto_awesome</span>
+                                <span class="material-icons text-lg text-arcade-magenta" aria-hidden="true">auto_awesome</span>
                                 Visual Features
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Customize the dashboard experience.</p>
@@ -1906,7 +1906,7 @@ SETTINGS_MODAL_COMPONENT = """
                         <div id="removePhotosModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
                             <div class="bg-[#1a1a2e] border border-ink/10 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
                                 <div class="flex items-center gap-3 mb-4">
-                                    <span class="material-icons text-yellow-400 text-2xl">warning</span>
+                                    <span class="material-icons text-yellow-400 text-2xl" aria-hidden="true">warning</span>
                                     <h3 class="text-text-main font-semibold text-lg">Remove existing photos?</h3>
                                 </div>
                                 <p class="text-gray-400 text-sm mb-6">
@@ -1933,7 +1933,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">pie_chart</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">pie_chart</span>
                                 Cache Statistics
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Disk space used by generated assets.</p>
@@ -1941,19 +1941,19 @@ SETTINGS_MODAL_COMPONENT = """
 
                         <div class="grid grid-cols-2 gap-3">
                             <div class="bg-surface p-4 rounded-xl border border-ink/5 flex flex-col items-center gap-2">
-                                <span class="material-icons text-gray-500 text-2xl">image</span>
+                                <span class="material-icons text-gray-500 text-2xl" aria-hidden="true">image</span>
                                 <span class="text-xs text-gray-500 uppercase tracking-wider">Thumbnails</span>
                                 <span class="text-lg font-mono text-text-main" id="statThumbnails">—</span>
                             </div>
                             <div class="bg-surface p-4 rounded-xl border border-accent/30 flex flex-col items-center gap-2">
-                                <span class="material-icons text-accent text-2xl">storage</span>
+                                <span class="material-icons text-accent text-2xl" aria-hidden="true">storage</span>
                                 <span class="text-xs text-gray-500 uppercase tracking-wider">Total</span>
                                 <span class="text-lg font-mono text-accent" id="statTotal">—</span>
                             </div>
                         </div>
 
                         <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex gap-3 text-sm text-amber-200">
-                            <span class="material-icons text-amber-400 text-lg">info</span>
+                            <span class="material-icons text-amber-400 text-lg" aria-hidden="true">info</span>
                             <div>Cache changes require an app restart. Clearing cache deletes all thumbnails.</div>
                         </div>
                     </section>
@@ -1965,7 +1965,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">shield</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">shield</span>
                                 Safe Mode Configuration
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Define what content is hidden when Safe Mode is enabled.</p>
@@ -2009,7 +2009,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">cloud_download</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">cloud_download</span>
                                 Export Settings
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Download your current configuration, including collections and tags.</p>
@@ -2021,7 +2021,7 @@ SETTINGS_MODAL_COMPONENT = """
                                 <div class="text-xs text-gray-500 mt-0.5">Saves as arcade_settings_backup.json</div>
                             </div>
                             <button onclick="exportSettings()" class="px-4 py-2 bg-ink/5 hover:bg-ink/10 text-text-main rounded-lg text-sm font-medium transition-colors border border-ink/10 flex items-center gap-2">
-                                <span class="material-icons text-sm">download</span>
+                                <span class="material-icons text-sm" aria-hidden="true">download</span>
                                 Download
                             </button>
                         </div>
@@ -2030,7 +2030,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                          <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">cloud_upload</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">cloud_upload</span>
                                 Import Settings
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Restore configuration from a backup file. Existing settings will be overwritten.</p>
@@ -2043,12 +2043,12 @@ SETTINGS_MODAL_COMPONENT = """
                                     <input type="file" id="settingsImportFile" accept=".json" class="block w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-ink/10 file:text-text-main hover:file:bg-ink/20 cursor-pointer">
                                 </div>
                                 <button onclick="importSettings()" class="px-4 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-lg text-sm font-medium transition-colors border border-accent/30 flex items-center gap-2 h-[38px] mt-6">
-                                    <span class="material-icons text-sm">upload</span>
+                                    <span class="material-icons text-sm" aria-hidden="true">upload</span>
                                     Restore
                                 </button>
                             </div>
                              <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex gap-3 text-sm text-yellow-200">
-                                <span class="material-icons text-yellow-400 text-lg">warning</span>
+                                <span class="material-icons text-yellow-400 text-lg" aria-hidden="true">warning</span>
                                 <div>Restoring will reload the page and apply settings immediately.</div>
                             </div>
                          </div>
@@ -2060,7 +2060,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                <span class="material-icons text-lg text-accent">cloud_sync</span>
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">cloud_sync</span>
                                 Encoding Queue
                             </h3>
                             <p class="text-[12px] text-text-muted mt-1">Files queued for remote Mac encoding. The Mac worker polls for pending jobs.</p>
@@ -2086,7 +2086,7 @@ SETTINGS_MODAL_COMPONENT = """
                         </div>
 
                         <div class="ds-settings-card flex gap-3 text-[12px] text-body-text">
-                            <span class="material-icons text-text-muted text-lg">info</span>
+                            <span class="material-icons text-text-muted text-lg" aria-hidden="true">info</span>
                             <div>Start the Mac worker with: <code class="px-2 py-0.5 bg-surface rounded text-accent">python3 scripts/mac_worker.py --server http://&lt;ip&gt;:8000 --user admin --password &lt;pw&gt;</code><br>Credentials are required — the queue API rejects anonymous workers.</div>
                         </div>
                     </section>
@@ -2097,7 +2097,7 @@ SETTINGS_MODAL_COMPONENT = """
                         <div class="flex items-center justify-between">
                             <div>
                                 <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
-                                    <span class="material-icons text-lg text-accent">sell</span>
+                                    <span class="material-icons text-lg text-accent" aria-hidden="true">sell</span>
                                     Auto-Tagging-Regeln
                                 </h3>
                                 <p class="text-[12px] text-text-muted mt-1">Regeln vergeben ihr Tag automatisch nach jedem Scan. Anlegen im Collection-Editor ("Als Regel").</p>
@@ -2116,14 +2116,14 @@ SETTINGS_MODAL_COMPONENT = """
             <footer class="p-4 border-t border-black/8 dark:border-ink/5 bg-[#f1f3f5] dark:bg-[#12121a] flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <div class="flex items-center gap-2 text-amber-400 text-xs font-medium opacity-0 transition-opacity" id="unsavedIndicator">
-                        <span class="material-icons text-sm">warning</span>
+                        <span class="material-icons text-sm" aria-hidden="true">warning</span>
                         Unsaved changes
                     </div>
                 </div>
                 <div class="flex gap-3">
                     <button class="px-4 py-2 rounded-lg text-sm font-medium text-text-muted dark:text-gray-400 hover:text-text-main dark:hover:text-text-main hover:bg-black/5 dark:hover:bg-ink/5 transition-all" onclick="closeSettings()">Cancel</button>
                     <button id="saveSettingsBtn" class="px-5 py-2 rounded-lg text-sm font-bold text-white bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-accent/20 transition-all flex items-center gap-2" onclick="saveSettings()">
-                        <span class="material-icons text-lg save-icon">save</span>
+                        <span class="material-icons text-lg save-icon" aria-hidden="true">save</span>
                         <svg class="animate-spin h-4 w-4 save-spinner hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -2140,7 +2140,7 @@ SETTINGS_MODAL_COMPONENT = """
 <!-- Settings Toast Notification -->
 <div id="settingsToast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
     <div class="bg-green-500/95 backdrop-blur text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
-        <span class="material-icons">check_circle</span>
+        <span class="material-icons" aria-hidden="true">check_circle</span>
         <span class="font-medium">Settings saved</span>
     </div>
 </div>
@@ -2152,7 +2152,7 @@ FILTER_BAR_COMPONENT = """
 <div class="workspace-indicator sticky top-[46px] md:top-[52px] z-30 bg-bg px-2 md:px-[22px] py-3 flex flex-col md:flex-row gap-3 md:items-center justify-between overflow-x-hidden">
     <!-- Search Input -->
     <div class="w-full md:w-80 lg:w-96 relative flex-shrink min-w-0">
-        <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">search</span>
+        <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]" aria-hidden="true">search</span>
         <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Search files..."
                class="w-full bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] rounded-ds-sm pl-10 pr-4 py-2 text-[13px] text-text-main placeholder-text-muted focus:outline-none focus:border-accent transition-colors">
     </div>
@@ -2161,14 +2161,14 @@ FILTER_BAR_COMPONENT = """
     <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide flex-shrink-0">
         <!-- Unified Filters Button -->
         <button id="openFiltersBtn" onclick="openFilterPanel()" class="ds-chip flex items-center gap-2">
-            <span class="material-icons text-[16px]">tune</span>
+            <span class="material-icons text-[16px]" aria-hidden="true">tune</span>
             <span>Filters</span>
             <span id="filterBadge" class="hidden bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] min-w-[18px] text-center">0</span>
         </button>
 
         <!-- Sort Dropdown -->
         <div class="relative">
-            <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px] pointer-events-none">sort</span>
+            <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px] pointer-events-none" aria-hidden="true">sort</span>
             <select id="sortSelect" onchange="setSort(this.value)" class="ds-chip pl-9 pr-4 appearance-none min-w-[140px]">
                 <option value="bitrate">Sort: bitrate</option>
                 <option value="size">Sort: size</option>
@@ -2181,33 +2181,33 @@ FILTER_BAR_COMPONENT = """
         <div class="hidden md:flex items-center bg-[var(--ds-fill-soft)] rounded-ds-sm p-0.5 border border-[var(--ds-hairline-strong)]">
             <!-- Grid Scale Slider -->
             <div class="flex items-center gap-1.5 px-2 mr-1 border-r border-[var(--ds-hairline-strong)]" id="gridScaleContainer">
-                <span class="material-icons text-[14px] text-text-muted">photo_size_select_small</span>
+                <span class="material-icons text-[14px] text-text-muted" aria-hidden="true">photo_size_select_small</span>
                 <input type="range" id="gridScaleSlider" min="150" max="500" value="240" step="10" oninput="updateGridScale(this.value)" class="w-16 h-1 bg-[var(--ds-hairline-strong)] rounded-full appearance-none cursor-pointer accent-accent">
-                <span class="material-icons text-[16px] text-text-muted">photo_size_select_large</span>
+                <span class="material-icons text-[16px] text-text-muted" aria-hidden="true">photo_size_select_large</span>
             </div>
 
             <button id="viewToggleGrid" onclick="setLayout('grid')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Grid View">
-                <span class="material-icons text-[18px]">grid_view</span>
+                <span class="material-icons text-[18px]" aria-hidden="true">grid_view</span>
             </button>
             <button id="viewToggleList" onclick="setLayout('list')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="List View">
-                 <span class="material-icons text-[18px]">view_list</span>
+                 <span class="material-icons text-[18px]" aria-hidden="true">view_list</span>
             </button>
             <button id="viewToggleTreemap" onclick="setLayout('treemap')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Tree View">
-                <span class="material-icons text-[18px]">account_tree</span>
+                <span class="material-icons text-[18px]" aria-hidden="true">account_tree</span>
             </button>
             <button id="viewToggleFolder" onclick="setLayout('folderbrowser')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Folder Browser">
-                <span class="material-icons text-[18px]">folder</span>
+                <span class="material-icons text-[18px]" aria-hidden="true">folder</span>
             </button>
         </div>
 
         <button id="refreshBtn" onclick="rescanLibrary()" class="p-2 rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors flex items-center justify-center flex-shrink-0" title="Rescan Library">
-            <span class="material-icons text-[18px]">refresh</span>
+            <span class="material-icons text-[18px]" aria-hidden="true">refresh</span>
         </button>
         <button id="stopScanBtn" onclick="stopScan()" class="hidden p-2 rounded-ds-sm border border-danger/40 text-danger hover:bg-danger/10 transition-colors flex items-center justify-center flex-shrink-0" title="Scan stoppen">
-            <span class="material-icons text-[18px]">stop</span>
+            <span class="material-icons text-[18px]" aria-hidden="true">stop</span>
         </button>
         <button id="shortcutsBtn" onclick="openShortcutsHelp()" class="hidden md:flex p-2 rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors items-center justify-center flex-shrink-0" title="Tastaturkürzel (?)" aria-label="Tastaturkürzel anzeigen">
-            <span class="material-icons text-[18px]">keyboard</span>
+            <span class="material-icons text-[18px]" aria-hidden="true">keyboard</span>
         </button>
     </div>
 </div>

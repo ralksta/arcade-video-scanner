@@ -655,7 +655,7 @@ function updateCinemaTags() {
                      <span class="w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]" style="background-color: ${color}; --color: ${color}"></span>
                      <span class="text-xs text-white font-semibold tracking-wide drop-shadow-md">${tagName}</span>
                      <button onclick="event.stopPropagation(); toggleCinemaTag('${tagName}')" class="ml-1 text-white/40 hover:text-red-400 hover:bg-ink/10 rounded-full p-0.5 transition-colors" title="Remove Tag">
-                         <span class="material-icons text-[14px] font-bold">close</span>
+                         <span class="material-icons text-[14px] font-bold" aria-hidden="true">close</span>
                      </button>
                  </div>
                  `;

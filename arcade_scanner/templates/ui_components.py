@@ -100,36 +100,36 @@ def render_header(theme: BaseTheme, hostname: str, count: int, size_gb: str) -> 
     <!-- Stat-Cluster -->
     <div class="hidden md:flex items-center gap-3 text-[12px] font-mono text-label">
         <div class="flex items-center gap-1.5">
-            <span class="material-icons text-[15px] text-text-muted">dns</span>
+            <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">dns</span>
             <span>{hostname}</span>
         </div>
         <span class="opacity-30">|</span>
         <div class="flex items-center gap-1.5">
-            <span class="material-icons text-[15px] text-text-muted">movie</span>
+            <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">movie</span>
             <span id="header-video-count">...</span> videos
         </div>
         <span class="opacity-30" id="image-separator" style="display:none;">|</span>
         <div class="flex items-center gap-1.5" id="image-count-section" style="display:none;">
-            <span class="material-icons text-[15px] text-text-muted">image</span>
+            <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">image</span>
             <span id="header-image-count">...</span> images
         </div>
         <span class="opacity-30">|</span>
         <div class="flex items-center gap-1.5">
-            <span class="material-icons text-[15px] text-text-muted">save</span>
+            <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">save</span>
             <span id="header-size">...</span>
         </div>
         <span class="opacity-30">|</span>
         <button onclick="toggleTheme()" class="p-1 rounded-md text-text-muted hover:text-text-main transition-colors" title="Light / Dark">
-            <span class="material-icons text-[18px]" id="themeIcon">light_mode</span>
+            <span class="material-icons text-[18px]" id="themeIcon" aria-hidden="true">light_mode</span>
         </button>
         <button onclick="logout()" class="p-1 rounded-md text-text-muted hover:text-danger transition-colors" title="Logout">
-            <span class="material-icons text-[18px]">logout</span>
+            <span class="material-icons text-[18px]" aria-hidden="true">logout</span>
         </button>
     </div>
 
     <!-- Mobile Actions -->
-    <button onclick="openSettings()" class="md:hidden p-1 text-text-muted hover:text-text-main">
-        <span class="material-icons text-[18px]">settings</span>
+    <button onclick="openSettings()" class="md:hidden p-1 text-text-muted hover:text-text-main" aria-label="Einstellungen öffnen">
+        <span class="material-icons text-[18px]" aria-hidden="true">settings</span>
     </button>
 </header>
 <!-- Spacer -->
@@ -149,7 +149,7 @@ def render_navigation(theme: BaseTheme) -> str:
         return f"""
     <button id="{id_val}" onclick="{onclick}" class="nav-item {('active' if active else '')} {theme.button_nav(active)}">
         <span class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[15px] bg-accent rounded-r-[2px] transition-opacity {indicator_state}"></span>
-        <span class="material-icons text-[19px] {icon_color} transition-colors">{icon}</span>
+        <span class="material-icons text-[19px] {icon_color} transition-colors" aria-hidden="true">{icon}</span>
         <span class="truncate">{label}</span>
         <span id="count-{id_val.replace('m-', '')}" class="ml-auto text-[11px] text-text-muted font-mono"></span>
     </button>
@@ -171,7 +171,7 @@ def render_navigation(theme: BaseTheme) -> str:
         <div class="flex items-center justify-between px-2.5 mb-2">
             <span class="ds-eyebrow !text-[10px]">Collections</span>
             <button onclick="openCollectionModal()" class="text-text-muted hover:text-accent-tint transition-colors" title="New Collection">
-                <span class="material-icons text-[16px]">add</span>
+                <span class="material-icons text-[16px]" aria-hidden="true">add</span>
             </button>
         </div>
         <div id="collectionsNav" class="space-y-0.5"></div>
@@ -179,7 +179,7 @@ def render_navigation(theme: BaseTheme) -> str:
 
     <div class="mt-auto pt-4 border-t border-line/60">
         <button onclick="openSettings()" class="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-md text-[13px] text-label hover:bg-[var(--ds-fill-soft)] hover:text-text-main transition-colors">
-            <span class="material-icons text-[19px] text-text-muted">settings</span>
+            <span class="material-icons text-[19px] text-text-muted" aria-hidden="true">settings</span>
             <span>Settings</span>
         </button>
     </div>
@@ -188,23 +188,23 @@ def render_navigation(theme: BaseTheme) -> str:
 <!-- Mobile Nav -->
 <nav class="md:hidden fixed bottom-0 left-0 right-0 h-[60px] pb-safe-bottom bg-header border-t border-line/60 z-50 flex justify-around items-center px-2">
     <button onclick="setWorkspaceMode('lobby')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
-        <span class="material-icons text-[22px]">dashboard</span>
+        <span class="material-icons text-[22px]" aria-hidden="true">dashboard</span>
         <span class="text-[9px] font-medium">Lobby</span>
     </button>
     <button onclick="setWorkspaceMode('favorites')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
-        <span class="material-icons text-[22px]">star</span>
+        <span class="material-icons text-[22px]" aria-hidden="true">star</span>
         <span class="text-[9px] font-medium">Favs</span>
     </button>
     <button onclick="setLayout('folderbrowser')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
-        <span class="material-icons text-[22px]">folder</span>
+        <span class="material-icons text-[22px]" aria-hidden="true">folder</span>
         <span class="text-[9px] font-medium">Ordner</span>
     </button>
     <button onclick="setWorkspaceMode('optimized')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
-        <span class="material-icons text-[22px]">offline_bolt</span>
+        <span class="material-icons text-[22px]" aria-hidden="true">offline_bolt</span>
         <span class="text-[9px] font-medium">Review</span>
     </button>
     <button onclick="document.getElementById('mobileSearchInput').focus()" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
-        <span class="material-icons text-[22px]">search</span>
+        <span class="material-icons text-[22px]" aria-hidden="true">search</span>
         <span class="text-[9px] font-medium">Search</span>
     </button>
 </nav>

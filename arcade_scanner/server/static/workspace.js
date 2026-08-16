@@ -120,7 +120,7 @@ function toggleLayout() {
 
     // Update button icon to show what's next
     const btn = document.getElementById('toggleView');
-    if (btn) btn.innerHTML = `<span class="material-icons">${icons[nextMode]}</span>`;
+    if (btn) btn.innerHTML = `<span class="material-icons" aria-hidden="true">${icons[nextMode]}</span>`;
 }
 
 /**

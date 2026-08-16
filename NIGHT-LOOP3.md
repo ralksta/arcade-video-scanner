@@ -32,8 +32,8 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
       - [x] Kontextbezogener Leer-Zustand statt weißer Fläche — `ae18a9a`
       - [x] Fehler-Zustände: 19/63 `fetch`-Aufrufe ohne Fehlerpfad, `apiWrite()`
             mit Rollback + Regressionstest — `006cd8e`
-      - [ ] A11y-Durchgang: Fokus-Ringe, `aria-label` auf Icon-Buttons,
-            Fokus-Falle in Modals, `Esc`-Verhalten vereinheitlichen
+      - [x] A11y: 14 Icon-Buttons gelabelt, 262 Icons `aria-hidden`,
+            Fokus-Käfig für Dialoge (`a11y.js`) — Fokus-Ringe waren schon da
       - [ ] Mobile: Touch-Ziele < 44 px, horizontale Overflows, Filter-Bar
       - [ ] Stille Aktionen: welche Buttons geben heute keinerlei Rückmeldung
       - [ ] ROADMAP-Haken für „Customizable grid layout" nachziehen — ist längst
@@ -51,6 +51,13 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 2 (Loop A, A11y)** — Icon-Buttons gelabelt, Icons aus der
+  Screenreader-Ausgabe genommen, Fokus-Käfig für Dialoge. Gelernt: `:focus-visible`
+  war global bereits sauber gelöst (`theme.py:454`) — der Mangel lag nicht bei den
+  Ringen, sondern daran, dass der Fokus die Dialoge überhaupt verlassen konnte.
+  Ohne jsdom im Projekt (bewusst kein Build-Schritt) stellt der Test die DOM-
+  Oberfläche nach, die der Handler benutzt. Nächstes: Mobile-Touch-Ziele.
 
 - **Iteration 1 (Loop A, UX)** — Shortcut-Overlay + Leer-Zustand. Gelernt: die
   Ladereihenfolge-Tests (`test_js_completeness`, `test_dashboard_template`) suchten

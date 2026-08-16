@@ -163,7 +163,7 @@ function createComparisonCard(pair) {
             <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="openCinema(this)" data-path="${orig.FilePath}">
                  <img src="/thumbnails/${orig.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                    <span class="material-icons text-white text-3xl drop-shadow-lg" aria-hidden="true">play_arrow</span>
                  </div>
                  <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/80 text-white font-mono font-bold backdrop-blur">${formatSizeCompact(orig.Size_MB)}</span>
             </div>
@@ -174,7 +174,7 @@ function createComparisonCard(pair) {
             </div>
             ${window.IS_LOCAL_ACCESS ? `
             <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
-                <span class="material-icons text-[12px]">folder_open</span> Reveal
+                <span class="material-icons text-[12px]" aria-hidden="true">folder_open</span> Reveal
             </button>
             ` : ''}
         </div>
@@ -185,10 +185,10 @@ function createComparisonCard(pair) {
              <div class="text-xs text-gray-500 font-mono mb-2">${diffMB.toFixed(1)} MB</div>
              
              <button class="ds-btn ds-btn-primary w-full mt-1" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')">
-                <span class="material-icons text-[14px]">check</span> KEEP
+                <span class="material-icons text-[14px]" aria-hidden="true">check</span> KEEP
              </button>
              <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-text-main border border-ink/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
-                <span class="material-icons text-[14px]">delete</span> DISCARD
+                <span class="material-icons text-[14px]" aria-hidden="true">delete</span> DISCARD
              </button>
         </div>
 
@@ -202,7 +202,7 @@ function createComparisonCard(pair) {
              <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group border-[1.5px] border-accent" onclick="openCinema(this)" data-path="${opt.FilePath}">
                  <img src="/thumbnails/${opt.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                    <span class="material-icons text-white text-3xl drop-shadow-lg" aria-hidden="true">play_arrow</span>
                  </div>
                  <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-arcade-cyan/20 text-arcade-cyan font-mono font-bold backdrop-blur border border-arcade-cyan/30">${formatSizeCompact(opt.Size_MB)}</span>
             </div>
@@ -213,7 +213,7 @@ function createComparisonCard(pair) {
             </div>
              ${window.IS_LOCAL_ACCESS ? `
              <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
-                <span class="material-icons text-[12px]">folder_open</span> Reveal
+                <span class="material-icons text-[12px]" aria-hidden="true">folder_open</span> Reveal
             </button>
             ` : ''}
         </div>
@@ -294,7 +294,7 @@ function _optimizeButton(v) {
         // hier gibt es kein Encoding-Problem.
         return `
                  <button class="${cls}" title="Queue for Mac" onclick="event.stopPropagation(); queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\'")}')">
-                    <span class="material-icons">cloud_upload</span>
+                    <span class="material-icons" aria-hidden="true">cloud_upload</span>
                  </button>`;
     }
 
@@ -303,12 +303,12 @@ function _optimizeButton(v) {
         return `
                  <button class="${cls} opacity-40 cursor-not-allowed" disabled
                          title="Optimieren nicht möglich: Der Dateiname enthält ungültige UTF-8-Bytes. Datei nach UTF-8 umbenennen.">
-                    <span class="material-icons">bolt</span>
+                    <span class="material-icons" aria-hidden="true">bolt</span>
                  </button>`;
     }
     return `
                  <button class="${cls}" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${enc}&audio=standard', 'h_frame')">
-                    <span class="material-icons">bolt</span>
+                    <span class="material-icons" aria-hidden="true">bolt</span>
                  </button>`;
 }
 
@@ -361,8 +361,10 @@ function createVideoCard(v) {
              </div>
 
              <button class="favorite-btn absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-full bg-black/45 flex items-center justify-center transition-all ${v.favorite ? 'text-bitrate active' : 'text-white/70 opacity-0 group-hover:opacity-100'}"
-                onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))">
-                <span class="material-icons text-lg">${v.favorite ? 'star' : 'star_border'}</span>
+                onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))"
+                aria-label="${v.favorite ? 'Favorit entfernen' : 'Als Favorit markieren'}"
+                title="${v.favorite ? 'Favorit' : 'Add to Favorites'}">
+                <span class="material-icons text-lg" aria-hidden="true">${v.favorite ? 'star' : 'star_border'}</span>
              </button>
 
              <!-- Thumbnail with Skeleton Loader -->
@@ -380,14 +382,14 @@ function createVideoCard(v) {
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
                  ${window.IS_LOCAL_ACCESS ? `
                  <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
-                    <span class="material-icons">folder_open</span>
+                    <span class="material-icons" aria-hidden="true">folder_open</span>
                  </button>
                  ` : ''}
                  <button class="w-11 h-11 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] flex items-center justify-center backdrop-blur transition-colors" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
-                    <span class="material-icons text-3xl">play_arrow</span>
+                    <span class="material-icons text-3xl" aria-hidden="true">play_arrow</span>
                  </button>
                  <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
-                    <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
+                    <span class="material-icons" aria-hidden="true">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
                   ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? _optimizeButton(v) : ''}
              </div>
@@ -951,14 +953,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             select.classList.add('hidden');
             input.classList.remove('hidden');
             input.focus();
-            btn.innerHTML = '<span class="material-icons text-sm">close</span>';
+            btn.innerHTML = '<span class="material-icons text-sm" aria-hidden="true">close</span>';
             btn.title = "Cancel";
         } else {
             // Hide input, show select
             select.classList.remove('hidden');
             input.classList.add('hidden');
             input.value = '';
-            btn.innerHTML = '<span class="material-icons text-sm">add</span>';
+            btn.innerHTML = '<span class="material-icons text-sm" aria-hidden="true">add</span>';
             btn.title = "Add new category";
         }
     }
@@ -1029,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             setLayout('treemap');
             // Update toggle button icon
             const btn = document.getElementById('toggleView');
-            if (btn) btn.innerHTML = '<span class="material-icons">view_module</span>';
+            if (btn) btn.innerHTML = '<span class="material-icons" aria-hidden="true">view_module</span>';
         });
     }
 
@@ -1191,11 +1193,11 @@ function loadSetupDirectories() {
                 return `<div class="setup-dir-card" data-path="${dir.path}" onclick="toggleSetupDirectory('${dir.path}')">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <span class="material-icons text-arcade-cyan">${dir.is_root ? 'folder_open' : 'folder'}</span>
+                            <span class="material-icons text-arcade-cyan" aria-hidden="true">${dir.is_root ? 'folder_open' : 'folder'}</span>
                             <div><div class="text-text-main font-medium">${displayName}</div>
                             <div class="text-xs text-gray-500">${sizeGB} GB • ${dir.file_count.toLocaleString()} files</div></div>
                         </div>
-                        <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan">check_circle</span></div>
+                        <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan" aria-hidden="true">check_circle</span></div>
                     </div>
                 </div>`;
             }).join('');

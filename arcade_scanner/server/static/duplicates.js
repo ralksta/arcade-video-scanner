@@ -140,7 +140,7 @@ function renderDuplicatesView() {
                 <!-- Icon -->
                 <div class="relative w-24 h-24">
                     <div class="absolute inset-0 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-2 border-purple-500/30 flex items-center justify-center">
-                        <span class="material-icons text-5xl text-purple-400">content_copy</span>
+                        <span class="material-icons text-5xl text-purple-400" aria-hidden="true">content_copy</span>
                     </div>
                 </div>
                 
@@ -156,22 +156,22 @@ function renderDuplicatesView() {
                 <!-- Feature Pills -->
                 <div class="flex flex-wrap justify-center gap-3">
                     <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink/5 border border-ink/10 text-xs text-gray-400">
-                        <span class="material-icons text-sm text-cyan-400">movie</span>
+                        <span class="material-icons text-sm text-cyan-400" aria-hidden="true">movie</span>
                         Videos
                     </div>
                     <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink/5 border border-ink/10 text-xs text-gray-400">
-                        <span class="material-icons text-sm text-pink-400">image</span>
+                        <span class="material-icons text-sm text-pink-400" aria-hidden="true">image</span>
                         Images
                     </div>
                     <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink/5 border border-ink/10 text-xs text-gray-400">
-                        <span class="material-icons text-sm text-purple-400">fingerprint</span>
+                        <span class="material-icons text-sm text-purple-400" aria-hidden="true">fingerprint</span>
                         Perceptual Hashing
                     </div>
                 </div>
                 
                 <!-- Scan Button -->
                 <button onclick="startDuplicateScan()" class="px-8 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold text-lg shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all transform hover:scale-105 flex items-center gap-3">
-                    <span class="material-icons text-2xl">search</span>
+                    <span class="material-icons text-2xl" aria-hidden="true">search</span>
                     Scan for Duplicates
                 </button>
                 
@@ -190,11 +190,11 @@ function renderDuplicatesView() {
 
         grid.innerHTML = `
             <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
-                <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
+                <span class="material-icons text-6xl text-gray-600 mb-4" aria-hidden="true">check_circle</span>
                 <h3 class="text-xl font-bold text-gray-400 mb-2">No Duplicates Found</h3>
                 <p class="text-sm text-gray-500 mb-6">Your library is clean! No duplicate media detected.</p>
                 <button onclick="rescanDuplicates()" class="px-5 py-2.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-text-main text-sm font-medium transition-colors flex items-center gap-2">
-                    <span class="material-icons text-[18px]">refresh</span>
+                    <span class="material-icons text-[18px]" aria-hidden="true">refresh</span>
                     Rescan for Duplicates
                 </button>
             </div>
@@ -209,7 +209,7 @@ function renderDuplicatesView() {
     // Render summary header
     const nextBatchButton = hasMoreBatches ? `
         <button onclick="scanNextBatch()" class="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/30">
-            <span class="material-icons text-[18px]">arrow_forward</span>
+            <span class="material-icons text-[18px]" aria-hidden="true">arrow_forward</span>
             Scan Next Batch
         </button>
     ` : '';
@@ -219,7 +219,7 @@ function renderDuplicatesView() {
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div class="flex items-center gap-4">
                         <div class="w-14 h-14 rounded-xl bg-purple-300 dark:bg-purple-500/20 flex items-center justify-center border border-purple-400 dark:border-purple-500/40">
-                            <span class="material-icons text-3xl text-purple-700 dark:text-purple-400">content_copy</span>
+                            <span class="material-icons text-3xl text-purple-700 dark:text-purple-400" aria-hidden="true">content_copy</span>
                         </div>
                         <div>
                             <h2 class="text-xl font-bold text-gray-900 dark:text-text-main">Duplicate Media</h2>
@@ -238,15 +238,15 @@ function renderDuplicatesView() {
                         </div>
                         ${nextBatchButton}
                         <button onclick="deleteAllDuplicates()" class="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 hover:text-text-main text-sm font-medium transition-colors flex items-center gap-2">
-                            <span class="material-icons text-[18px]">delete_sweep</span>
+                            <span class="material-icons text-[18px]" aria-hidden="true">delete_sweep</span>
                             Delete All Duplicates
                         </button>
                         <button onclick="openDuplicateChecker()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-400 hover:text-text-main text-sm font-medium transition-colors flex items-center gap-2">
-                            <span class="material-icons text-[18px]">fullscreen</span>
+                            <span class="material-icons text-[18px]" aria-hidden="true">fullscreen</span>
                             Fullscreen Mode
                         </button>
                         <button onclick="rescanDuplicates()" class="px-4 py-2 rounded-lg bg-purple-300 dark:bg-purple-500/20 hover:bg-purple-400 dark:hover:bg-purple-500/30 border border-purple-400 dark:border-purple-500/40 text-purple-900 dark:text-text-main text-sm font-medium transition-colors flex items-center gap-2">
-                            <span class="material-icons text-[18px]">refresh</span>
+                            <span class="material-icons text-[18px]" aria-hidden="true">refresh</span>
                             Rescan
                         </button>
                     </div>
@@ -265,7 +265,7 @@ function renderDuplicatesView() {
                     <!-- Group Header -->
                     <div class="p-4 border-b border-black/8 dark:border-ink/5 flex items-center justify-between flex-wrap gap-2 bg-black/[0.02] dark:bg-ink/[0.02]">
                         <div class="flex items-center gap-3">
-                            <span class="material-icons text-${color}-400">${icon}</span>
+                            <span class="material-icons text-${color}-400" aria-hidden="true">${icon}</span>
                             <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">
                                 Group ${idx + 1} • ${group.match_type} match • ${group.files.length} files
                             </span>
@@ -297,7 +297,7 @@ function renderDuplicatesView() {
                                     <div class="relative aspect-video bg-black cursor-pointer group" onclick="openCinema(this)" data-path="${escapeHtml(file.path)}">
                                         <img src="${thumbSrc}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                                            <span class="material-icons text-white text-3xl drop-shadow-lg" aria-hidden="true">play_arrow</span>
                                         </div>
                                     </div>
                                     
@@ -321,7 +321,7 @@ function renderDuplicatesView() {
                                         <!-- Reveal in Finder Button (only on local access) -->
                                         <button onclick="revealInFinder('${escapeHtml(file.path.replace(/'/g, "\\'"))}')"
                                                 class="w-full py-1.5 rounded-lg bg-ink/5 text-gray-400 hover:bg-ink/10 hover:text-text-main border border-ink/10 text-xs transition-all flex items-center justify-center gap-1">
-                                            <span class="material-icons text-sm">folder_open</span>
+                                            <span class="material-icons text-sm" aria-hidden="true">folder_open</span>
                                             Reveal in Finder
                                         </button>
                                         ` : ''}
@@ -329,7 +329,7 @@ function renderDuplicatesView() {
                                         <!-- Delete button for all files -->
                                         <button onclick="deleteDuplicate(${idx}, ${fIdx})"
                                                 class="w-full py-2 rounded-lg ${isKeep ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 border border-orange-500/30' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30'} text-xs font-bold transition-all flex items-center justify-center gap-1">
-                                            <span class="material-icons text-sm">delete</span>
+                                            <span class="material-icons text-sm" aria-hidden="true">delete</span>
                                             ${isKeep ? 'Delete (Recommended)' : 'Delete'}
                                         </button>
                                     </div>

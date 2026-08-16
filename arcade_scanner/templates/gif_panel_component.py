@@ -37,7 +37,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
         <input type="text" class="bg-ink/10 border border-ink/10 text-text-main px-3 py-1.5 rounded-md font-mono text-center w-[100px] focus:border-arcade-cyan/50 focus:outline-none" id="gifTrimStart" placeholder="00:00:00" oninput="updateGifEstimate()">
 
         <button class="w-[30px] h-[30px] flex items-center justify-center border border-ink/10 rounded-md text-gray-400 hover:bg-ink/10 hover:text-text-main transition-colors" onclick="setGifTrimFromHead('start')" title="Set Start">
-            <span class="material-icons text-[16px]">arrow_downward</span>
+            <span class="material-icons text-[16px]" aria-hidden="true">arrow_downward</span>
         </button>
 
         <div class="w-[10px] text-center text-gray-600">-</div>
@@ -45,11 +45,11 @@ GIF_EXPORT_PANEL_COMPONENT = """
         <input type="text" class="bg-ink/10 border border-ink/10 text-text-main px-3 py-1.5 rounded-md font-mono text-center w-[100px] focus:border-arcade-cyan/50 focus:outline-none" id="gifTrimEnd" placeholder="END" oninput="updateGifEstimate()">
 
         <button class="w-[30px] h-[30px] flex items-center justify-center border border-ink/10 rounded-md text-gray-400 hover:bg-ink/10 hover:text-text-main transition-colors" onclick="setGifTrimFromHead('end')" title="Set End">
-            <span class="material-icons text-[16px]">arrow_downward</span>
+            <span class="material-icons text-[16px]" aria-hidden="true">arrow_downward</span>
         </button>
 
         <button class="w-[30px] h-[30px] flex items-center justify-center border border-ink/10 rounded-md text-gray-400 hover:bg-ink/10 hover:text-text-main transition-colors ml-2" onclick="clearGifTrim()" title="Clear">
-            <span class="material-icons text-[16px]">close</span>
+            <span class="material-icons text-[16px]" aria-hidden="true">close</span>
         </button>
 
         <div class="flex-1"></div>
@@ -69,7 +69,7 @@ GIF_EXPORT_PANEL_COMPONENT = """
         <button class="flex-1 py-2.5 rounded-lg font-bold cursor-pointer text-gray-400 bg-ink/5 hover:bg-ink/10 hover:text-text-main transition-all max-w-[120px]" onclick="closeGifExport()">Cancel</button>
 
         <button class="flex-1 py-2.5 rounded-lg font-bold cursor-pointer text-text-main bg-purple-500/20 text-purple-400 border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.2)] hover:bg-purple-500 hover:text-text-main transition-all flex items-center justify-center gap-2" onclick="triggerGifExport()">
-            <span class="material-icons">gif</span> EXPORT GIF
+            <span class="material-icons" aria-hidden="true">gif</span> EXPORT GIF
         </button>
     </div>
 </div>

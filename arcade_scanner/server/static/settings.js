@@ -444,7 +444,7 @@ function markSettingsSaved() {
     const indicator = document.querySelector('.save-indicator');
     if (indicator) {
         indicator.className = 'save-indicator saved';
-        indicator.innerHTML = '<span class="material-icons">check_circle</span><span>All changes saved</span>';
+        indicator.innerHTML = '<span class="material-icons" aria-hidden="true">check_circle</span><span>All changes saved</span>';
     }
 }
 
@@ -555,7 +555,7 @@ function rescanLibrary() {
     const stopBtn = document.getElementById('stopScanBtn');
     const originalContent = btn.innerHTML;
 
-    btn.innerHTML = '<span class="material-icons spin">sync</span>';
+    btn.innerHTML = '<span class="material-icons spin" aria-hidden="true">sync</span>';
     btn.style.pointerEvents = 'none';
     if (stopBtn) stopBtn.classList.remove('hidden');
 
@@ -631,7 +631,7 @@ function renderSavedViews() {
 
         chip.innerHTML = `
             <span onclick="loadView('${view.id}')">${view.name}</span>
-            <span class="material-icons chip-delete" onclick="deleteView('${view.id}', event)">close</span>
+            <span class="material-icons chip-delete" onclick="deleteView('${view.id}', event)" aria-hidden="true">close</span>
         `;
         container.appendChild(chip);
     });

@@ -89,7 +89,7 @@ function renderShortcutSections() {
     return SHORTCUT_SECTIONS.map(section => `
         <section class="mb-5 last:mb-0">
             <h3 class="flex items-center gap-2 text-[12px] uppercase tracking-wider text-text-muted mb-2">
-                <span class="material-icons text-[15px]">${section.icon}</span>
+                <span class="material-icons text-[15px]" aria-hidden="true">${section.icon}</span>
                 ${section.title}
             </h3>
             <dl class="space-y-1.5">

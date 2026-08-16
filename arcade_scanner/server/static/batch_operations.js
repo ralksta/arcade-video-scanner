@@ -50,7 +50,7 @@ function updateBatchSelection() {
         }
         const warning = document.getElementById('batchSkipWarning');
         if (warning) {
-            warning.innerHTML = `<span class="material-icons" style="font-size: 16px;">warning</span> ${skippedCount} under ${BATCH_MIN_SIZE_MB}MB`;
+            warning.innerHTML = `<span class="material-icons" style="font-size: 16px;" aria-hidden="true">warning</span> ${skippedCount} under ${BATCH_MIN_SIZE_MB}MB`;
             warning.title = `${skippedCount} file(s) will be skipped because they are already under ${BATCH_MIN_SIZE_MB}MB`;
         }
     } else if (skipWarning) {

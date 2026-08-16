@@ -1014,7 +1014,7 @@ function renderCollections() {
                 <button onclick="toggleCategoryCollapse('${category}')"
                         class="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-gray-300 transition-colors rounded hover:bg-ink/5">
                     <span class="material-icons text-[14px] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}"
-                          id="cat-arrow-${safeKey}">expand_more</span>
+                          id="cat-arrow-${safeKey}" aria-hidden="true">expand_more</span>
                     <span class="flex-1 text-left">${category}</span>
                     <span class="text-gray-600 font-mono">${catCollections.length}</span>
                 </button>
@@ -1042,13 +1042,13 @@ function renderCollectionItem(col) {
         <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-ink/5 border border-transparent'}"
                 onclick="applyCollection('${col.id}')"
                 ondblclick="openCollectionModal('${col.id}')">
-            <span class="material-icons text-[18px]" style="color: ${col.color}">${col.icon}</span>
+            <span class="material-icons text-[18px]" style="color: ${col.color}" aria-hidden="true">${col.icon}</span>
             <span class="flex-1 text-left truncate">${col.name}</span>
 
             <button onclick="event.stopPropagation(); openCollectionModal('${col.id}')"
                     class="${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white transition-opacity"
                     title="Edit Collection">
-                <span class="material-icons text-[14px]">edit</span>
+                <span class="material-icons text-[14px]" aria-hidden="true">edit</span>
             </button>
 
             <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-ink/5 text-arcade-cyan border border-arcade-cyan/30' : 'bg-ink/[0.03] dark:bg-ink/5 text-gray-400 dark:text-gray-500'} font-mono">${count}</span>

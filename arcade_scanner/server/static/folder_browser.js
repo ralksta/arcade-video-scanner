@@ -368,7 +368,7 @@ function createFolderCard(folder) {
         if (thumbs[i]) {
             mosaicHtml += `<div class="bg-black overflow-hidden"><img src="/thumbnails/${thumbs[i]}" class="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity" loading="lazy"></div>`;
         } else {
-            mosaicHtml += `<div class="bg-gray-900/50 flex items-center justify-center"><span class="material-icons text-gray-700 text-2xl">folder</span></div>`;
+            mosaicHtml += `<div class="bg-gray-900/50 flex items-center justify-center"><span class="material-icons text-gray-700 text-2xl" aria-hidden="true">folder</span></div>`;
         }
     }
 
@@ -383,13 +383,13 @@ function createFolderCard(folder) {
 
         <!-- Folder Icon Badge -->
         <div class="absolute top-3 left-3 w-10 h-10 rounded-lg bg-arcade-cyan/20 backdrop-blur flex items-center justify-center border border-arcade-cyan/30">
-            <span class="material-icons text-arcade-cyan">${folder.hasSubfolders ? 'folder' : 'folder_open'}</span>
+            <span class="material-icons text-arcade-cyan" aria-hidden="true">${folder.hasSubfolders ? 'folder' : 'folder_open'}</span>
         </div>
 
         <!-- Subfolder Indicator -->
         ${folder.hasSubfolders ? `
         <div class="absolute top-3 right-3 px-2 py-1 rounded-md bg-ink/10 backdrop-blur text-[10px] font-bold text-gray-300 flex items-center gap-1">
-            <span class="material-icons text-xs">subdirectory_arrow_right</span>
+            <span class="material-icons text-xs" aria-hidden="true">subdirectory_arrow_right</span>
             HAS SUBFOLDERS
         </div>
         ` : ''}
@@ -399,11 +399,11 @@ function createFolderCard(folder) {
             <h3 class="text-base font-bold text-text-main truncate group-hover:text-arcade-cyan transition-colors" title="${folder.path}">${folder.name}</h3>
             <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
                 <span class="flex items-center gap-1">
-                    <span class="material-icons text-sm">video_library</span>
+                    <span class="material-icons text-sm" aria-hidden="true">video_library</span>
                     ${folder.count} videos
                 </span>
                 <span class="flex items-center gap-1">
-                    <span class="material-icons text-sm">storage</span>
+                    <span class="material-icons text-sm" aria-hidden="true">storage</span>
                     ${formatSize(folder.size_mb)}
                 </span>
             </div>
@@ -412,7 +412,7 @@ function createFolderCard(folder) {
         <!-- Hover Action Indicator -->
         <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
             <div class="w-14 h-14 rounded-full bg-arcade-cyan/20 border border-arcade-cyan/50 flex items-center justify-center backdrop-blur">
-                <span class="material-icons text-arcade-cyan text-3xl">${folder.hasSubfolders ? 'folder_open' : 'play_arrow'}</span>
+                <span class="material-icons text-arcade-cyan text-3xl" aria-hidden="true">${folder.hasSubfolders ? 'folder_open' : 'play_arrow'}</span>
             </div>
         </div>
     `;
@@ -448,7 +448,7 @@ function createFolderRow(folder) {
     const thumb = (folder.thumbnails || [])[0];
     const thumbHtml = thumb
         ? `<img src="/thumbnails/${thumb}" class="w-full h-full object-cover" loading="lazy">`
-        : `<span class="material-icons text-gray-600 text-xl">folder</span>`;
+        : `<span class="material-icons text-gray-600 text-xl" aria-hidden="true">folder</span>`;
 
     row.innerHTML = `
         <div class="folder-row-thumb flex items-center justify-center bg-black/40 rounded-ds-sm overflow-hidden flex-shrink-0">
@@ -458,7 +458,7 @@ function createFolderRow(folder) {
             <div class="text-sm font-bold text-text-main truncate" title="${folder.path}">${folder.name}</div>
             <div class="text-xs text-text-muted truncate">${folder.count} · ${formatSize(folder.size_mb)}</div>
         </div>
-        <span class="material-icons text-text-muted flex-shrink-0">${folder.hasSubfolders ? 'chevron_right' : 'play_arrow'}</span>
+        <span class="material-icons text-text-muted flex-shrink-0" aria-hidden="true">${folder.hasSubfolders ? 'chevron_right' : 'play_arrow'}</span>
     `;
 
     row.addEventListener('click', () => {
@@ -541,7 +541,7 @@ function renderFolderBrowser() {
             // Empty folder
             grid.innerHTML = `
                 <div class="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
-                    <span class="material-icons text-6xl mb-4">folder_off</span>
+                    <span class="material-icons text-6xl mb-4" aria-hidden="true">folder_off</span>
                     <p class="text-lg font-medium">No videos in this folder</p>
                     <button class="mt-4 px-4 py-2 rounded-lg bg-arcade-cyan/20 text-arcade-cyan hover:bg-arcade-cyan/30 transition-colors" onclick="folderBrowserBack()">
                         Go Back
@@ -565,7 +565,7 @@ function renderFolderBrowser() {
         // No folders at root level
         grid.innerHTML = `
             <div class="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
-                <span class="material-icons text-6xl mb-4">folder_off</span>
+                <span class="material-icons text-6xl mb-4" aria-hidden="true">folder_off</span>
                 <p class="text-lg font-medium">No folders found</p>
                 <p class="text-sm mt-2">Videos are not organized in folders</p>
             </div>

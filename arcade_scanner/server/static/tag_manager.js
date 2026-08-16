@@ -38,21 +38,21 @@ function createBatchTagModal() {
             <!-- Header -->
             <div class="px-5 py-4 border-b border-ink/5 flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <span class="material-icons text-purple-400 text-xl">sell</span>
+                    <span class="material-icons text-purple-400 text-xl" aria-hidden="true">sell</span>
                     <div>
                         <h2 class="font-semibold text-text-main">Batch Tagging</h2>
                         <p class="text-xs text-gray-500">Editing <strong id="batchTagCount" class="text-purple-400">0</strong> items</p>
                     </div>
                 </div>
-                <button onclick="closeBatchTagModal()" class="text-gray-500 hover:text-text-main p-1 rounded hover:bg-ink/10 transition-colors">
-                    <span class="material-icons">close</span>
+                <button onclick="closeBatchTagModal()" class="text-gray-500 hover:text-text-main p-1 rounded hover:bg-ink/10 transition-colors" aria-label="Tag-Zuweisung schließen">
+                    <span class="material-icons" aria-hidden="true">close</span>
                 </button>
             </div>
             
             <!-- Search Bar -->
             <div class="px-5 py-3 border-b border-ink/5">
                 <div class="relative">
-                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg">search</span>
+                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg" aria-hidden="true">search</span>
                     <input type="text" 
                            id="batchTagSearch" 
                            class="w-full pl-10 pr-4 py-2.5 bg-ink/5 border border-ink/10 rounded-lg text-text-main text-sm focus:border-purple-500 focus:outline-none" 
@@ -70,7 +70,7 @@ function createBatchTagModal() {
             <!-- Add New Tag -->
             <div class="px-5 py-3 border-t border-ink/5 bg-ink/5 flex gap-2">
                 <div class="relative flex-1">
-                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg">add</span>
+                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg" aria-hidden="true">add</span>
                     <input type="text" 
                            id="batchTagNewInput" 
                            class="w-full pl-10 pr-4 py-2 bg-ink/5 border border-ink/10 rounded-lg text-text-main text-sm focus:border-purple-500 focus:outline-none" 
@@ -88,7 +88,7 @@ function createBatchTagModal() {
                     Cancel
                 </button>
                 <button onclick="applyBatchTags()" class="flex-1 py-2.5 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-400 transition-colors flex items-center justify-center gap-2">
-                    <span class="material-icons text-sm">check</span>
+                    <span class="material-icons text-sm" aria-hidden="true">check</span>
                     Save Changes
                 </button>
             </div>
@@ -220,7 +220,7 @@ function renderBatchTagOptions() {
     if (filteredTags.length === 0 && availableTags.length === 0) {
         container.innerHTML = `
         < div class="batch-tag-empty" >
-                <span class="material-icons">label_off</span>
+                <span class="material-icons" aria-hidden="true">label_off</span>
                 <p>No tags yet</p>
                 <p class="text-xs text-gray-600">Create your first tag below</p>
             </div >
@@ -231,7 +231,7 @@ function renderBatchTagOptions() {
     if (filteredTags.length === 0) {
         container.innerHTML = `
         < div class="batch-tag-empty" >
-                <span class="material-icons">search_off</span>
+                <span class="material-icons" aria-hidden="true">search_off</span>
                 <p>No tags match "${batchTagSearchTerm}"</p>
             </div >
         `;
@@ -273,7 +273,7 @@ function renderBatchTagOptions() {
                     onclick="toggleBatchTagOption('${tag.name}')"
                     onkeydown="handleBatchTagChipKeydown(event, '${tag.name}')"
                     tabindex="${index === batchTagFocusIndex ? '0' : '-1'}">
-                <span class="material-icons text-lg">${checkIcon}</span>
+                <span class="material-icons text-lg" aria-hidden="true">${checkIcon}</span>
                 <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
                 <span>${tag.name}</span>
                 ${hasAction ? '<span class="text-purple-400 font-bold ml-1">•</span>' : ''}
@@ -325,7 +325,7 @@ async function applyBatchTags() {
     const saveBtn = document.querySelector('.batch-tag-save');
     if (saveBtn) {
         saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span class="material-icons animate-spin text-sm">refresh</span> Saving...';
+        saveBtn.innerHTML = '<span class="material-icons animate-spin text-sm" aria-hidden="true">refresh</span> Saving...';
     }
 
     for (const path of paths) {
@@ -592,8 +592,8 @@ function renderExistingTagsList() {
                 <span class="text-text-main text-sm">${t.name}</span>
                 ${shortcutDisplay}
             </div>
-            <button onclick="deleteTag('${t.name}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
-                <span class="material-icons text-lg">delete</span>
+            <button onclick="deleteTag('${t.name}')" aria-label="Tag ${escapeHtml(t.name)} löschen" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                <span class="material-icons text-lg" aria-hidden="true">delete</span>
             </button>
         </div>
     `;

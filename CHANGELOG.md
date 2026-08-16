@@ -14,6 +14,16 @@ All notable changes to this project will be documented in this file.
   globalen Kürzel halten sich zurück, während der Nutzer tippt oder Cinema bzw. die
   Duplikat-Prüfung offen ist. Neu: `static/shortcuts.js`.
 
+- **Barrierefreiheit**: 14 Icon-Buttons (Schließen-Kreuze, Zahlen-Stepper in den
+  Einstellungen, Tag löschen, Favorit auf der Karte) hatten keinen zugänglichen
+  Namen und wurden nur als „Schaltfläche" angesagt — sie tragen jetzt
+  `aria-label`. 262 Material-Icons-Spans sind `aria-hidden`, weil ein
+  Screenreader sonst den Ligatur-Namen vorliest („star_border", „more_vert").
+  Neu: `static/a11y.js` sperrt den Tastaturfokus in offene Dialoge ein (Tab und
+  Shift+Tab laufen im Dialog um) und gibt ihn beim Schließen an das Element
+  zurück, von dem aus geöffnet wurde. Vorher tabbte man aus dem offenen Dialog
+  in die Seite dahinter.
+
 - **Sichtbare Fehler statt stiller Divergenz**: 19 von 63 `fetch`-Aufrufen im
   Frontend hatten keinerlei Fehlerpfad. Die schlimmsten davon aktualisierten die
   Oberfläche optimistisch und feuerten den Server-Aufruf danach ab — war der

@@ -803,32 +803,32 @@
             <!-- Sidebar Navigation -->
             <aside class="settings-sidebar">
                 <div class="settings-logo">
-                    <span class="material-icons">settings</span>
+                    <span class="material-icons" aria-hidden="true">settings</span>
                     <h2>Settings</h2>
                 </div>
 
                 <nav class="settings-nav">
                     <div class="nav-item active" data-section="scanning">
-                        <span class="material-icons">folder_open</span>
+                        <span class="material-icons" aria-hidden="true">folder_open</span>
                         <span>Scanning</span>
                     </div>
                     <div class="nav-item" data-section="performance">
-                        <span class="material-icons">speed</span>
+                        <span class="material-icons" aria-hidden="true">speed</span>
                         <span>Performance</span>
                     </div>
                     <div class="nav-item" data-section="interface">
-                        <span class="material-icons">palette</span>
+                        <span class="material-icons" aria-hidden="true">palette</span>
                         <span>Interface</span>
                     </div>
 
                     <div class="nav-divider"></div>
 
                     <div class="nav-item" data-section="storage">
-                        <span class="material-icons">storage</span>
+                        <span class="material-icons" aria-hidden="true">storage</span>
                         <span>Storage</span>
                     </div>
                     <div class="nav-item" data-section="advanced">
-                        <span class="material-icons">tune</span>
+                        <span class="material-icons" aria-hidden="true">tune</span>
                         <span>Advanced</span>
                     </div>
                 </nav>
@@ -845,7 +845,7 @@
                     </div>
                     <div class="settings-header-actions">
                         <button class="btn-icon" title="Close Settings" onclick="closeSettings()">
-                            <span class="material-icons">close</span>
+                            <span class="material-icons" aria-hidden="true">close</span>
                         </button>
                     </div>
                 </header>
@@ -869,7 +869,7 @@
 
                             <div class="alert alert-info"
                                 style="margin-top: var(--space-md); font-size: var(--font-size-sm);">
-                                <span class="material-icons">info</span>
+                                <span class="material-icons" aria-hidden="true">info</span>
                                 <div>
                                     <strong>Default:</strong> System home directory
                                     <br><span id="defaultTargetsHint" style="opacity: 0.7;"></span>
@@ -923,11 +923,11 @@
                                     </div>
                                     <div class="number-input-wrapper">
                                         <button class="number-stepper" onclick="adjustNumber('settingsMinSize', -10)">
-                                            <span class="material-icons">remove</span>
+                                            <span class="material-icons" aria-hidden="true">remove</span>
                                         </button>
                                         <input type="number" id="settingsMinSize" value="100" min="1">
                                         <button class="number-stepper" onclick="adjustNumber('settingsMinSize', 10)">
-                                            <span class="material-icons">add</span>
+                                            <span class="material-icons" aria-hidden="true">add</span>
                                         </button>
                                     </div>
                                 </div>
@@ -948,11 +948,11 @@
                                     </div>
                                     <div class="number-input-wrapper">
                                         <button class="number-stepper" onclick="adjustNumber('settingsBitrate', -1000)">
-                                            <span class="material-icons">remove</span>
+                                            <span class="material-icons" aria-hidden="true">remove</span>
                                         </button>
                                         <input type="number" id="settingsBitrate" value="15000" min="1000" max="50000">
                                         <button class="number-stepper" onclick="adjustNumber('settingsBitrate', 1000)">
-                                            <span class="material-icons">add</span>
+                                            <span class="material-icons" aria-hidden="true">add</span>
                                         </button>
                                     </div>
                                 </div>
@@ -984,7 +984,7 @@
                             <div class="stats-grid">
                                 <div class="stat-card">
                                     <div class="stat-card-header">
-                                        <span class="material-icons">image</span>
+                                        <span class="material-icons" aria-hidden="true">image</span>
                                         <span>Thumbnails</span>
                                     </div>
                                     <div class="stat-card-value" id="statThumbnails">—</div>
@@ -994,7 +994,7 @@
 
                                 <div class="stat-card">
                                     <div class="stat-card-header">
-                                        <span class="material-icons">storage</span>
+                                        <span class="material-icons" aria-hidden="true">storage</span>
                                         <span>Total Cache</span>
                                     </div>
                                     <div class="stat-card-value" id="statTotal">—</div>
@@ -1003,7 +1003,7 @@
 
                             <div class="alert alert-warning"
                                 style="margin-top: var(--space-lg); font-size: var(--font-size-sm);">
-                                <span class="material-icons">warning</span>
+                                <span class="material-icons" aria-hidden="true">warning</span>
                                 <div>
                                     Clearing the cache will delete all thumbnails and preview clips. They will be
                                     regenerated on the next scan.
@@ -1011,7 +1011,7 @@
                             </div>
 
                             <button class="btn btn-danger" style="margin-top: var(--space-md);">
-                                <span class="material-icons">delete_sweep</span>
+                                <span class="material-icons" aria-hidden="true">delete_sweep</span>
                                 Clear Cache
                             </button>
                         </section>
@@ -1027,7 +1027,7 @@
                             </div>
 
                             <div class="alert alert-danger" style="font-size: var(--font-size-sm);">
-                                <span class="material-icons">warning</span>
+                                <span class="material-icons" aria-hidden="true">warning</span>
                                 <div>
                                     <strong>Warning:</strong> These settings are for advanced users only. Incorrect
                                     configuration may cause unexpected behavior.
@@ -1054,7 +1054,7 @@
                 <!-- Footer with Actions -->
                 <footer class="settings-footer">
                     <div class="save-indicator saved">
-                        <span class="material-icons">check_circle</span>
+                        <span class="material-icons" aria-hidden="true">check_circle</span>
                         <span>All changes saved</span>
                     </div>
                     <div class="footer-actions">
@@ -1062,7 +1062,7 @@
                             Cancel
                         </button>
                         <button class="btn btn-primary" onclick="saveSettings()">
-                            <span class="material-icons">save</span>
+                            <span class="material-icons" aria-hidden="true">save</span>
                             Save Changes
                         </button>
                     </div>
@@ -1140,7 +1140,7 @@
         function markUnsaved() {
             const indicator = document.querySelector('.save-indicator');
             indicator.className = 'save-indicator unsaved';
-            indicator.innerHTML = '<span class="material-icons">warning</span><span>Unsaved changes</span>';
+            indicator.innerHTML = '<span class="material-icons" aria-hidden="true">warning</span><span>Unsaved changes</span>';
         }
 
         function markSaving() {
@@ -1152,7 +1152,7 @@
         function markSaved() {
             const indicator = document.querySelector('.save-indicator');
             indicator.className = 'save-indicator saved';
-            indicator.innerHTML = '<span class="material-icons">check_circle</span><span>All changes saved</span>';
+            indicator.innerHTML = '<span class="material-icons" aria-hidden="true">check_circle</span><span>All changes saved</span>';
         }
 
         // Add change listeners
