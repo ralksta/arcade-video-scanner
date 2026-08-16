@@ -65,7 +65,10 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
             Nach dem Antwort-Cache nur noch bei Cache-Miss relevant — bewusst
             zurückgestellt, weil eine Semantikänderung (Normalisierung) riskanter
             wäre als der Gewinn
-- [ ] **Loop C — Feature**: Ein abgeschlossenes, kleines Feature inkl. Tests + CHANGELOG.
+- [ ] **Loop C — Feature**
+      - [x] „Ähnliche Medien"-Leiste im Cinema (Embedding Teil 2) — Backend
+            `/api/similar` gab es schon, nur die Oberfläche fehlte
+      - [ ] Weitere Feature-Kandidaten suchen
 
 ## Zyklus 2 (Loops werden nach Zyklus 1 festgelegt)
 
@@ -75,6 +78,17 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 9 (Loop C, Ähnlich-Leiste)** — Zwei Lehren. Erstens: mein eigener
+  Test aus Loop A (`test_cinema_section_documents_all_reserved_keys`) hat mich
+  gezwungen, die neue Taste `S` auch im Overlay zu dokumentieren — genau wofür
+  er da war. Zweitens: Beim Schreiben des Tests für veraltete Antworten fiel auf,
+  dass mein Guard die falsche Größe verglich (eigene Merkvariable statt des
+  laufenden Pfads); er hätte nur bei sich überholenden Anfragen gegriffen, nicht
+  beim Weiterblättern. Der Test hat den Fehler gefunden, nicht das Nachdenken.
+  Falscher Alarm zwischendurch: Ich hielt den GIF-Export für tot, weil
+  `window.currentCinemaPath` nirgends zugewiesen wird — die Zuweisung läuft über
+  `Object.defineProperty` am Ende von cinema.js, was mein Grep-Muster nicht traf.
 
 - **Iteration 8 (Loop B, HTML-Dump)** — Der interessante Teil war nicht die
   Performance. Beim Schreiben eines Tests für die Zusage „der Dump enthält keine

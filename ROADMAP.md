@@ -43,7 +43,8 @@ This document outlines planned features and improvements for the Arcade Media Sc
 - **Vektor-Speicher**: `embedding_meta`/`frame_embeddings` in SQLite, float32-Blobs, L2-normalisiert.
 - **GPU-Indexer**: eigenständiges Skript mit optionalen ML-Deps (`[indexer]`), inkrementell.
 - **`/api/similar`**: Brute-Force-kNN serverseitig ohne neue Runtime-Dependencies.
-- Geplant als Teil 2–4: „Ähnliche Videos"-Leiste im Cinema, Themen-Clustering, semantische Textsuche.
+- **Teil 2 erledigt** (2026-08-16): „Ähnliche Videos"-Leiste im Cinema (`static/similar.js`, Taste `S`).
+- Geplant als Teil 3–4: Themen-Clustering, semantische Textsuche.
 
 ### ✅ Auto-Tagging Rules (2026-08-08)
 - **Regel-Engine**: Smart-Collection-Query + Ziel-Tag, läuft serverseitig nach jedem Scan.

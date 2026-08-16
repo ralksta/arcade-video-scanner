@@ -343,12 +343,31 @@ CINEMA_MODAL_COMPONENT = """
             <span class="cinema-rail-label">Vault</span>
         </button>
 
+        <button class="cinema-rail-btn" onclick="toggleCinemaSimilar()" title="Ähnliche Medien [S]">
+            <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">auto_awesome_motion</span></span>
+            <span class="cinema-rail-label">Ähnlich</span>
+        </button>
+
         <button class="cinema-rail-btn" onclick="cinemaExportGif()" title="Export as GIF [G]">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">gif_box</span></span>
             <span class="cinema-rail-label">GIF</span>
         </button>
 
         {opt_btn}
+    </div>
+
+    <!-- Ähnliche Medien: Leiste über der Transportleiste -->
+    <div id="cinemaSimilarPanel" class="hidden absolute bottom-[92px] left-0 right-0 px-5 z-40">
+        <div class="bg-surface/95 backdrop-blur border border-[var(--ds-hairline-strong)] rounded-ds-md p-3">
+            <div class="flex items-center gap-2 mb-2 text-text-main text-[12px] font-semibold">
+                <span class="material-icons text-[16px]" aria-hidden="true">auto_awesome_motion</span>
+                <span>Ähnliche Medien</span>
+                <button onclick="toggleCinemaSimilar()" class="ml-auto text-text-muted hover:text-text-main transition-colors" aria-label="Leiste schließen">
+                    <span class="material-icons text-[18px]" aria-hidden="true">close</span>
+                </button>
+            </div>
+            <div id="cinemaSimilarBody" class="similar-strip"></div>
+        </div>
     </div>
 
     <!-- Bottom overlay: Scrubber + Transport -->

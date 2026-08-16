@@ -58,6 +58,7 @@ SCRIPT_MODULES = [
     "engine.js",
     "optimizer.js",
     "cinema.js",
+    "similar.js",
     "timeline_scrubber.js",
     "gif_export.js",
     "collections.js",

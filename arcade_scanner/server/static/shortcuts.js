@@ -31,6 +31,7 @@ const SHORTCUT_SECTIONS = [
             { keys: ['F'], label: 'Favorit umschalten' },
             { keys: ['V'], label: 'In den Vault verschieben' },
             { keys: ['I'], label: 'Info-Panel' },
+            { keys: ['S'], label: 'Ähnliche Medien' },
             { keys: ['G'], label: 'GIF-Export' },
             { keys: ['O'], label: 'Optimizer' },
             { keys: ['A', '…', 'Z'], label: 'Übrige Buchstaben: konfigurierte Tag-Shortcuts' },

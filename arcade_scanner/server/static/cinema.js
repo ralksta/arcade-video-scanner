@@ -115,6 +115,9 @@ function openCinema(container) {
     updateCinemaInfo();
     updateCinemaTags();
 
+    // Offene Ähnlich-Leiste folgt dem neuen Medium (Blättern mit ← / →)
+    if (typeof loadCinemaSimilar === 'function') loadCinemaSimilar();
+
     // Use capturing phase to ensure we catch ESC before video element
     window.addEventListener('keydown', cinemaKeyHandler, true);
 
@@ -161,6 +164,7 @@ function closeCinema() {
     // Close any open panels
     if (typeof closeOptimize === 'function') closeOptimize();
     if (typeof closeGifExport === 'function') closeGifExport();
+    if (typeof closeCinemaSimilar === 'function') closeCinemaSimilar();
 
     // Note: We do NOT clear cinemaPlaylist here because we might want to 
     // keep browsing the same context if we reopen a file in the same view.
@@ -430,6 +434,13 @@ function cinemaKeyHandler(e) {
             cinemaOptimize();
         }
 
+    } else if (key === 's') {
+        // Ähnliche Medien
+        e.preventDefault();
+        if (typeof toggleCinemaSimilar === 'function') {
+            toggleCinemaSimilar();
+        }
+
     } else if (key === 'i') {
         // Info panel toggle
         e.preventDefault();
@@ -440,7 +451,7 @@ function cinemaKeyHandler(e) {
 
     } else {
         // Check custom tag shortcuts (A-Z except reserved)
-        const reservedKeys = ['f', 'v', 'g', 'o', 'i', ' ', 'escape', 'arrowleft', 'arrowright'];
+        const reservedKeys = ['f', 'v', 'g', 'o', 'i', 's', ' ', 'escape', 'arrowleft', 'arrowright'];
         if (key.length === 1 && /[a-z]/i.test(key) && !reservedKeys.includes(key)) {
             const tags = window.userSettings?.available_tags || [];
             const matchingTag = tags.find(t => t.shortcut && t.shortcut.toLowerCase() === key);

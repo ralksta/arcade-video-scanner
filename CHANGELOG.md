@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **„Ähnliche Medien"-Leiste im Cinema** (Embedding-Fundament, Teil 2): Taste `S`
+  oder der Rail-Button blendet über der Transportleiste verwandte Aufnahmen ein,
+  mit Vorschaubild und Übereinstimmung in Prozent; ein Klick springt direkt
+  dorthin und die Leiste zeigt sofort die Nachbarn des neuen Mediums. Ohne
+  Indexlauf erklärt die Leiste, dass erst `scripts/media_indexer.py` laufen muss,
+  statt einen Fehler zu zeigen — bei frischer Installation ist das der Normalfall.
+  Treffer außerhalb der eigenen Scan-Ziele werden ausgefiltert (`/api/similar`
+  filtert den Vault, kennt aber die Pfad-Ziele nicht), und beim schnellen
+  Blättern verworfene Antworten überschreiben die Leiste nicht mehr.
+  Neu: `static/similar.js`.
+
 - **Tastaturkürzel-Overlay (`?`)**: Das Dashboard hatte eine ganze Reihe
   Tastenkürzel (Cinema: `←`/`→`, `Space`, `F`, `V`, `I`, `G`, `O` plus Tag-Shortcuts;
   Duplikat-Prüfung: `1`/`2`/`S`/`A`; Command-Palette: `Ctrl`/`⌘`+`K`) — dokumentiert

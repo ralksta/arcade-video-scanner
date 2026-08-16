@@ -2935,3 +2935,78 @@ html {
     transform: translateX(16px);
     background: #fff;
 }
+
+/* --- ÄHNLICHE MEDIEN (Cinema) --- */
+.similar-strip {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+}
+
+.similar-item {
+    position: relative;
+    flex: 0 0 auto;
+    width: 132px;
+    border: 1px solid var(--ds-hairline);
+    border-radius: var(--ds-radius-sm, 6px);
+    overflow: hidden;
+    background: var(--ds-fill-soft);
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    transition: border-color .15s ease, transform .15s ease;
+}
+
+.similar-item:hover {
+    border-color: var(--ds-accent);
+    transform: translateY(-2px);
+}
+
+.similar-item img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: #000;
+}
+
+.similar-score {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, .78);
+    color: #fff;
+    font-family: var(--ds-font-mono);
+    font-size: 10px;
+    line-height: 15px;
+}
+
+.similar-name {
+    display: block;
+    padding: 5px 7px 6px;
+    color: var(--ds-text);
+    font-size: 11px;
+    line-height: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.similar-note {
+    padding: 14px 4px;
+    color: var(--ds-text-label);
+    font-size: 12px;
+    line-height: 18px;
+}
+
+.similar-note code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--ds-fill);
+    font-family: var(--ds-font-mono);
+    font-size: 11px;
+}
