@@ -127,7 +127,7 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 
 Wieder aus Funden abgeleitet, nicht frei gewählt.
 
-- [ ] **Loop F — Sicherheit und Datentrennung**
+- [x] **Loop F — Sicherheit und Datentrennung** — ausgereizt (5 Funde)
       Das Produkt beschreibt sich als „self-hosted, privacy-first" mit
       Mehrbenutzer-Trennung. In Loop B fiel dabei ein echtes Leck auf
       (`FOLDERS_DATA` mit fremden Ordnerpfaden im gemeinsamen Dump) — gefunden
@@ -145,8 +145,10 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
       - [x] `innerHTML`: Grid-Karte und Vergleichskarte maskieren jetzt.
         87 weitere Fundstellen erhoben, **nicht** pauschal umgestellt —
         dokumentiert in `dev-docs/frontend-escaping.md`
-      - Trennung: gibt es weitere Stellen wie `FOLDERS_DATA`, an denen Daten
-        aller Nutzer in eine gemeinsame Antwort geraten?
+      - [x] Trennung: `/api/settings` mischt sauber pro Nutzer — mit einer
+        Ausnahme: `saved_views` ist global, enthält aber Suchbegriff und
+        Ordnerpfad. Als Produktentscheidung dokumentiert, nicht eigenmächtig
+        geändert (`dev-docs/saved-views-are-shared.md`)
 
 - [ ] **Loop G — Altlasten im Repository**
       Beim Durchsuchen sind wiederholt Dateien aufgefallen, die nicht mehr
@@ -160,6 +162,16 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 26 (Loop F, Datentrennung)** — Die Trennung ist besser gebaut,
+  als ich erwartet hatte: `/api/settings` mischt sieben Felder sauber pro Nutzer
+  über die globalen Einstellungen. Genau eines fehlt — `saved_views`, und das
+  trägt Suchbegriff und Ordnerpfad. Hier habe ich bewusst *nicht* repariert: ob
+  Ansichten geteilt gehören, hängt davon ab, ob das eine Familien-Installation
+  ist oder getrennte Konten. Datenhoheit umzustellen (samt Migration
+  bestehender Ansichten) gehört nicht in einen unbeaufsichtigten Nachtlauf. Ein
+  Test sichert den Ist-Zustand, damit die Änderung bewusst geschieht.
+  Loop F ist damit ausgereizt.
 
 - **Iteration 25 (Loop F, Maskierung)** — Bewusst nur zwei Renderpfade
   angefasst statt aller 87 Fundstellen. `escapeHtml()` pauschal darüberzuziehen
