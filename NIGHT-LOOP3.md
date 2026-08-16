@@ -77,14 +77,19 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
   beschrieb eine Absicht, keine Abfrage — `EXPLAIN QUERY PLAN` hat es in einer
   Minute geklärt.
 
-  **ACHTUNG für Ralf:** Beim Verifizieren habe ich `arcade_scanner.server.api_handler`
-  importiert. Dieses Modul öffnet beim Import über das Singleton `db` die echte
-  `arcade_data/media_library.db` und führt `_create_table()` aus — die Migration
-  lief dadurch bereits auf der Produktivdatenbank (23:25). Daten unverändert:
-  8788 Einträge, 18 Queue-Jobs, alle Tabellen und Spalten intakt; entfernt wurden
-  nur die fünf Indizes, also genau das, was beim nächsten Start ohnehin passiert
-  wäre. Konsequenz für den weiteren Nachtlauf: keine App-Module mehr importieren,
-  um etwas zu prüfen — nur noch auf Kopien in der Scratchpad-Umgebung arbeiten.
+  **Korrektur und eigentlicher Befund:** Ich hatte zunächst dem Modul-Import die
+  Schuld gegeben, dass die Migration auf der Produktivdatenbank lief. Das war
+  falsch — der Import allein ist nachweislich harmlos. Verursacher ist
+  `ReportDebouncer`: sein `threading.Timer` feuert eine Sekunde nach
+  `schedule()` auf einem Daemon-Thread, wenn der `config`-Patch des Tests schon
+  weg ist, und greift auf das echte `db`-Singleton zu. **Jeder volle
+  `pytest`-Lauf** hat damit `arcade_data/media_library.db` geöffnet (inklusive
+  Migrationen) und `arcade_data/index.html` überschrieben — ein vorbestehender
+  Fehler, den meine Index-Änderung nur sichtbar gemacht hat. Gefunden über einen
+  Stack-Trace aus `_generate`; die Halbierungssuche führte zuerst in die Irre,
+  weil die Eigenschaft zeitabhängig und damit nicht monoton ist.
+  Behoben per autouse-Fixture in `tests/conftest.py`, verifiziert: DB und
+  index.html bleiben nach einem vollen Lauf unverändert.
 
 - **Iteration 6 (Loop B, Cache-Buster)** — Die Header waren alle richtig
   gesetzt; entwertet wurde der Cache eine Ebene höher, in der URL. Lehre: bei

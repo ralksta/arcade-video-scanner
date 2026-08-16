@@ -113,6 +113,18 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **Die Test-Suite schrieb ins echte Datenverzeichnis.** `ReportDebouncer.schedule()`
+  startet einen `threading.Timer`, der eine Sekunde später auf einem Daemon-Thread
+  `_media_cache.get()` aufruft. Zu dem Zeitpunkt ist der `config`-Patch des
+  auslösenden Tests längst abgeräumt, der Timer greift also auf das echte
+  `db`-Singleton zu: er öffnete `arcade_data/media_library.db` samt aller
+  Schema-Migrationen und überschrieb `arcade_data/index.html` — bei jedem vollen
+  `pytest`-Lauf. Ein einzelner Testlauf reproduziert das nicht zuverlässig, weil
+  der Prozess meist endet, bevor die Sekunde um ist; deshalb blieb es unbemerkt.
+  Eine autouse-Fixture in `tests/conftest.py` neutralisiert den Debouncer jetzt
+  und protokolliert die Aufrufe stattdessen, damit Tests weiterhin prüfen können,
+  *dass* eine Route den Report anstößt.
+
 - **Ordner-Browser: echte Hierarchie statt flacher Liste**. `getSubfoldersAt(null)`
   hielt jeden Pfad für eine oberste Ebene, zu dem es keinen *anderen Ordner mit
   Dateien* als Präfix gab. Da Mount-Verzeichnisse wie `/media_ralf` selbst keine
