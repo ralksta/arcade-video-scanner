@@ -203,6 +203,22 @@ jetzt systematisch.
       - Parametrisierungen mit leerer Liste
       - Mocks, die so umfassend sind, dass der Test nur den Mock prüft
 
+## Zyklus 5
+
+- [ ] **Loop J — Maskierung dort, wo die Angriffsfläche wirklich ist**
+      Löst eine Schuld ein, die ich in `dev-docs/frontend-escaping.md` selbst
+      benannt habe: Von den 87 Fundstellen sind `folder_browser.js` (Ordnernamen)
+      und `tag_manager.js` (frei vergebene Tags) die einzigen mit echtem
+      Fremdeinfluss. Einzeln beurteilen, mit node-Tests belegen — nicht pauschal
+      `escapeHtml()` darüberziehen.
+
+- [ ] **Loop K — Der Optimizer**
+      `scripts/video_optimizer.py` ist die größte Einzeldatei und das
+      Kernversprechen des Produkts (50–80 % Ersparnis), aber die
+      Entscheidungslogik ist kaum abgedeckt: 25 Divisionen mit variablem
+      Divisor, 15 stumme Handler. Ohne Medien lässt sich kein Encode prüfen —
+      die reinen Rechen- und Entscheidungsfunktionen aber sehr wohl.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
