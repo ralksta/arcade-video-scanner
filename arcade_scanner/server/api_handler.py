@@ -1036,13 +1036,36 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     username = username.strip() if username else ""
 
                     # ── Brute-force rate limiting ────────────────────────────
+                    #
+                    # Die IP-Sperre allein war wirkungslos: X-Forwarded-For ist
+                    # ein Header, den der Client setzt. Wer den Server direkt
+                    # erreicht — im LAN oder über Tailscale — bekommt mit jedem
+                    # erfundenen Wert einen frischen Zähler und darf beliebig
+                    # oft raten.
+                    #
+                    # Ob dem Header zu trauen ist, hängt vom Aufbau ab (steht
+                    # ein nginx davor?) und lässt sich hier nicht entscheiden.
+                    # Deshalb kommt eine zweite Sperre dazu, die sich nicht
+                    # fälschen lässt: der Benutzername. Ein Angreifer, der ein
+                    # Konto knacken will, muss dessen Namen nennen — und der
+                    # zählt mit, egal welche IP im Header steht.
+                    #
+                    # Nebeneffekt in der richtigen Richtung: Hinter einem Proxy
+                    # teilen sich alle Nutzer eine IP. Die Konto-Sperre trifft
+                    # nur das angegriffene Konto, nicht den ganzen Haushalt.
                     client_ip = (
                         self.headers.get("X-Forwarded-For", "").split(",")[0].strip()
                         or self.client_address[0]
                     )
+                    account_key = f"user:{username.lower()}" if username else "user:"
 
                     if session_manager.is_locked_out(client_ip):
                         print(f"🔒 Blocked login attempt from locked-out IP {client_ip}")
+                        self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
+                        return
+
+                    if session_manager.is_locked_out(account_key):
+                        print(f"🔒 Blocked login attempt for locked-out account '{username}'")
                         self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
                         return
 
@@ -1051,6 +1074,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     if is_valid:
                         session_manager.record_success(client_ip)
+                        session_manager.record_success(account_key)
                         token = session_manager.create_session(username)
                         print(f"✅ Login succeeded for user: '{username}' from {client_ip}")
 
@@ -1081,8 +1105,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.end_headers()
                         self.wfile.write(json.dumps({"success": True, "token": token}).encode())
                     else:
-                        remaining = session_manager.record_failure(client_ip)
-                        print(f"❌ Login failed for IP {client_ip} ({remaining} attempts remaining)")
+                        remaining = min(
+                            session_manager.record_failure(client_ip),
+                            session_manager.record_failure(account_key),
+                        )
+                        print(f"❌ Login failed for '{username}' from {client_ip} "
+                              f"({remaining} attempts remaining)")
                         self.send_error(401, "Invalid credentials")
 
                 except Exception as e:

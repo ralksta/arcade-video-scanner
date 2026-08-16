@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 45 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 1505** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 55 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 1623** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -83,6 +83,8 @@ hätte dort Schaden angerichtet, wo bereits maskiert wird.
 | `/api/debug/dump` war **unauthentifiziert** | Gab ohne Anmeldung Scan-Pfade, sämtliche Benutzernamen mit Admin-Flag und Scan-Zielen sowie echte Dateipfade heraus. Der Rundum-Test fand dabei sofort eine zweite offene Route (`/api/cache-stats`). |
 | Sitzungs-Token im Zugriffslog | `/stream`-Zeilen wurden nur unterdrückt, solange `verbose_scanning` **aus** war. Die Diagnose-Option schrieb also gültige Zugangs-Token mit — genau dann, wenn man Logs weitergibt. |
 | Dateinamen führten Code aus | `createVideoCard()` setzte den Namen unmaskiert per `innerHTML`. Ein Video namens `<img src=x onerror=…>.mp4` führt beim Aufbau des Grids Code aus. |
+| Brute-Force-Sperre per Header aushebelbar | `/api/login` nahm die Kennung aus `X-Forwarded-For` — vom Client gesetzt. Mit wechselndem Wert: fünf Versuche je Fantasie-IP, beliebig viele. Jetzt zählt zusätzlich der Benutzername mit. |
+| Tag- und Ordnernamen in interpolierten `onclick`-Handlern | Fünf Stellen. Der Breadcrumb-Handler war sogar abgesichert — aber nur gegen Apostrophe, während das Attribut von Anführungszeichen begrenzt wird. |
 | Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump | `FOLDERS_DATA` enthielt die Ordner *aller* Nutzer, mit vollem Pfad im `title`-Attribut. |
 
 **Ursache hinter zwei dieser Funde:** Der Server hat kein globales Auth-Gate —

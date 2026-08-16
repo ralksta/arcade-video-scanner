@@ -228,7 +228,10 @@ jetzt systematisch.
 
 ## Zyklus 6
 
-- [ ] **Loop L — Sitzungen und Anmeldung**
+- [ ] **Loop L — Sitzungen und Anmeldung** (läuft)
+      - [x] Brute-Force-Sperre war per `X-Forwarded-For` aushebelbar — Sperre
+            auf den Benutzernamen ergänzt
+      - [x] Sitzungsverfall, Token-Erzeugung, Abmeldung geprüft: **korrekt**
       `security/auth.py` speichert bei jeder Sitzung ein `created_at` — ob es je
       ausgewertet wird, ist offen. Ein Token, das nie verfällt, ist nach dem
       Fund „Token im Zugriffslog" (Loop F) besonders relevant: was einmal
@@ -250,6 +253,14 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 38 (Loop L, Anmeldung)** — Meine Ausgangsvermutung („Sitzungen
+  verfallen nie") war falsch: Verfall, Gleitfenster und Sperrzeit sind sauber
+  gebaut. Der Fund lag daneben — die *Kennung* der Sperre kam aus einem
+  Client-Header. Besonders auffällig: `proxy_resolver.py` benennt genau diese
+  Fälschbarkeit im Kommentar und begründet, warum sie *dort* harmlos ist. Der
+  Login-Pfad hat dieselbe Logik noch einmal inline, ohne den Vorbehalt — und
+  dort ist sie es nicht. Kopierte Logik erbt den Code, nicht die Begründung.
 
 - **Iteration 37 (Loop K, Kommandobau)** — Die Ausschlussregeln des Builders
   (VideoToolbox: `-q:v` und `-b:v` heben sich auf; SVT-AV1 stürzt bei `-crf`
