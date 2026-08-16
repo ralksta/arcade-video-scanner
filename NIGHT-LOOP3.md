@@ -170,6 +170,42 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
             `[tool.ruff.lint]` umgestellt (die Deprecation-Warnung lief bei
             jedem Lauf mit). **Ruff ist erstmals vollständig sauber.**
 
+## Zyklus 4
+
+Beide Themen haben sich in dieser Nacht schon zufällig als ergiebig erwiesen —
+jetzt systematisch.
+
+- [ ] **Loop H — Behauptungen der Doku gegen den Code prüfen**
+      Genau diese Frage fand das `FOLDERS_DATA`-Leck: `CLAUDE.md` beschrieb einen
+      Trennungs-Mechanismus, den es so nicht mehr gab. Und der Abhängigkeits-
+      Wächter entstand aus derselben Frage. Weitere Kandidaten:
+      - `CLAUDE.md` sagt selbst: „Version numbers drift across files
+        (pyproject.toml, README, banner strings in main.py) — don't trust any
+        single one as authoritative." Eine Doku, die ihre eigene Unzuverlässigkeit
+        einräumt, ist eine Einladung.
+      - README-Versprechen: was steht dort über Funktionen, die es (noch/nicht
+        mehr) gibt?
+      - Docstrings, die ein anderes Verhalten beschreiben als der Code.
+      - `ROADMAP.md`: erledigte Punkte ohne Haken, offene Punkte die längst da
+        sind (heute Nacht schon zweimal vorgekommen).
+
+- [ ] **Loop I — Tests, die nichts prüfen**
+      Heute Nacht zweimal zufällig gefunden: ein `pytest.skip`, das nach einer
+      Umstellung immer griff, und Ladereihenfolge-Tests, die per Substring das
+      falsche Ergebnis verglichen und zufällig grün waren. Systematisch suchen:
+      - Tests ohne `assert`
+      - `skip`/`xfail`, deren Bedingung immer zutrifft
+      - Zusicherungen, die nicht fehlschlagen können (`assert True`,
+        `assert x or not x`, Vergleiche gegen sich selbst)
+      - Parametrisierungen mit leerer Liste
+      - Mocks, die so umfassend sind, dass der Test nur den Mock prüft
+
+## Abschluss vor dem Morgen
+
+- [ ] Übergabebericht schreiben: was geändert wurde, was Entscheidungen des
+      Nutzers braucht, was bewusst offen blieb. Solange der volle Kontext noch
+      da ist, nicht erst wenn er knapp wird.
+
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
