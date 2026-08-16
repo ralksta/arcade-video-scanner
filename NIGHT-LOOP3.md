@@ -34,7 +34,11 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
             mit Rollback + Regressionstest — `006cd8e`
       - [x] A11y: 14 Icon-Buttons gelabelt, 262 Icons `aria-hidden`,
             Fokus-Käfig für Dialoge (`a11y.js`) — Fokus-Ringe waren schon da
-      - [ ] Mobile: Touch-Ziele < 44 px, horizontale Overflows, Filter-Bar
+      - [x] Mobile: Ansichts-Umschalter waren `hidden md:flex` — drei von vier
+            Ansichten auf dem Handy unerreichbar. Dabei zwei Fehler in den
+            gespeicherten Ansichten gefunden (Sichtbarkeit, Apostroph im Namen)
+      - [ ] Offen aus diesem Punkt: 64 Buttons unter 44 px Touch-Ziel. Ohne
+            Browser nicht verantwortbar zu ändern — braucht visuelle Prüfung
       - [ ] Stille Aktionen: welche Buttons geben heute keinerlei Rückmeldung
       - [ ] ROADMAP-Haken für „Customizable grid layout" nachziehen — ist längst
             da (`gridScaleSlider` + `--grid-min-width`, `workspace.js:130`)
@@ -51,6 +55,14 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 3 (Loop A, Mobile)** — Ansichts-Umschalter freigelegt. Gelernt:
+  `hidden md:*` ist der stille Killer für Mobile — sieht im Markup harmlos aus und
+  fällt auf dem Entwickler-Desktop nie auf. Der neue Test prüft das jetzt über die
+  Vorfahren-Kette, nicht nur am Element selbst, und wurde gegen den echten Fehler
+  verifiziert (vorher rot, nachher grün). Zweite Lehre: `escapeHtml` rettet
+  JS-in-Attribut nicht — der HTML-Parser löst `&#39;` vor dem JS-Parser auf.
+  Nächstes: stille Aktionen ohne Rückmeldung.
 
 - **Iteration 2 (Loop A, A11y)** — Icon-Buttons gelabelt, Icons aus der
   Screenreader-Ausgabe genommen, Fokus-Käfig für Dialoge. Gelernt: `:focus-visible`

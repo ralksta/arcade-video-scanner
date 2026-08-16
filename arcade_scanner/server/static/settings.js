@@ -624,15 +624,32 @@ function renderSavedViews() {
 
     const views = window.userSettings?.saved_views || [];
 
+    // Der Container war fest `hidden md:flex` verdrahtet: auf dem Desktop nahm er
+    // auch ohne gespeicherte Ansichten Platz weg, auf dem Handy war er gar nicht
+    // erreichbar. Sichtbarkeit hängt jetzt am Inhalt, nicht an der Bildschirmbreite.
+    container.classList.toggle('hidden', views.length === 0);
+    container.classList.toggle('flex', views.length > 0);
+
     views.forEach(view => {
         const chip = document.createElement('button');
-        chip.className = 'view-chip';
-        // highlight if currently active? (complex to strict match, skip for now)
+        chip.className = 'view-chip flex-shrink-0';
 
-        chip.innerHTML = `
-            <span onclick="loadView('${view.id}')">${view.name}</span>
-            <span class="material-icons chip-delete" onclick="deleteView('${view.id}', event)" aria-hidden="true">close</span>
-        `;
+        // Ansichtsnamen sind frei eingegeben. Ein Apostroph im Namen zerlegte den
+        // interpolierten onclick-Handler und machte den Chip unklickbar — und
+        // escapeHtml hilft hier nicht: der HTML-Parser macht aus &#39; wieder ein
+        // Apostroph, bevor der JS-Parser die Zeile sieht. Also gar nicht erst
+        // interpolieren, sondern Knoten bauen und Listener anhängen.
+        const label = document.createElement('span');
+        label.textContent = view.name;
+        label.addEventListener('click', () => loadView(view.id));
+
+        const remove = document.createElement('span');
+        remove.className = 'material-icons chip-delete';
+        remove.setAttribute('aria-hidden', 'true');
+        remove.textContent = 'close';
+        remove.addEventListener('click', (event) => deleteView(view.id, event));
+
+        chip.append(label, remove);
         container.appendChild(chip);
     });
 }

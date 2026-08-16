@@ -616,7 +616,7 @@ FOLDER_SIDEBAR_COMPONENT = """
 
 SAVED_VIEWS_COMPONENT = """
 <!-- Saved Views Chips -->
-<div id="savedViewsContainer" class="hidden md:flex flex-wrap gap-2 px-6 pb-2 items-center">
+<div id="savedViewsContainer" class="hidden flex-nowrap md:flex-wrap overflow-x-auto scrollbar-hide gap-2 px-2 md:px-6 pb-2 items-center">
     <!-- Injected by JS -->
 </div>
 """
@@ -2178,9 +2178,9 @@ FILTER_BAR_COMPONENT = """
         </div>
 
         <!-- View Toggles & Grid Scale -->
-        <div class="hidden md:flex items-center bg-[var(--ds-fill-soft)] rounded-ds-sm p-0.5 border border-[var(--ds-hairline-strong)]">
-            <!-- Grid Scale Slider -->
-            <div class="flex items-center gap-1.5 px-2 mr-1 border-r border-[var(--ds-hairline-strong)]" id="gridScaleContainer">
+        <div class="flex items-center bg-[var(--ds-fill-soft)] rounded-ds-sm p-0.5 border border-[var(--ds-hairline-strong)] flex-shrink-0">
+            <!-- Grid Scale Slider (Desktop: ein Slider ist auf Touch kaum treffbar) -->
+            <div class="hidden md:flex items-center gap-1.5 px-2 mr-1 border-r border-[var(--ds-hairline-strong)]" id="gridScaleContainer">
                 <span class="material-icons text-[14px] text-text-muted" aria-hidden="true">photo_size_select_small</span>
                 <input type="range" id="gridScaleSlider" min="150" max="500" value="240" step="10" oninput="updateGridScale(this.value)" class="w-16 h-1 bg-[var(--ds-hairline-strong)] rounded-full appearance-none cursor-pointer accent-accent">
                 <span class="material-icons text-[16px] text-text-muted" aria-hidden="true">photo_size_select_large</span>

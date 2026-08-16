@@ -14,6 +14,19 @@ All notable changes to this project will be documented in this file.
   globalen Kürzel halten sich zurück, während der Nutzer tippt oder Cinema bzw. die
   Duplikat-Prüfung offen ist. Neu: `static/shortcuts.js`.
 
+- **Ansichten auf dem Handy erreichbar**: Die Umschaltung zwischen Grid, Liste,
+  Treemap und Ordner-Browser steckte in einem `hidden md:flex`-Container — auf
+  einem Telefon gab es damit keinen Weg zu drei der vier Ansichten. Die Umschalter
+  sind jetzt auf jeder Breite da; nur der Größen-Slider bleibt Desktop-only, weil
+  er auf Touch kaum präzise treffbar ist. Ebenso: gespeicherte Ansichten waren auf
+  dem Handy unerreichbar und nahmen auf dem Desktop auch dann Platz weg, wenn gar
+  keine gespeichert waren — ihre Sichtbarkeit hängt jetzt am Inhalt.
+
+- **Ansichts-Chips mit Apostroph im Namen**: Der Name wurde in einen
+  `onclick`-Handler interpoliert; eine Ansicht namens `Ralf's Urlaub` zerlegte
+  damit den Handler und machte den Chip unklickbar. Die Chips werden jetzt als
+  DOM-Knoten gebaut, ohne String-Interpolation.
+
 - **Barrierefreiheit**: 14 Icon-Buttons (Schließen-Kreuze, Zahlen-Stepper in den
   Einstellungen, Tag löschen, Favorit auf der Karte) hatten keinen zugänglichen
   Namen und wurden nur als „Schaltfläche" angesagt — sie tragen jetzt
