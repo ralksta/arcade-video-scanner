@@ -39,6 +39,11 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
             gespeicherten Ansichten gefunden (Sichtbarkeit, Apostroph im Namen)
       - [ ] Offen aus diesem Punkt: 64 Buttons unter 44 px Touch-Ziel. Ohne
             Browser nicht verantwortbar zu ändern — braucht visuelle Prüfung
+      - [ ] **Frage an Ralf**: Der Ordner-Browser bekam einen eigenen Bottom-Nav-
+            Eintrag, weil die View-Toggles auf dem Handy fehlten; dafür flog
+            **Vault** aus der Bottom-Nav (CHANGELOG, „Mobile-Navigation"). Der
+            Grund ist jetzt weg — soll Vault dort zurück? Nicht eigenmächtig
+            geändert, das ist eine Design-Entscheidung.
       - [ ] Stille Aktionen: welche Buttons geben heute keinerlei Rückmeldung
       - [ ] ROADMAP-Haken für „Customizable grid layout" nachziehen — ist längst
             da (`gridScaleSlider` + `--grid-min-width`, `workspace.js:130`)

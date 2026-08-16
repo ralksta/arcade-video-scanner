@@ -21,6 +21,10 @@ All notable changes to this project will be documented in this file.
   er auf Touch kaum präzise treffbar ist. Ebenso: gespeicherte Ansichten waren auf
   dem Handy unerreichbar und nahmen auf dem Desktop auch dann Platz weg, wenn gar
   keine gespeichert waren — ihre Sichtbarkeit hängt jetzt am Inhalt.
+  Damit entfällt der Grund für die frühere Umgehung, die den Ordner-Browser über
+  einen eigenen Bottom-Nav-Eintrag erreichbar machte und dafür **Vault** aus der
+  Bottom-Nav nahm (siehe „Mobile-Navigation" unter *Changed*). Ob Vault dort
+  zurückkehren soll, bleibt eine Design-Entscheidung und wurde nicht angefasst.
 
 - **Ansichts-Chips mit Apostroph im Namen**: Der Name wurde in einen
   `onclick`-Handler interpoliert; eine Ansicht namens `Ralf's Urlaub` zerlegte
