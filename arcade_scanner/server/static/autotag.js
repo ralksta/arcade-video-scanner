@@ -48,7 +48,7 @@ function renderAutoTagRules() {
                 return;
             }
             list.innerHTML = rules.map(r => `
-                <div id="atrule-${r.id}" class="flex items-center gap-3 p-2 rounded-lg bg-black/5 dark:bg-white/5">
+                <div id="atrule-${r.id}" class="flex items-center gap-3 p-2 rounded-lg bg-black/5 dark:bg-ink/5">
                     <input type="checkbox" ${r.enabled ? 'checked' : ''}
                            onchange="toggleAutoTagRule('${r.id}', this.checked)">
                     <div class="min-w-0 flex-1">

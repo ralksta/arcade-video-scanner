@@ -426,7 +426,7 @@ function createFolderCard(folder) {
 
         <!-- Subfolder Indicator -->
         ${folder.hasSubfolders ? `
-        <div class="absolute top-3 right-3 px-2 py-1 rounded-md bg-white/10 backdrop-blur text-[10px] font-bold text-gray-300 flex items-center gap-1">
+        <div class="absolute top-3 right-3 px-2 py-1 rounded-md bg-ink/10 backdrop-blur text-[10px] font-bold text-gray-300 flex items-center gap-1">
             <span class="material-icons text-xs">subdirectory_arrow_right</span>
             HAS SUBFOLDERS
         </div>
@@ -434,7 +434,7 @@ function createFolderCard(folder) {
 
         <!-- Content -->
         <div class="absolute bottom-0 left-0 right-0 p-4">
-            <h3 class="text-base font-bold text-white truncate group-hover:text-arcade-cyan transition-colors" title="${folder.path}">${folder.name}</h3>
+            <h3 class="text-base font-bold text-text-main truncate group-hover:text-arcade-cyan transition-colors" title="${folder.path}">${folder.name}</h3>
             <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
                 <span class="flex items-center gap-1">
                     <span class="material-icons text-sm">video_library</span>
@@ -501,7 +501,7 @@ function renderFolderBrowser() {
             const isLast = idx === breadcrumbs.length - 1;
             const clickHandler = isLast ? '' : `onclick="setFolderBrowserPath(${crumb.path === null ? 'null' : `'${crumb.path.replace(/'/g, "\\'")}'`})"`;
             return `
-                <span class="${isLast ? 'text-white font-bold' : 'text-arcade-cyan hover:text-white cursor-pointer transition-colors'}" ${clickHandler}>${crumb.name}</span>
+                <span class="${isLast ? 'text-text-main font-bold' : 'text-arcade-cyan hover:text-text-main cursor-pointer transition-colors'}" ${clickHandler}>${crumb.name}</span>
                 ${!isLast ? '<span class="text-gray-600 mx-1">/</span>' : ''}
             `;
         }).join('');

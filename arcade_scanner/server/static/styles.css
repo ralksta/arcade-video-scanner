@@ -13,10 +13,10 @@
     --bg: var(--ds-bg, #0b0b10);
 
     /* SURFACES */
-    --glass: var(--ds-fill, rgba(255, 255, 255, 0.06));
-    --glass-hover: rgba(255, 255, 255, 0.10);
-    --glass-active: rgba(255, 255, 255, 0.14);
-    --glass-border: var(--ds-hairline-strong, rgba(255, 255, 255, 0.12));
+    --glass: var(--ds-fill, rgb(var(--ds-text-rgb) / 0.06));
+    --glass-hover: rgb(var(--ds-text-rgb) / 0.10);
+    --glass-active: rgb(var(--ds-text-rgb) / 0.14);
+    --glass-border: var(--ds-hairline-strong, rgb(var(--ds-text-rgb) / 0.12));
     --glass-blur: blur(20px);
 
     /* SEMANTIC COLORS */
@@ -82,7 +82,7 @@ body[data-workspace] {
 
 /* Workspace indicator bar */
 .workspace-indicator {
-    border-bottom: 1px solid var(--ds-hairline, rgba(255, 255, 255, 0.08));
+    border-bottom: 1px solid var(--ds-hairline, rgb(var(--ds-text-rgb) / 0.08));
     background: transparent;
 }
 
@@ -102,8 +102,8 @@ body[data-workspace] {
 }
 
 /* Context Menu background utilities */
-.bg-white\/6 { background: rgba(255,255,255,0.06); }
-.bg-white\/8 { background: rgba(255,255,255,0.08); }
+.bg-white\/6 { background: rgb(var(--ds-text-rgb) / 0.06); }
+.bg-white\/8 { background: rgb(var(--ds-text-rgb) / 0.08); }
 
 body {
     margin: 0;
@@ -274,7 +274,7 @@ html {
 .top-bar {
     position: sticky;
     top: 0;
-    background: var(--surface-glass, rgba(255, 255, 255, 0.9));
+    background: var(--surface-glass, rgb(var(--ds-text-rgb) / 0.9));
     backdrop-filter: blur(25px) saturate(180%);
     z-index: var(--z-modal);
     padding: 18px 0;
@@ -284,7 +284,7 @@ html {
 
 .dark .top-bar {
     background: rgba(13, 1, 26, 0.7);
-    border-bottom-color: rgba(255, 255, 255, 0.05);
+    border-bottom-color: rgb(var(--ds-text-rgb) / 0.05);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
 }
 
@@ -303,7 +303,7 @@ html {
 #searchBar {
     background: var(--glass);
     border: 1px solid var(--glass-border);
-    color: white;
+    color: var(--ds-text);
     padding: 14px 24px;
     border-radius: var(--radius-pill);
     width: 300px;
@@ -365,9 +365,9 @@ html {
 
 .filter-btn.active {
     background: var(--action);
-    color: #000;
+    color: var(--ds-on-accent);
     border-color: transparent;
-    box-shadow: 0 0 20px var(--action-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 20px var(--action-glow), inset 0 1px 0 rgb(var(--ds-text-rgb) / 0.3);
 }
 
 /* Action buttons - circular icons */
@@ -382,15 +382,15 @@ html {
 .filter-btn.action-btn:hover {
     background: var(--action);
     border-color: var(--action);
-    color: #000;
+    color: var(--ds-on-accent);
     transform: scale(1.08);
     box-shadow: 0 0 20px var(--action-glow);
 }
 
 /* --- SAVED VIEW CHIPS --- */
 .view-chip {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgb(var(--ds-text-rgb) / 0.08);
+    border: 1px solid rgb(var(--ds-text-rgb) / 0.15);
     border-radius: 6px;
     /* Squarer, more like a button */
     padding: 6px 12px;
@@ -408,9 +408,9 @@ html {
 }
 
 .view-chip:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.4);
-    color: #fff;
+    background: rgb(var(--ds-text-rgb) / 0.15);
+    border-color: rgb(var(--ds-text-rgb) / 0.4);
+    color: var(--ds-text);
     transform: translateY(-1px);
 }
 
@@ -423,12 +423,12 @@ html {
 
 .add-view-btn {
     background: transparent;
-    border: 1px dashed rgba(255, 255, 255, 0.3);
-    color: rgba(255, 255, 255, 0.6);
+    border: 1px dashed rgb(var(--ds-text-rgb) / 0.3);
+    color: rgb(var(--ds-text-rgb) / 0.6);
 }
 
 .add-view-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgb(var(--ds-text-rgb) / 0.05);
     border-color: var(--gold);
     color: var(--gold);
 }
@@ -448,7 +448,7 @@ html {
 .chip-delete:hover {
     opacity: 1;
     background: rgba(255, 59, 48, 0.2);
-    color: #ff3b30;
+    color: var(--ds-danger);
 }
 
 /* Segmented Control - Arcade Style */
@@ -467,7 +467,7 @@ html {
 }
 
 .workspace-bar {
-    background: var(--surface-glass, rgba(255, 255, 255, 0.8));
+    background: var(--surface-glass, rgb(var(--ds-text-rgb) / 0.8));
     backdrop-filter: var(--glass-blur);
     border-bottom: 1px solid var(--surface-border, rgba(0, 0, 0, 0.1));
     padding: 12px 0;
@@ -486,7 +486,7 @@ html {
 .segment-btn {
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgb(var(--ds-text-rgb) / 0.5);
     padding: 10px 20px;
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -499,14 +499,14 @@ html {
 }
 
 .segment-btn:hover {
-    color: rgba(255, 255, 255, 0.8);
+    color: rgb(var(--ds-text-rgb) / 0.8);
     background: var(--glass);
 }
 
 .segment-btn.active {
     background: var(--action);
-    color: #000;
-    box-shadow: 0 0 20px var(--action-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    color: var(--ds-on-accent);
+    box-shadow: 0 0 20px var(--action-glow), inset 0 1px 0 rgb(var(--ds-text-rgb) / 0.3);
 }
 
 /* Gold Action Style */
@@ -519,7 +519,7 @@ html {
 #codecSelect {
     background: var(--glass);
     border: 1px solid var(--glass-border);
-    color: rgba(255, 255, 255, 0.8);
+    color: rgb(var(--ds-text-rgb) / 0.8);
     padding: 0 24px;
     border-radius: var(--radius-pill);
     cursor: pointer;
@@ -537,7 +537,7 @@ html {
 #statusSelect:hover,
 #codecSelect:hover {
     background: var(--glass-hover);
-    color: white;
+    color: var(--ds-text);
     border-color: var(--highlight);
 }
 
@@ -550,7 +550,7 @@ html {
 #statusSelect option,
 #codecSelect option {
     background: var(--deep-purple);
-    color: white;
+    color: var(--ds-text);
 }
 
 /* --- QUICK ACTIONS OVERLAY --- */
@@ -579,7 +579,7 @@ html {
     height: 45px;
     border-radius: 50%;
     background: var(--pink);
-    color: white;
+    color: var(--ds-on-accent-hover);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -596,12 +596,12 @@ html {
 .quick-action-btn:hover {
     transform: scale(1.1) !important;
     background: var(--gold);
-    color: #000;
+    color: var(--ds-on-bitrate);
 }
 
 .quick-action-btn.active {
     background: var(--gold);
-    color: #000;
+    color: var(--ds-on-bitrate);
 }
 
 /* --- CINEMA MODE MODAL --- */
@@ -738,7 +738,7 @@ html {
     display: flex;
     justify-content: space-between;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgb(var(--ds-text-rgb) / 0.05);
 }
 
 .info-row:last-child {
@@ -753,7 +753,7 @@ html {
 }
 
 .info-value {
-    color: white;
+    color: var(--ds-text);
     font-weight: 600;
     text-align: right;
 }
@@ -834,7 +834,7 @@ html {
     height: auto;
     min-height: 120px;
     gap: 15px;
-    background: var(--surface-glass, rgba(255, 255, 255, 0.92));
+    background: var(--surface-glass, rgb(var(--ds-text-rgb) / 0.92));
     border: 1px solid var(--surface-border, rgba(0, 0, 0, 0.1)) !important;
     border-width: 1px !important;
     box-sizing: border-box;
@@ -933,7 +933,7 @@ html {
 }
 
 .content-card {
-    background: var(--surface-glass, rgba(255, 255, 255, 0.92));
+    background: var(--surface-glass, rgb(var(--ds-text-rgb) / 0.92));
     border-radius: var(--radius-lg);
     border: 1px solid var(--surface-border, rgba(0, 0, 0, 0.1));
     transition: all 0.35s cubic-bezier(0.2, 1, 0.2, 1);
@@ -1029,11 +1029,11 @@ html {
     transform: translateY(-5px);
     border-color: var(--pink);
     box-shadow: 0 10px 30px rgb(var(--ds-accent-rgb) / 0.15);
-    background: var(--surface-glass, rgba(255, 255, 255, 0.95));
+    background: var(--surface-glass, rgb(var(--ds-text-rgb) / 0.95));
 }
 
 .dark .content-card:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgb(var(--ds-text-rgb) / 0.08);
     box-shadow: 0 10px 30px rgb(var(--ds-accent-rgb) / 0.2);
 }
 
@@ -1108,7 +1108,7 @@ html {
 
 .dark .card-footer {
     border-top-color: var(--glass-border);
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--ds-fill-soft);
 }
 
 .badge {
@@ -1163,22 +1163,22 @@ html {
 
 .badge.hevc {
     background: var(--action);
-    color: #000;
+    color: var(--ds-on-accent);
     box-shadow: 0 0 12px var(--action-glow);
     margin-left: 8px;
 }
 
 .badge.av1 {
-    background: rgba(139, 92, 246, 0.25);
-    color: #c4b5fd;
-    border: 1px solid rgba(139, 92, 246, 0.4);
+    background: rgb(var(--ds-av1-rgb) / 0.2);
+    color: var(--ds-av1);
+    border: 1px solid rgb(var(--ds-av1-rgb) / 0.4);
     box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
     margin-left: 8px;
 }
 
 .badge.optimized {
     background: var(--highlight);
-    color: #000;
+    color: var(--ds-on-bitrate);
     box-shadow: 0 0 12px var(--highlight-glow);
 }
 
@@ -1288,7 +1288,7 @@ html {
 }
 
 .folder-item {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgb(var(--ds-text-rgb) / 0.03);
     border: 1px solid var(--glass-border);
     padding: 22px 25px;
     border-radius: 12px;
@@ -1299,7 +1299,7 @@ html {
 }
 
 .folder-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgb(var(--ds-text-rgb) / 0.08);
     border-color: var(--pink);
 }
 
@@ -1328,7 +1328,7 @@ html {
 
 .folder-progress {
     height: 6px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgb(var(--ds-text-rgb) / 0.05);
     border-radius: 3px;
     margin-top: 15px;
     overflow: hidden;
@@ -1463,7 +1463,7 @@ html {
 .treemap-legend {
     background: rgba(13, 1, 26, 0.6);
     backdrop-filter: blur(15px);
-    border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 2px solid rgb(var(--ds-text-rgb) / 0.05);
     padding: 12px 0;
 }
 
@@ -1604,10 +1604,10 @@ html {
 .settings-section textarea,
 .settings-section input[type="number"] {
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgb(var(--ds-text-rgb) / 0.05);
     border: 1px solid var(--glass-border);
     border-radius: 10px;
-    color: white;
+    color: var(--ds-text);
     padding: 12px 15px;
     font-family: 'SF Mono', monospace;
     font-size: 0.85rem;
@@ -1676,14 +1676,14 @@ html {
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgb(var(--ds-text-rgb) / 0.03);
     border: 1px solid var(--glass-border);
     border-radius: 8px;
     transition: 0.2s;
 }
 
 .exclusion-item:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgb(var(--ds-text-rgb) / 0.06);
     border-color: var(--gold);
 }
 
@@ -1709,7 +1709,7 @@ html {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: #000;
+    color: var(--ds-on-accent);
     font-size: 14px;
     font-weight: bold;
 }
@@ -1722,7 +1722,7 @@ html {
 .exclusion-path {
     font-family: 'SF Mono', monospace;
     font-size: 0.85rem;
-    color: #fff;
+    color: var(--ds-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1747,7 +1747,7 @@ html {
     align-items: center;
     gap: 12px;
     padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgb(var(--ds-text-rgb) / 0.03);
     border: 1px solid var(--glass-border);
     border-radius: 10px;
 }
@@ -1836,7 +1836,7 @@ html {
         min-height: 44px;
         background: transparent;
         border: none;
-        color: rgba(255, 255, 255, 0.5);
+        color: rgb(var(--ds-text-rgb) / 0.5);
         font-size: 10px;
         gap: 4px;
         cursor: pointer;
@@ -2226,9 +2226,9 @@ html {
 }
 
 .video-card-tag.overflow-tag {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: #9ca3af;
+    background: rgb(var(--ds-text-rgb) / 0.08);
+    border-color: rgb(var(--ds-text-rgb) / 0.15);
+    color: var(--ds-text-label);
 }
 
 /* --- CINEMA MODAL TAG PICKER --- */
@@ -2274,16 +2274,16 @@ html {
     font-size: 13px;
     font-weight: 600;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    color: #e5e7eb;
+    background: rgb(var(--ds-text-rgb) / 0.08);
+    border: 2px solid rgb(var(--ds-text-rgb) / 0.15);
+    color: var(--ds-text-body);
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .batch-tag-option:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: rgb(var(--ds-text-rgb) / 0.15);
+    border-color: rgb(var(--ds-text-rgb) / 0.3);
     transform: translateY(-1px);
 }
 
@@ -2302,30 +2302,30 @@ html {
 /* State: All selected videos have this tag */
 .batch-tag-option.state-all {
     background: rgba(34, 197, 94, 0.2);
-    border-color: #22c55e;
-    color: #22c55e;
+    border-color: var(--ds-optimized);
+    color: var(--ds-optimized);
 }
 
 .batch-tag-option.state-all .tag-state-icon {
-    color: #22c55e;
+    color: var(--ds-optimized);
 }
 
 /* State: Some selected videos have this tag */
 .batch-tag-option.state-some {
     background: rgba(251, 191, 36, 0.15);
-    border-color: #fbbf24;
-    color: #fbbf24;
+    border-color: var(--ds-bitrate);
+    color: var(--ds-bitrate);
 }
 
 .batch-tag-option.state-some .tag-state-icon {
-    color: #fbbf24;
+    color: var(--ds-bitrate);
 }
 
 /* State: None of selected videos have this tag */
 .batch-tag-option.state-none {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: #9ca3af;
+    background: rgb(var(--ds-text-rgb) / 0.05);
+    border-color: rgb(var(--ds-text-rgb) / 0.15);
+    color: var(--ds-text-label);
 }
 
 /* Has pending action indicator */
@@ -2357,9 +2357,9 @@ html {
 .batch-tag-modal {
     width: 100%;
     max-width: 420px;
-    background: #1A1A1E;
+    background: var(--ds-surface);
     border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgb(var(--ds-text-rgb) / 0.08);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
     overflow: hidden;
     transform: scale(0.95);
@@ -2375,7 +2375,7 @@ html {
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgb(var(--ds-text-rgb) / 0.06);
 }
 
 .batch-tag-title-row {
@@ -2386,30 +2386,30 @@ html {
 
 .batch-tag-icon {
     font-size: 22px;
-    color: #9D5BFF;
+    color: var(--ds-av1);
 }
 
 .batch-tag-title {
     font-size: 16px;
     font-weight: 600;
-    color: white;
+    color: var(--ds-text);
     margin: 0;
 }
 
 .batch-tag-subtitle {
     font-size: 12px;
-    color: #6B7280;
+    color: var(--ds-text-muted);
     margin: 2px 0 0 0;
 }
 
 .batch-tag-subtitle strong {
-    color: #9D5BFF;
+    color: var(--ds-av1);
 }
 
 .batch-tag-close {
     background: none;
     border: none;
-    color: #6B7280;
+    color: var(--ds-text-muted);
     cursor: pointer;
     padding: 4px;
     border-radius: 6px;
@@ -2417,14 +2417,14 @@ html {
 }
 
 .batch-tag-close:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
+    background: rgb(var(--ds-text-rgb) / 0.08);
+    color: var(--ds-text);
 }
 
 .batch-tag-search-container {
     position: relative;
     padding: 12px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgb(var(--ds-text-rgb) / 0.06);
 }
 
 .batch-tag-search-icon {
@@ -2433,28 +2433,28 @@ html {
     top: 50%;
     transform: translateY(-50%);
     font-size: 18px;
-    color: #6B7280;
+    color: var(--ds-text-muted);
 }
 
 .batch-tag-search {
     width: 100%;
     padding: 10px 12px 10px 36px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgb(var(--ds-text-rgb) / 0.05);
+    border: 1px solid rgb(var(--ds-text-rgb) / 0.1);
     border-radius: 8px;
-    color: white;
+    color: var(--ds-text);
     font-size: 13px;
     outline: none;
     transition: all 0.15s;
 }
 
 .batch-tag-search:focus {
-    border-color: #9D5BFF;
-    box-shadow: 0 0 0 3px rgba(157, 91, 255, 0.15);
+    border-color: var(--ds-av1);
+    box-shadow: 0 0 0 3px rgb(var(--ds-av1-rgb) / 0.15);
 }
 
 .batch-tag-search::placeholder {
-    color: #6B7280;
+    color: var(--ds-text-muted);
 }
 
 .batch-tag-cloud {
@@ -2470,7 +2470,7 @@ html {
     width: 100%;
     text-align: center;
     padding: 24px;
-    color: #6B7280;
+    color: var(--ds-text-muted);
 }
 
 .batch-tag-empty .material-icons {
@@ -2494,48 +2494,48 @@ html {
     cursor: pointer;
     border: 1px solid transparent;
     transition: all 0.15s;
-    background: rgba(255, 255, 255, 0.05);
-    color: #D1D5DB;
+    background: rgb(var(--ds-text-rgb) / 0.05);
+    color: var(--ds-text-body);
     position: relative;
 }
 
 .batch-tag-chip:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgb(var(--ds-text-rgb) / 0.1);
 }
 
 .batch-tag-chip:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(157, 91, 255, 0.4);
+    box-shadow: 0 0 0 2px rgb(var(--ds-av1-rgb) / 0.4);
 }
 
 .batch-tag-checkbox {
     font-size: 18px;
-    color: #6B7280;
+    color: var(--ds-text-muted);
 }
 
 .batch-tag-chip.state-applied {
-    background: rgba(34, 197, 94, 0.15);
-    border-color: rgba(34, 197, 94, 0.3);
-    color: #22c55e;
+    background: rgb(var(--ds-optimized-rgb) / 0.15);
+    border-color: rgb(var(--ds-optimized-rgb) / 0.3);
+    color: var(--ds-optimized);
 }
 
 .batch-tag-chip.state-applied .batch-tag-checkbox {
-    color: #22c55e;
+    color: var(--ds-optimized);
 }
 
 .batch-tag-chip.state-indeterminate {
-    background: rgba(251, 191, 36, 0.12);
-    border-color: rgba(251, 191, 36, 0.3);
-    color: #fbbf24;
+    background: rgb(var(--ds-bitrate-rgb) / 0.12);
+    border-color: rgb(var(--ds-bitrate-rgb) / 0.3);
+    color: var(--ds-bitrate);
 }
 
 .batch-tag-chip.state-indeterminate .batch-tag-checkbox {
-    color: #fbbf24;
+    color: var(--ds-bitrate);
 }
 
 .batch-tag-chip.state-unapplied {
-    background: rgba(255, 255, 255, 0.04);
-    color: #9CA3AF;
+    background: rgb(var(--ds-text-rgb) / 0.04);
+    color: var(--ds-text-label);
 }
 
 .batch-tag-chip.has-pending {
@@ -2557,7 +2557,7 @@ html {
     position: absolute;
     top: -2px;
     right: -2px;
-    color: #9D5BFF;
+    color: var(--ds-av1);
     font-size: 16px;
     font-weight: bold;
 }
@@ -2567,39 +2567,39 @@ html {
     align-items: center;
     gap: 8px;
     padding: 12px 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid rgb(var(--ds-text-rgb) / 0.06);
+    border-bottom: 1px solid rgb(var(--ds-text-rgb) / 0.06);
+    background: var(--ds-fill-soft);
 }
 
 .batch-tag-add-icon {
     font-size: 18px;
-    color: #6B7280;
+    color: var(--ds-text-muted);
 }
 
 .batch-tag-new-input {
     flex: 1;
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgb(var(--ds-text-rgb) / 0.05);
+    border: 1px solid rgb(var(--ds-text-rgb) / 0.1);
     border-radius: 6px;
-    color: white;
+    color: var(--ds-text);
     font-size: 13px;
     outline: none;
 }
 
 .batch-tag-new-input:focus {
-    border-color: #9D5BFF;
+    border-color: var(--ds-av1);
 }
 
 .batch-tag-new-input::placeholder {
-    color: #6B7280;
+    color: var(--ds-text-muted);
 }
 
 .batch-tag-add-btn {
     padding: 8px 16px;
-    background: rgba(157, 91, 255, 0.2);
-    color: #9D5BFF;
+    background: rgb(var(--ds-av1-rgb) / 0.2);
+    color: var(--ds-av1);
     border: 1px solid rgba(157, 91, 255, 0.3);
     border-radius: 6px;
     font-size: 13px;
@@ -2609,23 +2609,23 @@ html {
 }
 
 .batch-tag-add-btn:hover {
-    background: rgba(157, 91, 255, 0.3);
-    color: white;
+    background: rgb(var(--ds-av1-rgb) / 0.3);
+    color: var(--ds-text);
 }
 
 .batch-tag-footer {
     display: flex;
     gap: 12px;
     padding: 16px 20px;
-    background: rgba(0, 0, 0, 0.15);
+    background: var(--ds-fill-soft);
 }
 
 .batch-tag-cancel {
     flex: 1;
     padding: 10px 16px;
     background: transparent;
-    color: #9CA3AF;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--ds-text-label);
+    border: 1px solid rgb(var(--ds-text-rgb) / 0.1);
     border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
@@ -2634,8 +2634,8 @@ html {
 }
 
 .batch-tag-cancel:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: white;
+    background: rgb(var(--ds-text-rgb) / 0.05);
+    color: var(--ds-text);
 }
 
 .batch-tag-save {
@@ -2645,7 +2645,7 @@ html {
     justify-content: center;
     gap: 6px;
     padding: 10px 16px;
-    background: #9D5BFF;
+    background: var(--ds-av1);
     color: white;
     border: none;
     border-radius: 8px;
@@ -2656,7 +2656,7 @@ html {
 }
 
 .batch-tag-save:hover {
-    background: #B47FFF;
+    background: rgb(var(--ds-av1-rgb) / 0.82);
 }
 
 .batch-tag-save:disabled {
@@ -2679,9 +2679,9 @@ html {
     overflow: hidden;
     background: linear-gradient(
         90deg,
-        rgba(255, 255, 255, 0.03) 25%,
-        rgba(255, 255, 255, 0.08) 50%,
-        rgba(255, 255, 255, 0.03) 75%
+        rgb(var(--ds-text-rgb) / 0.03) 25%,
+        rgb(var(--ds-text-rgb) / 0.08) 50%,
+        rgb(var(--ds-text-rgb) / 0.03) 75%
     );
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.5s ease-in-out infinite;
@@ -2711,146 +2711,13 @@ html {
     animation: none;
 }
 /* ============================================================
-   LIGHT MODE — WCAG 2.1 AA CONTRAST OVERRIDES
-   Target: 4.5:1 for normal text, 3:1 for large/UI text
-   Applied via :root (no .dark class) to flip dark-only values
+   LIGHT MODE
+   Frueher stand hier ein Block aus !important-Overrides, der die
+   dark-only Hardcodes (text-white, text-gray-*, bg-black/*) pro
+   Container zurueckgebogen hat. Die Utilities zeigen jetzt auf
+   mode-aware Tokens (--ds-text, --ds-ink, semantische Farben),
+   deshalb ist das Pflaster entfallen.
    ============================================================ */
-
-/* --- Settings Modal --- */
-:root:not(.dark) #settingsModal .settings-nav-item,
-:root:not(.dark) #settingsModal .settings-nav-item span {
-    color: var(--text-muted) !important; /* #374151 — 7:1 on white */
-}
-:root:not(.dark) #settingsModal .settings-nav-item:hover,
-:root:not(.dark) #settingsModal .settings-nav-item:hover span {
-    color: var(--text-main) !important;
-    background: rgba(0,0,0,0.05) !important;
-}
-:root:not(.dark) #settingsModal .settings-nav-item.active,
-:root:not(.dark) #settingsModal .settings-nav-item.active span {
-    color: var(--text-main) !important;
-    background: rgba(0,0,0,0.06) !important;
-}
-/* Section headings: text-white → text-main */
-:root:not(.dark) #settingsModal h1,
-:root:not(.dark) #settingsModal h2,
-:root:not(.dark) #settingsModal h3,
-:root:not(.dark) #settingsModal h4 {
-    color: var(--text-main) !important;
-}
-/* Sub-labels: text-gray-500 → text-muted */
-:root:not(.dark) #settingsModal p,
-:root:not(.dark) #settingsModal label,
-:root:not(.dark) #settingsModal .text-gray-400,
-:root:not(.dark) #settingsModal .text-gray-500,
-:root:not(.dark) #settingsModal .text-gray-600 {
-    color: var(--text-muted) !important;
-}
-/* Stats cards (THUMBNAILS/TOTAL) */
-:root:not(.dark) #settingsModal .stat-card,
-:root:not(.dark) #settingsModal [class*="rounded"][class*="bg-white"] {
-    background: rgba(0,0,0,0.05) !important;
-    border-color: rgba(0,0,0,0.1) !important;
-    color: var(--text-muted) !important;
-}
-/* Close button */
-:root:not(.dark) #settingsModal button.text-gray-500 {
-    color: var(--text-muted) !important;
-}
-:root:not(.dark) #settingsModal button.text-gray-500:hover {
-    color: var(--text-main) !important;
-    background: rgba(0,0,0,0.06) !important;
-}
-/* Dividers */
-:root:not(.dark) #settingsModal .bg-white\/10,
-:root:not(.dark) #settingsModal [class*="border-white"] {
-    border-color: rgba(0,0,0,0.1) !important;
-    background-color: rgba(0,0,0,0.06) !important;
-}
-/* Form inputs */
-:root:not(.dark) #settingsModal input,
-:root:not(.dark) #settingsModal textarea,
-:root:not(.dark) #settingsModal select {
-    background: rgba(0,0,0,0.04) !important;
-    border-color: rgba(0,0,0,0.15) !important;
-    color: var(--text-main) !important;
-}
-:root:not(.dark) #settingsModal input::placeholder,
-:root:not(.dark) #settingsModal textarea::placeholder {
-    color: rgba(0,0,0,0.3) !important;
-}
-/* Section borders */
-:root:not(.dark) #settingsModal header,
-:root:not(.dark) #settingsModal footer {
-    border-color: rgba(0,0,0,0.08) !important;
-}
-
-/* --- Segmented Control Buttons (workspace chooser) --- */
-:root:not(.dark) .segment-btn {
-    color: var(--text-muted) !important;
-}
-:root:not(.dark) .segment-btn.active {
-    color: var(--text-main) !important;
-    background: var(--surface-glass) !important;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
-}
-
-/* --- Filter Panel light mode text --- */
-:root:not(.dark) #filterPanelContent h3,
-:root:not(.dark) #filterPanelContent label,
-:root:not(.dark) #filterPanelContent .text-gray-400,
-:root:not(.dark) #filterPanelContent .text-gray-500,
-:root:not(.dark) #filterPanelContent .text-white {
-    color: var(--text-main) !important;
-}
-:root:not(.dark) #filterPanelContent .text-gray-400 {
-    color: var(--text-muted) !important;
-}
-
-/* --- Top-bar text (search, icons) --- */
-:root:not(.dark) .top-bar .text-gray-400,
-:root:not(.dark) .top-bar .text-gray-500,
-:root:not(.dark) .top-bar .text-white {
-    color: var(--text-main) !important;
-}
-:root:not(.dark) .top-bar .text-gray-400 {
-    color: var(--text-muted) !important;
-}
-
-/* --- Collection/Tag Modals --- */
-:root:not(.dark) #collectionsModal .text-white,
-:root:not(.dark) #collectionsModal h3,
-:root:not(.dark) #tagModal .text-white,
-:root:not(.dark) #tagModal h3 {
-    color: var(--text-main) !important;
-}
-:root:not(.dark) #collectionsModal .text-gray-400,
-:root:not(.dark) #tagModal .text-gray-400 {
-    color: var(--text-muted) !important;
-}
-
-/* --- Settings Modal — Sidebar solid background (light mode) --- */
-/* Tailwind arbitrary value might not generate in Python strings,   */
-/* so we force it here with high specificity.                       */
-:root:not(.dark) #settingsModal aside {
-    background-color: #f1f3f5 !important;
-    backdrop-filter: none !important;
-}
-:root:not(.dark) #settingsModal .settings-container > aside {
-    background-color: #f1f3f5 !important;
-}
-:root:not(.dark) #settingsModal footer {
-    background-color: #f1f3f5 !important;
-    backdrop-filter: none !important;
-}
-/* Settings main content white */
-:root:not(.dark) #settingsModal main {
-    background-color: #ffffff !important;
-}
-/* outer container slight warmth */
-:root:not(.dark) #settingsModal .settings-container {
-    background-color: #ffffff !important;
-}
 
 /* === CINEMA PLAYER (Design System) ===
    Liegt hier statt im Template, weil CINEMA_MODAL_COMPONENT durch

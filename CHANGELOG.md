@@ -19,6 +19,19 @@ All notable changes to this project will be documented in this file.
   on a remote NVENC machine, reading originals only).
 
 ### Fixed
+- **Light-Mode-Kontraste**: Die Views trugen noch flächendeckend Hardcodes aus
+  der dark-only Zeit (`text-white`, `text-gray-400/500/600`, `bg-white/10`,
+  `bg-black/40`, `rgba(255,255,255,…)` in `styles.css`), die im hellen Design
+  weiß auf weiß bzw. ~2:1 landeten — am deutlichsten in den Settings. Diese
+  Utilities zeigen jetzt auf mode-aware Tokens: neue Tailwind-Farbe `ink`
+  (Vordergrund als Flächen-/Linienquelle) statt `*-white/N`, die Graustufen
+  200–900 auf die semantische Textskala, und die semantischen Farben (HEVC,
+  AV1, Bitrate, Optimized, Danger, Info) haben eigene Light-Werte mit ≥4.5:1
+  auf Weiß. Gefüllte Buttons/Badges beziehen ihre Textfarbe aus `--ds-on-*`
+  (automatisch schwarz/weiß nach Luminanz), Badges auf Thumbnails behalten über
+  `--ds-*-media-rgb` den hellen Ton plus dunklen Scrim. `--ds-text-muted` im
+  Dark-Mode von `#6b6b76` auf `#7e7e8a` angehoben (3.4:1 → 4.5:1). Der alte
+  Block aus `!important`-Overrides in `styles.css` ist damit entfallen.
 - `do_HEAD` split the stream path with `split("path=")`, so any appended query
   parameter ended up inside the filename. Now uses `parse_qs` like `do_GET`.
 

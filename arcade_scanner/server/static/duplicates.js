@@ -146,7 +146,7 @@ function renderDuplicatesView() {
                 
                 <!-- Title & Description -->
                 <div class="text-center max-w-md">
-                    <h2 class="text-2xl font-bold text-white mb-3">Duplicate Finder</h2>
+                    <h2 class="text-2xl font-bold text-text-main mb-3">Duplicate Finder</h2>
                     <p class="text-gray-400 leading-relaxed">
                         Scan your library to find visually similar or duplicate media files. 
                         This uses perceptual hashing to detect duplicates even with different file sizes or resolutions.
@@ -155,15 +155,15 @@ function renderDuplicatesView() {
                 
                 <!-- Feature Pills -->
                 <div class="flex flex-wrap justify-center gap-3">
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400">
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink/5 border border-ink/10 text-xs text-gray-400">
                         <span class="material-icons text-sm text-cyan-400">movie</span>
                         Videos
                     </div>
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400">
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink/5 border border-ink/10 text-xs text-gray-400">
                         <span class="material-icons text-sm text-pink-400">image</span>
                         Images
                     </div>
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-400">
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-ink/5 border border-ink/10 text-xs text-gray-400">
                         <span class="material-icons text-sm text-purple-400">fingerprint</span>
                         Perceptual Hashing
                     </div>
@@ -193,7 +193,7 @@ function renderDuplicatesView() {
                 <span class="material-icons text-6xl text-gray-600 mb-4">check_circle</span>
                 <h3 class="text-xl font-bold text-gray-400 mb-2">No Duplicates Found</h3>
                 <p class="text-sm text-gray-500 mb-6">Your library is clean! No duplicate media detected.</p>
-                <button onclick="rescanDuplicates()" class="px-5 py-2.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-white text-sm font-medium transition-colors flex items-center gap-2">
+                <button onclick="rescanDuplicates()" class="px-5 py-2.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-text-main text-sm font-medium transition-colors flex items-center gap-2">
                     <span class="material-icons text-[18px]">refresh</span>
                     Rescan for Duplicates
                 </button>
@@ -222,7 +222,7 @@ function renderDuplicatesView() {
                             <span class="material-icons text-3xl text-purple-700 dark:text-purple-400">content_copy</span>
                         </div>
                         <div>
-                            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Duplicate Media</h2>
+                            <h2 class="text-xl font-bold text-gray-900 dark:text-text-main">Duplicate Media</h2>
                             <p class="text-sm text-gray-700 dark:text-gray-400">
                                 Found <span class="text-purple-700 dark:text-purple-400 font-bold">${duplicateData.summary.total_groups}</span> groups
                                 (<span class="text-cyan-700 dark:text-cyan-400">${duplicateData.summary.video_groups}</span> videos,
@@ -237,15 +237,15 @@ function renderDuplicatesView() {
                             <div class="text-xs text-gray-600 dark:text-gray-500 uppercase tracking-wider">Potential Savings</div>
                         </div>
                         ${nextBatchButton}
-                        <button onclick="deleteAllDuplicates()" class="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
+                        <button onclick="deleteAllDuplicates()" class="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 hover:text-text-main text-sm font-medium transition-colors flex items-center gap-2">
                             <span class="material-icons text-[18px]">delete_sweep</span>
                             Delete All Duplicates
                         </button>
-                        <button onclick="openDuplicateChecker()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-400 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
+                        <button onclick="openDuplicateChecker()" class="px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-400 hover:text-text-main text-sm font-medium transition-colors flex items-center gap-2">
                             <span class="material-icons text-[18px]">fullscreen</span>
                             Fullscreen Mode
                         </button>
-                        <button onclick="rescanDuplicates()" class="px-4 py-2 rounded-lg bg-purple-300 dark:bg-purple-500/20 hover:bg-purple-400 dark:hover:bg-purple-500/30 border border-purple-400 dark:border-purple-500/40 text-purple-900 dark:text-white text-sm font-medium transition-colors flex items-center gap-2">
+                        <button onclick="rescanDuplicates()" class="px-4 py-2 rounded-lg bg-purple-300 dark:bg-purple-500/20 hover:bg-purple-400 dark:hover:bg-purple-500/30 border border-purple-400 dark:border-purple-500/40 text-purple-900 dark:text-text-main text-sm font-medium transition-colors flex items-center gap-2">
                             <span class="material-icons text-[18px]">refresh</span>
                             Rescan
                         </button>
@@ -261,9 +261,9 @@ function renderDuplicatesView() {
         const color = isVideo ? 'cyan' : 'pink';
 
         html += `
-                <div class="col-span-full bg-arcade-bg dark:bg-[#14141c] rounded-xl border border-black/8 dark:border-white/5 hover:border-${color}-500/30 overflow-hidden mb-4 transition-all">
+                <div class="col-span-full bg-arcade-bg dark:bg-[#14141c] rounded-xl border border-black/8 dark:border-ink/5 hover:border-${color}-500/30 overflow-hidden mb-4 transition-all">
                     <!-- Group Header -->
-                    <div class="p-4 border-b border-black/8 dark:border-white/5 flex items-center justify-between flex-wrap gap-2 bg-black/[0.02] dark:bg-white/[0.02]">
+                    <div class="p-4 border-b border-black/8 dark:border-ink/5 flex items-center justify-between flex-wrap gap-2 bg-black/[0.02] dark:bg-ink/[0.02]">
                         <div class="flex items-center gap-3">
                             <span class="material-icons text-${color}-400">${icon}</span>
                             <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">
@@ -274,7 +274,7 @@ function renderDuplicatesView() {
                             <span class="text-sm font-mono text-green-400">
                                 +${group.potential_savings_mb.toFixed(0)} MB
                             </span>
-                            <span class="text-xs text-gray-500 px-2 py-1 rounded bg-white/5">
+                            <span class="text-xs text-gray-500 px-2 py-1 rounded bg-ink/5">
                                 ${Math.round(group.confidence * 100)}% match
                             </span>
                         </div>
@@ -286,7 +286,7 @@ function renderDuplicatesView() {
             const isKeep = file.path === group.recommended_keep;
             const thumbSrc = file.thumb ? `/thumbnails/${file.thumb}` : '/static/placeholder.png';
             return `
-                                <div class="relative rounded-lg border ${isKeep ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 bg-white/[0.02]'} overflow-hidden flex flex-col">
+                                <div class="relative rounded-lg border ${isKeep ? 'border-green-500/50 bg-green-500/5' : 'border-ink/10 bg-ink/[0.02]'} overflow-hidden flex flex-col">
                                     ${isKeep ? `
                                         <div class="absolute top-2 right-2 z-10 px-2 py-0.5 rounded text-[10px] font-bold bg-green-500 text-black uppercase tracking-wider">
                                             Keep
@@ -311,16 +311,16 @@ function renderDuplicatesView() {
                                         </div>
                                         
                                         <div class="flex items-center gap-2 text-[10px] text-gray-400 font-mono flex-wrap">
-                                            <span class="bg-white/5 px-1.5 py-0.5 rounded">${file.size_mb.toFixed(0)} MB</span>
-                                            ${file.width && file.height ? `<span class="bg-white/5 px-1.5 py-0.5 rounded">${file.width}×${file.height}</span>` : ''}
-                                            ${file.bitrate_mbps ? `<span class="bg-white/5 px-1.5 py-0.5 rounded">${file.bitrate_mbps.toFixed(1)} Mbps</span>` : ''}
+                                            <span class="bg-ink/5 px-1.5 py-0.5 rounded">${file.size_mb.toFixed(0)} MB</span>
+                                            ${file.width && file.height ? `<span class="bg-ink/5 px-1.5 py-0.5 rounded">${file.width}×${file.height}</span>` : ''}
+                                            ${file.bitrate_mbps ? `<span class="bg-ink/5 px-1.5 py-0.5 rounded">${file.bitrate_mbps.toFixed(1)} Mbps</span>` : ''}
                                             <span class="ml-auto bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Q: ${file.quality_score.toFixed(0)}</span>
                                         </div>
                                         
                                         ${window.IS_LOCAL_ACCESS ? `
                                         <!-- Reveal in Finder Button (only on local access) -->
                                         <button onclick="revealInFinder('${escapeHtml(file.path.replace(/'/g, "\\'"))}')"
-                                                class="w-full py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10 text-xs transition-all flex items-center justify-center gap-1">
+                                                class="w-full py-1.5 rounded-lg bg-ink/5 text-gray-400 hover:bg-ink/10 hover:text-text-main border border-ink/10 text-xs transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm">folder_open</span>
                                             Reveal in Finder
                                         </button>
@@ -584,12 +584,12 @@ function showDuplicateScanningUI() {
             
             <!-- Status Text -->
             <div class="text-center">
-                <h3 class="text-xl font-bold text-white mb-2" id="scan-status-text">Starting visual analysis...</h3>
+                <h3 class="text-xl font-bold text-text-main mb-2" id="scan-status-text">Starting visual analysis...</h3>
                 <p class="text-sm text-gray-400">This may take a minute for large libraries.</p>
             </div>
             
             <!-- Progress Bar -->
-            <div class="w-full max-w-md bg-white/5 rounded-full h-4 overflow-hidden relative border border-white/5">
+            <div class="w-full max-w-md bg-ink/5 rounded-full h-4 overflow-hidden relative border border-ink/5">
                 <div id="scan-progress-bar" class="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300" style="width: 0%"></div>
             </div>
             <div class="text-xs text-gray-500 font-mono" id="scan-progress-text">0%</div>

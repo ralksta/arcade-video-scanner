@@ -913,7 +913,7 @@ async function loadQueueStatus() {
                 failed: 'bg-red-500/20 text-red-300',
                 cancelled: 'bg-gray-500/20 text-gray-300'
             };
-            return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-white/10 text-gray-400'}">${s}</span>`;
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-ink/10 text-gray-400'}">${s}</span>`;
         };
 
         const timeAgo = (ts) => {
@@ -942,7 +942,7 @@ async function loadQueueStatus() {
             const pct = Math.max(0, Math.min(100, Number(j.progress_pct) || 0));
             const phase = j.phase || j.status;
             return `<div class="min-w-[120px]">
-                        <div class="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <div class="h-1.5 rounded-full bg-ink/10 overflow-hidden">
                             <div class="h-full bg-accent transition-all" style="width: ${pct}%"></div>
                         </div>
                         <div class="text-[10px] text-gray-500 mt-1 truncate">${escapeHtml(phase)} ${Math.round(pct)}%${eta(j.eta_seconds)}</div>
@@ -950,9 +950,9 @@ async function loadQueueStatus() {
         };
 
         tbody.innerHTML = jobs.map(j => `
-            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+            <tr class="border-b border-ink/5 hover:bg-ink/5 transition-colors">
                 <td class="px-4 py-3">${statusBadge(j.status)}</td>
-                <td class="px-4 py-3 text-white text-xs font-mono truncate max-w-[200px]" title="${escapeHtml(j.file_path)}">${escapeHtml(j.file_path.split(/[\\/]/).pop())}</td>
+                <td class="px-4 py-3 text-text-main text-xs font-mono truncate max-w-[200px]" title="${escapeHtml(j.file_path)}">${escapeHtml(j.file_path.split(/[\\/]/).pop())}</td>
                 <td class="px-4 py-3">${progressCell(j)}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">${escapeHtml(j.worker_id || '—')}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">${timeAgo(j.created_at)}</td>

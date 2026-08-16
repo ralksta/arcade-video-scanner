@@ -45,10 +45,10 @@ function _candHeader() {
     const codecBtn = (c, label) => `
         <button onclick="setCandidatesCodec('${c}')"
                 class="px-3 py-1 rounded text-xs font-bold ${candState.codec === c
-                    ? 'bg-arcade-cyan text-black'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'}">${label}</button>`;
+                    ? 'bg-arcade-cyan text-white'
+                    : 'bg-ink/10 text-gray-300 hover:bg-ink/20'}">${label}</button>`;
     return `
-    <div id="candidatesHeader" class="col-span-full p-4 rounded-xl bg-white/5 mb-2">
+    <div id="candidatesHeader" class="col-span-full p-4 rounded-xl bg-ink/5 mb-2">
         <div class="flex flex-wrap items-center gap-4">
             <div>
                 <div class="text-2xl font-bold text-arcade-cyan">~${_fmtGB(s.total_estimated_saved_mb)}</div>
@@ -72,9 +72,9 @@ function _candRow(r, idx) {
     const confColors = { high: 'text-green-400', medium: 'text-yellow-400', low: 'text-gray-400' };
     const confLabel = r.source === 'history' ? 'Historie' : 'Schätzung';
     const thumb = r.thumb ? `<img src="/thumbnails/${r.thumb}" class="w-24 h-14 object-cover rounded" loading="lazy">`
-                          : '<div class="w-24 h-14 rounded bg-white/10"></div>';
+                          : '<div class="w-24 h-14 rounded bg-ink/10"></div>';
     return `
-    <div id="cand-${idx}" class="col-span-full flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10">
+    <div id="cand-${idx}" class="col-span-full flex items-center gap-3 p-2 rounded-lg bg-ink/5 hover:bg-ink/10">
         <input type="checkbox" ${checked} onclick="toggleCandidateSelect(${idx})">
         <div class="cursor-pointer" onclick="openCinema(this)" data-path="${escapeHtml(r.file_path)}">${thumb}</div>
         <div class="min-w-0 flex-1">
@@ -87,7 +87,7 @@ function _candRow(r, idx) {
             <div class="text-[11px] ${confColors[r.confidence] || ''}">${r.estimated_saved_pct}% · ${confLabel}</div>
         </div>
         <button onclick="queueCandidate(${idx})"
-                class="shrink-0 px-3 py-1.5 rounded text-xs font-bold bg-white/10 hover:bg-arcade-cyan/30">
+                class="shrink-0 px-3 py-1.5 rounded text-xs font-bold bg-ink/10 hover:bg-arcade-cyan/30">
             In Queue
         </button>
     </div>`;
