@@ -91,8 +91,8 @@ class TestJsCompleteness:
     def test_store_js_loads_before_engine_js(self):
         """store.js must appear before engine.js in the template (state before logic)."""
         source = TEMPLATE_FILE.read_text(encoding="utf-8")
-        store_pos = source.find("store.js")
-        engine_pos = source.find("engine.js")
+        store_pos = source.find("/static/store.js")
+        engine_pos = source.find("/static/engine.js")
 
         assert store_pos != -1, "store.js not found in template"
         assert engine_pos != -1, "engine.js not found in template"
@@ -104,8 +104,8 @@ class TestJsCompleteness:
     def test_filter_engine_loads_before_cards_js(self):
         """filter_engine.js must appear before cards.js (filterAndSort defined before use)."""
         source = TEMPLATE_FILE.read_text(encoding="utf-8")
-        filter_pos = source.find("filter_engine.js")
-        cards_pos = source.find("cards.js")
+        filter_pos = source.find("/static/filter_engine.js")
+        cards_pos = source.find("/static/cards.js")
 
         if filter_pos == -1 or cards_pos == -1:
             pytest.skip("filter_engine.js or cards.js not in template")

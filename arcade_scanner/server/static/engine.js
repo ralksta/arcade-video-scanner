@@ -18,6 +18,10 @@ const BATCH_SIZE = 40;
  * @param {boolean} [scrollToTop=false] - If true, scrolls viewport to top
  */
 function renderUI(reset, scrollToTop = false) {
+    // Leer-Zustand zuerst: er hängt nur an filteredVideos/Layout und muss auch
+    // dann stimmen, wenn wir gleich in einen der Early-Returns laufen.
+    if (typeof updateEmptyState === 'function') updateEmptyState();
+
     // If in treemap mode, re-render treemap instead
     if (currentLayout === 'treemap') {
         renderTreemap();

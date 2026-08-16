@@ -14,6 +14,13 @@ All notable changes to this project will be documented in this file.
   globalen Kürzel halten sich zurück, während der Nutzer tippt oder Cinema bzw. die
   Duplikat-Prüfung offen ist. Neu: `static/shortcuts.js`.
 
+- **Leer-Zustand im Grid**: 0 Treffer hießen bisher: weiße Fläche, keine
+  Erklärung, kein Weg zurück. Jetzt erklärt das Grid, *warum* nichts da ist —
+  leere Bibliothek (mit Link in die Einstellungen und zum Scan), zu enge Suche
+  (mit „Suche löschen"), zu enge Filter (mit „Filter zurücksetzen"), oder ein
+  noch leerer Vault/Favoriten/Review-Workspace samt Hinweis, wie man dort etwas
+  hineinbekommt. Neu: `static/empty_state.js`.
+
 - **Proxy Streaming**: Every video may have a smaller copy in its own directory
   tree, which is excluded from scans. `/stream` decides per request which file to
   serve — the original on the LAN, the proxy over Tailscale (CGNAT

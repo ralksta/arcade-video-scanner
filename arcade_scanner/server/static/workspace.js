@@ -156,6 +156,10 @@ function updateGridScale(value) {
 function setLayout(layout, skipURLUpdate = false) {
     currentLayout = layout;
 
+    // Treemap und Ordner-Browser rendern nicht über renderUI() — der Leer-Zustand
+    // muss trotzdem verschwinden, wenn wir aus dem Grid dorthin wechseln.
+    if (typeof updateEmptyState === 'function') updateEmptyState();
+
     const grid = document.getElementById('videoGrid');
     const treemap = document.getElementById('treemapContainer');
     const sentinel = document.getElementById('loadingSentinel');

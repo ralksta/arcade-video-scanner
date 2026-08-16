@@ -134,8 +134,8 @@ class TestDashboardTemplateOutput:
 
     def test_store_js_before_engine_js_in_html(self, generated_html):
         """store.js (state management) must be loaded before engine.js."""
-        store_pos = generated_html.find("store.js")
-        engine_pos = generated_html.find("engine.js")
+        store_pos = generated_html.find("/static/store.js")
+        engine_pos = generated_html.find("/static/engine.js")
         assert store_pos != -1, "store.js not in generated HTML"
         assert engine_pos != -1, "engine.js not in generated HTML"
         assert store_pos < engine_pos, (
@@ -144,8 +144,8 @@ class TestDashboardTemplateOutput:
 
     def test_filter_engine_before_cards_in_html(self, generated_html):
         """filter_engine.js must be loaded before cards.js."""
-        filter_pos = generated_html.find("filter_engine.js")
-        cards_pos = generated_html.find("cards.js")
+        filter_pos = generated_html.find("/static/filter_engine.js")
+        cards_pos = generated_html.find("/static/cards.js")
         if filter_pos == -1 or cards_pos == -1:
             pytest.skip("filter_engine.js or cards.js not in HTML")
         assert filter_pos < cards_pos, (

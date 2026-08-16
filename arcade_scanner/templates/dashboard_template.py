@@ -143,6 +143,14 @@ def generate_html_report(results, report_file, server_port=8000):
             <!-- Treemap Container -->
             <div id="treemapContainer" class="hidden h-[70vh] w-full rounded-xl overflow-hidden border border-ink/10 shadow-2xl"></div>
 
+            <!-- Empty State (von engine.js befüllt, wenn 0 Treffer) -->
+            <div id="emptyState" class="hidden flex-col items-center justify-center text-center py-20 px-6">
+                <span id="emptyStateIcon" class="material-icons text-[44px] text-text-muted opacity-60 mb-3">search_off</span>
+                <h2 id="emptyStateTitle" class="text-[16px] font-semibold text-text-main mb-1.5">Nichts gefunden</h2>
+                <p id="emptyStateHint" class="text-[13px] text-text-muted max-w-md leading-6"></p>
+                <div id="emptyStateActions" class="flex flex-wrap items-center justify-center gap-2 mt-5"></div>
+            </div>
+
             <!-- Loading Spinner -->
             <div id="loadingSentinel" class="h-24 flex items-center justify-center opacity-0 transition-opacity">
                 <span class="material-icons animate-spin text-arcade-cyan text-3xl">refresh</span>
@@ -214,6 +222,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/collections.js?v={int(time.time())}"></script>
     <script src="/static/context_menu.js?v={int(time.time())}"></script>
     <script src="/static/shortcuts.js?v={int(time.time())}"></script>
+    <script src="/static/empty_state.js?v={int(time.time())}"></script>
     """
 
     # Combine content using Theme-aware Base Layout
