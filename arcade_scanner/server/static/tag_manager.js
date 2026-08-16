@@ -34,28 +34,28 @@ function createBatchTagModal() {
     modal.className = 'fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4';
     modal.style.display = 'none';
     modal.innerHTML = `
-        <div class="w-full max-w-md bg-[#1a1a1e] rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+        <div class="w-full max-w-md bg-[#1a1a1e] rounded-2xl shadow-2xl border border-ink/10 overflow-hidden">
             <!-- Header -->
-            <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+            <div class="px-5 py-4 border-b border-ink/5 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <span class="material-icons text-purple-400 text-xl">sell</span>
                     <div>
-                        <h2 class="font-semibold text-white">Batch Tagging</h2>
+                        <h2 class="font-semibold text-text-main">Batch Tagging</h2>
                         <p class="text-xs text-gray-500">Editing <strong id="batchTagCount" class="text-purple-400">0</strong> items</p>
                     </div>
                 </div>
-                <button onclick="closeBatchTagModal()" class="text-gray-500 hover:text-white p-1 rounded hover:bg-white/10 transition-colors">
+                <button onclick="closeBatchTagModal()" class="text-gray-500 hover:text-text-main p-1 rounded hover:bg-ink/10 transition-colors">
                     <span class="material-icons">close</span>
                 </button>
             </div>
             
             <!-- Search Bar -->
-            <div class="px-5 py-3 border-b border-white/5">
+            <div class="px-5 py-3 border-b border-ink/5">
                 <div class="relative">
                     <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg">search</span>
                     <input type="text" 
                            id="batchTagSearch" 
-                           class="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-purple-500 focus:outline-none" 
+                           class="w-full pl-10 pr-4 py-2.5 bg-ink/5 border border-ink/10 rounded-lg text-text-main text-sm focus:border-purple-500 focus:outline-none" 
                            placeholder="Search tags..." 
                            oninput="handleBatchTagSearch(this.value)"
                            onkeydown="handleBatchTagKeyNav(event)">
@@ -68,12 +68,12 @@ function createBatchTagModal() {
             </div>
             
             <!-- Add New Tag -->
-            <div class="px-5 py-3 border-t border-white/5 bg-black/20 flex gap-2">
+            <div class="px-5 py-3 border-t border-ink/5 bg-ink/5 flex gap-2">
                 <div class="relative flex-1">
                     <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg">add</span>
                     <input type="text" 
                            id="batchTagNewInput" 
-                           class="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:border-purple-500 focus:outline-none" 
+                           class="w-full pl-10 pr-4 py-2 bg-ink/5 border border-ink/10 rounded-lg text-text-main text-sm focus:border-purple-500 focus:outline-none" 
                            placeholder="New tag name..."
                            onkeydown="handleBatchTagNewKeydown(event)">
                 </div>
@@ -83,8 +83,8 @@ function createBatchTagModal() {
             </div>
             
             <!-- Footer -->
-            <div class="px-5 py-4 border-t border-white/5 flex gap-3">
-                <button onclick="closeBatchTagModal()" class="flex-1 py-2.5 bg-white/5 text-gray-400 border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 hover:text-white transition-colors">
+            <div class="px-5 py-4 border-t border-ink/5 flex gap-3">
+                <button onclick="closeBatchTagModal()" class="flex-1 py-2.5 bg-ink/5 text-gray-400 border border-ink/10 rounded-lg text-sm font-medium hover:bg-ink/10 hover:text-text-main transition-colors">
                     Cancel
                 </button>
                 <button onclick="applyBatchTags()" class="flex-1 py-2.5 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-400 transition-colors flex items-center justify-center gap-2">
@@ -253,15 +253,15 @@ function renderBatchTagOptions() {
             textColor = 'text-yellow-400';
         } else {
             checkIcon = 'check_box_outline_blank';
-            bgColor = 'bg-white/5';
-            borderColor = 'border-white/10';
+            bgColor = 'bg-ink/5';
+            borderColor = 'border-ink/10';
             textColor = 'text-gray-400';
         }
 
         const pendingGlow = hasAction ? 'shadow-[0_0_12px_rgba(168,85,247,0.4)]' : '';
 
         return `
-            <button class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm font-medium ${bgColor} ${borderColor} ${textColor} ${pendingGlow} hover:bg-white/10"
+            <button class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm font-medium ${bgColor} ${borderColor} ${textColor} ${pendingGlow} hover:bg-ink/10"
                     onclick="toggleBatchTagOption('${tag.name}')"
                     onkeydown="handleBatchTagChipKeydown(event, '${tag.name}')"
                     tabindex="${index === batchTagFocusIndex ? '0' : '-1'}">
@@ -575,13 +575,13 @@ function renderExistingTagsList() {
     container.innerHTML = tags.map(t => {
         const shortcutValue = t.shortcut ? t.shortcut.toUpperCase() : '';
         const shortcutDisplay = shortcutValue
-            ? `<span class="text-xs px-1.5 py-0.5 rounded bg-white/10 text-gray-400 cursor-pointer hover:bg-white/20" onclick="editTagShortcut('${t.name}', '${shortcutValue}')" title="Click to edit">(${shortcutValue})</span>`
+            ? `<span class="text-xs px-1.5 py-0.5 rounded bg-ink/10 text-gray-400 cursor-pointer hover:bg-ink/20" onclick="editTagShortcut('${t.name}', '${shortcutValue}')" title="Click to edit">(${shortcutValue})</span>`
             : `<span class="text-xs text-gray-600 cursor-pointer hover:text-gray-400" onclick="editTagShortcut('${t.name}', '')" title="Click to add shortcut">+ key</span>`;
         return `
-        <div class="flex items-center justify-between py-2 px-3 bg-black/30 rounded-lg border border-white/5 group" id="tag-row-${t.name}">
+        <div class="flex items-center justify-between py-2 px-3 bg-ink/10 rounded-lg border border-ink/5 group" id="tag-row-${t.name}">
             <div class="flex items-center gap-3">
                 <span class="w-4 h-4 rounded-full" style="background-color: ${t.color}"></span>
-                <span class="text-white text-sm">${t.name}</span>
+                <span class="text-text-main text-sm">${t.name}</span>
                 ${shortcutDisplay}
             </div>
             <button onclick="deleteTag('${t.name}')" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">

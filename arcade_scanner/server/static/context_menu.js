@@ -17,26 +17,26 @@ function _buildContextMenu() {
     _cmEl.innerHTML = `
         <div id="arcadeContextMenuInner" class="
             fixed z-[9900] min-w-[200px] py-1.5 rounded-xl
-            bg-[#12012a]/95 border border-white/10
+            bg-[#12012a]/95 border border-ink/10
             backdrop-blur-xl shadow-2xl shadow-black/60
             text-sm font-medium
             transition-all duration-150
             opacity-0 scale-95 pointer-events-none
         ">
-            <div class="px-3 py-1 text-[10px] uppercase tracking-widest text-gray-500 font-bold border-b border-white/5 mb-1" id="ctxFileName">—</div>
-            <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-gray-200 hover:bg-white/8 hover:text-white transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-cinema">
+            <div class="px-3 py-1 text-[10px] uppercase tracking-widest text-gray-500 font-bold border-b border-ink/5 mb-1" id="ctxFileName">—</div>
+            <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-gray-200 hover:bg-ink/8 hover:text-text-main transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-cinema">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 In Cinema öffnen
             </button>
-            <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-gray-200 hover:bg-white/8 hover:text-white transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-favorite">
+            <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-gray-200 hover:bg-ink/8 hover:text-text-main transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-favorite">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 <span id="ctx-fav-label">Favorit</span>
             </button>
-            <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-gray-200 hover:bg-white/8 hover:text-white transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-locate">
+            <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-gray-200 hover:bg-ink/8 hover:text-text-main transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-locate">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 In Finder zeigen
             </button>
-            <div class="border-t border-white/5 my-1"></div>
+            <div class="border-t border-ink/5 my-1"></div>
             <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-arcade-cyan hover:bg-arcade-cyan/10 transition-colors cursor-pointer rounded-lg mx-1 cinema-action-btn-ctx" style="width:calc(100% - 8px)" id="ctx-optimize">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fill-opacity="0.2"/><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 Optimieren
@@ -45,7 +45,7 @@ function _buildContextMenu() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M9 12h3v2.5a2.5 2.5 0 0 1-5 0v-5a2.5 2.5 0 0 1 5 0"/><line x1="14" y1="8" x2="14" y2="16"/><line x1="17" y1="8" x2="19" y2="8"/><line x1="17" y1="12" x2="19" y2="12"/></svg>
                 Als GIF exportieren
             </button>
-            <div class="border-t border-white/5 my-1"></div>
+            <div class="border-t border-ink/5 my-1"></div>
             <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-vault">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
                 Vault
@@ -156,29 +156,29 @@ function _buildCommandPalette() {
             bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200">
             <div id="cmdPanel" class="
                 w-full max-w-xl mx-4
-                bg-[#0d0120]/95 border border-white/10
+                bg-[#0d0120]/95 border border-ink/10
                 rounded-2xl shadow-2xl shadow-black/80
                 backdrop-blur-2xl
                 overflow-hidden
                 transform scale-95 transition-transform duration-200
             ">
                 <!-- Search input -->
-                <div class="flex items-center gap-3 px-4 py-3.5 border-b border-white/8">
+                <div class="flex items-center gap-3 px-4 py-3.5 border-b border-ink/8">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 shrink-0">
                         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </svg>
                     <input id="cmdInput" type="text" placeholder="Suchen oder Aktion eingeben…"
-                        class="flex-1 bg-transparent border-0 outline-none text-white text-base placeholder-gray-600 font-medium"
+                        class="flex-1 bg-transparent border-0 outline-none text-text-main text-base placeholder-gray-600 font-medium"
                         autocomplete="off" spellcheck="false">
-                    <kbd class="text-[10px] text-gray-600 border border-white/10 rounded px-1.5 py-0.5 font-mono">ESC</kbd>
+                    <kbd class="text-[10px] text-gray-600 border border-ink/10 rounded px-1.5 py-0.5 font-mono">ESC</kbd>
                 </div>
                 <!-- Results -->
                 <div id="cmdResults" class="max-h-[380px] overflow-y-auto py-2"></div>
                 <!-- Footer -->
-                <div class="flex items-center gap-4 px-4 py-2.5 border-t border-white/5 text-[11px] text-gray-600">
-                    <span><kbd class="border border-white/10 rounded px-1 py-0.5 font-mono">↑↓</kbd> Navigieren</span>
-                    <span><kbd class="border border-white/10 rounded px-1 py-0.5 font-mono">↵</kbd> Auswählen</span>
-                    <span><kbd class="border border-white/10 rounded px-1 py-0.5 font-mono">ESC</kbd> Schließen</span>
+                <div class="flex items-center gap-4 px-4 py-2.5 border-t border-ink/5 text-[11px] text-gray-600">
+                    <span><kbd class="border border-ink/10 rounded px-1 py-0.5 font-mono">↑↓</kbd> Navigieren</span>
+                    <span><kbd class="border border-ink/10 rounded px-1 py-0.5 font-mono">↵</kbd> Auswählen</span>
+                    <span><kbd class="border border-ink/10 rounded px-1 py-0.5 font-mono">ESC</kbd> Schließen</span>
                 </div>
             </div>
         </div>
@@ -229,12 +229,12 @@ function _renderCmdResults() {
             const name = v.FileName || '—';
             const size = v.Size_MB ? `${v.Size_MB.toFixed(0)} MB` : '';
             html += `
-            <button class="cmd-result w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/6 transition-colors cursor-pointer group" data-idx="${i}" data-type="video" data-id="${v.id || v.FilePath}">
+            <button class="cmd-result w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-ink/6 transition-colors cursor-pointer group" data-idx="${i}" data-type="video" data-id="${v.id || v.FilePath}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 shrink-0 group-hover:text-arcade-cyan transition-colors">
                     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                 </svg>
                 <div class="flex-1 min-w-0">
-                    <div class="text-gray-200 text-sm font-medium truncate group-hover:text-white">${name}</div>
+                    <div class="text-gray-200 text-sm font-medium truncate group-hover:text-text-main">${name}</div>
                     <div class="text-gray-600 text-[11px] truncate">${v.DirectoryPath || ''}</div>
                 </div>
                 <span class="text-[11px] text-gray-600 shrink-0">${size}</span>
@@ -243,12 +243,12 @@ function _renderCmdResults() {
     }
 
     if (actions.length) {
-        html += `<div class="px-3 py-1 text-[10px] uppercase tracking-widest text-gray-600 font-bold ${videos.length ? 'mt-1 border-t border-white/5 pt-2' : ''}">Aktionen</div>`;
+        html += `<div class="px-3 py-1 text-[10px] uppercase tracking-widest text-gray-600 font-bold ${videos.length ? 'mt-1 border-t border-ink/5 pt-2' : ''}">Aktionen</div>`;
         actions.forEach((a, i) => {
             html += `
-            <button class="cmd-result w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/6 transition-colors cursor-pointer group" data-idx="${videos.length + i}" data-type="action" data-action-idx="${CMD_ACTIONS.indexOf(a)}">
+            <button class="cmd-result w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-ink/6 transition-colors cursor-pointer group" data-idx="${videos.length + i}" data-type="action" data-action-idx="${CMD_ACTIONS.indexOf(a)}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500 shrink-0 group-hover:text-arcade-cyan transition-colors">${a.icon}</svg>
-                <span class="text-gray-200 text-sm font-medium group-hover:text-white">${a.label}</span>
+                <span class="text-gray-200 text-sm font-medium group-hover:text-text-main">${a.label}</span>
             </button>`;
         });
     }
@@ -292,7 +292,7 @@ function _cmdKeyNav(e) {
         if (_cmdSelectedIdx >= 0) _executeCmdResult(results[_cmdSelectedIdx]);
         return;
     }
-    results.forEach((r, i) => r.classList.toggle('bg-white/6', i === _cmdSelectedIdx));
+    results.forEach((r, i) => r.classList.toggle('bg-ink/6', i === _cmdSelectedIdx));
     if (_cmdSelectedIdx >= 0) results[_cmdSelectedIdx].scrollIntoView({ block: 'nearest' });
 }
 

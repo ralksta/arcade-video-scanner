@@ -393,6 +393,11 @@ function loadFromURL() {
     if (params.get('folderPath')) {
         folderBrowserState.currentPath = decodeURIComponent(params.get('folderPath'));
         folderBrowserPath = folderBrowserState.currentPath;
+    } else {
+        // Kein folderPath in der URL = Wurzelebene. Ohne dieses Reset bleibt beim
+        // Zurück-Navigieren der alte Pfad stehen.
+        folderBrowserState.currentPath = null;
+        folderBrowserPath = null;
     }
 
     // Check deep links

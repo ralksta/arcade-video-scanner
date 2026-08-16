@@ -549,7 +549,7 @@ function updateCinemaInfo() {
             </div>
             <div class="info-row">
                 <span class="info-label">Status</span>
-                <span class="info-value" style="color: ${v.Status === 'SOURCE' ? '#A855F7' : (v.Status === 'HIGH' ? '#E3A857' : '#568203')}">${v.Status}</span>
+                <span class="info-value" style="color: ${v.Status === 'SOURCE' ? 'var(--ds-av1)' : (v.Status === 'HIGH' ? 'var(--ds-bitrate)' : 'var(--ds-optimized)')}">${v.Status}</span>
             </div>
         `;
     } else {
@@ -596,7 +596,7 @@ function updateCinemaInfo() {
             </div>
             <div class="info-row">
                 <span class="info-label">Status</span>
-                <span class="info-value" style="color: ${v.Status === 'SOURCE' ? '#A855F7' : (v.Status === 'HIGH' ? '#E3A857' : '#568203')}">${v.Status}</span>
+                <span class="info-value" style="color: ${v.Status === 'SOURCE' ? 'var(--ds-av1)' : (v.Status === 'HIGH' ? 'var(--ds-bitrate)' : 'var(--ds-optimized)')}">${v.Status}</span>
             </div>
         `;
     }
@@ -644,10 +644,10 @@ function updateCinemaTags() {
                 const tagData = availableTags.find(t => t.name === tagName);
                 const color = tagData?.color || '#888';
                 return `
-                 <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-white/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none">
+                 <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-ink/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none">
                      <span class="w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]" style="background-color: ${color}; --color: ${color}"></span>
                      <span class="text-xs text-white font-semibold tracking-wide drop-shadow-md">${tagName}</span>
-                     <button onclick="event.stopPropagation(); toggleCinemaTag('${tagName}')" class="ml-1 text-white/40 hover:text-red-400 hover:bg-white/10 rounded-full p-0.5 transition-colors" title="Remove Tag">
+                     <button onclick="event.stopPropagation(); toggleCinemaTag('${tagName}')" class="ml-1 text-white/40 hover:text-red-400 hover:bg-ink/10 rounded-full p-0.5 transition-colors" title="Remove Tag">
                          <span class="material-icons text-[14px] font-bold">close</span>
                      </button>
                  </div>
@@ -657,7 +657,7 @@ function updateCinemaTags() {
     }
 
     if (availableTags.length === 0) {
-        container.innerHTML = '<span class="text-xs text-gray-600 italic">No tags available</span>';
+        container.innerHTML = '<span class="text-xs text-white/60 italic">No tags available</span>';
         return;
     }
 
@@ -731,7 +731,7 @@ function showCinemaToast(message) {
 
     toast = document.createElement('div');
     toast.id = 'cinemaToast';
-    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 text-white rounded-lg backdrop-blur border border-white/20 text-sm font-medium z-[10001] animate-fade-in';
+    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 text-white rounded-lg backdrop-blur border border-ink/20 text-sm font-medium z-[10001] animate-fade-in';
     toast.textContent = message;
     document.body.appendChild(toast);
 

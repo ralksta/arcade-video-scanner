@@ -253,7 +253,7 @@ function renderCollectionTagsList() {
     container.innerHTML = availableTags.map(tag => `
         <button class="collection-filter-chip ${collectionCriteria.tags.includes(tag.name) ? 'active' : ''}"
                 onclick="toggleCollectionTag('${tag.name}')"
-                style="border-color: ${collectionCriteria.tags.includes(tag.name) ? tag.color : 'rgba(255,255,255,0.1)'}">
+                style="border-color: ${collectionCriteria.tags.includes(tag.name) ? tag.color : 'rgb(var(--ds-text-rgb) / 0.12)'}">
             <span class="tag-dot" style="background-color: ${tag.color}; width: 6px; height: 6px; border-radius: 50%; display: inline-block;"></span>
             ${tag.name}
         </button>
@@ -1012,7 +1012,7 @@ function renderCollections() {
         html += `
             <div class="category-group mb-1">
                 <button onclick="toggleCategoryCollapse('${category}')"
-                        class="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-gray-300 transition-colors rounded hover:bg-white/5">
+                        class="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-gray-300 transition-colors rounded hover:bg-ink/5">
                     <span class="material-icons text-[14px] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}"
                           id="cat-arrow-${safeKey}">expand_more</span>
                     <span class="flex-1 text-left">${category}</span>
@@ -1039,7 +1039,7 @@ function renderCollectionItem(col) {
     const isActive = col.id === activeCollectionId;
 
     return `
-        <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 border border-transparent'}"
+        <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-ink/5 border border-transparent'}"
                 onclick="applyCollection('${col.id}')"
                 ondblclick="openCollectionModal('${col.id}')">
             <span class="material-icons text-[18px]" style="color: ${col.color}">${col.icon}</span>
@@ -1051,7 +1051,7 @@ function renderCollectionItem(col) {
                 <span class="material-icons text-[14px]">edit</span>
             </button>
 
-            <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-black/40 text-arcade-cyan border border-arcade-cyan/30' : 'bg-black/5 dark:bg-white/5 text-gray-400 dark:text-gray-500'} font-mono">${count}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-ink/5 text-arcade-cyan border border-arcade-cyan/30' : 'bg-ink/[0.03] dark:bg-ink/5 text-gray-400 dark:text-gray-500'} font-mono">${count}</span>
         </div>
     `;
 }

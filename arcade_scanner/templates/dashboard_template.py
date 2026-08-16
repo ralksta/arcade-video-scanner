@@ -127,11 +127,11 @@ def generate_html_report(results, report_file, server_port=8000):
                 <!-- Skeleton cards shown while data loads -->
                 {''.join(['''
                 <div class="group relative w-full bg-card rounded-ds-md overflow-hidden border border-line/60 flex flex-col skeleton-card" aria-hidden="true">
-                    <div class="aspect-video bg-white/5 animate-pulse"></div>
+                    <div class="aspect-video bg-ink/5 animate-pulse"></div>
                     <div class="px-[11px] py-2.5 flex flex-col gap-2">
-                        <div class="h-3 bg-white/5 animate-pulse rounded w-3/4"></div>
-                        <div class="h-2 bg-white/5 animate-pulse rounded w-1/2"></div>
-                        <div class="h-[3px] bg-white/5 animate-pulse rounded w-full mt-2"></div>
+                        <div class="h-3 bg-ink/5 animate-pulse rounded w-3/4"></div>
+                        <div class="h-2 bg-ink/5 animate-pulse rounded w-1/2"></div>
+                        <div class="h-[3px] bg-ink/5 animate-pulse rounded w-full mt-2"></div>
                     </div>
                 </div>''' for _ in range(8)])}
             </div>
@@ -140,7 +140,7 @@ def generate_html_report(results, report_file, server_port=8000):
             {LIST_VIEW_COMPONENT}
 
             <!-- Treemap Container -->
-            <div id="treemapContainer" class="hidden h-[70vh] w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl"></div>
+            <div id="treemapContainer" class="hidden h-[70vh] w-full rounded-xl overflow-hidden border border-ink/10 shadow-2xl"></div>
 
             <!-- Loading Spinner -->
             <div id="loadingSentinel" class="h-24 flex items-center justify-center opacity-0 transition-opacity">

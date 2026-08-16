@@ -195,13 +195,13 @@ def render_navigation(theme: BaseTheme) -> str:
         <span class="material-icons text-[22px]">star</span>
         <span class="text-[9px] font-medium">Favs</span>
     </button>
+    <button onclick="setLayout('folderbrowser')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
+        <span class="material-icons text-[22px]">folder</span>
+        <span class="text-[9px] font-medium">Ordner</span>
+    </button>
     <button onclick="setWorkspaceMode('optimized')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
         <span class="material-icons text-[22px]">offline_bolt</span>
         <span class="text-[9px] font-medium">Review</span>
-    </button>
-     <button onclick="setWorkspaceMode('vault')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
-        <span class="material-icons text-[22px]">archive</span>
-        <span class="text-[9px] font-medium">Vault</span>
     </button>
     <button onclick="document.getElementById('mobileSearchInput').focus()" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
         <span class="material-icons text-[22px]">search</span>

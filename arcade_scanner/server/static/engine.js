@@ -169,21 +169,21 @@ function createComparisonCard(pair) {
                 <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
             ${window.IS_LOCAL_ACCESS ? `
-            <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
+            <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
             ` : ''}
         </div>
 
         <!-- Stats Center -->
-        <div class="w-full md:w-32 flex flex-col items-center justify-center gap-1 border-y md:border-y-0 md:border-x border-white/5 py-4 md:py-0 bg-white/[0.02] rounded-lg md:bg-transparent">
+        <div class="w-full md:w-32 flex flex-col items-center justify-center gap-1 border-y md:border-y-0 md:border-x border-ink/5 py-4 md:py-0 bg-ink/[0.02] rounded-lg md:bg-transparent">
              <div class="text-2xl font-bold ${isSmaller ? 'text-green-400 drop-shadow-[0_0_8px_rgba(76,217,100,0.4)]' : 'text-red-500'} font-mono tracking-tighter">${diffPct.toFixed(1)}%</div>
              <div class="text-xs text-gray-500 font-mono mb-2">${diffMB.toFixed(1)} MB</div>
              
              <button class="ds-btn ds-btn-primary w-full mt-1" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')">
                 <span class="material-icons text-[14px]">check</span> KEEP
              </button>
-             <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-white border border-white/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
+             <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-text-main border border-ink/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
                 <span class="material-icons text-[14px]">delete</span> DISCARD
              </button>
         </div>
@@ -208,7 +208,7 @@ function createComparisonCard(pair) {
                 <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
              ${window.IS_LOCAL_ACCESS ? `
-             <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
+             <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
                 <span class="material-icons text-[12px]">folder_open</span> Reveal
             </button>
             ` : ''}
@@ -281,7 +281,7 @@ function discardOptimized(opt) {
  * @returns {string} HTML für den Button
  */
 function _optimizeButton(v) {
-    const cls = 'w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center ' +
+    const cls = 'w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center ' +
                 'justify-center backdrop-blur text-white transition-all transform hover:scale-110';
 
     if (window.IS_DOCKER) {
@@ -352,7 +352,7 @@ function createVideoCard(v) {
              
              <!-- Corner Checkbox -->
              <div class="absolute top-1.5 left-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                <input type="checkbox" class="w-4 h-4 rounded-[4px] border-white/30 bg-black/50 text-accent focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
+                <input type="checkbox" class="w-4 h-4 rounded-[4px] border-ink/30 bg-black/50 text-accent focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
              </div>
 
              <button class="favorite-btn absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-full bg-black/45 flex items-center justify-center transition-all ${v.favorite ? 'text-bitrate active' : 'text-white/70 opacity-0 group-hover:opacity-100'}"
@@ -374,14 +374,14 @@ function createVideoCard(v) {
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
                  ${window.IS_LOCAL_ACCESS ? `
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
+                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
                     <span class="material-icons">folder_open</span>
                  </button>
                  ` : ''}
                  <button class="w-11 h-11 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] flex items-center justify-center backdrop-blur transition-colors" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
                     <span class="material-icons text-3xl">play_arrow</span>
                  </button>
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
+                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
                     <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
                   ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? _optimizeButton(v) : ''}
@@ -898,10 +898,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadAvailableTags();
     }
 
-    // Handle URL Back/Forward
-    window.onpopstate = (event) => {
-        loadFromURL();
-    };
+    // Back/Forward wird von genau EINEM Handler bedient — dem
+    // addEventListener('popstate', ...) weiter oben in dieser Datei. Ein zweiter
+    // Handler hier hat den wiederhergestellten State direkt wieder überschrieben.
 
     // --- CATEGORY MANAGEMENT FUNCTIONS ---
     function getAvailableCategories() {
@@ -1182,7 +1181,7 @@ function loadSetupDirectories() {
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <span class="material-icons text-arcade-cyan">${dir.is_root ? 'folder_open' : 'folder'}</span>
-                            <div><div class="text-white font-medium">${displayName}</div>
+                            <div><div class="text-text-main font-medium">${displayName}</div>
                             <div class="text-xs text-gray-500">${sizeGB} GB • ${dir.file_count.toLocaleString()} files</div></div>
                         </div>
                         <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan">check_circle</span></div>
