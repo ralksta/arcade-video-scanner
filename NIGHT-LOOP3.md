@@ -47,7 +47,7 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
       - [x] Rückmeldungen vereinheitlicht: 30 `alert()` → Toasts; dabei
             Toast-z-index unter Optimizer-/GIF-Panel entdeckt und behoben
       - [x] ROADMAP-Haken für „Customizable grid layout" nachgezogen
-- [ ] **Loop B — Performance** (Messung an der echten DB: 8788 Einträge, 4,95 MB JSON)
+- [x] **Loop B — Performance** — ausgereizt (Messung an der echten DB: 8788 Einträge, 4,95 MB JSON)
       - [x] `/api/videos`-Antwort-Cache: ~105 ms CPU/Request gespart
       - Messwerte: `SELECT *` 40 ms · `_row_to_api_dict` 68 ms · `json.dumps` 42 ms ·
         `gzip(6)` 54 ms (→ 0,56 MB) · Filterschleife 10,5 ms
@@ -56,7 +56,11 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
       - [x] Caching-Header geprüft: Thumbnails (`max-age=604800` + 304) und
             Static (`no-cache` + 304 + gzip) waren korrekt — der Fehler lag im
             Cache-Buster `?v={int(time.time())}`, der alles entwertete
-      - [ ] HTML-Dump (`index.html`, 204 KB) — wird bei jeder Änderung neu erzeugt
+      - [x] HTML-Dump: toter `clean_results`-Aufbau entfernt (8788 Dict-Kopien
+            pro Neugenerierung, Ergebnis verworfen) und dabei ein Leck gefunden —
+            `FOLDERS_DATA` trug die Ordnerpfade aller Nutzer in den gemeinsamen
+            Dump. CLAUDE.md beschrieb außerdem einen Trennungs-Mechanismus, den
+            es so nicht mehr gab; korrigiert
       - [ ] Filterschleife: `os.path.abspath` pro Eintrag kostet 8,8 der 10,5 ms.
             Nach dem Antwort-Cache nur noch bei Cache-Miss relevant — bewusst
             zurückgestellt, weil eine Semantikänderung (Normalisierung) riskanter
@@ -71,6 +75,13 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 8 (Loop B, HTML-Dump)** — Der interessante Teil war nicht die
+  Performance. Beim Schreiben eines Tests für die Zusage „der Dump enthält keine
+  Nutzerdaten" fiel auf, dass die Zusage nicht galt: `FOLDERS_DATA` enthielt die
+  Ordner aller Nutzer. Lehre: Behauptungen aus der Doku als Test formulieren —
+  hier hat genau das den Fehler gefunden, nicht das Lesen des Codes.
+  Damit ist Loop B ausgereizt.
 
 - **Iteration 7 (Loop B, Indizes)** — 5 von 8 Indizes auf `media` waren reine
   Schreiblast. Lehre: der Kommentar über ihnen („common filter/sort queries")

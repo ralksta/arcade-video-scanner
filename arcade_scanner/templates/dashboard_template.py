@@ -100,30 +100,21 @@ def asset_url(filename: str) -> str:
 def generate_html_report(results, report_file, server_port=8000):
     total_mb = sum(r["Size_MB"] for r in results)
 
-    # Aggregate Folder Data
-    folders_data = {}
-    for r in results:
-        fdir = os.path.dirname(r["FilePath"])
-        if fdir not in folders_data:
-            folders_data[fdir] = {"count": 0, "size_mb": 0}
-        folders_data[fdir]["count"] += 1
-        folders_data[fdir]["size_mb"] += r["Size_MB"]
+    # Keine Ordner-Aggregation mehr im Dump: Diese Datei wird EINMAL erzeugt und
+    # an jeden Nutzer ausgeliefert. Die Aggregation enthielt die Ordnerpfade der
+    # gesamten Bibliothek — also auch die Verzeichnisse anderer Nutzer, obwohl
+    # /api/videos anschließend sauber nach Scan-Zielen filtert. Der Ordner-Baum
+    # baut sich jetzt clientseitig aus ALL_VIDEOS auf (buildFoldersData() in
+    # folder_browser.js), das bereits pro Nutzer gefiltert ist.
 
-    # Prepare JSON Data
-    folders_json = json.dumps(folders_data)
-
-    # Strip user-specific data from static dump for multi-user support
-    # (The frontend will hydrate this via /api/user/data)
-    clean_results = []
-    for r in results:
-        # Create a copy to modify without affecting the passed dict references (if they are mutable)
-        # Assuming r is a dict from model_dump
-        r_clean = r.copy()
-        # Reset user fields to defaults
-        r_clean["favorite"] = False
-        r_clean["hidden"] = False # aliased from vaulted
-        r_clean["tags"] = []
-        clean_results.append(r_clean)
+    # Mehrbenutzer-Trennung: Der statische Dump enthält überhaupt keine
+    # Medien-Einträge — `window.ALL_VIDEOS` startet als leeres Array, gefüllt
+    # wird es erst zur Laufzeit über /api/videos und /api/user/data.
+    #
+    # Hier stand früher eine Schleife, die von jedem Eintrag eine Kopie zog und
+    # darin favorite/hidden/tags zurücksetzte. Seit der Dump keine Einträge mehr
+    # einbettet, wurde das Ergebnis nirgends verwendet: 8788 Dict-Kopien und
+    # ~10 ms bei jeder Neugenerierung des Reports, ersatzlos verworfen.
 
     user_settings_json = json.dumps(config.settings.model_dump())
 
@@ -247,7 +238,7 @@ def generate_html_report(results, report_file, server_port=8000):
     # 4. Prepare Scripts
     scripts_html = f"""
         window.SERVER_PORT = {server_port};
-        window.FOLDERS_DATA = {folders_json};
+        window.FOLDERS_DATA = {{}}; /* aus ALL_VIDEOS aufgebaut, siehe folder_browser.js */
         window.ALL_VIDEOS = []; /* Loaded via API for user isolation */
         window.userSettings = {user_settings_json};
         window.OPTIMIZER_AVAILABLE = {opt_avail_str};

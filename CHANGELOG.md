@@ -113,6 +113,17 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump.** `index.html`
+  wird einmal erzeugt und an jeden Nutzer ausgeliefert — enthielt aber
+  `window.FOLDERS_DATA` mit der Ordner-Aggregation der *gesamten* Bibliothek,
+  also auch den Verzeichnissen anderer Nutzer, samt vollem Pfad im
+  `title`-Attribut der Ordner-Seitenleiste. `/api/videos` filtert sauber nach
+  Scan-Zielen, der Dump umging das. Der Ordner-Baum wird jetzt clientseitig aus
+  `ALL_VIDEOS` aufgebaut (`buildFoldersData()`), das bereits pro Nutzer
+  gefiltert ist. Gefunden durch einen neuen Test, der prüft, dass aus einem
+  Dump mit einem Eintrag `/geheim/privat/urlaub_2019.mp4` nichts davon in der
+  Seite landet.
+
 - **Die Test-Suite schrieb ins echte Datenverzeichnis.** `ReportDebouncer.schedule()`
   startet einen `threading.Timer`, der eine Sekunde später auf einem Daemon-Thread
   `_media_cache.get()` aufruft. Zu dem Zeitpunkt ist der `config`-Patch des

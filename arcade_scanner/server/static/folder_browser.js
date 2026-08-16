@@ -30,13 +30,37 @@ function initialRender() {
 /**
  * Render the folder sidebar with folder list sorted by size
  */
+function buildFoldersData() {
+    // Früher kam diese Aggregation fertig aus dem Server-Template. Der
+    // HTML-Dump wird aber EINMAL erzeugt und an jeden Nutzer ausgeliefert —
+    // damit standen die Ordnerpfade aller Bibliotheken in der Seite, die jeder
+    // bekam, obwohl /api/videos anschließend sauber nach Scan-Zielen filtert.
+    // ALL_VIDEOS ist bereits pro Nutzer gefiltert, also aggregieren wir hier.
+    const data = {};
+    (window.ALL_VIDEOS || []).forEach(video => {
+        const path = video.FilePath || '';
+        const separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        const folder = separator > 0 ? path.slice(0, separator) : path;
+        if (!folder) return;
+
+        if (!data[folder]) data[folder] = { count: 0, size_mb: 0 };
+        data[folder].count += 1;
+        data[folder].size_mb += video.Size_MB || 0;
+    });
+    window.FOLDERS_DATA = data;
+    return data;
+}
+
 function renderFolderSidebar() {
     const list = document.getElementById('folderList');
     if (!list.parentElement.classList.contains('active')) return;
 
+    const foldersData = buildFoldersData();
+
     list.innerHTML = '';
-    const folders = Object.keys(window.FOLDERS_DATA).sort((a, b) => window.FOLDERS_DATA[b].size_mb - window.FOLDERS_DATA[a].size_mb);
-    const maxSize = Math.max(...Object.values(window.FOLDERS_DATA).map(f => f.size_mb));
+    const folders = Object.keys(foldersData).sort((a, b) => foldersData[b].size_mb - foldersData[a].size_mb);
+    if (folders.length === 0) return;
+    const maxSize = Math.max(...Object.values(foldersData).map(f => f.size_mb));
 
     const allItem = document.createElement('div');
     allItem.className = `folder-item ${currentFolder === 'all' ? 'active' : ''}`;
@@ -45,7 +69,7 @@ function renderFolderSidebar() {
     list.appendChild(allItem);
 
     folders.forEach(path => {
-        const data = window.FOLDERS_DATA[path];
+        const data = foldersData[path];
         const item = document.createElement('div');
         item.className = `folder-item ${currentFolder === path ? 'active' : ''}`;
         item.onclick = () => setFolderFilter(path);
