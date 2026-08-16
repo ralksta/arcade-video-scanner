@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "arcade_scanner"
-version = "4.9.0"
+# Quelle: arcade_scanner/__version__ — nicht hier doppeln.
+dynamic = ["version"]
 authors = [
   { name="Ralksta", email="ralksta@users.noreply.github.com" },
 ]
@@ -48,6 +49,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+
+[tool.setuptools.dynamic]
+version = {attr = "arcade_scanner.__version__"}
 
 [tool.ruff]
 line-length = 100

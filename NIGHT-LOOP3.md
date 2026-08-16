@@ -179,10 +179,9 @@ jetzt systematisch.
       Genau diese Frage fand das `FOLDERS_DATA`-Leck: `CLAUDE.md` beschrieb einen
       Trennungs-Mechanismus, den es so nicht mehr gab. Und der Abhängigkeits-
       Wächter entstand aus derselben Frage. Weitere Kandidaten:
-      - `CLAUDE.md` sagt selbst: „Version numbers drift across files
-        (pyproject.toml, README, banner strings in main.py) — don't trust any
-        single one as authoritative." Eine Doku, die ihre eigene Unzuverlässigkeit
-        einräumt, ist eine Einladung.
+      - [x] Versionsnummern: fünf verschiedene gefunden (4.9.0 / 6.3 / 6.7 /
+        6.8.0 / 7.0.0). Eine Quelle in `arcade_scanner/__version__`, CLAUDE.md
+        korrigiert. Offen und dokumentiert: 7.0.0 hat keinen CHANGELOG-Abschnitt
       - README-Versprechen: was steht dort über Funktionen, die es (noch/nicht
         mehr) gibt?
       - Docstrings, die ein anderes Verhalten beschreiben als der Code.
@@ -209,6 +208,15 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 29 (Loop H, Versionen)** — Die Doku sagte die Wahrheit über sich
+  selbst („don't trust any single one") und blieb dabei stehen. Das ist die
+  gefährlichere Sorte Doku: sie klingt ehrlich und normalisiert den Zustand.
+  Belegt war 7.0.0 über zwei Commits; gesetzt worden war die Nummer damals nur
+  im README. Bewusst nicht getan: einen CHANGELOG-Abschnitt für 7.0.0
+  erfinden — die Einträge kenne ich nicht, und plausibel klingende
+  Release-Notes wären schlimmer als eine sichtbare Lücke. Ein Test hält die
+  Lücke fest.
 
 - **Iteration 28 (Loop G, Lint)** — Die acht Fehler, die seit Beginn der Nacht
   als Baseline mitliefen, sind weg: drei automatisch (Importsortierung), fünf

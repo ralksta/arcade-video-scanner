@@ -68,4 +68,4 @@ When you add/rename an element ID or a JS global, update both sides or these tes
 - Commit style: conventional commits with scope, e.g. `fix(web): ...`, `feat(tv): ...`. Work happens on `dev`; `main` is for PRs.
 - Comments in the codebase are mixed German/English; either is fine.
 - Update `CHANGELOG.md` for user-facing changes; `ROADMAP.md` tracks planned features.
-- Version numbers drift across files (pyproject.toml, README, banner strings in main.py) — don't trust any single one as authoritative.
+- The version lives in exactly one place: `arcade_scanner/__version__`. `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, `main.py` prints it, and `tests/test_version_consistency.py` keeps it that way. (It used to drift across five files — 4.9.0 / 6.3 / 6.7 / 6.8.0 / 7.0.0.) Note: 7.0.0 has no CHANGELOG section; the release notes were never written.

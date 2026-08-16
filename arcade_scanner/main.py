@@ -3,6 +3,7 @@ import asyncio
 import time
 import webbrowser
 
+from arcade_scanner import __version__
 from arcade_scanner.config import config
 from arcade_scanner.core.maintenance import purge_broken_media, purge_media, purge_thumbnails
 from arcade_scanner.database import db, user_db
@@ -12,7 +13,7 @@ from arcade_scanner.templates.dashboard_template import generate_html_report
 
 
 def run_scanner(args_list=None):
-    parser = argparse.ArgumentParser(description="Arcade Media Scanner 6.3")
+    parser = argparse.ArgumentParser(description=f"Arcade Media Scanner {__version__}")
     parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
     parser.add_argument("--rebuild-thumbs", action="store_true", help="Delete only thumbnails and regenerate them.")
 
@@ -26,7 +27,7 @@ def run_scanner(args_list=None):
         from arcade_scanner.onboarding import run_onboarding
         run_onboarding()
 
-    print("--- Arcade Media Scanner 6.7 ---")
+    print(f"--- Arcade Media Scanner {__version__} ---")
 
     # 0. Maintenance
     if args.rebuild:
