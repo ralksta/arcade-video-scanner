@@ -215,6 +215,9 @@ jetzt systematisch.
 - [ ] **Loop K — Der Optimizer** (läuft)
       - [x] `parse_time_to_seconds`: las Trim-Zeiten anders als ffmpeg — die
             SSIM-Prüfung verglich dadurch die falschen Bilder
+      - [x] `apply_encoding_preset` und `apply_scale_to_filter` abgedeckt —
+            **kein Fehler**, beide arbeiten korrekt; der Software-Filter ist
+            gegen echtes ffmpeg geprüft
       `scripts/video_optimizer.py` ist die größte Einzeldatei und das
       Kernversprechen des Produkts (50–80 % Ersparnis), aber die
       Entscheidungslogik ist kaum abgedeckt: 25 Divisionen mit variablem
@@ -230,6 +233,15 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 36 (Loop K, Encoder-Konfiguration)** — Hier fast einen Fehler
+  gemeldet, den es nicht gibt: Mein synthetisches Profil enthielt weder
+  `-realtime` noch `-compression_level`, weshalb die Preset-Wahl wirkungslos
+  aussah. Die *echten* Profile tragen beides, und beides wird korrekt ersetzt.
+  Lehre: Wer die Wirklichkeit prüfen will, muss die wirklichen Daten nehmen —
+  die Tests laufen jetzt über `ENCODER_PROFILES` statt über erfundene Eingaben.
+  Der erzeugte Software-Filter wird zusätzlich gegen echtes ffmpeg gehalten,
+  statt seine Gültigkeit anzunehmen.
 
 - **Iteration 35 (Loop K, Trim-Zeiten)** — Der bisher subtilste Fund. Zwei
   Auslegungen derselben Zeichenkette: ffmpeg bekommt sie roh, der Optimizer
