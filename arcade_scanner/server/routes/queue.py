@@ -27,6 +27,7 @@ import socket
 import subprocess
 import tempfile
 import threading
+import time
 import traceback
 import uuid
 from pathlib import Path
@@ -46,7 +47,67 @@ from arcade_scanner.server.response_helpers import (
 # GIF-Job-Tracking (in-memory, resets on server restart)
 # ---------------------------------------------------------------------------
 
-GIF_JOBS: dict[str, dict] = {}
+class _GifJobRegistry:
+    """Zustand der GIF-Aufträge, begrenzt in Anzahl und Alter.
+
+    Vorher war das ein nacktes Modul-Dict, in das jeder Export schrieb und aus
+    dem nie etwas entfernt wurde. Auf einem Server, der monatelang läuft, wächst
+    das mit jedem erzeugten GIF — und behält Dateinamen und Pfade fertiger
+    Aufträge auf unbestimmte Zeit im Speicher.
+
+    Die Einträge müssen nur so lange leben, wie der Client den Status abfragt:
+    er pollt im Sekundentakt bis „done" und lädt dann herunter. Eine Stunde ist
+    dafür großzügig bemessen; die Obergrenze fängt den Fall ab, dass in kurzer
+    Zeit sehr viele Aufträge laufen.
+
+    Der Zugriff läuft über ein Lock, weil Worker-Threads schreiben, während
+    Request-Threads lesen.
+    """
+
+    MAX_ENTRIES = 200
+    TTL_SECONDS = 3600.0
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._jobs: dict[str, dict] = {}
+        self._touched: dict[str, float] = {}
+
+    def __setitem__(self, job_id: str, state: dict) -> None:
+        with self._lock:
+            self._jobs[job_id] = state
+            self._touched[job_id] = time.time()
+            self._evict_locked()
+
+    def __getitem__(self, job_id: str) -> dict:
+        with self._lock:
+            return self._jobs[job_id]
+
+    def __contains__(self, job_id: object) -> bool:
+        with self._lock:
+            return job_id in self._jobs
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._jobs)
+
+    def get(self, job_id: str, default=None):
+        with self._lock:
+            return self._jobs.get(job_id, default)
+
+    def _evict_locked(self) -> None:
+        """Alte und überzählige Einträge entfernen. Aufrufer hält das Lock."""
+        cutoff = time.time() - self.TTL_SECONDS
+        for job_id in [j for j, t in self._touched.items() if t < cutoff]:
+            self._jobs.pop(job_id, None)
+            self._touched.pop(job_id, None)
+
+        while len(self._jobs) > self.MAX_ENTRIES:
+            oldest = min(self._touched, key=self._touched.get)
+            self._jobs.pop(oldest, None)
+            self._touched.pop(oldest, None)
+
+
+GIF_JOBS = _GifJobRegistry()
 
 
 # ---------------------------------------------------------------------------

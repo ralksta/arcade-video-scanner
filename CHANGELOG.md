@@ -141,6 +141,14 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **GIF-Auftragszustände wuchsen unbegrenzt.** `GIF_JOBS` war ein nacktes
+  Modul-Dict: jeder Export schrieb hinein, entfernt wurde nie etwas. Auf einem
+  Server, der monatelang durchläuft, sammeln sich dort Dateinamen und Pfade
+  sämtlicher je erzeugter GIFs an — kein dramatisches Leck, aber eines, das
+  nie aufhört. Ersetzt durch eine Registry mit Lock (Worker-Threads schreiben,
+  Request-Threads lesen), 200 Einträgen Obergrenze und einer Stunde
+  Aufbewahrung, was den Poll-und-Download-Zyklus eines Clients weit überdauert.
+
 - **`/api/debug/dump` griff an der Thread-Sicherung vorbei auf die Datenbank.**
   Die Route las über `db._conn.execute(...)` direkt auf der geteilten
   Verbindung — ohne `_write_lock`. Genau davor warnt der Kommentar im Store:

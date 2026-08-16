@@ -88,6 +88,8 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
             jetzt an der Grenze validiert
       - [x] Nebenläufigkeit: `/api/debug/dump` las an `_write_lock` vorbei auf
             der geteilten Verbindung — gekapselt, Contract-Test ergänzt
+      - [x] Unbegrenztes Wachstum: `GIF_JOBS` wurde nie aufgeräumt — jetzt
+            Registry mit Lock, Obergrenze und Ablaufzeit
       Die ergiebigste Ader der Nacht: veraltete Proxys, ein Cache ohne
       Invalidierung, `FOLDERS_DATA` mit fremden Pfaden, eine Test-Suite die ins
       Produktivverzeichnis schrieb — alle vier hatten gemeinsam, dass nichts
@@ -109,6 +111,12 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 16 (Loop D, unbegrenztes Wachstum)** — Ein Leck, das man nur bei
+  einem Werkzeug bemerkt, das *dauerhaft* läuft: ein Modul-Dict ohne Aufräumen.
+  Beim Ersetzen war die eigentliche Frage nicht die Obergrenze, sondern die
+  Aufbewahrungsdauer — zu kurz, und ein Auftrag verschwindet unter dem noch
+  pollenden Client weg. Deshalb ein Test, der genau diese Untergrenze festhält.
 
 - **Iteration 15 (Loop D, Nebenläufigkeit)** — Der Store dokumentiert seine
   Thread-Falle ausführlich und misst sie sogar (0 bis 5199 Zeilen bei 800). Und
