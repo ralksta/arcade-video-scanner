@@ -1386,6 +1386,53 @@ HIDDEN_PATH_MODAL_COMPONENT = """
 </style>
 """
 
+SHORTCUTS_MODAL_COMPONENT = """
+<!-- Keyboard Shortcuts Help Overlay -->
+<div id="shortcutsModal" class="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle" onclick="if (event.target === this) closeShortcutsHelp()">
+    <div class="w-full max-w-2xl max-h-[85vh] flex flex-col bg-surface-2 rounded-ds border border-line shadow-2xl transform scale-95 transition-transform duration-200 overflow-hidden">
+
+        <!-- Header -->
+        <div class="p-4 border-b border-line flex items-center gap-3">
+            <span class="material-icons text-accent-tint">keyboard</span>
+            <h2 id="shortcutsTitle" class="font-semibold text-text-main flex-1">Tastaturkürzel</h2>
+            <button id="shortcutsCloseBtn" onclick="closeShortcutsHelp()"
+                    class="p-1 rounded-ds-sm text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors"
+                    aria-label="Hilfe schließen">
+                <span class="material-icons text-[20px]">close</span>
+            </button>
+        </div>
+
+        <!-- Body (von shortcuts.js gerendert) -->
+        <div id="shortcutsBody" class="p-5 overflow-y-auto"></div>
+
+        <!-- Footer -->
+        <div class="px-5 py-3 border-t border-line text-[12px] text-text-muted">
+            <kbd class="shortcut-key">?</kbd> öffnet diese Übersicht jederzeit.
+        </div>
+    </div>
+</div>
+
+<style>
+    #shortcutsModal.active { display: flex !important; opacity: 1; }
+    #shortcutsModal.active > div { transform: scale(1); }
+    .shortcut-key {
+        display: inline-block;
+        min-width: 22px;
+        padding: 2px 6px;
+        border-radius: 5px;
+        background: var(--ds-fill);
+        border: 1px solid var(--ds-hairline-strong);
+        border-bottom-width: 2px;
+        color: var(--ds-text);
+        font-family: var(--ds-font-mono);
+        font-size: 11px;
+        line-height: 16px;
+        text-align: center;
+    }
+</style>
+"""
+
 SETUP_WIZARD_COMPONENT = """
 <!-- First-Run Setup Wizard -->
 <div id="setupWizard" class="hidden fixed inset-0 z-50 bg-gradient-to-br from-[#0a0a12] via-[#1a1a24] to-[#0a0a12] flex items-center justify-center p-4">
@@ -2158,6 +2205,9 @@ FILTER_BAR_COMPONENT = """
         </button>
         <button id="stopScanBtn" onclick="stopScan()" class="hidden p-2 rounded-ds-sm border border-danger/40 text-danger hover:bg-danger/10 transition-colors flex items-center justify-center flex-shrink-0" title="Scan stoppen">
             <span class="material-icons text-[18px]">stop</span>
+        </button>
+        <button id="shortcutsBtn" onclick="openShortcutsHelp()" class="hidden md:flex p-2 rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors items-center justify-center flex-shrink-0" title="Tastaturkürzel (?)" aria-label="Tastaturkürzel anzeigen">
+            <span class="material-icons text-[18px]">keyboard</span>
         </button>
     </div>
 </div>

@@ -20,6 +20,7 @@ from arcade_scanner.templates.components import (
     SAVED_VIEWS_COMPONENT,
     SETTINGS_MODAL_COMPONENT,
     SETUP_WIZARD_COMPONENT,
+    SHORTCUTS_MODAL_COMPONENT,
     TAG_MANAGER_MODAL_COMPONENT,
     TREEMAP_LEGEND_COMPONENT,
 )
@@ -163,6 +164,7 @@ def generate_html_report(results, report_file, server_port=8000):
     {COLLECTION_MODAL_COMPONENT}
     {SETUP_WIZARD_COMPONENT}
     {HIDDEN_PATH_MODAL_COMPONENT}
+    {SHORTCUTS_MODAL_COMPONENT}
     {BATCH_BAR_COMPONENT}
 
     <!-- Hidden frame for form submissions if needed -->
@@ -211,6 +213,7 @@ def generate_html_report(results, report_file, server_port=8000):
     <script src="/static/gif_export.js?v={int(time.time())}"></script>
     <script src="/static/collections.js?v={int(time.time())}"></script>
     <script src="/static/context_menu.js?v={int(time.time())}"></script>
+    <script src="/static/shortcuts.js?v={int(time.time())}"></script>
     """
 
     # Combine content using Theme-aware Base Layout

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Tastaturkürzel-Overlay (`?`)**: Das Dashboard hatte eine ganze Reihe
+  Tastenkürzel (Cinema: `←`/`→`, `Space`, `F`, `V`, `I`, `G`, `O` plus Tag-Shortcuts;
+  Duplikat-Prüfung: `1`/`2`/`S`/`A`; Command-Palette: `Ctrl`/`⌘`+`K`) — dokumentiert
+  war davon nichts. `?` öffnet jetzt überall eine Übersicht, ein Tastatur-Button in
+  der Filter-Bar tut dasselbe für die Maus. Neu dazu: `/` fokussiert die Suche und
+  `1`–`4` schalten zwischen Grid-, Listen-, Treemap- und Ordner-Ansicht um. Die
+  globalen Kürzel halten sich zurück, während der Nutzer tippt oder Cinema bzw. die
+  Duplikat-Prüfung offen ist. Neu: `static/shortcuts.js`.
+
 - **Proxy Streaming**: Every video may have a smaller copy in its own directory
   tree, which is excluded from scans. `/stream` decides per request which file to
   serve — the original on the LAN, the proxy over Tailscale (CGNAT
