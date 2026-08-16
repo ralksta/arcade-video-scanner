@@ -205,13 +205,20 @@ jetzt systematisch.
 
 ## Abschluss vor dem Morgen
 
-- [ ] Übergabebericht schreiben: was geändert wurde, was Entscheidungen des
-      Nutzers braucht, was bewusst offen blieb. Solange der volle Kontext noch
-      da ist, nicht erst wenn er knapp wird.
+- [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
+      Ralfs Entscheidung zuerst, dann Sicherheits- und Korrektheitsfunde,
+      Performance-Messwerte, und ein Abschnitt „Was ich falsch hatte".
 
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 33 (Übergabebericht)** — Bewusst als Datei im Repository, nicht
+  als veröffentlichte Seite: der Bericht enthält Sicherheitsfunde zu einem
+  privaten Medienserver. Aufbau nach Nutzen sortiert, nicht chronologisch — die
+  sechs Punkte, die eine Entscheidung brauchen, stehen oben. Eigener Abschnitt
+  für die fünf Fehleinschätzungen der Nacht: wer nur die Treffer liest, kann
+  den Rest nicht einordnen.
 
 - **Iteration 32 (Loop I, Testqualität)** — Ergebnis: keine leeren Tests. Die
   sieben Treffer „ohne assert" sind legitime „wirft nicht"-Tests, die drei
