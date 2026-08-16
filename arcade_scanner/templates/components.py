@@ -1975,6 +1975,28 @@ SETTINGS_MODAL_COMPONENT = """
                             <span class="material-icons text-amber-400 text-lg" aria-hidden="true">info</span>
                             <div>Cache changes require an app restart. Clearing cache deletes all thumbnails.</div>
                         </div>
+
+                        <!-- Ähnlichkeits-Index -->
+                        <div>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">auto_awesome_motion</span>
+                                Ähnlichkeits-Index
+                            </h3>
+                            <p class="text-[12px] text-text-muted mt-1">
+                                Grundlage der „Ähnliche Medien"-Leiste im Cinema (Taste <kbd class="shortcut-key">S</kbd>).
+                            </p>
+                        </div>
+
+                        <div class="bg-surface p-4 rounded-xl border border-ink/5 space-y-3">
+                            <div class="flex items-baseline justify-between gap-3">
+                                <span class="text-xs text-gray-500 uppercase tracking-wider">Indiziert</span>
+                                <span class="text-lg font-mono text-text-main" id="statEmbeddingCoverage">—</span>
+                            </div>
+                            <div class="h-1.5 w-full rounded-full bg-[var(--ds-fill)] overflow-hidden">
+                                <div id="statEmbeddingBar" class="h-full bg-accent transition-all duration-500" style="width:0%"></div>
+                            </div>
+                            <p class="text-[12px] text-text-muted" id="statEmbeddingHint">Wird geladen …</p>
+                        </div>
                     </section>
                     </section>
                 </div>

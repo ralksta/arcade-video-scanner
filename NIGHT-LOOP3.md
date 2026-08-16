@@ -68,6 +68,8 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 - [ ] **Loop C — Feature**
       - [x] „Ähnliche Medien"-Leiste im Cinema (Embedding Teil 2) — Backend
             `/api/similar` gab es schon, nur die Oberfläche fehlte
+      - [x] Index-Status (`/api/similar/status`) + Anzeige in den Einstellungen —
+            macht sichtbar, ob die Ähnlich-Leiste überhaupt Daten haben kann
       - [ ] Weitere Feature-Kandidaten suchen
 
 ## Zyklus 2 (Loops werden nach Zyklus 1 festgelegt)
@@ -78,6 +80,12 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 10 (Loop C, Index-Status)** — Direkte Folge aus Iteration 9: Ein
+  Feature, dessen Datengrundlage unsichtbar ist, wirkt kaputt statt leer. Der
+  Status-Endpunkt kostet zwanzig Zeilen und beantwortet die Frage, die sonst
+  jeder Nutzer an der leeren Leiste stellen würde. Beim Testen an den Rand
+  gedacht: leere Bibliothek → Division durch null, jetzt abgedeckt.
 
 - **Iteration 9 (Loop C, Ähnlich-Leiste)** — Zwei Lehren. Erstens: mein eigener
   Test aus Loop A (`test_cinema_section_documents_all_reserved_keys`) hat mich

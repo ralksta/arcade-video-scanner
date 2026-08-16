@@ -48,6 +48,12 @@ class FakeMediaDB:
     def register_on_change(self, cb):
         self.callbacks.append(cb)
 
+    def get_embedding_state(self):
+        return {path: (1_700_000_000.0, model) for path, model, _blob in self._vectors}
+
+    def count(self):
+        return getattr(self, "media_count", len(self._vectors))
+
 
 def _user_db(vaulted=()):
     user_db = MagicMock()
@@ -139,3 +145,61 @@ def test_cache_invalidated_via_on_change_hook():
         similar.handle_get(h2)
     paths = [r["file_path"] for r in h2.body()["results"]]
     assert "/lib/new.mp4" in paths
+
+
+# ---------------------------------------------------------------------------
+# /api/similar/status — Abdeckung des Index
+#
+# Die „Ähnliche Medien"-Leiste sieht identisch leer aus, egal ob es zu einem
+# Medium keine ähnlichen gibt oder ob gar kein Index existiert. Dieser Endpunkt
+# ist die einzige Stelle, die den Unterschied sichtbar macht.
+# ---------------------------------------------------------------------------
+
+def test_status_requires_session():
+    h = FakeHandler("/api/similar/status", user=None)
+    assert run(h) is True
+    assert h.error == 401
+
+
+def test_status_on_an_empty_index():
+    db = FakeMediaDB()
+    db.media_count = 500
+    h = FakeHandler("/api/similar/status")
+
+    assert run(h, db) is True
+    assert h.body() == {"indexed": 0, "total": 500, "coverage": 0.0, "models": []}
+
+
+def test_status_reports_partial_coverage():
+    db = FakeMediaDB([("/lib/a.mp4", [1.0, 0.0]), ("/lib/b.mp4", [0.0, 1.0])])
+    db.media_count = 8
+    h = FakeHandler("/api/similar/status")
+
+    assert run(h, db) is True
+    body = h.body()
+    assert body["indexed"] == 2
+    assert body["total"] == 8
+    assert body["coverage"] == 25.0
+    assert body["models"] == ["m"]
+
+
+def test_status_survives_an_empty_library():
+    """Division durch null: eine leere Bibliothek darf keinen 500er auslösen."""
+    db = FakeMediaDB()
+    db.media_count = 0
+    h = FakeHandler("/api/similar/status")
+
+    assert run(h, db) is True
+    assert h.body()["coverage"] == 0.0
+    assert h.error is None
+
+
+def test_status_lists_each_model_once():
+    """Nach einem Modellwechsel liegen gemischte Einträge vor."""
+    db = FakeMediaDB([("/lib/a.mp4", [1.0]), ("/lib/b.mp4", [1.0])])
+    db._vectors = [("/lib/a.mp4", "ViT-B-16", b""), ("/lib/b.mp4", "ViT-B-16", b"")]
+    db.media_count = 2
+    h = FakeHandler("/api/similar/status")
+
+    assert run(h, db) is True
+    assert h.body()["models"] == ["ViT-B-16"]

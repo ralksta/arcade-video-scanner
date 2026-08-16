@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Index-Status in den Speicher-Einstellungen**: Neuer Endpunkt
+  `/api/similar/status` (Session-pflichtig) meldet, wie viele Medien im
+  Ähnlichkeits-Index liegen, wie hoch die Abdeckung ist und mit welchem Modell
+  indiziert wurde; die Einstellungen zeigen das als Balken mit Klartext-Hinweis.
+  Ohne diese Auskunft ließ sich nicht unterscheiden, ob es zu einem Medium keine
+  ähnlichen gibt oder ob schlicht kein Index existiert — die Leiste im Cinema
+  sieht in beiden Fällen gleich leer aus.
+
 - **„Ähnliche Medien"-Leiste im Cinema** (Embedding-Fundament, Teil 2): Taste `S`
   oder der Rail-Button blendet über der Transportleiste verwandte Aufnahmen ein,
   mit Vorschaubild und Übereinstimmung in Prozent; ein Klick springt direkt

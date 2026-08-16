@@ -92,6 +92,46 @@ async function openSettings() {
     } catch (e) {
         console.error('Failed to load settings:', e);
     }
+
+    loadEmbeddingStatus();
+}
+
+/**
+ * Abdeckung des Ähnlichkeits-Index anzeigen.
+ *
+ * Ohne diese Auskunft ist von außen nicht zu unterscheiden, ob es zu einem
+ * Medium keine ähnlichen gibt oder ob schlicht kein Index existiert — die
+ * Leiste im Cinema sieht in beiden Fällen gleich leer aus.
+ */
+async function loadEmbeddingStatus() {
+    const value = document.getElementById('statEmbeddingCoverage');
+    const bar = document.getElementById('statEmbeddingBar');
+    const hint = document.getElementById('statEmbeddingHint');
+    if (!value || !bar || !hint) return;
+
+    try {
+        const response = await fetch('/api/similar/status');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        value.textContent = `${data.indexed.toLocaleString('de-DE')} / ${data.total.toLocaleString('de-DE')}`;
+        bar.style.width = `${data.coverage}%`;
+
+        if (data.indexed === 0) {
+            hint.textContent = 'Kein Index vorhanden — mit scripts/media_indexer.py anlegen.';
+        } else if (data.indexed < data.total) {
+            const missing = data.total - data.indexed;
+            hint.textContent = `${data.coverage}% abgedeckt, ${missing.toLocaleString('de-DE')} Medien fehlen noch`
+                + (data.models.length ? ` · Modell: ${data.models.join(', ')}` : '');
+        } else {
+            hint.textContent = 'Vollständig indiziert'
+                + (data.models.length ? ` · Modell: ${data.models.join(', ')}` : '');
+        }
+    } catch (e) {
+        console.error('Index-Status nicht abrufbar:', e);
+        value.textContent = '—';
+        hint.textContent = 'Status konnte nicht geladen werden.';
+    }
 }
 
 /**
@@ -1101,4 +1141,4 @@ function selectEncodingPreset(value) {
     if (hidden) hidden.value = value;
 }
 window.selectEncodingPreset = selectEncodingPreset;
-
+window.loadEmbeddingStatus = loadEmbeddingStatus;
