@@ -170,5 +170,6 @@ def test_focus_is_restored_to_the_opener():
 
 
 def test_a11y_script_is_loaded():
-    dashboard = (TEMPLATES_DIR / "dashboard_template.py").read_text(encoding="utf-8")
-    assert "/static/a11y.js" in dashboard
+    from arcade_scanner.templates.dashboard_template import SCRIPT_MODULES
+
+    assert "a11y.js" in SCRIPT_MODULES

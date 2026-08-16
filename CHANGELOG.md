@@ -83,6 +83,15 @@ All notable changes to this project will be documented in this file.
   on a remote NVENC machine, reading originals only).
 
 ### Performance
+- **Browser-Cache für statische Assets wieder wirksam.** Die 28 Script- und
+  Link-Tags trugen `?v={int(time.time())}` — für jede Datei denselben Wert, neu
+  bei jeder Neugenerierung des HTML-Reports (nach jedem Scan, jeder
+  Einstellungsänderung, jedem Encode-Upload). Eine neue URL ist im Browser-Cache
+  kein 304, sondern ein voller Fehltreffer: 588 KB (122 KB gzip) wurden erneut
+  übertragen, obwohl sich nichts geändert hatte — der `no-cache`-Header des
+  Servers, der sonst billige 304er liefert, lief dabei ins Leere. Die Version
+  kommt jetzt aus der mtime der jeweiligen Datei, eine URL ändert sich also nur
+  noch, wenn sich genau diese Datei ändert.
 - **`/api/videos`: ~105 ms CPU pro Request eingespart.** Gemessen an der echten
   Bibliothek (8788 Einträge): der Endpunkt serialisierte bei *jedem* Request
   4,95 MB JSON neu (~40 ms) und komprimierte sie neu (~54 ms), dazu ~10 ms

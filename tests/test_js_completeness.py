@@ -15,7 +15,6 @@ Why this exists:
       A) New file added to disk but forgotten in template → missing script
       B) Script listed in template pointing to a deleted/renamed file → 404
 """
-import re
 from pathlib import Path
 
 import pytest
@@ -41,11 +40,15 @@ TEMPLATE_NON_SCRIPT_REFS = set()
 
 
 def get_template_js_files() -> set[str]:
-    """Extract all JS filenames referenced in dashboard_template.py."""
-    source = TEMPLATE_FILE.read_text(encoding="utf-8")
-    # Match both /static/foo.js and foo.js?v=... patterns
-    matches = re.findall(r'/static/([^"\'?]+\.js)', source)
-    return set(matches)
+    """Alle JS-Dateien, die das Dashboard lädt.
+
+    Die Liste steht seit der mtime-basierten Cache-Buster-Umstellung in
+    SCRIPT_MODULES statt als 28 einzelne <script>-Zeilen im Quelltext — das
+    ist damit die Quelle der Wahrheit, nicht mehr ein Regex über die Datei.
+    """
+    from arcade_scanner.templates.dashboard_template import SCRIPT_MODULES
+
+    return set(SCRIPT_MODULES)
 
 
 def get_disk_js_files() -> set[str]:
@@ -90,12 +93,12 @@ class TestJsCompleteness:
 
     def test_store_js_loads_before_engine_js(self):
         """store.js must appear before engine.js in the template (state before logic)."""
-        source = TEMPLATE_FILE.read_text(encoding="utf-8")
-        store_pos = source.find("/static/store.js")
-        engine_pos = source.find("/static/engine.js")
+        from arcade_scanner.templates.dashboard_template import SCRIPT_MODULES
 
-        assert store_pos != -1, "store.js not found in template"
-        assert engine_pos != -1, "engine.js not found in template"
+        assert "store.js" in SCRIPT_MODULES, "store.js not found in template"
+        assert "engine.js" in SCRIPT_MODULES, "engine.js not found in template"
+        store_pos = SCRIPT_MODULES.index("store.js")
+        engine_pos = SCRIPT_MODULES.index("engine.js")
         assert store_pos < engine_pos, (
             "store.js must be loaded BEFORE engine.js — "
             "engine.js depends on globals defined in store.js"
@@ -103,12 +106,14 @@ class TestJsCompleteness:
 
     def test_filter_engine_loads_before_cards_js(self):
         """filter_engine.js must appear before cards.js (filterAndSort defined before use)."""
-        source = TEMPLATE_FILE.read_text(encoding="utf-8")
-        filter_pos = source.find("/static/filter_engine.js")
-        cards_pos = source.find("/static/cards.js")
+        from arcade_scanner.templates.dashboard_template import SCRIPT_MODULES
 
-        if filter_pos == -1 or cards_pos == -1:
-            pytest.skip("filter_engine.js or cards.js not in template")
+        # Kein skip: fehlt eine der beiden Dateien, ist das ein Fehler, kein
+        # Grund, die Prüfung stillschweigend zu überspringen.
+        assert "filter_engine.js" in SCRIPT_MODULES
+        assert "cards.js" in SCRIPT_MODULES
+        filter_pos = SCRIPT_MODULES.index("filter_engine.js")
+        cards_pos = SCRIPT_MODULES.index("cards.js")
 
         assert filter_pos < cards_pos, (
             "filter_engine.js must be loaded BEFORE cards.js — "

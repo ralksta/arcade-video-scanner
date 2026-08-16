@@ -52,7 +52,9 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
       - Messwerte: `SELECT *` 40 ms · `_row_to_api_dict` 68 ms · `json.dumps` 42 ms ·
         `gzip(6)` 54 ms (→ 0,56 MB) · Filterschleife 10,5 ms
       - [ ] Indizes prüfen: 8 Stück auf `media`, aber keiner auf `file_path`-Präfix
-      - [ ] Thumbnail-/Static-Caching-Header prüfen
+      - [x] Caching-Header geprüft: Thumbnails (`max-age=604800` + 304) und
+            Static (`no-cache` + 304 + gzip) waren korrekt — der Fehler lag im
+            Cache-Buster `?v={int(time.time())}`, der alles entwertete
       - [ ] HTML-Dump (`index.html`, 204 KB) — wird bei jeder Änderung neu erzeugt
       - [ ] Filterschleife: `os.path.abspath` pro Eintrag kostet 8,8 der 10,5 ms.
             Nach dem Antwort-Cache nur noch bei Cache-Miss relevant — bewusst
@@ -68,6 +70,14 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 6 (Loop B, Cache-Buster)** — Die Header waren alle richtig
+  gesetzt; entwertet wurde der Cache eine Ebene höher, in der URL. Lehre: bei
+  Caching-Fragen nicht nur die Header prüfen, sondern ob die URL überhaupt
+  stabil bleibt. Nebenbei zwei Tests entschärft, die sich nach der Umstellung
+  still selbst übersprungen hätten (`pytest.skip`, wenn ein Dateiname nicht
+  gefunden wird) — die prüfen jetzt gegen `SCRIPT_MODULES` als echten Vertrag.
+  Nächstes: Indizes und HTML-Dump.
 
 - **Iteration 5 (Loop B, Performance)** — Erst gemessen, dann gefixt. Gelernt:
   gzip und ein Medien-Cache waren längst da — die Lücke lag dazwischen, nämlich

@@ -1,7 +1,6 @@
 import json
 import os
 import socket
-import time
 
 from arcade_scanner.config import config
 from arcade_scanner.templates.components import (
@@ -30,6 +29,72 @@ from arcade_scanner.templates.ui_components import (
     render_header,
     render_navigation,
 )
+
+# Stylesheets und JS-Module in Ladereihenfolge. Die Reihenfolge ist bindend:
+# store.js definiert die Globals, auf die engine.js beim Laden zugreift, und
+# filter_engine.js muss vor cards.js stehen. Tests pinnen beides.
+STYLESHEETS = [
+    "styles.css",
+    "timeline_scrubber.css",
+]
+
+SCRIPT_MODULES = [
+    "store.js",
+    "formatters.js",
+    "api.js",
+    "utils.js",
+    "treemap_layout.js",
+    "treemap.js",
+    "settings.js",
+    "autotag.js",
+    "duplicates.js",
+    "candidates.js",
+    "filter_engine.js",
+    "workspace.js",
+    "cards.js",
+    "batch_operations.js",
+    "tag_manager.js",
+    "folder_browser.js",
+    "engine.js",
+    "optimizer.js",
+    "cinema.js",
+    "timeline_scrubber.js",
+    "gif_export.js",
+    "collections.js",
+    "context_menu.js",
+    "shortcuts.js",
+    "empty_state.js",
+    "a11y.js",
+]
+
+
+def asset_url(filename: str) -> str:
+    """URL eines statischen Assets mit Cache-Buster aus seiner Änderungszeit.
+
+    Vorher stand hier ``?v={int(time.time())}`` — für jede Datei derselbe Wert,
+    neu bei jeder Neugenerierung des HTML. Da der Report nach jedem Scan, jeder
+    Einstellungsänderung und jedem Encode-Upload neu geschrieben wird, bekamen
+    alle 28 Assets regelmäßig frische URLs. Eine neue URL ist im Browser-Cache
+    ein Fehltreffer, kein 304: die vollen 588 KB (122 KB gzip) wurden erneut
+    übertragen, obwohl sich an ihnen nichts geändert hatte.
+
+    Mit der mtime der jeweiligen Datei ändert sich die URL nur, wenn sich die
+    Datei tatsächlich ändert — und dann auch nur ihre eigene.
+
+    Args:
+        filename: Dateiname relativ zum statischen Verzeichnis.
+
+    Returns:
+        Pfad mit Versions-Query, z. B. ``/static/engine.js?v=1755380000``.
+    """
+    try:
+        version = int(os.path.getmtime(os.path.join(config.static_dir, filename)))
+    except OSError:
+        # Fehlt die Datei, ist das ein Deployment-Fehler, kein Grund für einen
+        # Absturz beim Rendern. Ohne Versionsangabe greift der no-cache-Header
+        # des Servers, der Browser revalidiert also ohnehin.
+        version = 0
+    return f"/static/{filename}?v={version}"
 
 
 def generate_html_report(results, report_file, server_port=8000):
@@ -195,35 +260,15 @@ def generate_html_report(results, report_file, server_port=8000):
     </script>
     """
 
+    stylesheet_tags = "\n    ".join(
+        f'<link rel="stylesheet" href="{asset_url(name)}">' for name in STYLESHEETS
+    )
+    script_tags = "\n    ".join(
+        f'<script src="{asset_url(name)}"></script>' for name in SCRIPT_MODULES
+    )
     external_scripts = f"""
-    <link rel="stylesheet" href="/static/styles.css?v={int(time.time())}">
-    <link rel="stylesheet" href="/static/timeline_scrubber.css?v={int(time.time())}">
-    <script src="/static/store.js?v={int(time.time())}"></script>
-    <script src="/static/formatters.js?v={int(time.time())}"></script>
-    <script src="/static/api.js?v={int(time.time())}"></script>
-    <script src="/static/utils.js?v={int(time.time())}"></script>
-    <script src="/static/treemap_layout.js?v={int(time.time())}"></script>
-    <script src="/static/treemap.js?v={int(time.time())}"></script>
-    <script src="/static/settings.js?v={int(time.time())}"></script>
-    <script src="/static/autotag.js?v={int(time.time())}"></script>
-    <script src="/static/duplicates.js?v={int(time.time())}"></script>
-    <script src="/static/candidates.js?v={int(time.time())}"></script>
-    <script src="/static/filter_engine.js?v={int(time.time())}"></script>
-    <script src="/static/workspace.js?v={int(time.time())}"></script>
-    <script src="/static/cards.js?v={int(time.time())}"></script>
-    <script src="/static/batch_operations.js?v={int(time.time())}"></script>
-    <script src="/static/tag_manager.js?v={int(time.time())}"></script>
-    <script src="/static/folder_browser.js?v={int(time.time())}"></script>
-    <script src="/static/engine.js?v={int(time.time())}"></script>
-    <script src="/static/optimizer.js?v={int(time.time())}"></script>
-    <script src="/static/cinema.js?v={int(time.time())}"></script>
-    <script src="/static/timeline_scrubber.js?v={int(time.time())}"></script>
-    <script src="/static/gif_export.js?v={int(time.time())}"></script>
-    <script src="/static/collections.js?v={int(time.time())}"></script>
-    <script src="/static/context_menu.js?v={int(time.time())}"></script>
-    <script src="/static/shortcuts.js?v={int(time.time())}"></script>
-    <script src="/static/empty_state.js?v={int(time.time())}"></script>
-    <script src="/static/a11y.js?v={int(time.time())}"></script>
+    {stylesheet_tags}
+    {script_tags}
     """
 
     # Combine content using Theme-aware Base Layout

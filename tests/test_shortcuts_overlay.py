@@ -21,7 +21,9 @@ DASHBOARD_PY = (TEMPLATES_DIR / "dashboard_template.py").read_text(encoding="utf
 
 
 def test_shortcuts_script_is_loaded_by_dashboard():
-    assert "/static/shortcuts.js" in DASHBOARD_PY
+    from arcade_scanner.templates.dashboard_template import SCRIPT_MODULES
+
+    assert "shortcuts.js" in SCRIPT_MODULES
 
 
 def test_shortcuts_modal_is_rendered_by_dashboard():

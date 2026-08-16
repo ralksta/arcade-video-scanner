@@ -113,7 +113,9 @@ def test_search_term_is_escaped_into_the_hint():
 # --- Verdrahtung ---
 
 def test_script_is_loaded_and_ids_exist():
-    assert "/static/empty_state.js" in DASHBOARD_PY
+    from arcade_scanner.templates.dashboard_template import SCRIPT_MODULES
+
+    assert "empty_state.js" in SCRIPT_MODULES
     for element_id in ("emptyState", "emptyStateIcon", "emptyStateTitle",
                        "emptyStateHint", "emptyStateActions"):
         assert f'id="{element_id}"' in DASHBOARD_PY
