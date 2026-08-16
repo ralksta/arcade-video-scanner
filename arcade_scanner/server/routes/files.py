@@ -325,6 +325,36 @@ def _handle_compress(handler) -> None:
         handler.send_error(500, str(e))
 
 
+def _sanitize_media_path(raw_path: str) -> str:
+    """Prüft einen Pfad aus dem Request, bevor er ans Dateisystem geht.
+
+    Erlaubt sind die aktiven Scan-Ziele plus das Review-Verzeichnis — dort
+    liegen die Dateien aus dem Optimizer, die außerhalb der Bibliothek geparkt
+    werden.
+
+    Der Grund für diese Funktion: ``_handle_discard_optimized`` und
+    ``_handle_keep_optimized`` nahmen den Pfad ungeprüft entgegen und riefen
+    darauf ``os.remove`` bzw. ``shutil.move``. Der Löschzweig hing an keinem
+    Datenbank-Eintrag — jeder angemeldete Nutzer konnte damit beliebige Dateien
+    entfernen, die der Serverprozess schreiben darf.
+
+    Args:
+        raw_path: Pfad, wie er im Request stand.
+
+    Returns:
+        Absoluter, geprüfter Pfad.
+
+    Raises:
+        SecurityError: Pfad liegt außerhalb der erlaubten Verzeichnisse.
+        ValueError: Pfad ist unbrauchbar.
+    """
+    allowed = list(config.active_scan_targets)
+    review_dir = getattr(config, "review_dir", "")
+    if review_dir:
+        allowed.append(review_dir)
+    return sanitize_path(raw_path, allowed_dirs=allowed)
+
+
 def _handle_keep_optimized(handler) -> None:
     user_name = handler.get_current_user()
     if not user_name:
@@ -344,8 +374,13 @@ def _handle_keep_optimized(handler) -> None:
         print(f"🔄 keep_optimized: optimized={optimized_path}")
 
         if original_path and optimized_path:
-            orig_abs = os.path.abspath(original_path)
-            opt_abs = os.path.abspath(optimized_path)
+            try:
+                orig_abs = _sanitize_media_path(original_path)
+                opt_abs = _sanitize_media_path(optimized_path)
+            except (SecurityError, ValueError) as e:
+                print(f"🚨 Security violation in keep_optimized: {e}")
+                handler.send_error(403, "Forbidden - Invalid path")
+                return
 
             if os.path.exists(opt_abs):
                 # Review Mode Check
@@ -420,10 +455,16 @@ def _handle_discard_optimized(handler) -> None:
         from arcade_scanner.models.video_entry import VideoEntry  # lazy
 
         params = parse_qs(urlparse(handler.path).query)
-        path = unquote(params.get("path", [None])[0])
+        raw_path = params.get("path", [None])[0]
+        path = unquote(raw_path) if raw_path else None
 
         if path:
-            abs_path = os.path.abspath(path)
+            try:
+                abs_path = _sanitize_media_path(path)
+            except (SecurityError, ValueError) as e:
+                print(f"🚨 Security violation in discard_optimized: {e}")
+                handler.send_error(403, "Forbidden - Invalid path")
+                return
 
             # Review Mode Check: If this is an optimized file in a review folder,
             # we must also restore the original file.

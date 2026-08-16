@@ -158,6 +158,20 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Security
+- **`/api/discard_optimized` löschte beliebige Dateien.** Der Endpunkt ist
+  sitzungspflichtig, nahm den Pfad aber ungeprüft aus dem Request. Der
+  Standard-Zweig lautete `if os.path.exists(abs_path): os.remove(abs_path)` und
+  lief für *jeden* Pfad — auch ohne zugehörigen Datenbank-Eintrag. Ein
+  angemeldeter Nutzer konnte damit jede Datei entfernen, die der Serverprozess
+  schreiben darf, weit außerhalb der Bibliothek; in einer
+  Mehrbenutzer-Installation genügt dafür ein gewöhnliches Konto.
+  `/api/keep_optimized` hatte dieselbe Klasse mit `shutil.move` auf zwei
+  ungeprüften Pfaden. Beide gehen jetzt über `sanitize_path()` gegen die aktiven
+  Scan-Ziele plus das Review-Verzeichnis (das außerhalb der Bibliothek liegt und
+  erlaubt bleiben muss). Die Tests wurden gegen den alten Stand geprüft: dort
+  schlagen sie fehl, weil die Datei außerhalb der Bibliothek tatsächlich
+  verschwindet.
+
 - **`/api/debug/dump` war unauthentifiziert erreichbar.** Die Route gab den
   kompletten Systemzustand ohne jede Prüfung heraus: aktive Scan-Pfade und
   Ausschlüsse, **sämtliche Benutzernamen mit Admin-Flag und ihren Scan-Zielen**,

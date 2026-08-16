@@ -136,8 +136,9 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
       - [x] Sitzungs-Token im Log: `/stream`-Zeilen wurden nur unterdrückt,
         solange `verbose_scanning` aus war — die Diagnose-Option schrieb also
         gültige Zugangs-Token mit. Wird jetzt immer maskiert.
-      - Pfad-Prüfungen: `sanitize_path`, `validate_filename`, Thumbnail-Pfade —
-        greifen sie überall, wo Pfade aus Requests kommen?
+      - [x] Pfad-Prüfungen: `discard_optimized` löschte **beliebige Dateien**
+        (Zweig ohne DB-Bindung), `keep_optimized` verschob ungeprüft. Beide
+        jetzt über `sanitize_path`; gegen den alten Stand verifiziert
       - [x] `/api/debug/dump` war **unauthentifiziert**: Nutzerliste, Scan-Ziele,
         Dateipfade. Jetzt admin-pflichtig; Rundum-Test fand zusätzlich
         `/api/cache-stats` offen
@@ -157,6 +158,15 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 24 (Loop F, Pfad-Prüfung)** — Der schwerwiegendste Fund der
+  Nacht: `os.remove()` auf einem Pfad direkt aus der Anfrage, in einem Zweig,
+  der an keinen Datenbank-Eintrag gebunden war. Auffällig wurde er nur, weil ich
+  systematisch alle Handler mit Pfad-Parameter gegen die vorhandenen Validatoren
+  gehalten habe — 6 von 12 ohne Prüfung, davon zwei mit Dateisystem-Zugriff. Die
+  vier übrigen arbeiten rein auf der Datenbank und sind unkritisch. Wichtig beim
+  Fix: das Review-Verzeichnis liegt außerhalb der Scan-Ziele und musste explizit
+  erlaubt bleiben, sonst hätte die Prüfung die Optimizer-Funktion zerstört.
 
 - **Iteration 23 (Loop F, offene Routen)** — `/api/debug/dump` gab ohne jede
   Prüfung Benutzerliste und Bibliotheksstruktur heraus. Die Ursache ist
