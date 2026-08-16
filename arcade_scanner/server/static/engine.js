@@ -247,7 +247,7 @@ function keepOptimized(orig, opt) {
         })
         .catch(err => {
             console.error('keepOptimized error:', err);
-            alert('Failed to keep optimized file: ' + err.message);
+            showToast('Optimierte Datei konnte nicht übernommen werden: ' + err.message, 'error');
         });
 }
 

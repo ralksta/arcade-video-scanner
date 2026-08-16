@@ -44,7 +44,8 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
             **Vault** aus der Bottom-Nav (CHANGELOG, „Mobile-Navigation"). Der
             Grund ist jetzt weg — soll Vault dort zurück? Nicht eigenmächtig
             geändert, das ist eine Design-Entscheidung.
-      - [ ] Stille Aktionen: welche Buttons geben heute keinerlei Rückmeldung
+      - [x] Rückmeldungen vereinheitlicht: 30 `alert()` → Toasts; dabei
+            Toast-z-index unter Optimizer-/GIF-Panel entdeckt und behoben
       - [ ] ROADMAP-Haken für „Customizable grid layout" nachziehen — ist längst
             da (`gridScaleSlider` + `--grid-min-width`, `workspace.js:130`)
 - [ ] **Loop B — Performance**: Messen, dann fixen. Kandidaten: SQLite-Indizes für die
@@ -60,6 +61,14 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 4 (Loop A, Rückmeldungen)** — `alert()` komplett abgelöst.
+  Gelernt: Der eigentliche Fund kam nicht aus der Umstellung selbst, sondern aus
+  der Frage „wo erscheinen die Toasts eigentlich?" — z-index 10000 gegen zwei
+  Panels auf 10050/10100, beide `bottom-4`. Die Meldungen im Optimizer waren also
+  schon vorher unsichtbar, unabhängig von dieser Änderung. Loop A ist damit
+  ausgereizt bis auf die 44-px-Touch-Ziele, die ohne Browser nicht seriös zu
+  beurteilen sind. Nächstes: Loop B (Performance).
 
 - **Iteration 3 (Loop A, Mobile)** — Ansichts-Umschalter freigelegt. Gelernt:
   `hidden md:*` ist der stille Killer für Mobile — sieht im Markup harmlos aus und

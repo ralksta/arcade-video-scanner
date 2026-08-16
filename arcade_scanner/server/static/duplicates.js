@@ -430,11 +430,11 @@ async function deleteDuplicate(groupIdx, fileIdx) {
             // Refresh view with updated data
             renderDuplicatesView();
         } else {
-            alert('Failed to delete file');
+            showToast('Datei konnte nicht gelöscht werden', 'error');
         }
     } catch (e) {
         console.error('Delete error:', e);
-        alert('Error deleting file');
+        showToast('Fehler beim Löschen der Datei', 'error');
     }
 }
 
@@ -472,7 +472,7 @@ async function rescanDuplicates() {
         });
 
         if (!clearRes.ok) {
-            alert('Failed to clear cache');
+            showToast('Cache konnte nicht geleert werden', 'error');
             return;
         }
 
@@ -482,7 +482,7 @@ async function rescanDuplicates() {
 
     } catch (e) {
         console.error('Rescan error:', e);
-        alert('Error triggering rescan');
+        showToast('Rescan konnte nicht gestartet werden', 'error');
     }
 }
 
@@ -492,7 +492,7 @@ async function rescanDuplicates() {
  */
 async function deleteAllDuplicates() {
     if (!duplicateData || !duplicateData.groups || duplicateData.groups.length === 0) {
-        alert('No duplicates to delete');
+        showToast('Keine Duplikate zum Löschen', 'warning');
         return;
     }
 
@@ -511,7 +511,7 @@ async function deleteAllDuplicates() {
     });
 
     if (filesToDelete.length === 0) {
-        alert('No duplicate files to delete');
+        showToast('Keine Duplikat-Dateien zum Löschen', 'warning');
         return;
     }
 
@@ -548,22 +548,23 @@ async function deleteAllDuplicates() {
 
             // Handle any failed deletions
             if (result.failed && result.failed.length > 0) {
-                alert(
-                    `Deleted ${result.deleted.length} files (freed ${result.freed_mb.toFixed(1)} MB).\n\n` +
-                    `${result.failed.length} file(s) could not be deleted.`
+                showToast(
+                    `${result.deleted.length} Dateien gelöscht (${result.freed_mb.toFixed(1)} MB frei) — `
+                    + `${result.failed.length} konnten nicht gelöscht werden`,
+                    'warning', 6000
                 );
             } else {
-                alert(`Successfully deleted ${result.deleted.length} files and freed ${result.freed_mb.toFixed(1)} MB!`);
+                showToast(`${result.deleted.length} Dateien gelöscht, ${result.freed_mb.toFixed(1)} MB frei`, 'success');
             }
 
             // Refresh the view
             renderDuplicatesView();
         } else {
-            alert('Failed to delete files');
+            showToast('Dateien konnten nicht gelöscht werden', 'error');
         }
     } catch (e) {
         console.error('Bulk delete error:', e);
-        alert('Error deleting files');
+        showToast('Fehler beim Löschen der Dateien', 'error');
     }
 }
 
@@ -624,7 +625,7 @@ async function startDuplicateScan(batchOffset = 0) {
  */
 async function scanNextBatch() {
     if (!hasMoreBatches || nextBatchOffset === 0) {
-        alert('No more batches to scan');
+        showToast('Keine weiteren Stapel zu scannen', 'info');
         return;
     }
 
@@ -655,7 +656,7 @@ async function scanNextBatch() {
  */
 function openDuplicateChecker() {
     if (!duplicateData || !duplicateData.groups || duplicateData.groups.length === 0) {
-        alert('No duplicate groups to review');
+        showToast('Keine Duplikat-Gruppen zu prüfen', 'info');
         return;
     }
 
@@ -712,7 +713,7 @@ function renderDuplicateCheckerGroup(groupIndex) {
     if (groupIndex < 0 || groupIndex >= groups.length) {
         // No more groups - close the checker
         closeDuplicateChecker();
-        alert('All duplicate groups reviewed!');
+        showToast('Alle Duplikat-Gruppen geprüft', 'success');
         return;
     }
 
@@ -871,7 +872,7 @@ async function keepDuplicateFile(side) {
     const filesToDelete = group.files.filter(f => f.path !== fileToKeep.path);
 
     if (filesToDelete.length === 0) {
-        alert('No files to delete');
+        showToast('Keine Dateien zum Löschen', 'warning');
         return;
     }
 
@@ -895,11 +896,11 @@ async function keepDuplicateFile(side) {
             // Show next group (same index since we removed current)
             renderDuplicateCheckerGroup(window.duplicateCheckerState.currentGroupIndex);
         } else {
-            alert('Failed to delete files');
+            showToast('Dateien konnten nicht gelöscht werden', 'error');
         }
     } catch (err) {
         console.error('Delete error:', err);
-        alert('Error deleting files');
+        showToast('Fehler beim Löschen der Dateien', 'error');
     }
 }
 
@@ -944,11 +945,11 @@ async function markAnyIsFine() {
             // Show next group
             renderDuplicateCheckerGroup(window.duplicateCheckerState.currentGroupIndex);
         } else {
-            alert('Failed to delete files');
+            showToast('Dateien konnten nicht gelöscht werden', 'error');
         }
     } catch (err) {
         console.error('Delete error:', err);
-        alert('Error deleting files');
+        showToast('Fehler beim Löschen der Dateien', 'error');
     }
 }
 

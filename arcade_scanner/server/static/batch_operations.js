@@ -256,7 +256,11 @@ function triggerBatchCompress() {
     }
 
     if (processable.length === 0) {
-        alert(`No files to process!\n\nAll ${skipped.length} selected file(s) are under ${BATCH_MIN_SIZE_MB}MB and will be skipped.\n\nThese files are already compact and don't need optimization.`);
+        showToast(
+            `Nichts zu tun: alle ${skipped.length} ausgewählten Dateien sind unter `
+            + `${BATCH_MIN_SIZE_MB} MB und damit bereits kompakt`,
+            'warning', 5000
+        );
         return;
     }
 

@@ -14,6 +14,15 @@ All notable changes to this project will be documented in this file.
   globalen Kürzel halten sich zurück, während der Nutzer tippt oder Cinema bzw. die
   Duplikat-Prüfung offen ist. Neu: `static/shortcuts.js`.
 
+- **Eine Sorte Rückmeldung statt zwei**: Das Dashboard nutzte 30 blockierende
+  `alert()`-Dialoge neben 34 Toasts — dieselbe Art Information, einmal als
+  Systemdialog mitten im Bild, einmal als Einblendung unten rechts. Alle
+  `alert()`-Aufrufe sind jetzt Toasts mit passendem Typ (Fehler, Warnung,
+  Erfolg, Info); `confirm()` bleibt, weil es einen Rückgabewert liefert. Dabei
+  aufgefallen: Toasts lagen auf `z-index: 10000`, das Optimizer- (10050) und das
+  GIF-Panel (10100) darüber — und beide sitzen `bottom-4`, also genau dort, wo
+  die Toasts erscheinen. Meldungen aus dem Optimizer waren damit unsichtbar.
+
 - **Ansichten auf dem Handy erreichbar**: Die Umschaltung zwischen Grid, Liste,
   Treemap und Ordner-Browser steckte in einem `hidden md:flex`-Container — auf
   einem Telefon gab es damit keinen Weg zu drei der vier Ansichten. Die Umschalter

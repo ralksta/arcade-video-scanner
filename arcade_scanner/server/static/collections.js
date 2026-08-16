@@ -305,7 +305,7 @@ function saveCollection() {
     const _el = (id) => document.getElementById(id);
     const name = (_el('collectionName')?.value || '').trim();
     if (!name) {
-        alert('Please enter a collection name');
+        showToast('Bitte einen Namen für die Collection eingeben', 'warning');
         return;
     }
 

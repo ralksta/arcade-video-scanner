@@ -493,18 +493,18 @@ function createNewTag() {
     let shortcut = shortcutInput?.value?.trim().toUpperCase() || '';
 
     if (!name) {
-        alert('Please enter a tag name');
+        showToast('Bitte einen Tag-Namen eingeben', 'warning');
         return;
     }
 
     // Validate shortcut
     const reservedKeys = ['F', 'V'];
     if (shortcut && reservedKeys.includes(shortcut)) {
-        alert(`Shortcut "${shortcut}" is reserved. Please use a different letter.`);
+        showToast(`Kürzel „${shortcut}" ist reserviert — bitte einen anderen Buchstaben wählen`, 'warning');
         return;
     }
     if (shortcut && !/^[A-Z]$/.test(shortcut)) {
-        alert('Shortcut must be a single letter A-Z');
+        showToast('Kürzel muss ein einzelner Buchstabe A–Z sein', 'warning');
         return;
     }
 
@@ -515,7 +515,7 @@ function createNewTag() {
     })
         .then(res => {
             if (res.status === 409) {
-                alert('Tag already exists');
+                showToast('Tag existiert bereits', 'warning');
                 return null;
             }
             return res.json();
@@ -531,7 +531,7 @@ function createNewTag() {
         })
         .catch(err => {
             console.error('Error creating tag:', err);
-            alert('Failed to create tag');
+            showToast('Tag konnte nicht angelegt werden', 'error');
         });
 }
 
@@ -549,7 +549,7 @@ function deleteTag(tagName) {
         })
         .catch(err => {
             console.error('Error deleting tag:', err);
-            alert('Failed to delete tag');
+            showToast('Tag konnte nicht gelöscht werden', 'error');
         });
 }
 
@@ -609,11 +609,11 @@ function editTagShortcut(tagName, currentShortcut) {
 
     // Validate
     if (shortcut && !/^[A-Z]$/.test(shortcut)) {
-        alert('Shortcut must be a single letter A-Z');
+        showToast('Kürzel muss ein einzelner Buchstabe A–Z sein', 'warning');
         return;
     }
     if (['F', 'V'].includes(shortcut)) {
-        alert(`"${shortcut}" is reserved. Please use a different letter.`);
+        showToast(`Kürzel „${shortcut}" ist reserviert — bitte einen anderen Buchstaben wählen`, 'warning');
         return;
     }
 

@@ -94,8 +94,9 @@ function setWorkspaceMode(mode, preserveCollection = false) {
         }
         updateURL();
     } catch (e) {
-        alert("Error in setWorkspaceMode: " + e.message + "\\n" + e.stack);
-        console.error(e);
+        // Der Stacktrace gehört in die Konsole, nicht in einen Blocker-Dialog.
+        console.error('setWorkspaceMode:', e);
+        showToast(`Ansicht konnte nicht gewechselt werden: ${e.message}`, 'error');
     }
 }
 

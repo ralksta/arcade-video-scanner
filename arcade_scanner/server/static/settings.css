@@ -655,7 +655,9 @@
     align-items: center;
     gap: var(--space-sm);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    z-index: 10000;
+    /* Über Optimizer- (10050) und GIF-Panel (10100): beide sitzen bottom-4,
+       also genau dort, wo die Toasts erscheinen — darunter wären sie unsichtbar. */
+    z-index: 10200;
     font-size: var(--font-size-sm);
     font-weight: 500;
     min-width: 220px;
