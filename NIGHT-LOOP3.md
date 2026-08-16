@@ -205,7 +205,7 @@ jetzt systematisch.
 
 ## Zyklus 5
 
-- [ ] **Loop J — Maskierung dort, wo die Angriffsfläche wirklich ist**
+- [x] **Loop J — Maskierung dort, wo die Angriffsfläche wirklich ist** — ausgereizt
       Löst eine Schuld ein, die ich in `dev-docs/frontend-escaping.md` selbst
       benannt habe: Von den 87 Fundstellen sind `folder_browser.js` (Ordnernamen)
       und `tag_manager.js` (frei vergebene Tags) die einzigen mit echtem
@@ -228,6 +228,16 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 34 (Loop J, Tags und Ordner)** — Fünf interpolierte
+  `onclick`-Handler mit frei eingegebenen Tag- bzw. Ordnernamen. Der lehrreichste
+  war der *abgesicherte*: `crumb.path.replace(/'/g, "\\'")` schützt gegen
+  Apostrophe, aber das Attribut begrenzen Anführungszeichen — eine Absicherung,
+  die die falsche Grenze kennt, ist keine. Alle auf DOM-Knoten umgestellt.
+  Nebenbei mein eigener `alert()`-Wächter aus Loop A ausgelöst: durch einen
+  *Kommentar*, der die behobene Stelle erklärt. Genau der Fehlalarm-Typ, den ich
+  in derselben Nacht schon einmal hatte — der Wächter filtert jetzt Kommentare,
+  wie der `fetch`-Wächter direkt daneben es längst tat.
 
 - **Iteration 33 (Übergabebericht)** — Bewusst als Datei im Repository, nicht
   als veröffentlichte Seite: der Bericht enthält Sicherheitsfunde zu einem

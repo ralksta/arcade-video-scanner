@@ -238,7 +238,7 @@ function renderBatchTagOptions() {
         return;
     }
 
-    container.innerHTML = filteredTags.map((tag, index) => {
+    const batchNodes = filteredTags.map((tag, index) => {
         const currentState = getTagStateForSelection(tag.name);
         const action = batchTagActions[tag.name];
 
@@ -268,18 +268,36 @@ function renderBatchTagOptions() {
 
         const pendingGlow = hasAction ? 'shadow-[0_0_12px_rgba(168,85,247,0.4)]' : '';
 
-        return `
-            <button class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm font-medium ${bgColor} ${borderColor} ${textColor} ${pendingGlow} hover:bg-ink/10"
-                    onclick="toggleBatchTagOption('${tag.name}')"
-                    onkeydown="handleBatchTagChipKeydown(event, '${tag.name}')"
-                    tabindex="${index === batchTagFocusIndex ? '0' : '-1'}">
-                <span class="material-icons text-lg" aria-hidden="true">${checkIcon}</span>
-                <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${tag.color}"></span>
-                <span>${tag.name}</span>
-                ${hasAction ? '<span class="text-purple-400 font-bold ml-1">•</span>' : ''}
-            </button>
-        `;
-    }).join('');
+        const button = document.createElement('button');
+        button.className = `inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm font-medium ${bgColor} ${borderColor} ${textColor} ${pendingGlow} hover:bg-ink/10`;
+        button.tabIndex = index === batchTagFocusIndex ? 0 : -1;
+        button.addEventListener('click', () => toggleBatchTagOption(tag.name));
+        button.addEventListener('keydown', (event) => handleBatchTagChipKeydown(event, tag.name));
+
+        const icon = document.createElement('span');
+        icon.className = 'material-icons text-lg';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = checkIcon;
+
+        const dot = document.createElement('span');
+        dot.className = 'w-2 h-2 rounded-full shrink-0';
+        dot.style.backgroundColor = tag.color || '';
+
+        const label = document.createElement('span');
+        label.textContent = tag.name;
+
+        button.append(icon, dot, label);
+        if (hasAction) {
+            const marker = document.createElement('span');
+            marker.className = 'text-purple-400 font-bold ml-1';
+            marker.textContent = '•';
+            button.appendChild(marker);
+        }
+        return button;
+    });
+
+    container.innerHTML = '';
+    batchNodes.forEach(node => container.appendChild(node));
 }
 
 function toggleBatchTagOption(tagName) {
@@ -399,7 +417,7 @@ function renderFilterTagsList() {
         return;
     }
 
-    container.innerHTML = availableTags.map(tag => {
+    const filterNodes = availableTags.map(tag => {
         const isPos = activeTags.includes(tag.name);
         const isNeg = activeTags.includes('!' + tag.name);
         let classes = 'tag-filter-chip';
@@ -413,15 +431,23 @@ function renderFilterTagsList() {
             style = `border-color: rgba(239, 68, 68, 0.5)`;
         }
 
-        return `
-        <button class="${classes}" 
-                onclick="toggleTagFilter('${tag.name}')"
-                style="${style}">
-            <span class="tag-dot" style="background-color: ${isNeg ? '#ef4444' : tag.color}"></span>
-            ${tag.name}
-        </button>
-        `;
-    }).join('');
+        // Knoten statt String: der Tag-Name ist frei eingegeben und stand hier
+        // in einem interpolierten onclick.
+        const button = document.createElement('button');
+        button.className = classes;
+        button.setAttribute('style', style);
+        button.addEventListener('click', () => toggleTagFilter(tag.name));
+
+        const dot = document.createElement('span');
+        dot.className = 'tag-dot';
+        dot.style.backgroundColor = isNeg ? '#ef4444' : (tag.color || '');
+
+        button.append(dot, document.createTextNode(tag.name));
+        return button;
+    });
+
+    container.innerHTML = '';
+    filterNodes.forEach(node => container.appendChild(node));
 }
 
 // --- VIDEO CARD TAG CHIPS ---
@@ -580,24 +606,56 @@ function renderExistingTagsList() {
         return;
     }
 
-    container.innerHTML = tags.map(t => {
+    // Tag-Namen sind frei eingegeben. Sie standen hier in drei interpolierten
+    // onclick-Handlern — ein Tag namens `'); alert(1); ('` bricht daraus aus.
+    // escapeHtml hilft dabei nicht: der HTML-Parser löst die Entities auf,
+    // bevor der JS-Parser die Zeile sieht. Also Knoten bauen statt Text
+    // zusammensetzen; dann gibt es keinen Parser, aus dem man ausbrechen kann.
+    container.innerHTML = '';
+
+    tags.forEach(t => {
         const shortcutValue = t.shortcut ? t.shortcut.toUpperCase() : '';
-        const shortcutDisplay = shortcutValue
-            ? `<span class="text-xs px-1.5 py-0.5 rounded bg-ink/10 text-gray-400 cursor-pointer hover:bg-ink/20" onclick="editTagShortcut('${t.name}', '${shortcutValue}')" title="Click to edit">(${shortcutValue})</span>`
-            : `<span class="text-xs text-gray-600 cursor-pointer hover:text-gray-400" onclick="editTagShortcut('${t.name}', '')" title="Click to add shortcut">+ key</span>`;
-        return `
-        <div class="flex items-center justify-between py-2 px-3 bg-ink/10 rounded-lg border border-ink/5 group" id="tag-row-${t.name}">
-            <div class="flex items-center gap-3">
-                <span class="w-4 h-4 rounded-full" style="background-color: ${t.color}"></span>
-                <span class="text-text-main text-sm">${t.name}</span>
-                ${shortcutDisplay}
-            </div>
-            <button onclick="deleteTag('${t.name}')" aria-label="Tag ${escapeHtml(t.name)} löschen" class="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
-                <span class="material-icons text-lg" aria-hidden="true">delete</span>
-            </button>
-        </div>
-    `;
-    }).join('');
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between py-2 px-3 bg-ink/10 rounded-lg border border-ink/5 group';
+        row.id = `tag-row-${t.name}`;
+
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-3';
+
+        const swatch = document.createElement('span');
+        swatch.className = 'w-4 h-4 rounded-full';
+        // Über style.backgroundColor statt per Attribut-Interpolation: der
+        // Browser verwirft ungültige Farben, statt Markup zu übernehmen.
+        swatch.style.backgroundColor = t.color || '';
+
+        const label = document.createElement('span');
+        label.className = 'text-text-main text-sm';
+        label.textContent = t.name;
+
+        const shortcut = document.createElement('span');
+        if (shortcutValue) {
+            shortcut.className = 'text-xs px-1.5 py-0.5 rounded bg-ink/10 text-gray-400 cursor-pointer hover:bg-ink/20';
+            shortcut.textContent = `(${shortcutValue})`;
+            shortcut.title = 'Click to edit';
+        } else {
+            shortcut.className = 'text-xs text-gray-600 cursor-pointer hover:text-gray-400';
+            shortcut.textContent = '+ key';
+            shortcut.title = 'Click to add shortcut';
+        }
+        shortcut.addEventListener('click', () => editTagShortcut(t.name, shortcutValue));
+
+        left.append(swatch, label, shortcut);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100';
+        removeBtn.setAttribute('aria-label', `Tag ${t.name} löschen`);
+        removeBtn.innerHTML = '<span class="material-icons text-lg" aria-hidden="true">delete</span>';
+        removeBtn.addEventListener('click', () => deleteTag(t.name));
+
+        row.append(left, removeBtn);
+        container.appendChild(row);
+    });
 }
 
 function editTagShortcut(tagName, currentShortcut) {
