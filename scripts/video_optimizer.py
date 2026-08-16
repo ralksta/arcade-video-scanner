@@ -14,7 +14,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -433,18 +433,69 @@ def promote_staging(staging: Path, output_path: Path, expected_duration: float) 
     return True
 
 
+class TimeParseError(ValueError):
+    """Eine Zeitangabe war nicht lesbar."""
+
+
 def parse_time_to_seconds(time_str: Optional[str]) -> float:
-    """Convert time string (HH:MM:SS or SS) to seconds."""
-    if not time_str:
+    """Zeitangabe in Sekunden umrechnen — dieselben Formen, die ffmpeg akzeptiert.
+
+    Unterstützt ``[HH:]MM:SS[.ms]`` und reine Sekunden (auch mit Nachkomma).
+
+    Warum das genau stimmen muss: Der Wert von ``--ss`` geht **roh** an ffmpeg
+    (``cmd.extend(['-ss', str(ss)])``), und parallel wird er hier ausgewertet,
+    um ``start_offset`` zu bestimmen. Aus dem Offset ergeben sich die
+    SSIM-Vergleichspunkte im Original::
+
+        orig_starts = [start_offset + s for s in opt_starts]
+
+    Weichen beide Auslegungen voneinander ab, vergleicht die Qualitätsprüfung
+    Bilder aus verschiedenen Stellen des Films — die Sicherung, die einen
+    schlechten Encode vom Original fernhält, misst dann Rauschen.
+
+    Vorher lief die Auswertung über ``strptime(..., "%H:%M:%S")`` und gab bei
+    allem anderen stillschweigend ``0.0`` zurück. ``--ss 1:30`` bedeutet für
+    ffmpeg 90 Sekunden, hier ergab es 0 — ohne jeden Hinweis. Ebenso
+    ``--ss 25:00:00`` (strptime lässt keine Stunde über 23 zu).
+
+    Args:
+        time_str: Zeitangabe oder None.
+
+    Returns:
+        Sekunden als float; 0.0 wenn nichts angegeben wurde.
+
+    Raises:
+        TimeParseError: Bei einer Angabe, die sich nicht auswerten lässt —
+            lieber abbrechen als das falsche Segment kodieren.
+    """
+    if time_str is None or str(time_str).strip() == "":
         return 0.0
+
+    raw = str(time_str).strip()
+    negative = raw.startswith("-")
+    if negative:
+        raw = raw[1:]
+
     try:
-        if ':' in str(time_str):
-            t = datetime.strptime(str(time_str), "%H:%M:%S")
-            delta = timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
-            return delta.total_seconds()
-        return float(time_str)
-    except (ValueError, TypeError):
-        return 0.0
+        if ":" in raw:
+            parts = raw.split(":")
+            if len(parts) > 3:
+                raise ValueError("zu viele Doppelpunkte")
+            # ffmpeg liest von rechts: SS, dann MM, dann HH.
+            seconds = 0.0
+            for factor, part in zip((1.0, 60.0, 3600.0), reversed(parts)):
+                if part == "":
+                    raise ValueError("leerer Abschnitt")
+                seconds += float(part) * factor
+        else:
+            seconds = float(raw)
+    except (ValueError, TypeError) as e:
+        raise TimeParseError(
+            f"Zeitangabe {time_str!r} ist nicht lesbar ({e}). "
+            "Erlaubt sind [HH:]MM:SS[.ms] oder Sekunden."
+        ) from None
+
+    return -seconds if negative else seconds
 
 def _detect_quality_filter() -> str:
     """Detect best available quality metric filter: MS-SSIM if available, else SSIM."""
@@ -2015,6 +2066,16 @@ def main():
         print(f"{Y}Min size: {args.min_size} MB{NC}")
 
     if args.ss or args.to:
+        # Früh und laut scheitern: Der rohe Wert geht an ffmpeg, unsere
+        # Auswertung bestimmt die SSIM-Vergleichspunkte. Weichen beide ab,
+        # misst die Qualitätsprüfung an der falschen Stelle — dann lieber
+        # gar nicht erst anfangen.
+        try:
+            parse_time_to_seconds(args.ss)
+            parse_time_to_seconds(args.to)
+        except TimeParseError as e:
+            print(f"{R}✗ {e}{NC}")
+            return 1
         print(f"{Y}Trim Active: {args.ss} -> {args.to}{NC}")
 
     files = args.files

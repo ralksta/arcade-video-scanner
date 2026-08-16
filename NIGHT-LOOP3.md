@@ -212,7 +212,9 @@ jetzt systematisch.
       Fremdeinfluss. Einzeln beurteilen, mit node-Tests belegen — nicht pauschal
       `escapeHtml()` darüberziehen.
 
-- [ ] **Loop K — Der Optimizer**
+- [ ] **Loop K — Der Optimizer** (läuft)
+      - [x] `parse_time_to_seconds`: las Trim-Zeiten anders als ffmpeg — die
+            SSIM-Prüfung verglich dadurch die falschen Bilder
       `scripts/video_optimizer.py` ist die größte Einzeldatei und das
       Kernversprechen des Produkts (50–80 % Ersparnis), aber die
       Entscheidungslogik ist kaum abgedeckt: 25 Divisionen mit variablem
@@ -228,6 +230,15 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 35 (Loop K, Trim-Zeiten)** — Der bisher subtilste Fund. Zwei
+  Auslegungen derselben Zeichenkette: ffmpeg bekommt sie roh, der Optimizer
+  wertet sie selbst aus. Solange beide übereinstimmen, fällt nichts auf — bei
+  `--ss 1:30` (ffmpeg: 90 s, Optimizer: 0) verrutschen die SSIM-Vergleichspunkte
+  um anderthalb Minuten, und die Qualitätsprüfung misst an der falschen Stelle.
+  Sie ist die Sicherung gegen einen schlechten Encode, der das Original ersetzt.
+  Lehre: Wo derselbe Wert zweimal ausgelegt wird, ist die Übereinstimmung eine
+  Zusage — und Zusagen gehören getestet.
 
 - **Iteration 34 (Loop J, Tags und Ordner)** — Fünf interpolierte
   `onclick`-Handler mit frei eingegebenen Tag- bzw. Ordnernamen. Der lehrreichste
