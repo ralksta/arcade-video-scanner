@@ -45,7 +45,13 @@ from arcade_scanner.core.proxy_resolver import is_proxy_stale  # noqa: E402
 
 DEFAULT_DB = str(SCRIPT_DIR.parent / "arcade_data" / "media_library.db")
 
-G = "\033[92m"; Y = "\033[93m"; R = "\033[91m"; C = "\033[96m"; B = "\033[1m"; N = "\033[0m"
+# ANSI-Farben für die Konsolenausgabe
+G = "\033[92m"   # grün
+Y = "\033[93m"   # gelb
+R = "\033[91m"   # rot
+C = "\033[96m"   # cyan
+B = "\033[1m"    # fett
+N = "\033[0m"    # zurücksetzen
 
 
 def log(msg: str = "") -> None:

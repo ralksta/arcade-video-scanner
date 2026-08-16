@@ -52,6 +52,11 @@ addopts = "-v --tb=short"
 [tool.ruff]
 line-length = 100
 target-version = "py38"
+
+[tool.ruff.lint]
+# Seit Ruff 0.2 gehören select/ignore unter [tool.ruff.lint]; als Top-Level-
+# Schlüssel wirkten sie zwar weiter, gaben aber bei jedem Lauf eine
+# Deprecation-Warnung aus.
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 

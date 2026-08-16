@@ -7,7 +7,6 @@ import pytest
 
 from arcade_scanner.core import proxy_resolver as pr
 
-
 # ── Path mapping ────────────────────────────────────────────────────────────
 
 def test_proxy_path_mirrors_full_original_path():

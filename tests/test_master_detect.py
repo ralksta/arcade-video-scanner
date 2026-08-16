@@ -16,7 +16,6 @@ from arcade_scanner.core.master_detect import (
     session_of,
 )
 
-
 # ── Raw material via the folder ─────────────────────────────────────────────
 
 @pytest.mark.parametrize("path", [

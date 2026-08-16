@@ -16,6 +16,11 @@ from arcade_scanner.config import (
     MAX_REQUEST_SIZE,  # noqa: F401 — re-exported for routes/* lazy imports
     config,
 )
+from arcade_scanner.core.proxy_resolver import (
+    client_ip_from_handler,
+    parse_override,
+    resolve_stream_path,
+)
 from arcade_scanner.database import db, user_db
 from arcade_scanner.security import (
     SecurityError,
@@ -29,14 +34,8 @@ from arcade_scanner.server.response_helpers import (
     send_json_precompressed,
     send_not_modified_if_unchanged,
 )
-from arcade_scanner.core.proxy_resolver import (
-    client_ip_from_handler,
-    parse_override,
-    resolve_stream_path,
-)
 from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
-
 
 _TOKEN_QUERY_RE = re.compile(r"([?&]token=)[^&\s\"]+")
 

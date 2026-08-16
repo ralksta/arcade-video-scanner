@@ -22,6 +22,9 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 
 ## Baseline (Start)
 
+> Nachtrag: Der Ruff-Baseline-Wert von 8 Fehlern ist am Ende von Loop G auf 0
+> gefallen. Die Suite steht bei 1474 statt 880 Tests.
+
 - `pytest`: 880 passed, 1 xfailed
 - `ruff`: 8 vorbestehende Fehler (api_handler I001, generate_proxies E702 ×5, 2× Test-I001)
 
@@ -150,7 +153,7 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
         Ordnerpfad. Als Produktentscheidung dokumentiert, nicht eigenmächtig
         geändert (`dev-docs/saved-views-are-shared.md`)
 
-- [ ] **Loop G — Altlasten im Repository**
+- [x] **Loop G — Altlasten im Repository** — ausgereizt
       Beim Durchsuchen sind wiederholt Dateien aufgefallen, die nicht mehr
       dazugehören: macOS-Ressourcenzweige (`._*.py`, die als Python-Dateien
       gescannt werden und Analysen stören), `docker-compose.yml_back2`,
@@ -163,11 +166,22 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
       - [x] `.ipk` (15 MB Binärpaket) aus Git entfernt, Datei bleibt lokal
       - Befund: `._*`, `screenlog.0` und `*_back*` standen bereits in
         `.gitignore` — sie liegen nur lokal, nicht im Repository
-      - [ ] Die acht vorbestehenden Ruff-Fehler
+      - [x] Die acht vorbestehenden Ruff-Fehler behoben; Ruff-Konfiguration auf
+            `[tool.ruff.lint]` umgestellt (die Deprecation-Warnung lief bei
+            jedem Lauf mit). **Ruff ist erstmals vollständig sauber.**
 
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 28 (Loop G, Lint)** — Die acht Fehler, die seit Beginn der Nacht
+  als Baseline mitliefen, sind weg: drei automatisch (Importsortierung), fünf
+  von Hand (eine Zeile mit sechs Semikolon-getrennten Farbdefinitionen).
+  Zusätzlich die Ruff-Konfiguration auf `[tool.ruff.lint]` umgestellt — die
+  Deprecation-Warnung lief bei *jedem* Aufruf mit und hätte irgendwann dazu
+  geführt, dass niemand mehr hinsieht. Nach der Umstellung geprüft, dass die
+  Regeln noch greifen (absichtlicher Verstoß wird gemeldet), statt nur „All
+  checks passed" zu glauben. Loop G ist damit ausgereizt.
 
 - **Iteration 27 (Loop G, Ad-hoc-Skripte)** — Was wie Aufräumen aussah, war
   wieder ein Sicherheitsthema: fünf Skripte im Wurzelverzeichnis mit
