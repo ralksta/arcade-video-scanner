@@ -859,13 +859,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     })
 
                 # DB Samples (Top 20)
-                cursor = db._conn.execute("SELECT file_path, status, media_type FROM media LIMIT 20")
-                for row in cursor:
-                    debug_info["db_stats"]["samples"].append({
-                        "path": row[0],
-                        "status": row[1],
-                        "type": row[2]
-                    })
+                debug_info["db_stats"]["samples"] = db.get_sample_rows(20)
 
                 # Mount Check
                 mount_status = {}

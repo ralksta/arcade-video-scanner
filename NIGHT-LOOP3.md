@@ -86,6 +86,8 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
       - [x] 50 Divisionen mit variablem Divisor geprüft: die meisten sauber
             abgesichert, aber `1/speed` im GIF-Export nicht — Parameter werden
             jetzt an der Grenze validiert
+      - [x] Nebenläufigkeit: `/api/debug/dump` las an `_write_lock` vorbei auf
+            der geteilten Verbindung — gekapselt, Contract-Test ergänzt
       Die ergiebigste Ader der Nacht: veraltete Proxys, ein Cache ohne
       Invalidierung, `FOLDERS_DATA` mit fremden Pfaden, eine Test-Suite die ins
       Produktivverzeichnis schrieb — alle vier hatten gemeinsam, dass nichts
@@ -107,6 +109,13 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 15 (Loop D, Nebenläufigkeit)** — Der Store dokumentiert seine
+  Thread-Falle ausführlich und misst sie sogar (0 bis 5199 Zeilen bei 800). Und
+  genau daneben griff eine Route direkt auf `_conn` zu. Lehre: eine Warnung im
+  Kommentar schützt nur den, der sie liest; ein Test schützt alle. Der neue
+  Contract-Test verbietet `._conn` außerhalb des Stores — einmal per Textsuche,
+  einmal über den Syntaxbaum.
 
 - **Iteration 14 (Loop D, Randfälle)** — 50 Divisionen mit variablem Divisor
   durchgesehen. Erfreulich: `criteria_eval`, `similarity` und `media_probe` sind

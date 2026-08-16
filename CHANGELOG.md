@@ -141,6 +141,17 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **`/api/debug/dump` griff an der Thread-Sicherung vorbei auf die Datenbank.**
+  Die Route las über `db._conn.execute(...)` direkt auf der geteilten
+  Verbindung — ohne `_write_lock`. Genau davor warnt der Kommentar im Store:
+  Pythons sqlite3 hält einen Statement-Cache pro Verbindung, zwei Threads mit
+  derselben SQL teilen sich ein vorbereitetes Statement und konsumieren
+  gegenseitig ihre Zeilen; nichts wirft, das Ergebnis ist einfach falsch.
+  Zweiter Fehler in derselben Zeile: ohne `_ensure_connection()` ist `_conn` vor
+  dem ersten Zugriff `None`, die Route lief dann in einen AttributeError. Beides
+  behoben über die neue Store-Methode `get_sample_rows()`; ein Test hält den
+  Rest des Projekts von `._conn` fern.
+
 - **GIF-Export: `speed=0` ließ den Auftrag an einer Division durch null
   scheitern.** Die Zahlen aus dem Request-Body kamen ungeprüft durch; im Worker
   steht `1/speed` hinter dem Guard `if speed != 1.0`, der für 0 wahr ist. Der

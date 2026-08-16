@@ -615,6 +615,36 @@ class SQLiteStore:
                     print(f"⚠️ Skipping corrupted DB row (dict): {e}")
             return results
 
+    def get_sample_rows(self, limit: int = 20) -> list[dict]:
+        """Ein paar Zeilen für Diagnosezwecke — Pfad, Status, Medientyp.
+
+        Existiert, damit Diagnose-Code nicht auf ``store._conn`` zugreifen muss.
+        Genau das tat die Debug-Route: ohne ``_write_lock`` (zwei Threads teilen
+        sich dann dasselbe vorbereitete Statement und konsumieren gegenseitig
+        ihre Zeilen, siehe Kommentar bei ``_write_lock``) und ohne
+        ``_ensure_connection()`` — vor dem ersten Zugriff ist ``_conn`` noch
+        ``None``, der Aufruf lief dann in einen AttributeError.
+
+        Args:
+            limit: Höchstzahl zurückgegebener Zeilen.
+
+        Returns:
+            Liste von Dicts mit ``path``, ``status`` und ``type``.
+        """
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.execute(
+                "SELECT file_path, status, media_type FROM media LIMIT ?", (max(0, limit),)
+            )
+            return [
+                {
+                    "path": self._decode_safe_path(row["file_path"]),
+                    "status": row["status"],
+                    "type": row["media_type"],
+                }
+                for row in cursor
+            ]
+
     def get(self, path: str) -> Optional[VideoEntry]:
         """Lookup a single entry by file_path. O(1) indexed."""
         conn = self._ensure_connection()
