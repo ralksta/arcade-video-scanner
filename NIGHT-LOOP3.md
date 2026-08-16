@@ -90,6 +90,9 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
             der geteilten Verbindung — gekapselt, Contract-Test ergänzt
       - [x] Unbegrenztes Wachstum: `GIF_JOBS` wurde nie aufgeräumt — jetzt
             Registry mit Lock, Obergrenze und Ablaufzeit
+      - [x] Zusage „nur vier Laufzeit-Abhängigkeiten, kein Framework" abgesichert.
+            Kein Fehler gefunden — der Bestand hält sie exakt ein; es fehlte
+            nur der Wächter
       Die ergiebigste Ader der Nacht: veraltete Proxys, ein Cache ohne
       Invalidierung, `FOLDERS_DATA` mit fremden Pfaden, eine Test-Suite die ins
       Produktivverzeichnis schrieb — alle vier hatten gemeinsam, dass nichts
@@ -111,6 +114,15 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 17 (Loop D, Abhängigkeits-Zusage)** — Hier gab es nichts zu
+  reparieren: nur pydantic, pydantic-settings, Pillow, imagehash, alle auf
+  Modul-Ebene, kein Framework irgendwo. Wert liegt allein im Wächter. Beim
+  Verifizieren zweimal danebengegriffen (Einfügung vor `from __future__`, dann
+  mitten hinein) — der saubere Nachweis lief am Ende über eine temporäre Datei
+  mit `import pluggy`: installiert, aber nicht deklariert, also genau der Fall,
+  der beim Entwickeln unsichtbar bleibt und erst bei frischer Installation
+  zuschlägt.
 
 - **Iteration 16 (Loop D, unbegrenztes Wachstum)** — Ein Leck, das man nur bei
   einem Werkzeug bemerkt, das *dauerhaft* läuft: ein Modul-Dict ohne Aufräumen.

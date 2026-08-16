@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Wächter für die Laufzeit-Abhängigkeiten**: `CLAUDE.md` sagt zu, dass der
+  Server reine Standardbibliothek ist und nur pydantic, pydantic-settings,
+  Pillow und imagehash braucht. Geprüft hatte das niemand — ein `import
+  requests` in einer Route fällt beim Entwickeln nicht auf und schlägt erst bei
+  der nächsten frischen Installation zu. Neue Tests prüfen jeden Import im
+  Paket: nicht deklarierte Bibliotheken auf Modul-Ebene, Web-Frameworks
+  überhaupt, und optionale Extras (torch, open_clip) außerhalb einer Funktion.
+  Der Bestand hielt die Zusage vollständig ein; hier wird also kein Fehler
+  behoben, sondern ein Zustand festgehalten.
+
 - **Export der aktuellen Ansicht** (CSV und M3U): Über die Command-Palette
   (`Ctrl`/`⌘`+`K` → „Ansicht als …") wird genau das ausgegeben, was gerade zu
   sehen ist — dieselbe Liste, dieselbe Reihenfolge, inklusive aller aktiven
