@@ -169,7 +169,7 @@ function createComparisonCard(pair) {
             </div>
             
             <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
-                <span class="truncate font-medium text-gray-300" title="${orig.FilePath}">${orig.FilePath.split(/[\\\\/]/).pop()}</span>
+                <span class="truncate font-medium text-gray-300" title="${escapeHtml(orig.FilePath)}">${escapeHtml(orig.FilePath.split(/[\\\\/]/).pop())}</span>
                 <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
             ${window.IS_LOCAL_ACCESS ? `
@@ -208,7 +208,7 @@ function createComparisonCard(pair) {
             </div>
             
             <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
-                <span class="truncate font-medium text-gray-300" title="${opt.FilePath}">${opt.FilePath.split(/[\\\\/]/).pop()}</span>
+                <span class="truncate font-medium text-gray-300" title="${escapeHtml(opt.FilePath)}">${escapeHtml(opt.FilePath.split(/[\\\\/]/).pop())}</span>
                 <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
              ${window.IS_LOCAL_ACCESS ? `
@@ -350,6 +350,13 @@ function createVideoCard(v) {
     const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
     const dirName = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
 
+    // Dateinamen dürfen fast jedes Zeichen enthalten — auch spitze Klammern.
+    // Unmaskiert in innerHTML gesetzt, führt eine Datei namens
+    // `<img src=x onerror=...>.mp4` beim Aufbau des Grids Code aus, und zwar in
+    // der Sitzung des Nutzers. Bei einer Bibliothek aus heruntergeladenen
+    // Dateien ist das kein konstruierter Fall.
+    const safeFileName = escapeHtml(fileName);
+
     container.innerHTML = `
         <!-- Thumbnail (Card Media) -->
         <div class="card-media relative aspect-video bg-black overflow-hidden group cursor-pointer"
@@ -413,8 +420,8 @@ function createVideoCard(v) {
 
         <!-- Content -->
         <div class="card-body px-[11px] py-2.5 flex flex-col gap-0.5">
-            <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${fileName}">${fileName}</h3>
-            <p class="text-[10.5px] text-text-muted truncate" title="${v.FilePath}">${dirName}</p>
+            <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${safeFileName}">${safeFileName}</h3>
+            <p class="text-[10.5px] text-text-muted truncate" title="${escapeHtml(v.FilePath)}">${escapeHtml(dirName)}</p>
 
             ${renderVideoCardTags(v.tags || [])}
 

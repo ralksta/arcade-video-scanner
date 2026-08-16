@@ -142,7 +142,9 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
       - [x] `/api/debug/dump` war **unauthentifiziert**: Nutzerliste, Scan-Ziele,
         Dateipfade. Jetzt admin-pflichtig; Rundum-Test fand zusätzlich
         `/api/cache-stats` offen
-      - `innerHTML` im Frontend: wo fließen Dateinamen unmaskiert hinein?
+      - [x] `innerHTML`: Grid-Karte und Vergleichskarte maskieren jetzt.
+        87 weitere Fundstellen erhoben, **nicht** pauschal umgestellt —
+        dokumentiert in `dev-docs/frontend-escaping.md`
       - Trennung: gibt es weitere Stellen wie `FOLDERS_DATA`, an denen Daten
         aller Nutzer in eine gemeinsame Antwort geraten?
 
@@ -158,6 +160,14 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 25 (Loop F, Maskierung)** — Bewusst nur zwei Renderpfade
+  angefasst statt aller 87 Fundstellen. `escapeHtml()` pauschal darüberzuziehen
+  hätte dort Schaden angerichtet, wo bereits maskiert oder absichtlich Markup
+  erzeugt wird (doppelte Maskierung, zerstörte Icon-Spans) — und ohne Browser
+  wäre das Ergebnis nicht prüfbar gewesen. Also der Pfad, über den *jede* Datei
+  läuft, sauber gemacht und der Rest offen dokumentiert, statt eine
+  Halb-Umstellung als erledigt auszugeben.
 
 - **Iteration 24 (Loop F, Pfad-Prüfung)** — Der schwerwiegendste Fund der
   Nacht: `os.remove()` auf einem Pfad direkt aus der Anfrage, in einem Zweig,

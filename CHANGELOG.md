@@ -158,6 +158,19 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Security
+- **Dateinamen führten Code aus.** `createVideoCard()` setzte den Dateinamen
+  unmaskiert per `innerHTML` — als Text *und* im `title`-Attribut. Ein Video
+  namens `<img src=x onerror=…>.mp4` führte damit beim Aufbau des Grids Code in
+  der Sitzung des angemeldeten Nutzers aus. Bei einer Bibliothek aus
+  heruntergeladenen Dateien ist das kein konstruierter Fall: der Name kommt von
+  außen, und Anzeigen genügt — angeklickt werden muss nichts. Behoben für die
+  Grid-Karte (läuft für jede Datei) und die Vergleichskarte der Review-Ansicht.
+  **Nicht abgeschlossen:** eine Erhebung fand 87 weitere Interpolationen von
+  Namens-, Pfad- und Tag-Feldern ohne sichtbare Maskierung, ein erheblicher Teil
+  davon Fehlalarme. Welche echt sind, lässt sich nur einzeln beurteilen; Stand,
+  Priorisierung und empfohlenes Vorgehen stehen in
+  `dev-docs/frontend-escaping.md`.
+
 - **`/api/discard_optimized` löschte beliebige Dateien.** Der Endpunkt ist
   sitzungspflichtig, nahm den Pfad aber ungeprüft aus dem Request. Der
   Standard-Zweig lautete `if os.path.exists(abs_path): os.remove(abs_path)` und
