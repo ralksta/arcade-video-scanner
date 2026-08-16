@@ -65,14 +65,15 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
             Nach dem Antwort-Cache nur noch bei Cache-Miss relevant — bewusst
             zurückgestellt, weil eine Semantikänderung (Normalisierung) riskanter
             wäre als der Gewinn
-- [ ] **Loop C — Feature**
+- [x] **Loop C — Feature** — ausgereizt (4 Features)
       - [x] „Ähnliche Medien"-Leiste im Cinema (Embedding Teil 2) — Backend
             `/api/similar` gab es schon, nur die Oberfläche fehlte
       - [x] Index-Status (`/api/similar/status`) + Anzeige in den Einstellungen —
             macht sichtbar, ob die Ähnlich-Leiste überhaupt Daten haben kann
       - [x] Veraltete Proxys erkennen (Roadmap-Punkt „automatische
             Aktualisierung") — Server fällt zurück, Generator erneuert
-      - [ ] Weitere Feature-Kandidaten suchen
+      - [x] Export der aktuellen Ansicht (CSV/M3U) — ein Inventar-Werkzeug ohne
+            Export lässt jede Auswertung in der Oberfläche gefangen
 
 ## Zyklus 2 (Loops werden nach Zyklus 1 festgelegt)
 
@@ -82,6 +83,13 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 12 (Loop C, Export)** — CSV-Maskierung gegen Pythons `csv`-Modul
+  geprüft statt gegen die eigene Erwartung: ein unabhängiger RFC-4180-Leser muss
+  zurückbekommen, was hineinging. Der Test mit Zeilenumbruch im Dateinamen ist
+  kein konstruierter Fall — auf Unix ist das erlaubt, und unmaskiert zerreißt es
+  die Zeile, ohne dass es bei 8000 Zeilen jemandem auffällt. Loop C ist damit
+  ausgereizt; als Nächstes die zwei selbstgewählten Loops.
 
 - **Iteration 11 (Loop C, veraltete Proxys)** — Der offene Roadmap-Punkt war als
   Feature notiert, ist aber ein Korrektheitsproblem: unterwegs bekam man eine

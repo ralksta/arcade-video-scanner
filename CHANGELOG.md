@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Export der aktuellen Ansicht** (CSV und M3U): Über die Command-Palette
+  (`Ctrl`/`⌘`+`K` → „Ansicht als …") wird genau das ausgegeben, was gerade zu
+  sehen ist — dieselbe Liste, dieselbe Reihenfolge, inklusive aller aktiven
+  Filter. CSV mit Pfad, Größe, Dauer, Codec, Bitrate, Auflösung, Status,
+  Favorit und Tags (RFC 4180 maskiert, BOM für Excel); M3U mit lokalen
+  Dateipfaden für Player, die dieselbe Freigabe eingebunden haben. Ein
+  Werkzeug zum Filtern und Auswerten, dessen Ergebnisse in der Oberfläche
+  gefangen bleiben, ist nur die halbe Miete. Neu: `static/export_view.js`.
+
 - **Index-Status in den Speicher-Einstellungen**: Neuer Endpunkt
   `/api/similar/status` (Session-pflichtig) meldet, wie viele Medien im
   Ähnlichkeits-Index liegen, wie hoch die Abdeckung ist und mit welchem Modell

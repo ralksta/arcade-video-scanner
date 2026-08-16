@@ -65,6 +65,7 @@ SCRIPT_MODULES = [
     "context_menu.js",
     "shortcuts.js",
     "empty_state.js",
+    "export_view.js",
     "a11y.js",
 ]
 
