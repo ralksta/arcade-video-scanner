@@ -33,29 +33,54 @@ const sortVideos = (list, sortKey) => {
 	}
 };
 
+// Muss dieselben Verdikte liefern wie evaluateCollectionMatch() im
+// Browser-Client (arcade_scanner/server/static/collections.js) und wie der
+// Python-Port in arcade_scanner/core/criteria_eval.py. Ein Differenztest
+// (tests/test_tv_collection_parity.py) hält die drei gegeneinander.
+//
+// Bewusst NICHT unterstützt, weil die TV-Oberfläche diese Dimensionen nicht
+// anbietet: media_type, format, resolution, orientation, Größen- und
+// Dauergrenzen. Sammlungen, die darauf beruhen, zeigen auf dem Fernseher mehr
+// Treffer als im Browser — dokumentiert statt still abweichend.
 const matchesCollectionCriteria = (v, criteria) => {
 	if (!criteria) return true;
 	const inc = criteria.include || {};
 	const exc = criteria.exclude || {};
 
+	// Die API liefert das Feld als `Status` mit großem S. Hier stand `v.status`:
+	// immer undefined, womit 'optimized' nie und 'pending' immer traf — auf dem
+	// Fernseher zeigte dieselbe Sammlung also nichts oder alles.
+	const status = v.Status || '';
+	const codec = (v.codec || '').toLowerCase();
+
+	// Vault-Videos gehören in keine Sammlung — gleiche Regel wie im Browser.
+	// Der TV-Client filtert sie zwar beim Laden schon heraus, aber die Regel
+	// gehört in den Matcher: sonst hängt die Korrektheit daran, dass jeder
+	// künftige Aufrufer daran denkt.
+	if (v.hidden) return false;
+
 	// Status
 	if (inc.status && inc.status.length) {
 		const match = inc.status.some(s => {
-			if (s === 'optimized') return v.status === 'optimized';
-			if (s === 'pending')   return !v.status || v.status === 'pending';
-			if (s === 'favorite')  return v.favorite;
-			if (s === 'hidden')    return v.hidden;
-			return v.status === s;
+			// Gleiche Sonderregel wie im Browser: '_opt' im Dateinamen.
+			if (s === 'optimized_files') return (v.FilePath || '').includes('_opt');
+			return status === s;
 		});
 		if (!match) return false;
 	}
+	if (exc.status && exc.status.length) {
+		if (exc.status.some(s => status.toLowerCase().includes(s.toLowerCase()) || status === s)) {
+			return false;
+		}
+	}
 
-	// Codec
+	// Codec — Teilstring wie im Browser: die API liefert auch Werte wie
+	// "hevc (Main 10)", ein exakter Vergleich verfehlt die.
 	if (inc.codec && inc.codec.length) {
-		if (!inc.codec.includes(v.codec?.toLowerCase())) return false;
+		if (!inc.codec.some(c => codec.includes(c.toLowerCase()))) return false;
 	}
 	if (exc.codec && exc.codec.length) {
-		if (exc.codec.includes(v.codec?.toLowerCase())) return false;
+		if (exc.codec.some(c => codec.includes(c.toLowerCase()))) return false;
 	}
 
 	// Tags
@@ -78,8 +103,12 @@ const matchesCollectionCriteria = (v, criteria) => {
 		if (!v.FilePath.toLowerCase().includes(q)) return false;
 	}
 
-	// Favorites
-	if (criteria.favorites === true && !v.favorite) return false;
+	// Favorites — der Browser kennt beide Richtungen: true = nur Favoriten,
+	// false = Favoriten ausschließen. Letzteres fehlte hier.
+	const wantOnlyFavorites = criteria.favorites === true || criteria.favorites === 'true';
+	const wantExcludeFavorites = criteria.favorites === false || criteria.favorites === 'false';
+	if (wantOnlyFavorites && !v.favorite) return false;
+	if (wantExcludeFavorites && v.favorite) return false;
 
 	return true;
 };

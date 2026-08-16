@@ -158,6 +158,18 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **TV-Client: Smart Collections filterten nach dem falschen Feld.** Der
+  Matcher las `v.status`, die API liefert das Feld aber als `Status`. Der Wert
+  war damit immer `undefined` — `optimized` traf nie, `pending` traf immer.
+  Dieselbe Sammlung zeigte auf dem Fernseher nichts oder alles, im Browser das
+  Richtige. Drei weitere Abweichungen mitbehoben: Codec-Vergleich war exakt
+  statt per Teilstring (verfehlt Werte wie „hevc (Main 10)"), `favorites: false`
+  (Favoriten ausschließen) wurde ignoriert, und Vault-Videos landeten in
+  Sammlungen, die der Browser ausschließt. Ein Differenztest wertet ab jetzt
+  dieselben Fixtures durch Browser- *und* TV-Matcher aus; für Dimensionen, die
+  die TV-Oberfläche nicht anbietet, wird geprüft, dass der TV-Client nie
+  strenger filtert als der Browser.
+
 - **Dokumentiert: der iOS-Client funktioniert seit `8c6008a` nicht mehr.** Der
   Commit „complete removal of VR Gallery and DeoVR integration" entfernte
   `/api/deovr/library` und `/api/deovr/collection/<id>` — der iOS-Client ruft

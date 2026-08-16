@@ -109,6 +109,9 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
       - [x] Endpunkt-Abgleich: **iOS-Client seit `8c6008a` funktionsunfähig**
             (tote DeoVR-Routen + keine Sitzung). Dokumentiert statt blind
             repariert — keine Swift-Toolchain zum Prüfen. Vertrags-Test ergänzt
+      - [x] Filter-Semantik: TV-Client las `v.status` statt `v.Status` — Status-
+            Filter kehrten sich um. Plus Codec-Vergleich, `favorites: false` und
+            Vault-Regel angeglichen; Differenztest gegen den Browser-Matcher
       `CLAUDE.md` warnt ausdrücklich davor, dass TV- und iOS-Client bei
       API-Änderungen mitgezogen werden müssen; frühere Commits haben genau das
       nachgeholt. Nach einer Nacht mit Änderungen an `/api/videos`,
@@ -120,6 +123,15 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 20 (Loop E, Filter-Semantik)** — Dieselbe Semantik liegt dreimal
+  im Projekt: Browser, Python-Port (an den Browser gepinnt) und TV-Client. Die
+  dritte Kopie hing an nichts — und enthielt einen Tippfehler, der das Verhalten
+  nicht bricht, sondern *umkehrt*: `v.status` statt `v.Status`, also immer
+  `undefined`, also traf `pending` immer und `optimized` nie. Der Differenztest
+  fand danach sofort eine zweite Abweichung, an die ich nicht gedacht hatte
+  (Vault-Videos in Sammlungen). Lehre: bei mehrfach implementierter Logik ist
+  der Differenztest wertvoller als jede Durchsicht.
 
 - **Iteration 19 (Loop E, Endpunkt-Abgleich)** — Der größte Fund der Nacht
   gemessen an der Auswirkung: Der iOS-Client spricht Endpunkte an, die es seit
