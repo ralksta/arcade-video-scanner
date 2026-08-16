@@ -185,8 +185,10 @@ jetzt systematisch.
       - [x] CLAUDE.md systematisch geprüft: alle 30 Dateiverweise, fünf
         CLI-Flags und drei Nutzer-Kommandos stimmen. Einzige Unrichtigkeit: die
         Routen-Liste nannte 5 von 9 Modulen. Wächter-Test ergänzt.
-      - `ROADMAP.md`: erledigte Punkte ohne Haken, offene Punkte die längst da
-        sind (heute Nacht schon zweimal vorgekommen).
+      - [x] README: Zusage „100% locally" traf nicht zu — Dashboard lädt
+        Tailwind und Schriften von CDNs. Zusage präzisiert, Beseitigung
+        dokumentiert (`dev-docs/external-resources.md`)
+      - [ ] `ROADMAP.md`: erledigte Punkte ohne Haken
 
 - [ ] **Loop I — Tests, die nichts prüfen**
       Heute Nacht zweimal zufällig gefunden: ein `pytest.skip`, das nach einer
@@ -208,6 +210,16 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 31 (Loop H, Privacy-Zusage)** — Die prominenteste Zusage des
+  Projekts traf nicht zu: „No data ever leaves your computer" bei einem
+  Dashboard, das Tailwind von Cloudflare und Schriften von Google zieht — schon
+  auf der Anmeldeseite. Zwei Entscheidungen dabei: Erstens die Zusage
+  präzisiert statt sie stehen zu lassen — eine unzutreffende Datenschutz-Aussage
+  ist schlimmer als eine eingeschränkte. Zweitens die Abhängigkeit *nicht*
+  beseitigt: Schriften ginge, Tailwind ist der JIT-Compiler, und jeder Ersatz
+  kollidiert mit „no build step" oder veraltet unbemerkt. Ohne Browser wäre das
+  Ergebnis zudem ungeprüft geblieben.
 
 - **Iteration 30 (Loop H, Doku-Verweise)** — Angenehme Überraschung: von 30
   Dateiverweisen in CLAUDE.md stimmten 28 sofort, die zwei Ausreißer waren
