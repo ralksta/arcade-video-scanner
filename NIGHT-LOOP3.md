@@ -212,12 +212,14 @@ jetzt systematisch.
       Fremdeinfluss. Einzeln beurteilen, mit node-Tests belegen — nicht pauschal
       `escapeHtml()` darüberziehen.
 
-- [ ] **Loop K — Der Optimizer** (läuft)
+- [x] **Loop K — Der Optimizer** — ausgereizt (1 Fehler, 2× kein Fehler)
       - [x] `parse_time_to_seconds`: las Trim-Zeiten anders als ffmpeg — die
             SSIM-Prüfung verglich dadurch die falschen Bilder
       - [x] `apply_encoding_preset` und `apply_scale_to_filter` abgedeckt —
             **kein Fehler**, beide arbeiten korrekt; der Software-Filter ist
             gegen echtes ffmpeg geprüft
+      - [x] `build_ffmpeg_command` abgedeckt — kein Fehler; der erzeugte Aufruf
+            wird von echtem ffmpeg ausgeführt, nicht nur inspiziert
       `scripts/video_optimizer.py` ist die größte Einzeldatei und das
       Kernversprechen des Produkts (50–80 % Ersparnis), aber die
       Entscheidungslogik ist kaum abgedeckt: 25 Divisionen mit variablem
@@ -233,6 +235,16 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 37 (Loop K, Kommandobau)** — Die Ausschlussregeln des Builders
+  (VideoToolbox: `-q:v` und `-b:v` heben sich auf; SVT-AV1 stürzt bei `-crf`
+  plus `-b:v` ab) standen als Kommentar im Code und gelten jetzt als Test. Beim
+  ffmpeg-Gegencheck erst auf x264 ausgewichen, um Zeit zu sparen — das schlug
+  fehl, weil der Builder `-tag:v hvc1` setzt. Richtig so: Der Aufruf ist nur als
+  Ganzes prüfbar, ein ausgetauschter Codec prüft etwas anderes als das, was in
+  Wirklichkeit läuft. Mit libx265 und `ultrafast` läuft der Test in Sekunden und
+  erzeugt tatsächlich eine Datei. Loop K ist damit ausgereizt: ein echter Fehler
+  (Trim-Zeiten), zweimal Bestätigung ohne Fehler.
 
 - **Iteration 36 (Loop K, Encoder-Konfiguration)** — Hier fast einen Fehler
   gemeldet, den es nicht gibt: Mein synthetisches Profil enthielt weder
