@@ -226,6 +226,21 @@ jetzt systematisch.
       Divisor, 15 stumme Handler. Ohne Medien lässt sich kein Encode prüfen —
       die reinen Rechen- und Entscheidungsfunktionen aber sehr wohl.
 
+## Zyklus 6
+
+- [ ] **Loop L — Sitzungen und Anmeldung**
+      `security/auth.py` speichert bei jeder Sitzung ein `created_at` — ob es je
+      ausgewertet wird, ist offen. Ein Token, das nie verfällt, ist nach dem
+      Fund „Token im Zugriffslog" (Loop F) besonders relevant: was einmal
+      irgendwo landete, gilt dann für immer. Weiter: Passwort-Hashing,
+      Abmeldung, Sitzungen über Neustarts.
+
+- [ ] **Loop M — Der Scanner: was wird tatsächlich gescannt?**
+      Ausschlüsse sind bei diesem Produkt eine Datenschutz-Funktion
+      (`exclude_paths`, `sensitive_dirs`). Ein Fehler dort heißt: Verzeichnisse
+      landen in der Bibliothek, die der Nutzer ausdrücklich ausgenommen hat.
+      Reine Logik, ohne Medien prüfbar.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
