@@ -123,6 +123,34 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
       - Welche neuen Endpunkte fehlen den Clients?
       - Wo sind Annahmen über Antwortformate fest verdrahtet?
 
+## Zyklus 3
+
+Wieder aus Funden abgeleitet, nicht frei gewählt.
+
+- [ ] **Loop F — Sicherheit und Datentrennung**
+      Das Produkt beschreibt sich als „self-hosted, privacy-first" mit
+      Mehrbenutzer-Trennung. In Loop B fiel dabei ein echtes Leck auf
+      (`FOLDERS_DATA` mit fremden Ordnerpfaden im gemeinsamen Dump) — gefunden
+      nur, weil ich zufällig einen Test für eine Doku-Zusage schrieb. Das
+      verdient eine gezielte Durchsicht:
+      - Sitzungs-Token: der TV-Client hängt ihn als `&token=` an die Stream-URL.
+        Query-Parameter landen in Server-Logs, Proxy-Logs und Verläufen.
+      - Pfad-Prüfungen: `sanitize_path`, `validate_filename`, Thumbnail-Pfade —
+        greifen sie überall, wo Pfade aus Requests kommen?
+      - `/api/debug/dump`: was steht da drin, und wer darf es sehen?
+      - `innerHTML` im Frontend: wo fließen Dateinamen unmaskiert hinein?
+      - Trennung: gibt es weitere Stellen wie `FOLDERS_DATA`, an denen Daten
+        aller Nutzer in eine gemeinsame Antwort geraten?
+
+- [ ] **Loop G — Altlasten im Repository**
+      Beim Durchsuchen sind wiederholt Dateien aufgefallen, die nicht mehr
+      dazugehören: macOS-Ressourcenzweige (`._*.py`, die als Python-Dateien
+      gescannt werden und Analysen stören), `docker-compose.yml_back2`,
+      `screenlog.0`, eine gebaute `.ipk`, sowie `test_api.py`, `test_dump.py`,
+      `test_probe*.py`, `test_ui.js`, `test_puppeteer.js` und `run_fix.py` im
+      Wurzelverzeichnis — die sehen aus wie Tests, laufen aber nicht mit der
+      Suite. Dazu die acht vorbestehenden Ruff-Fehler.
+
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
