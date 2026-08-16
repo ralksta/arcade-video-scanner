@@ -11,6 +11,15 @@ Autonomer Nachtlauf, gestartet 2026-08-16. Branch: `feat/nightly-loops` (aus `de
 - Vor JEDEM Commit: `.venv/bin/pytest` grün + `.venv/bin/ruff check .` nicht schlechter als Baseline.
 - Conventional Commits mit Scope. Jeder Loop-Schritt = eigener Commit.
 
+## Abbruch-Kriterium pro Loop (korrigiert nach Rückfrage des Users)
+
+Ein Loop ist **nicht** nach einer festen Anzahl Punkte fertig. Er läuft, bis mir
+im jeweiligen Themenfeld nichts Lohnendes mehr einfällt — konkret: bis zwei
+aufeinanderfolgende Durchgänge nur noch Kosmetik oder Spekulation hervorbringen.
+Erst dann Haken setzen und zum nächsten Loop.
+
+Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
+
 ## Baseline (Start)
 
 - `pytest`: 880 passed, 1 xfailed
@@ -18,12 +27,17 @@ Autonomer Nachtlauf, gestartet 2026-08-16. Branch: `feat/nightly-loops` (aus `de
 
 ## Zyklus 1
 
-- [x] **Loop A — UX** (2 Commits)
+- [ ] **Loop A — UX** (wieder geöffnet: war nach 2 Punkten vorschnell abgehakt)
       - [x] Tastaturkürzel-Overlay `?` + globale Shortcuts (`/`, `1`–`4`) — `150eb83`
       - [x] Kontextbezogener Leer-Zustand statt weißer Fläche — `ae18a9a`
-      - Verworfen: „Grid-Layout konfigurierbar" aus der ROADMAP ist längst da
-        (`gridScaleSlider` + `--grid-min-width`, `workspace.js:130`) — nur der
-        Haken fehlt. Wird in einem Doku-Commit nachgezogen.
+      - [ ] Fehler-Zustände: fehlgeschlagene `fetch`-Aufrufe enden heute teils
+            stumm (`fetch()` ohne `.catch`) — sichtbares Feedback + Retry
+      - [ ] A11y-Durchgang: Fokus-Ringe, `aria-label` auf Icon-Buttons,
+            Fokus-Falle in Modals, `Esc`-Verhalten vereinheitlichen
+      - [ ] Mobile: Touch-Ziele < 44 px, horizontale Overflows, Filter-Bar
+      - [ ] Stille Aktionen: welche Buttons geben heute keinerlei Rückmeldung
+      - [ ] ROADMAP-Haken für „Customizable grid layout" nachziehen — ist längst
+            da (`gridScaleSlider` + `--grid-min-width`, `workspace.js:130`)
 - [ ] **Loop B — Performance**: Messen, dann fixen. Kandidaten: SQLite-Indizes für die
       heißen Query-Pfade, Thumbnail-/Static-Caching-Header, HTML-Dump-Größe, JS-Renderpfad
       (DocumentFragment statt innerHTML-Konkatenation), N+1 in Routen.

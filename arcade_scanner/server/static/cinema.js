@@ -464,19 +464,24 @@ function cinemaFavorite() {
 
     const newState = !currentCinemaVideo.favorite;
 
-    fetch(`/favorite?path=` + encodeURIComponent(currentCinemaPath) + `&state=${newState}`)
-        .then(() => {
-            currentCinemaVideo.favorite = newState;
+    const path = currentCinemaPath;
 
-            // Update in ALL_VIDEOS array
-            const videoInArray = window.ALL_VIDEOS.find(v => v.FilePath === currentCinemaPath);
-            if (videoInArray) {
-                videoInArray.favorite = newState;
-            }
+    apiWrite(`/favorite?path=` + encodeURIComponent(path) + `&state=${newState}`, {}, {
+        action: 'Favorit ändern',
+    }).then(response => {
+        if (!response) return;   // apiWrite hat den Fehler bereits gemeldet
 
-            updateCinemaButtons();
-            filterAndSort();
-        });
+        currentCinemaVideo.favorite = newState;
+
+        // Update in ALL_VIDEOS array
+        const videoInArray = window.ALL_VIDEOS.find(v => v.FilePath === path);
+        if (videoInArray) {
+            videoInArray.favorite = newState;
+        }
+
+        updateCinemaButtons();
+        filterAndSort();
+    });
 }
 
 /**
@@ -485,11 +490,13 @@ function cinemaFavorite() {
 function cinemaVault() {
     if (!currentCinemaPath) return;
 
-    fetch(`/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`)
-        .then(() => {
-            closeCinema();
-            location.reload();
-        });
+    apiWrite(`/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`, {}, {
+        action: 'In den Vault verschieben',
+    }).then(response => {
+        if (!response) return;   // Fehler gemeldet — Cinema bleibt offen
+        closeCinema();
+        location.reload();
+    });
 }
 
 /**

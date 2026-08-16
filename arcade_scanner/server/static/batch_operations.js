@@ -186,11 +186,26 @@ function triggerBatchHide(state) {
     const selected = document.querySelectorAll('.video-card-container input:checked');
     const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
 
-    fetch(`/batch_hide?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
-
+    const previous = new Map();
     paths.forEach(p => {
         const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
-        if (v) v.hidden = state;
+        if (v) {
+            previous.set(p, v.hidden);
+            v.hidden = state;
+        }
+    });
+
+    apiWrite(`/batch_hide?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`, {}, {
+        action: state
+            ? `${paths.length} Dateien in den Vault verschieben`
+            : `${paths.length} Dateien aus dem Vault holen`,
+        rollback: () => {
+            previous.forEach((wasHidden, p) => {
+                const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
+                if (v) v.hidden = wasHidden;
+            });
+            filterAndSort();
+        },
     });
 
     filterAndSort();
@@ -254,8 +269,18 @@ function triggerBatchCompress() {
         } else {
             // Local mode: use batch_compress endpoint
             // Use ||| as separator to avoid issues with commas in filenames
-            fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')));
-            alert(`Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
+            // Erst melden, wenn der Server den Auftrag auch angenommen hat —
+            // vorher stand die Erfolgsmeldung auch dann da, wenn nichts ankam.
+            apiWrite(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')), {}, {
+                action: 'Batch-Optimierung starten',
+            }).then(response => {
+                if (!response) return;
+                showToast(
+                    `Batch-Optimierung gestartet: ${processable.length} Dateien`
+                    + (skipped.length ? `, ${skipped.length} übersprungen (< ${BATCH_MIN_SIZE_MB} MB)` : ''),
+                    'success'
+                );
+            });
         }
         clearSelection();
     }

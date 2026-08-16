@@ -163,11 +163,19 @@ async function createAndApplyNewTag() {
     availableTags.push(newTag);
 
     userSettings.available_tags = availableTags;
-    await fetch('/api/settings', {
+    const saved = await apiWrite('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userSettings)
+    }, {
+        action: `Tag „${name}" anlegen`,
+        rollback: () => {
+            availableTags.splice(availableTags.indexOf(newTag), 1);
+            userSettings.available_tags = availableTags;
+            renderBatchTagOptions();
+        },
     });
+    if (!saved) return;
 
     batchTagActions[name] = 'add';
     input.value = '';
@@ -626,13 +634,14 @@ function editTagShortcut(tagName, currentShortcut) {
 
 // --- VIDEO TAG ASSIGNMENT ---
 function setVideoTags(videoPath, tags) {
-    return fetch('/api/video/tags', {
+    return apiWrite('/api/video/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: videoPath, tags })
-    })
-        .then(res => res.json())
+    }, { action: 'Tags speichern' })
+        .then(res => (res ? res.json() : { tags: null }))
         .then(data => {
+            if (data.tags === null) return null;   // Fehler bereits gemeldet
             // Update local cache
             const video = window.ALL_VIDEOS.find(v => v.FilePath === videoPath);
             if (video) {

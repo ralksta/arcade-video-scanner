@@ -13,12 +13,23 @@ function toggleHidden(card) {
     const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
     if (!video) return;
 
+    const previous = video.hidden;
     video.hidden = !video.hidden;
-    fetch(`/hide?path=` + encodeURIComponent(path) + `&state=${video.hidden}`);
 
     // Update specific card UI instantly
     const btn = card.querySelector('.hide-toggle-btn .material-icons');
-    btn.innerText = video.hidden ? 'visibility' : 'visibility_off';
+    const paintIcon = () => { btn.innerText = video.hidden ? 'visibility' : 'visibility_off'; };
+    paintIcon();
+
+    apiWrite(`/hide?path=` + encodeURIComponent(path) + `&state=${video.hidden}`, {}, {
+        action: video.hidden ? 'In den Vault verschieben' : 'Aus dem Vault holen',
+        rollback: () => {
+            video.hidden = previous;
+            paintIcon();
+            filterAndSort();
+            renderCollections();
+        },
+    });
 
     // Animate out if no longer matching workspace
     const shouldHide = (workspaceMode === 'lobby' && video.hidden) || (workspaceMode === 'vault' && !video.hidden);
@@ -45,21 +56,34 @@ function toggleFavorite(card) {
     const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
     if (!video) return;
 
+    const previous = video.favorite;
     video.favorite = !video.favorite;
-    fetch(`/favorite?path=` + encodeURIComponent(path) + `&state=${video.favorite}`);
 
     const starBtn = card.querySelector('.favorite-btn');
     const starIcon = starBtn.querySelector('.material-icons');
 
-    if (video.favorite) {
-        starBtn.classList.add('active');
-        starIcon.innerText = 'star';
-        starBtn.title = 'Favorit';
-    } else {
-        starBtn.classList.remove('active');
-        starIcon.innerText = 'star_border';
-        starBtn.title = 'Add to Favorites';
-    }
+    const paintStar = () => {
+        if (video.favorite) {
+            starBtn.classList.add('active');
+            starIcon.innerText = 'star';
+            starBtn.title = 'Favorit';
+        } else {
+            starBtn.classList.remove('active');
+            starIcon.innerText = 'star_border';
+            starBtn.title = 'Add to Favorites';
+        }
+    };
+    paintStar();
+
+    apiWrite(`/favorite?path=` + encodeURIComponent(path) + `&state=${video.favorite}`, {}, {
+        action: 'Favorit ändern',
+        rollback: () => {
+            video.favorite = previous;
+            paintStar();
+            filterAndSort();
+            renderCollections();
+        },
+    });
 
     if (workspaceMode === 'favorites' && !video.favorite) {
         card.style.opacity = '0';
@@ -85,14 +109,28 @@ function triggerBatchFavorite(state) {
 
     const paths = Array.from(selected).map(cb => cb.closest('.video-card-container').getAttribute('data-path'));
 
-    // Update Local Data
+    // Update Local Data — vorherigen Stand für den Rollback merken
+    const previous = new Map();
     paths.forEach(p => {
         const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
-        if (v) v.favorite = state;
+        if (v) {
+            previous.set(p, v.favorite);
+            v.favorite = state;
+        }
     });
 
     // Notify Server
-    fetch(`/batch_favorite?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`);
+    apiWrite(`/batch_favorite?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`, {}, {
+        action: `Favoriten für ${paths.length} Dateien ändern`,
+        rollback: () => {
+            previous.forEach((wasFavorite, p) => {
+                const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
+                if (v) v.favorite = wasFavorite;
+            });
+            filterAndSort();
+            renderCollections();
+        },
+    });
 
     // Update UI
     selected.forEach(cb => {

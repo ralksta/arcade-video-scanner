@@ -253,8 +253,9 @@ function keepOptimized(orig, opt) {
 
 function discardOptimized(opt) {
     if (!confirm("Delete the optimized file?")) return;
-    fetch(`/api/discard_optimized?path=${opt}`)
-        .then(() => {
+    apiWrite(`/api/discard_optimized?path=${opt}`, {}, { action: 'Optimierte Datei verwerfen' })
+        .then(response => {
+            if (!response) return;
             const card = document.querySelector(`[data-path="${opt}"]`);
             if (card) {
                 card.style.opacity = '0';
@@ -1146,7 +1147,10 @@ function checkSetupRequired() {
             if (!data.setup_complete) {
                 showSetupWizard();
             }
-        });
+        })
+        // Reine Statusabfrage beim Start: schlägt sie fehl, bleibt es beim
+        // normalen Dashboard — kein Toast, aber auch keine stille Rejection.
+        .catch(err => console.error('Setup-Status nicht abrufbar:', err));
 }
 
 function showSetupWizard() {
@@ -1168,7 +1172,10 @@ function hideSetupWizard() {
 
 function loadSetupDirectories() {
     fetch('/api/setup/directories')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        })
         .then(data => {
             const listEl = document.getElementById('setupDirectoryList');
             if (!listEl) return;
@@ -1192,6 +1199,18 @@ function loadSetupDirectories() {
                     </div>
                 </div>`;
             }).join('');
+        })
+        .catch(err => {
+            // Ohne diesen Zweig bleibt der Einrichtungs-Assistent bei einem
+            // Serverfehler dauerhaft leer — ohne jeden Hinweis.
+            console.error('Verzeichnisse nicht abrufbar:', err);
+            const listEl = document.getElementById('setupDirectoryList');
+            if (listEl) {
+                listEl.innerHTML = '<div class="text-center py-8 text-danger">'
+                    + 'Verzeichnisse konnten nicht geladen werden. '
+                    + '<button onclick="loadSetupDirectories()" class="underline">Erneut versuchen</button>'
+                    + '</div>';
+            }
         });
 }
 
@@ -1216,17 +1235,17 @@ function toggleSetupDirectory(path) {
 function completeSetup() {
     if (selectedSetupDirectories.length === 0) return;
 
-    fetch('/api/setup/complete', {
+    apiWrite('/api/setup/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             scan_targets: selectedSetupDirectories,
             scan_images: document.getElementById('setupScanImages')?.checked || false
         })
-    })
-        .then(res => res.json())
+    }, { action: 'Einrichtung abschließen' })
+        .then(res => (res ? res.json() : null))
         .then(data => {
-            if (data.success) {
+            if (data && data.success) {
                 hideSetupWizard();
                 location.reload();
             }
@@ -1234,12 +1253,12 @@ function completeSetup() {
 }
 
 function skipSetup() {
-    fetch('/api/setup/complete', {
+    apiWrite('/api/setup/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scan_targets: ['/media'], scan_images: false })
-    })
-        .then(() => location.reload());
+    }, { action: 'Einrichtung überspringen' })
+        .then(res => { if (res) location.reload(); });
 }
 
 // Duplicate Checker Fullscreen Mode has been moved to duplicates.js

@@ -68,7 +68,7 @@ function _buildContextMenu() {
     _cmEl.querySelector('#ctx-locate').addEventListener('click', () => {
         if (_cmCurrentVideo) {
             const path = _cmCurrentVideo.FilePath || _cmCurrentVideo.file_path;
-            if (path) fetch(`/api/locate?path=${encodeURIComponent(path)}`);
+            if (path) apiWrite(`/api/locate?path=${encodeURIComponent(path)}`, {}, { action: 'Im Dateimanager zeigen' });
         }
         hideCtxMenu();
     });

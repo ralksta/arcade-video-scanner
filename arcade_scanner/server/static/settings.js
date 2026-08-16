@@ -716,15 +716,13 @@ function deleteView(id, event) {
  * Used for background saves (views, collections, etc.)
  */
 function saveSettingsWithoutReload() {
-    fetch(`/api/settings`, {
+    // Speichert Views/Collections im Hintergrund. Schlägt das fehl, ist die
+    // Ansicht nur scheinbar gespeichert — deshalb hier eine sichtbare Meldung.
+    apiWrite(`/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(window.userSettings)
-    }).then(r => r.json()).then(data => {
-        if (data.success) {
-            // Views saved
-        }
-    });
+    }, { action: 'Einstellungen speichern' });
 }
 
 // ============================================================================

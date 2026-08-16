@@ -14,6 +14,18 @@ All notable changes to this project will be documented in this file.
   globalen Kürzel halten sich zurück, während der Nutzer tippt oder Cinema bzw. die
   Duplikat-Prüfung offen ist. Neu: `static/shortcuts.js`.
 
+- **Sichtbare Fehler statt stiller Divergenz**: 19 von 63 `fetch`-Aufrufen im
+  Frontend hatten keinerlei Fehlerpfad. Die schlimmsten davon aktualisierten die
+  Oberfläche optimistisch und feuerten den Server-Aufruf danach ab — war der
+  Server weg, zeigte das Dashboard einen Zustand an, den der Server nie gesehen
+  hatte, sichtbar erst beim nächsten Reload. Neu: `apiWrite()` in `api.js` prüft
+  den Status, meldet den Fehler und rollt die optimistische Änderung zurück
+  (Vault, Favorit, Batch-Vault, Batch-Favorit, Tag anlegen). Ebenfalls behoben:
+  „Batch-Optimierung gestartet" erschien auch dann, wenn der Auftrag nie ankam;
+  der Einrichtungs-Assistent blieb bei einem Serverfehler dauerhaft leer;
+  Views/Collections galten als gespeichert, obwohl der Aufruf scheiterte. Ein
+  Test hält alle `fetch`-Aufrufe künftig auf einem Fehlerpfad.
+
 - **Leer-Zustand im Grid**: 0 Treffer hießen bisher: weiße Fläche, keine
   Erklärung, kein Weg zurück. Jetzt erklärt das Grid, *warum* nichts da ist —
   leere Bibliothek (mit Link in die Einstellungen und zum Scan), zu enge Suche

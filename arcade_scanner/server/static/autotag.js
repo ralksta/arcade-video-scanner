@@ -63,19 +63,19 @@ function renderAutoTagRules() {
 }
 
 function toggleAutoTagRule(id, enabled) {
-    fetch('/api/autotag/rules', {
+    apiWrite('/api/autotag/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'toggle', id: id, enabled: enabled })
-    }).then(() => renderAutoTagRules());
+    }, { action: 'Regel umschalten' }).then(() => renderAutoTagRules());
 }
 
 function deleteAutoTagRule(id) {
-    fetch('/api/autotag/rules', {
+    apiWrite('/api/autotag/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', id: id })
-    }).then(() => renderAutoTagRules());
+    }, { action: 'Regel löschen' }).then(() => renderAutoTagRules());
 }
 
 function runAutoTagRules() {
