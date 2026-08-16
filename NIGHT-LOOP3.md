@@ -18,9 +18,12 @@ Autonomer Nachtlauf, gestartet 2026-08-16. Branch: `feat/nightly-loops` (aus `de
 
 ## Zyklus 1
 
-- [ ] **Loop A — UX**: Frontend/Bedienbarkeit. Kandidaten: Grid-Layout konfigurierbar (offener
-      Roadmap-Punkt), Tastatur-Shortcuts-Overlay, Empty-/Error-States, Fokus-Ringe & A11y,
-      Toast-Feedback statt stiller Aktionen, Mobile-Touch-Targets.
+- [x] **Loop A — UX** (2 Commits)
+      - [x] Tastaturkürzel-Overlay `?` + globale Shortcuts (`/`, `1`–`4`) — `150eb83`
+      - [x] Kontextbezogener Leer-Zustand statt weißer Fläche — `ae18a9a`
+      - Verworfen: „Grid-Layout konfigurierbar" aus der ROADMAP ist längst da
+        (`gridScaleSlider` + `--grid-min-width`, `workspace.js:130`) — nur der
+        Haken fehlt. Wird in einem Doku-Commit nachgezogen.
 - [ ] **Loop B — Performance**: Messen, dann fixen. Kandidaten: SQLite-Indizes für die
       heißen Query-Pfade, Thumbnail-/Static-Caching-Header, HTML-Dump-Größe, JS-Renderpfad
       (DocumentFragment statt innerHTML-Konkatenation), N+1 in Routen.
@@ -34,3 +37,9 @@ Autonomer Nachtlauf, gestartet 2026-08-16. Branch: `feat/nightly-loops` (aus `de
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 1 (Loop A, UX)** — Shortcut-Overlay + Leer-Zustand. Gelernt: die
+  Ladereihenfolge-Tests (`test_js_completeness`, `test_dashboard_template`) suchten
+  Dateinamen als nackte Substrings; `find("engine.js")` traf `filter_engine.js`.
+  Jetzt auf `/static/<name>.js` verschärft. Nächstes: Loop B (Performance) —
+  zuerst messen (Query-Zeiten, HTML-Dump-Größe, Render-Pfad), dann fixen.
