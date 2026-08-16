@@ -44,7 +44,7 @@ Some tests require `node` on PATH (JS syntax/contract tests shell out to `node -
 
 ## Architecture
 
-**No web framework.** The server is Python stdlib only: `socketserver.ThreadingTCPServer` + a custom `http.server` handler (`FinderHandler` in `arcade_scanner/server/api_handler.py`). Route handlers live in `arcade_scanner/server/routes/` (files, queue, tags, settings, duplicates). Runtime dependencies are just pydantic, Pillow, imagehash — keep it that way.
+**No web framework.** The server is Python stdlib only: `socketserver.ThreadingTCPServer` + a custom `http.server` handler (`FinderHandler` in `arcade_scanner/server/api_handler.py`). Route handlers live in `arcade_scanner/server/routes/` (autotag, candidates, duplicates, files, queue, settings, similar, tags). There is **no global auth gate** — every route checks the session in its own branch, so a new one can silently forget to; `tests/test_debug_route_authorization.py` sweeps all GET/POST branches and demands either a check or a documented exception. Runtime dependencies are just pydantic, Pillow, imagehash — keep it that way.
 
 **Server-generated frontend.** The dashboard HTML is built from Python string templates: `arcade_scanner/templates/dashboard_template.py` assembles component constants from `templates/components.py` / `ui_components.py` / `theme.py`. The client-side logic is vanilla JS modules in `arcade_scanner/server/static/` (engine.js, filter_engine.js, cinema.js, store.js, etc.) — no bundler, no build step for the web client.
 

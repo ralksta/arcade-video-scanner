@@ -182,9 +182,9 @@ jetzt systematisch.
       - [x] Versionsnummern: fünf verschiedene gefunden (4.9.0 / 6.3 / 6.7 /
         6.8.0 / 7.0.0). Eine Quelle in `arcade_scanner/__version__`, CLAUDE.md
         korrigiert. Offen und dokumentiert: 7.0.0 hat keinen CHANGELOG-Abschnitt
-      - README-Versprechen: was steht dort über Funktionen, die es (noch/nicht
-        mehr) gibt?
-      - Docstrings, die ein anderes Verhalten beschreiben als der Code.
+      - [x] CLAUDE.md systematisch geprüft: alle 30 Dateiverweise, fünf
+        CLI-Flags und drei Nutzer-Kommandos stimmen. Einzige Unrichtigkeit: die
+        Routen-Liste nannte 5 von 9 Modulen. Wächter-Test ergänzt.
       - `ROADMAP.md`: erledigte Punkte ohne Haken, offene Punkte die längst da
         sind (heute Nacht schon zweimal vorgekommen).
 
@@ -208,6 +208,16 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 30 (Loop H, Doku-Verweise)** — Angenehme Überraschung: von 30
+  Dateiverweisen in CLAUDE.md stimmten 28 sofort, die zwei Ausreißer waren
+  korrekt als „wird erzeugt" bzw. „if present" beschrieben. Auch alle
+  Kommandozeilen stimmen. Die einzige echte Unrichtigkeit war die Routen-Liste
+  (5 von 9 Modulen genannt) — wer eine Route sucht, findet sie sonst nicht dort,
+  wo die Doku sie vermuten lässt. Mein erster Prüflauf meldete 20 fehlende
+  Dateien; das Muster war zu streng (Dateinamen im Kontext eines zuvor genannten
+  Verzeichnisses). Erst nach der Korrektur blieben zwei übrig, und die waren
+  richtig.
 
 - **Iteration 29 (Loop H, Versionen)** — Die Doku sagte die Wahrheit über sich
   selbst („don't trust any single one") und blieb dabei stehen. Das ist die
