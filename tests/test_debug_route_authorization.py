@@ -20,6 +20,7 @@ Admin statt nur angemeldet, weil der Inhalt alle Nutzer betrifft und nicht nur
 den anfragenden.
 """
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -76,26 +77,68 @@ def test_the_dump_really_contains_sensitive_fields(leaked):
     assert leaked in _debug_route_block()
 
 
-def test_every_api_get_route_checks_the_session():
+def _handler_bodies() -> dict[str, str]:
+    """Quelltext aller handle_*-Funktionen in den Routen-Modulen.
+
+    Viele Zweige prüfen die Sitzung nicht selbst, sondern delegieren an einen
+    Handler, der es tut. Ohne diesen Schritt meldet die Analyse genau solche
+    Routen fälschlich als offen — beim Schreiben dieses Tests passiert mit
+    `/api/settings/remove-photos`, das sehr wohl geschützt ist.
+    """
+    bodies = {}
+    routes_dir = ROOT / "arcade_scanner" / "server" / "routes"
+    for path in list(routes_dir.glob("*.py")) + [HANDLER]:
+        if path.name.startswith("._"):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                bodies[node.name] = ast.unparse(node)
+    return bodies
+
+
+def _branch_is_guarded(node: ast.If, handler_bodies: dict[str, str]) -> bool:
+    body_source = "\n".join(ast.unparse(stmt) for stmt in node.body)
+    if "get_current_user" in body_source or "require_auth" in body_source:
+        return True
+
+    # Delegation verfolgen: ruft der Zweig einen handle_*-Handler auf, zählt
+    # dessen Prüfung.
+    for called in re.findall(r"\b(handle_\w+)\s*\(", body_source):
+        target = handler_bodies.get(called, "")
+        if "get_current_user" in target or "require_auth" in target:
+            return True
+    return False
+
+
+@pytest.mark.parametrize("method", ["do_GET", "do_POST"])
+def test_every_api_route_checks_the_session(method):
     """
     Es gibt kein globales Auth-Gate: jede Route prüft selbst. Genau deshalb
-    konnte eine einzelne die Prüfung vergessen. Dieser Test zählt die Zweige.
+    konnte eine einzelne die Prüfung vergessen — und genau deshalb braucht es
+    diesen Durchlauf über alle Zweige.
     """
-    source = HANDLER.read_text(encoding="utf-8")
-    tree = ast.parse(source)
+    tree = ast.parse(HANDLER.read_text(encoding="utf-8"))
+    handler_bodies = _handler_bodies()
 
-    do_get = next(
-        n for n in ast.walk(tree)
-        if isinstance(n, ast.FunctionDef) and n.name == "do_GET"
+    dispatch = next(
+        (n for n in ast.walk(tree)
+         if isinstance(n, ast.FunctionDef) and n.name == method),
+        None,
     )
+    assert dispatch is not None, f"{method} nicht gefunden"
 
     unguarded = []
-    for node in ast.walk(do_get):
+    checked = 0
+    for node in ast.walk(dispatch):
         if not isinstance(node, ast.If):
             continue
-        # Zweige der Form:  elif self.path == "/api/..."
         test = node.test
         if not (isinstance(test, ast.Compare)
+                and test.comparators
                 and isinstance(test.comparators[0], ast.Constant)
                 and isinstance(test.comparators[0].value, str)
                 and test.comparators[0].value.startswith("/api/")):
@@ -105,12 +148,13 @@ def test_every_api_get_route_checks_the_session():
         if route in ALLOWED_WITHOUT_SESSION:
             continue
 
-        body_source = "\n".join(ast.unparse(stmt) for stmt in node.body)
-        if "get_current_user" not in body_source and "require_auth" not in body_source:
+        checked += 1
+        if not _branch_is_guarded(node, handler_bodies):
             unguarded.append(route)
 
+    assert checked > 0, f"Keine Routen in {method} erkannt — Analyse veraltet?"
     assert not unguarded, (
-        "API-Route ohne Sitzungsprüfung:\n  " + "\n  ".join(unguarded)
+        f"API-Route in {method} ohne Sitzungsprüfung:\n  " + "\n  ".join(unguarded)
         + "\nEntweder prüfen oder in ALLOWED_WITHOUT_SESSION eintragen."
     )
 
