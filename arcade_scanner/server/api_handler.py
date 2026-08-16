@@ -836,7 +836,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
         try:
             if self.path.startswith("/stream?path="):
-                file_path = unquote(self.path.split("path=")[1])
+                # parse_qs instead of split("path="): otherwise any further
+                # query parameter ends up inside the file path.
+                params = parse_qs(urlparse(self.path).query)
+                file_path = params.get("path", [None])[0]
+
+                if not file_path:
+                    self.send_error(400, "Missing path parameter")
+                    return
 
                 # Security: Validate path
                 if not is_path_allowed(file_path):
