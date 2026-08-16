@@ -192,7 +192,7 @@ jetzt systematisch.
         heute Nacht gesetzt), alle 9 Dateiverweise und 4 Endpunkte stimmen —
         `client.js` wird korrekt als *ehemalige* Datei genannt
 
-- [ ] **Loop I — Tests, die nichts prüfen**
+- [x] **Loop I — Tests, die nichts prüfen** — ausgereizt, **keine gefunden**
       Heute Nacht zweimal zufällig gefunden: ein `pytest.skip`, das nach einer
       Umstellung immer griff, und Ladereihenfolge-Tests, die per Substring das
       falsche Ergebnis verglichen und zufällig grün waren. Systematisch suchen:
@@ -212,6 +212,16 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 32 (Loop I, Testqualität)** — Ergebnis: keine leeren Tests. Die
+  sieben Treffer „ohne assert" sind legitime „wirft nicht"-Tests, die drei
+  Verdachtsfälle bei den Teilstring-Prüfungen allesamt Fehlalarme meiner
+  Heuristik. Der eigentliche Beleg kam vom Mutationstest: zehn semantische
+  Mutationen eingespielt (Lock entfernt, Pfadprüfung auf immer-True,
+  Stale-Vergleich umgedreht, Token-Maskierung wirkungslos …), **zehn von zehn
+  erkannt**. Vier davon betrafen Code aus dieser Nacht — wer seine eigenen Tests
+  schreibt, sollte sie auch selbst gegen die Mutation prüfen. Dokumentiert in
+  `dev-docs/test-suite-verification.md`, samt Anleitung zum Wiederholen.
 
 - **Iteration 31 (Loop H, Privacy-Zusage)** — Die prominenteste Zusage des
   Projekts traf nicht zu: „No data ever leaves your computer" bei einem
