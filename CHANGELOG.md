@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Endpunkt-Vertrag zwischen Server und Clients**: Ein Test liest die
+  API-Pfade aus dem Quelltext von TV-, iOS- und webOS-Client und prüft sie
+  gegen die Routen des Servers. Solche Brüche fallen sonst niemandem auf — die
+  Clients leben in eigenen Sprachen, kein Import bricht, und wer den Server
+  entwickelt, startet keinen iOS-Simulator. Bekannte Brüche stehen als `xfail`
+  mit Begründung in `KNOWN_BROKEN`.
+
 - **Wächter für die Laufzeit-Abhängigkeiten**: `CLAUDE.md` sagt zu, dass der
   Server reine Standardbibliothek ist und nur pydantic, pydantic-settings,
   Pillow und imagehash braucht. Geprüft hatte das niemand — ein `import
@@ -151,6 +158,15 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **Dokumentiert: der iOS-Client funktioniert seit `8c6008a` nicht mehr.** Der
+  Commit „complete removal of VR Gallery and DeoVR integration" entfernte
+  `/api/deovr/library` und `/api/deovr/collection/<id>` — der iOS-Client ruft
+  beide bis heute auf und bekommt auf jede Bibliotheksabfrage einen 404. Dazu
+  schickt er keinerlei Sitzung mit, stammt also noch aus der Zeit vor der
+  Mehrbenutzer-Umstellung. Beschreibung samt Reparaturweg in
+  `dev-docs/ios-client-status.md`; nicht behoben, weil sich Swift-Code hier
+  weder übersetzen noch testen lässt.
+
 - **GIF-Auftragszustände wuchsen unbegrenzt.** `GIF_JOBS` war ein nacktes
   Modul-Dict: jeder Export schrieb hinein, entfernt wurde nie etwas. Auf einem
   Server, der monatelang durchläuft, sammeln sich dort Dateinamen und Pfade

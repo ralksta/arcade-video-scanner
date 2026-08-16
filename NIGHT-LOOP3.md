@@ -106,6 +106,9 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
       - Wo hängt Korrektheit an einer Zusage, die kein Test prüft?
 
 - [ ] **Loop E — Konsistenz zwischen den Clients**
+      - [x] Endpunkt-Abgleich: **iOS-Client seit `8c6008a` funktionsunfähig**
+            (tote DeoVR-Routen + keine Sitzung). Dokumentiert statt blind
+            repariert — keine Swift-Toolchain zum Prüfen. Vertrags-Test ergänzt
       `CLAUDE.md` warnt ausdrücklich davor, dass TV- und iOS-Client bei
       API-Änderungen mitgezogen werden müssen; frühere Commits haben genau das
       nachgeholt. Nach einer Nacht mit Änderungen an `/api/videos`,
@@ -117,6 +120,16 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 19 (Loop E, Endpunkt-Abgleich)** — Der größte Fund der Nacht
+  gemessen an der Auswirkung: Der iOS-Client spricht Endpunkte an, die es seit
+  einem Aufräum-Commit nicht mehr gibt. Er ist damit seit Monaten tot, und
+  niemand hat es bemerkt — weil Clients in eigenen Sprachen leben und kein
+  Import bricht. Bewusste Entscheidung: **nicht** blind repariert. Ohne
+  Swift-Toolchain hätte ich ~150 Zeilen unprüfbaren Code geschrieben, die nach
+  Fortschritt aussehen, und der nächste Mensch könnte Geprüftes nicht von
+  Ungeprüftem unterscheiden. Stattdessen präzise dokumentiert, was fehlt, plus
+  ein Test, der die nächste solche Drift am Tag ihrer Entstehung meldet.
 
 - **Iteration 18 (Loop D, Rückgabewerte)** — Erst eine Fehlanalyse: mein
   AST-Matcher ging nach Funktionsnamen und meldete sechs verworfene `save()`-
