@@ -30,8 +30,8 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 - [ ] **Loop A — UX** (wieder geöffnet: war nach 2 Punkten vorschnell abgehakt)
       - [x] Tastaturkürzel-Overlay `?` + globale Shortcuts (`/`, `1`–`4`) — `150eb83`
       - [x] Kontextbezogener Leer-Zustand statt weißer Fläche — `ae18a9a`
-      - [ ] Fehler-Zustände: fehlgeschlagene `fetch`-Aufrufe enden heute teils
-            stumm (`fetch()` ohne `.catch`) — sichtbares Feedback + Retry
+      - [x] Fehler-Zustände: 19/63 `fetch`-Aufrufe ohne Fehlerpfad, `apiWrite()`
+            mit Rollback + Regressionstest — `006cd8e`
       - [ ] A11y-Durchgang: Fokus-Ringe, `aria-label` auf Icon-Buttons,
             Fokus-Falle in Modals, `Esc`-Verhalten vereinheitlichen
       - [ ] Mobile: Touch-Ziele < 44 px, horizontale Overflows, Filter-Bar
