@@ -506,22 +506,23 @@ FOLDER_BROWSER_LEGEND_COMPONENT = """
 <div id="folderBrowserLegend" class="hidden w-full bg-arcade-bg/95 border-b border-ink/5 py-2">
     <div class="w-full px-4 flex items-center justify-between">
         <!-- Back Button -->
-        <button id="folderBrowserBackBtn" class="hidden items-center gap-2 text-sm text-gray-400 hover:text-text-main transition-colors" onclick="folderBrowserBack()">
-            <span class="material-icons text-base">arrow_back</span> BACK
+        <button id="folderBrowserBackBtn" class="hidden items-center gap-2 text-sm text-gray-400 hover:text-text-main transition-colors flex-shrink-0" onclick="folderBrowserBack()">
+            <span class="material-icons text-base">arrow_back</span>
+            <span class="hidden md:inline">BACK</span>
         </button>
 
         <!-- Breadcrumb Navigation -->
-        <div class="flex items-center gap-2 text-sm flex-1 ml-4 overflow-x-auto">
-            <span class="material-icons text-arcade-cyan text-base">folder</span>
-            <div id="folderBreadcrumb" class="flex items-center gap-1 font-mono">
+        <div class="flex items-center gap-2 text-sm flex-1 min-w-0 ml-2 md:ml-4 overflow-x-auto">
+            <span class="material-icons text-arcade-cyan text-base flex-shrink-0">folder</span>
+            <div id="folderBreadcrumb" class="flex items-center gap-1 font-mono flex-nowrap whitespace-nowrap">
                 <!-- Populated by JS -->
             </div>
         </div>
 
         <!-- Videos Here Link -->
-        <div id="folderVideosHereLink" class="hidden items-center gap-2 text-sm text-arcade-cyan hover:text-text-main cursor-pointer transition-colors" onclick="toggleFolderBrowserVideos()">
+        <div id="folderVideosHereLink" class="hidden items-center gap-2 text-sm text-arcade-cyan hover:text-text-main cursor-pointer transition-colors flex-shrink-0 ml-2" onclick="toggleFolderBrowserVideos()">
             <span class="material-icons text-base">play_circle</span>
-            <span id="folderVideosHereCount">0 videos here</span>
+            <span id="folderVideosHereCount" class="hidden md:inline">0 videos here</span>
         </div>
     </div>
 </div>

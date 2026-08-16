@@ -813,6 +813,26 @@ html {
     width: 100%;
 }
 
+/* Compact Folder List (Mobile) — ein Ordner pro Zeile zum Durchklicken */
+#videoGrid.folder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+#videoGrid.folder-list .folder-row {
+    /* 44px ist das minimale Touch-Ziel; 64px gibt Thumbnail + zwei Textzeilen Platz */
+    min-height: 64px;
+    padding: 8px 12px;
+}
+
+.folder-row-thumb {
+    width: 56px;
+    height: 56px;
+}
+
 /* Enhanced List View (Accessible & Readable) */
 #videoGrid.list-view {
     display: flex;

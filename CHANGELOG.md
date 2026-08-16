@@ -19,6 +19,22 @@ All notable changes to this project will be documented in this file.
   on a remote NVENC machine, reading originals only).
 
 ### Fixed
+- **Ordner-Browser: echte Hierarchie statt flacher Liste**. `getSubfoldersAt(null)`
+  hielt jeden Pfad für eine oberste Ebene, zu dem es keinen *anderen Ordner mit
+  Dateien* als Präfix gab. Da Mount-Verzeichnisse wie `/media_ralf` selbst keine
+  Dateien enthalten, landete jeder tiefe Blattordner auf der Startebene — bei einer
+  Bibliothek mit 8776 Dateien 153 flache Einträge statt 3 Mounts. Root- und
+  Kind-Ebene laufen jetzt über denselben Code und leiten die nächste Ebene aus den
+  Pfadsegmenten ab, so dass auch Zwischenordner ohne eigene Dateien eine Ebene
+  bilden (`/media_ralf` → `OD`/`korea`/`Reface` → …). Breadcrumbs und die
+  Zurück-Navigation folgen derselben Logik und springen keine Ebene mehr über.
+- **Browser-Zurück im Ordner-Browser**: Es liefen zwei konkurrierende
+  Popstate-Handler (`addEventListener('popstate')` und `window.onpopstate`); der
+  zweite überschrieb den gerade wiederhergestellten State. Der zweite Handler
+  entfällt, und `loadFromURL()` setzt den Ordnerpfad jetzt aktiv zurück, wenn die
+  URL keinen `folderPath` enthält — vorher blieb beim Zurücknavigieren der alte
+  Pfad stehen.
+
 - **Light-Mode-Kontraste**: Die Views trugen noch flächendeckend Hardcodes aus
   der dark-only Zeit (`text-white`, `text-gray-400/500/600`, `bg-white/10`,
   `bg-black/40`, `rgba(255,255,255,…)` in `styles.css`), die im hellen Design
@@ -36,6 +52,17 @@ All notable changes to this project will be documented in this file.
   parameter ended up inside the filename. Now uses `parse_qs` like `do_GET`.
 
 ### Changed
+- **Mobile-Navigation**: Neuer Eintrag **Ordner** in der Bottom-Nav, der direkt in
+  den Ordner-Browser springt — der war auf dem Handy bisher gar nicht erreichbar
+  (die View-Toggles sind `hidden md:flex`, nur per Deep-Link zugänglich). Dafür ist
+  **Vault** aus der Bottom-Nav entfernt; der Workspace bleibt über `/vault` und den
+  Desktop erreichbar.
+- **Ordnerliste auf schmalen Viewports**: unterhalb von 768px kompakte Zeilen
+  (56px-Thumbnail, Name, Anzahl + Größe, Chevron, ≥64px Tap-Ziel) statt der
+  bildschirmfüllenden Karten mit 2×2-Mosaik — damit sind mehrere Ordner gleichzeitig
+  sichtbar und Durchklicken fühlt sich wie ein Dateimanager an. Beim Wechsel über den
+  Breakpoint (Rotation) wird neu gerendert; die Breadcrumb-Leiste scrollt horizontal
+  und springt ans Ende des Pfads.
 - **Einheitliches Design System**: Die drei Themes (Arcade/Professional/Candy)
   sind durch *ein* dark-first Theme mit genau einem Brand-Accent (Magenta
   `#c4179f`) ersetzt. Semantische Farben (HEVC-Türkis, AV1-Violett,

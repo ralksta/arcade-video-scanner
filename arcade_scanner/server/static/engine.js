@@ -898,10 +898,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadAvailableTags();
     }
 
-    // Handle URL Back/Forward
-    window.onpopstate = (event) => {
-        loadFromURL();
-    };
+    // Back/Forward wird von genau EINEM Handler bedient — dem
+    // addEventListener('popstate', ...) weiter oben in dieser Datei. Ein zweiter
+    // Handler hier hat den wiederhergestellten State direkt wieder überschrieben.
 
     // --- CATEGORY MANAGEMENT FUNCTIONS ---
     function getAvailableCategories() {

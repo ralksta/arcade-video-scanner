@@ -131,74 +131,55 @@ function getSubfoldersAt(path) {
     const allPaths = Array.from(folderStats.keys());
     const subfolders = new Map();
 
-    if (normalizedPath === null) {
-        // Root level: find top-level folders
-        allPaths.forEach(folderPath => {
-            // Check if this path is a subfolder of any other path
-            let isSubfolder = false;
-            allPaths.forEach(otherPath => {
-                if (otherPath !== folderPath && folderPath.startsWith(otherPath + '/')) {
-                    isSubfolder = true;
-                }
+    // Root und Kind-Ebene laufen über denselben Code: die nächste Ebene wird immer
+    // aus den Pfadsegmenten abgeleitet. Wichtig für Zwischenordner, die selbst keine
+    // Dateien enthalten (z.B. /media_ralf) — die wären sonst gar keine eigene Ebene.
+    const isRoot = normalizedPath === null;
+    const prefix = isRoot ? '' : normalizedPath + '/';
+
+    allPaths.forEach(folderPath => {
+        if (!folderPath.startsWith(prefix)) return;
+
+        let remainder = folderPath.substring(prefix.length);
+
+        // Auf Root-Ebene den Mount-Slash abtrennen ('/media_ralf/OD' → 'media_ralf/OD'),
+        // damit das erste Segment nicht leer ist.
+        let leading = '';
+        if (isRoot) {
+            const match = remainder.match(/^\/+/);
+            if (match) {
+                leading = match[0];
+                remainder = remainder.substring(match[0].length);
+            }
+        }
+
+        const nextSegment = remainder.split('/')[0];
+        if (!nextSegment) return;
+
+        const childPath = isRoot ? leading + nextSegment : normalizedPath + '/' + nextSegment;
+
+        if (!subfolders.has(childPath)) {
+            // Original-Schreibweise (Backslashes) rekonstruieren: Normalisierung
+            // ersetzt nur '\' durch '/', die Länge bleibt identisch.
+            const stats = folderStats.get(folderPath);
+            subfolders.set(childPath, {
+                path: stats.originalPath.substring(0, childPath.length),
+                count: 0,
+                size_mb: 0,
+                hasSubfolders: false
             });
+        }
 
-            if (!isSubfolder) {
-                // This is a root-level folder - aggregate all subfolders into it
-                const stats = folderStats.get(folderPath);
-                if (!subfolders.has(folderPath)) {
-                    subfolders.set(folderPath, {
-                        path: stats.originalPath,
-                        count: 0,
-                        size_mb: 0,
-                        hasSubfolders: false
-                    });
-                }
-                const folder = subfolders.get(folderPath);
-                folder.count += stats.count;
-                folder.size_mb += stats.size_mb;
+        const folder = subfolders.get(childPath);
+        const stats = folderStats.get(folderPath);
+        folder.count += stats.count;
+        folder.size_mb += stats.size_mb;
 
-                // Also add stats from all subfolders
-                allPaths.forEach(subPath => {
-                    if (subPath !== folderPath && subPath.startsWith(folderPath + '/')) {
-                        const subStats = folderStats.get(subPath);
-                        folder.count += subStats.count;
-                        folder.size_mb += subStats.size_mb;
-                        folder.hasSubfolders = true;
-                    }
-                });
-            }
-        });
-    } else {
-        // Find direct children of the given path
-        allPaths.forEach(folderPath => {
-            if (folderPath.startsWith(normalizedPath + '/')) {
-                const remainder = folderPath.substring(normalizedPath.length + 1);
-                const nextSegment = remainder.split('/')[0];
-                const childPath = normalizedPath + '/' + nextSegment;
-
-                if (!subfolders.has(childPath)) {
-                    // Reconstruct original path format
-                    const originalPath = path + (path.includes('\\') ? '\\' : '/') + nextSegment;
-                    subfolders.set(childPath, {
-                        path: originalPath,
-                        count: 0,
-                        size_mb: 0,
-                        hasSubfolders: false
-                    });
-                }
-
-                const folder = subfolders.get(childPath);
-                const stats = folderStats.get(folderPath);
-                folder.count += stats.count;
-                folder.size_mb += stats.size_mb;
-
-                // Check if there are deeper subfolders
-                if (remainder.includes('/')) {
-                    folder.hasSubfolders = true;
-                }
-            }
-        });
-    }
+        // Gibt es unterhalb dieses Kindes noch tiefere Ordner?
+        if (remainder.includes('/')) {
+            folder.hasSubfolders = true;
+        }
+    });
 
     // Convert to array, add names, and sort by size
     const result = Array.from(subfolders.values()).map(folder => ({
@@ -319,20 +300,16 @@ function folderBrowserBack() {
     const lastSlash = normalized.lastIndexOf('/');
 
     if (lastSlash > 0) {
-        // Go up one level
+        // Eine Ebene hoch. Der Parent ist immer eine gültige Ebene, auch wenn er
+        // selbst keine Dateien enthält — getSubfoldersAt() leitet Ebenen aus den
+        // Pfadsegmenten ab.
         const parentPath = folderBrowserState.currentPath.substring(0,
             Math.max(folderBrowserState.currentPath.lastIndexOf('/'),
                 folderBrowserState.currentPath.lastIndexOf('\\')));
 
-        // Check if parent is a root folder or has a parent itself
-        const subfolders = getSubfoldersAt(null);
-        const isRootFolder = subfolders.some(f =>
-            normalizePath(f.path) === normalizePath(parentPath)
-        );
-
-        setFolderBrowserPath(isRootFolder ? null : parentPath);
+        setFolderBrowserPath(parentPath);
     } else {
-        // Go to root
+        // Mount-Ebene ('/media_ralf') → zurück zur Übersicht
         setFolderBrowserPath(null);
     }
 }
@@ -354,37 +331,22 @@ function getFolderBreadcrumbs() {
 
     if (!folderBrowserState.currentPath) return breadcrumbs;
 
-    const normalizePath = (p) => p.replace(/\\/g, '/');
-    const normalized = normalizePath(folderBrowserState.currentPath);
-    const rootFolders = getSubfoldersAt(null);
+    // Direkt aus den Pfadsegmenten aufbauen — jede Ebene ist anklickbar, auch
+    // Zwischenordner ohne eigene Dateien.
+    const original = folderBrowserState.currentPath;
+    const normalized = original.replace(/\\/g, '/');
 
-    // Find which root folder this path belongs to
-    let rootFolder = null;
-    for (const folder of rootFolders) {
-        const normalizedRoot = normalizePath(folder.path);
-        if (normalized === normalizedRoot || normalized.startsWith(normalizedRoot + '/')) {
-            rootFolder = folder;
-            break;
-        }
-    }
+    // Führenden Slash als Teil des ersten Segments behalten ('/media_ralf')
+    const leading = (normalized.match(/^\/+/) || [''])[0];
+    const segments = normalized.substring(leading.length).split('/').filter(Boolean);
 
-    if (rootFolder) {
-        const normalizedRoot = normalizePath(rootFolder.path);
-        breadcrumbs.push({ name: rootFolder.name, path: rootFolder.path });
-
-        // Add intermediate segments
-        if (normalized !== normalizedRoot) {
-            const remainder = normalized.substring(normalizedRoot.length + 1);
-            const segments = remainder.split('/');
-            let currentPath = rootFolder.path;
-            const separator = rootFolder.path.includes('\\') ? '\\' : '/';
-
-            segments.forEach(segment => {
-                currentPath = currentPath + separator + segment;
-                breadcrumbs.push({ name: segment, path: currentPath });
-            });
-        }
-    }
+    // Jede Ebene ist ein Präfix des Originalpfads — dadurch bleibt die
+    // Original-Schreibweise (Backslashes unter Windows) automatisch erhalten.
+    let end = leading.length;
+    segments.forEach((segment, idx) => {
+        end += segment.length + (idx === 0 ? 0 : 1);
+        breadcrumbs.push({ name: segment, path: original.substring(0, end) });
+    });
 
     return breadcrumbs;
 }
@@ -464,6 +426,49 @@ function createFolderCard(folder) {
 }
 
 /**
+ * Breakpoint check — unterhalb von md (768px) wird die kompakte Listendarstellung
+ * benutzt. Muss zum `md:`-Breakpoint der Templates passen.
+ * @returns {boolean} True auf schmalen Viewports
+ */
+function isCompactFolderView() {
+    return window.innerWidth < 768;
+}
+
+/**
+ * Create a compact folder row for mobile — ein Ordner pro Zeile statt
+ * bildschirmfüllender Karte, damit man sich durch Ebenen klicken kann.
+ * @param {Object} folder - Folder data {path, name, count, size_mb, hasSubfolders, thumbnails}
+ * @returns {HTMLElement} DOM element for the folder row
+ */
+function createFolderRow(folder) {
+    const row = document.createElement('div');
+    row.className = 'folder-row folder-card flex items-center gap-3 w-full bg-card rounded-ds-md border border-[var(--ds-hairline)] active:border-[var(--ds-hairline-strong)] transition-colors cursor-pointer';
+    row.setAttribute('data-path', folder.path);
+
+    const thumb = (folder.thumbnails || [])[0];
+    const thumbHtml = thumb
+        ? `<img src="/thumbnails/${thumb}" class="w-full h-full object-cover" loading="lazy">`
+        : `<span class="material-icons text-gray-600 text-xl">folder</span>`;
+
+    row.innerHTML = `
+        <div class="folder-row-thumb flex items-center justify-center bg-black/40 rounded-ds-sm overflow-hidden flex-shrink-0">
+            ${thumbHtml}
+        </div>
+        <div class="min-w-0 flex-1">
+            <div class="text-sm font-bold text-text-main truncate" title="${folder.path}">${folder.name}</div>
+            <div class="text-xs text-text-muted truncate">${folder.count} · ${formatSize(folder.size_mb)}</div>
+        </div>
+        <span class="material-icons text-text-muted flex-shrink-0">${folder.hasSubfolders ? 'chevron_right' : 'play_arrow'}</span>
+    `;
+
+    row.addEventListener('click', () => {
+        setFolderBrowserPath(folder.path);
+    });
+
+    return row;
+}
+
+/**
  * Render the folder browser view
  */
 function renderFolderBrowser() {
@@ -501,10 +506,14 @@ function renderFolderBrowser() {
             const isLast = idx === breadcrumbs.length - 1;
             const clickHandler = isLast ? '' : `onclick="setFolderBrowserPath(${crumb.path === null ? 'null' : `'${crumb.path.replace(/'/g, "\\'")}'`})"`;
             return `
-                <span class="${isLast ? 'text-text-main font-bold' : 'text-arcade-cyan hover:text-text-main cursor-pointer transition-colors'}" ${clickHandler}>${crumb.name}</span>
-                ${!isLast ? '<span class="text-gray-600 mx-1">/</span>' : ''}
+                <span class="flex-shrink-0 ${isLast ? 'text-text-main font-bold' : 'text-arcade-cyan hover:text-text-main cursor-pointer transition-colors'}" ${clickHandler}>${crumb.name}</span>
+                ${!isLast ? '<span class="text-gray-600 mx-1 flex-shrink-0">/</span>' : ''}
             `;
         }).join('');
+
+        // Bei tiefen Pfaden ans Ende scrollen, damit der aktuelle Ordner sichtbar ist
+        const scroller = breadcrumbEl.parentElement;
+        if (scroller) scroller.scrollLeft = scroller.scrollWidth;
     }
 
     // Update "videos here" link
@@ -521,6 +530,7 @@ function renderFolderBrowser() {
     // Clear the grid
     grid.innerHTML = '';
     grid.classList.remove('list-view');
+    grid.classList.remove('folder-list');
 
     // Decide what to render
     if (folderBrowserState.showVideosHere || (subfolders.length === 0 && folderBrowserState.currentPath)) {
@@ -561,14 +571,27 @@ function renderFolderBrowser() {
             </div>
         `;
     } else {
-        // Render folder cards
+        // Render folder cards — auf schmalen Viewports als kompakte Liste
+        const compact = isCompactFolderView();
+        grid.classList.toggle('folder-list', compact);
+
         const fragment = document.createDocumentFragment();
         subfolders.forEach(folder => {
-            fragment.appendChild(createFolderCard(folder));
+            fragment.appendChild(compact ? createFolderRow(folder) : createFolderCard(folder));
         });
         grid.appendChild(fragment);
     }
 }
+
+// Beim Wechsel über den Breakpoint (Rotation, Resize) neu rendern —
+// sonst bleiben Karten/Zeilen in der falschen Darstellung stehen.
+let lastCompactFolderView = null;
+window.addEventListener('resize', () => {
+    const compact = isCompactFolderView();
+    if (lastCompactFolderView === compact) return;
+    lastCompactFolderView = compact;
+    if (currentLayout === 'folderbrowser') renderFolderBrowser();
+});
 
 /**
  * Update the folder browser legend state
