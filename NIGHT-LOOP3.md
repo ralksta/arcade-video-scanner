@@ -138,7 +138,9 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
         gültige Zugangs-Token mit. Wird jetzt immer maskiert.
       - Pfad-Prüfungen: `sanitize_path`, `validate_filename`, Thumbnail-Pfade —
         greifen sie überall, wo Pfade aus Requests kommen?
-      - `/api/debug/dump`: was steht da drin, und wer darf es sehen?
+      - [x] `/api/debug/dump` war **unauthentifiziert**: Nutzerliste, Scan-Ziele,
+        Dateipfade. Jetzt admin-pflichtig; Rundum-Test fand zusätzlich
+        `/api/cache-stats` offen
       - `innerHTML` im Frontend: wo fließen Dateinamen unmaskiert hinein?
       - Trennung: gibt es weitere Stellen wie `FOLDERS_DATA`, an denen Daten
         aller Nutzer in eine gemeinsame Antwort geraten?
@@ -155,6 +157,14 @@ Wieder aus Funden abgeleitet, nicht frei gewählt.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 23 (Loop F, offene Routen)** — `/api/debug/dump` gab ohne jede
+  Prüfung Benutzerliste und Bibliotheksstruktur heraus. Die Ursache ist
+  strukturell: Der Server hat kein globales Auth-Gate, jede Route prüft selbst —
+  eine kann es also vergessen, und niemand merkt es. Statt nur diese eine zu
+  reparieren, geht ein Test jetzt per AST alle GET-Routen durch und verlangt
+  Prüfung oder begründete Ausnahme. Er fand beim ersten Lauf sofort eine zweite
+  offene Route (`/api/cache-stats`) — der Test war also mehr wert als der Fix.
 
 - **Iteration 22 (Loop F, Token im Log)** — Der Token als Query-Parameter ist
   eine bewusste Entscheidung (Video-Tags können keinen Header senden) und für

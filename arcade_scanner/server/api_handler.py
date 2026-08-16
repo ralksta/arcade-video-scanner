@@ -768,6 +768,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
             elif self.path == "/api/cache-stats":
+                # Sitzungspflichtig: Der Wert erscheint nur im Einstellungs-Panel
+                # angemeldeter Nutzer. Ungeschützt verriet er die ungefähre Größe
+                # der Bibliothek und lief bei jedem Aufruf rekursiv über den
+                # gesamten Thumbnail-Ordner — beides ohne Not.
+                if not self.get_current_user():
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 # Calculate cache sizes
                 def get_dir_size(path):
                     total = 0
@@ -863,6 +871,25 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 send_json_precompressed(self, raw, gzipped)
 
             elif self.path == "/api/debug/dump":
+                # Diese Route gab den kompletten Systemzustand ohne jede Prüfung
+                # heraus: Scan-Pfade, sämtliche Benutzernamen samt Admin-Flag
+                # und Scan-Zielen, echte Dateipfade aus der Bibliothek und die
+                # Inhalte der Mount-Verzeichnisse. Wer den Port erreichte —
+                # im LAN oder über Tailscale — bekam damit die Struktur der
+                # Bibliothek und die Benutzerliste, ohne angemeldet zu sein.
+                #
+                # Admin-pflichtig statt nur angemeldet: der Inhalt betrifft alle
+                # Nutzer, nicht nur den anfragenden.
+                debug_user = self.get_current_user()
+                if not debug_user:
+                    self.send_error(401, "Unauthorized")
+                    return
+
+                debug_account = user_db.get_user(debug_user)
+                if not debug_account or not debug_account.is_admin:
+                    self.send_error(403, "Forbidden")
+                    return
+
                 # GET: Return full system state for debugging
                 debug_info = {
                     "config": {

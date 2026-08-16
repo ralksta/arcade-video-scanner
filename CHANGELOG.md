@@ -158,6 +158,22 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Security
+- **`/api/debug/dump` war unauthentifiziert erreichbar.** Die Route gab den
+  kompletten Systemzustand ohne jede Prüfung heraus: aktive Scan-Pfade und
+  Ausschlüsse, **sämtliche Benutzernamen mit Admin-Flag und ihren Scan-Zielen**,
+  Beispielzeilen aus der Datenbank mit echten Dateipfaden sowie den Inhalt der
+  Mount-Verzeichnisse. Wer den Port erreichte — im LAN oder über Tailscale —
+  bekam damit Benutzerliste und Bibliotheksstruktur, ohne angemeldet zu sein.
+  Jetzt admin-pflichtig, weil der Inhalt alle Nutzer betrifft und nicht nur den
+  anfragenden. Ein globales Auth-Gate gibt es im Server nicht — jede Route prüft
+  selbst, und genau deshalb konnte diese es vergessen. Ein neuer Test geht alle
+  GET-Routen durch und verlangt entweder eine Prüfung oder einen begründeten
+  Eintrag in der Ausnahmeliste; er fand dabei gleich eine zweite Route:
+- **`/api/cache-stats` war ebenfalls offen.** Weniger brisant (Größe des
+  Thumbnail-Ordners), aber es verriet die ungefähre Größe der Bibliothek und
+  lief bei jedem Aufruf rekursiv über den gesamten Ordner. Jetzt
+  sitzungspflichtig.
+
 - **Sitzungs-Token landeten im Zugriffslog, sobald man die Diagnose einschaltet.**
   `<video>`-Tags können keinen `Authorization`-Header senden, deshalb nimmt
   `/stream` den Token als Query-Parameter entgegen — es ist derselbe Token wie
