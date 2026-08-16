@@ -79,7 +79,7 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 
 Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 
-- [ ] **Loop D — Stille Fehlerpfade und Randfälle**
+- [x] **Loop D — Stille Fehlerpfade und Randfälle** — ausgereizt (4 Fixes, 2 Wächter)
       - [x] 46 nackte `except: pass` erfasst; vier davon schalteten sichtbares
             Verhalten ab (Auto-Tagging nach Scan, Laufzeitprüfung beim Upload,
             Bild-Scan, Resource-Watchdog) — laut gemacht, Rest ist legitim
@@ -93,6 +93,9 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
       - [x] Zusage „nur vier Laufzeit-Abhängigkeiten, kein Framework" abgesichert.
             Kein Fehler gefunden — der Bestand hält sie exakt ein; es fehlte
             nur der Wächter
+      - [x] Ignorierte Rückgabewerte: im Server keiner — beide `config.save()`-
+            Aufrufer prüfen korrekt. Nur ein Wartungsskript meldete Erfolg,
+            ohne den Status anzusehen
       Die ergiebigste Ader der Nacht: veraltete Proxys, ein Cache ohne
       Invalidierung, `FOLDERS_DATA` mit fremden Pfaden, eine Test-Suite die ins
       Produktivverzeichnis schrieb — alle vier hatten gemeinsam, dass nichts
@@ -114,6 +117,15 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 18 (Loop D, Rückgabewerte)** — Erst eine Fehlanalyse: mein
+  AST-Matcher ging nach Funktionsnamen und meldete sechs verworfene `save()`-
+  Aufrufe. Das waren `db.save()` (ein dokumentierter No-Op), nicht das
+  `config.save()` mit Statusrückgabe. Lehre: bei namensbasierter Suche gehört
+  der Empfänger dazu, sonst produziert man Funde, die keine sind. Echter Befund
+  nach der Korrektur: beide Server-Aufrufer prüfen sauber, nur ein
+  Wartungsskript meldete „Success", ohne hinzusehen. Zwei magere Durchgänge in
+  Folge — Loop D ist damit ausgereizt.
 
 - **Iteration 17 (Loop D, Abhängigkeits-Zusage)** — Hier gab es nichts zu
   reparieren: nur pydantic, pydantic-settings, Pillow, imagehash, alle auf

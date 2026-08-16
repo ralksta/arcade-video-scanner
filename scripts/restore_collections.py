@@ -39,5 +39,12 @@ collections_to_restore = [
 ]
 
 print("Restoring collections...")
-config.save({"smart_collections": collections_to_restore})
-print("✅ Success! You may need to restart the server or refresh the page.")
+
+# config.save() meldet über den Rückgabewert, ob das Schreiben geklappt hat.
+# Ohne die Prüfung stand hier auch dann "Success", wenn die Datei nicht
+# beschreibbar war — und die Collections waren trotzdem weg.
+if config.save({"smart_collections": collections_to_restore}):
+    print("✅ Success! You may need to restart the server or refresh the page.")
+else:
+    print("❌ Speichern fehlgeschlagen — die Collections wurden NICHT wiederhergestellt.")
+    sys.exit(1)
