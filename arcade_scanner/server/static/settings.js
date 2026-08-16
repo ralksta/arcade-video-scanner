@@ -48,6 +48,12 @@ async function openSettings() {
         const precomputeThumbsCheckbox = document.getElementById('settingsPrecomputeThumbs');
         if (precomputeThumbsCheckbox) precomputeThumbsCheckbox.checked = data.precompute_thumbnails !== false;
 
+        const proxyStreamingCheckbox = document.getElementById('settingsProxyStreaming');
+        if (proxyStreamingCheckbox) proxyStreamingCheckbox.checked = data.proxy_streaming !== false;
+
+        const proxyRootInput = document.getElementById('settingsProxyRoot');
+        if (proxyRootInput) proxyRootInput.value = data.proxy_root || '';
+
         const verboseScanningCheckbox = document.getElementById('settingsVerboseScanning');
         if (verboseScanningCheckbox) verboseScanningCheckbox.checked = data.verbose_scanning === true;
 
@@ -141,6 +147,8 @@ async function saveSettings() {
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
         encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
         precompute_thumbnails: document.getElementById('settingsPrecomputeThumbs')?.checked ?? true,
+        proxy_streaming: document.getElementById('settingsProxyStreaming')?.checked ?? true,
+        proxy_root: (document.getElementById('settingsProxyRoot')?.value ?? '').trim(),
         verbose_scanning: document.getElementById('settingsVerboseScanning')?.checked || false
     };
 

@@ -1744,6 +1744,33 @@ SETTINGS_MODAL_COMPONENT = """
                     <section class="space-y-4">
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent">travel_explore</span>
+                                Proxy Streaming
+                            </h3>
+                            <p class="text-[12px] text-text-muted mt-1">Serve a smaller copy when streaming from outside your LAN, so high-bitrate originals stay playable on the road. Originals are never modified.</p>
+                        </div>
+
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-white font-medium text-sm">Use proxies for remote clients</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Clients on the local network keep getting the original.</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingsProxyStreaming" class="sr-only peer" onchange="markSettingsUnsaved()">
+                                <div class="ds-peer-switch"></div>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-white mb-2">Proxy Directory</label>
+                            <input type="text" id="settingsProxyRoot" placeholder="/proxies" class="w-full bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-accent focus:outline-none" oninput="markSettingsUnsaved()">
+                            <p class="text-xs text-gray-500 mt-1">Absolute path. Leave empty to disable proxy streaming entirely. The directory is excluded from scans automatically, so proxies never appear as duplicate entries. Generate the files with <code>scripts/generate_proxies.py</code>.</p>
+                        </div>
+                    </section>
+
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
                                 <span class="material-icons text-lg text-accent">tune</span>
                                 Encoding Quality
                             </h3>

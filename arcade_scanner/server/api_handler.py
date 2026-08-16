@@ -26,6 +26,11 @@ from arcade_scanner.server.response_helpers import (
     send_json,
     send_not_modified_if_unchanged,
 )
+from arcade_scanner.core.proxy_resolver import (
+    client_ip_from_handler,
+    parse_override,
+    resolve_stream_path,
+)
 from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
 
@@ -656,7 +661,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.send_error(403, error_msg)
                         return
 
-                    serve_file_range(self, file_path, method="GET")
+                    # Proxy selection AFTER the whitelist check: what gets
+                    # validated is always the original path. The proxy path is
+                    # derived from it and never comes from the request.
+                    serve_path, variant = resolve_stream_path(
+                        file_path,
+                        client_ip=client_ip_from_handler(self),
+                        override=parse_override(params.get("proxy", [None])[0]),
+                    )
+                    serve_file_range(self, serve_path, method="GET",
+                                     extra_headers={"X-Arcade-Variant": variant})
                 except SecurityError as e:
                     print(f"🚨 Security violation in stream: {e}")
                     self.send_error(403, "Forbidden")
@@ -836,14 +850,29 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
         try:
             if self.path.startswith("/stream?path="):
-                file_path = unquote(self.path.split("path=")[1])
+                # parse_qs instead of split("path="): otherwise any further
+                # query parameter ends up inside the file path.
+                params = parse_qs(urlparse(self.path).query)
+                file_path = params.get("path", [None])[0]
+
+                if not file_path:
+                    self.send_error(400, "Missing path parameter")
+                    return
 
                 # Security: Validate path
                 if not is_path_allowed(file_path):
                     self.send_error(403, "Forbidden")
                     return
 
-                serve_file_range(self, file_path, method="HEAD")
+                # Must reach the same decision as do_GET — otherwise HEAD
+                # reports the original's size while GET serves the proxy.
+                serve_path, variant = resolve_stream_path(
+                    file_path,
+                    client_ip=client_ip_from_handler(self),
+                    override=parse_override(params.get("proxy", [None])[0]),
+                )
+                serve_file_range(self, serve_path, method="HEAD",
+                                 extra_headers={"X-Arcade-Variant": variant})
 
             else:
                 self.send_error(405)

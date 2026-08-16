@@ -27,6 +27,13 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Proxy Streaming — the library on the road (2026-08-16)
+- **Per-request switching**: `/stream` serves the original on the LAN and a smaller proxy over Tailscale; without a proxy always the original. `?proxy=0/1` overrides, `X-Arcade-Variant` reports the choice.
+- **One entry per video**: the proxy tree lives outside the library and is excluded from the scan paths automatically — no duplicates, originals stay untouched.
+- **Raw material detection**: `core/master_detect.py` tells camera source files from edited versions using folders, keywords, camera filename schemes and device names.
+- **Generator**: `scripts/generate_proxies.py` encodes on a remote NVENC machine, reads originals only and is resumable.
+- Open: a `--local` mode for a GPU in the same machine; automatic refresh when an original changes.
+
 ### ✅ Embedding Foundation — Ähnlichkeit Teil 1 (2026-08-08)
 - **Vektor-Speicher**: `embedding_meta`/`frame_embeddings` in SQLite, float32-Blobs, L2-normalisiert.
 - **GPU-Indexer**: eigenständiges Skript mit optionalen ML-Deps (`[indexer]`), inkrementell.

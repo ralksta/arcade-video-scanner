@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Proxy Streaming**: Every video may have a smaller copy in its own directory
+  tree, which is excluded from scans. `/stream` decides per request which file to
+  serve — the original on the LAN, the proxy over Tailscale (CGNAT
+  `100.64.0.0/10` and `fd7a:115c:a1e0::/48`), falling back to the original when no
+  proxy exists. The library still shows exactly one entry per video, and originals
+  are never modified. Controlled through `proxy_streaming` / `proxy_root` in the
+  Settings UI; `?proxy=0` and `?proxy=1` override the automatic choice, and the
+  response carries `X-Arcade-Variant`. New: `core/proxy_resolver.py`,
+  `core/master_detect.py` (identifies raw camera material by folder, keyword,
+  camera filename scheme and device name, so proxies are built from edits rather
+  than from source footage) and `scripts/generate_proxies.py` (creates the proxies
+  on a remote NVENC machine, reading originals only).
+
+### Fixed
+- `do_HEAD` split the stream path with `split("path=")`, so any appended query
+  parameter ended up inside the filename. Now uses `parse_qs` like `do_GET`.
+
 ### Changed
 - **Einheitliches Design System**: Die drei Themes (Arcade/Professional/Candy)
   sind durch *ein* dark-first Theme mit genau einem Brand-Accent (Magenta
