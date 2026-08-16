@@ -130,3 +130,75 @@ def test_known_broken_entries_are_documented():
     text = doc.read_text(encoding="utf-8")
     for endpoint in KNOWN_BROKEN:
         assert endpoint in text, f"{endpoint} ist nicht dokumentiert"
+
+
+# ---------------------------------------------------------------------------
+# Fest verdrahtete Server-Adressen
+# ---------------------------------------------------------------------------
+
+HARDCODED_HOST_RE = re.compile(r"https?://(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?")
+
+
+def test_no_hardcoded_server_address_in_client_views():
+    """
+    Der TV-Client trug `http://192.168.2.183:8000` an acht Stellen im Code. Er
+    funktionierte damit nur in genau einem Netz mit genau dieser IP — vergibt
+    der Router eine andere, laden weder Bibliothek noch Vorschaubilder, und die
+    Ursache steht an acht Stellen statt an einer.
+
+    Die Adresse gehört an *eine* Stelle (`tv_client/src/serverConfig.js`), damit
+    sie sich ändern lässt und später aus dem Login-Bildschirm kommen kann.
+    """
+    allowed = {"serverConfig.js"}
+    offenders = []
+
+    for client, paths in CLIENT_SOURCES.items():
+        for path in paths:
+            if path.name in allowed:
+                continue
+            try:
+                source = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            for lineno, line in enumerate(source.splitlines(), 1):
+                stripped = line.lstrip()
+                if stripped.startswith(("//", "*", "#")):
+                    continue
+                # Beispieladressen in Eingabefeld-Platzhaltern sind Text für den
+                # Nutzer, keine Verdrahtung — der iOS-Client fragt die Adresse ab.
+                if "e.g." in line or "z. B." in line:
+                    continue
+                if HARDCODED_HOST_RE.search(line):
+                    offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {line.strip()[:70]}")
+
+    assert not offenders, (
+        "Fest verdrahtete Server-Adresse — gehört nach serverConfig.js:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_tv_client_reads_only_fields_the_api_delivers():
+    """
+    Der `Status`-Fehler war ein falscher Feldname. Dieselbe Klasse: `v.resolution`
+    gibt es in der Antwort nicht (die API liefert Width und Height), das Label
+    blieb dadurch still leer.
+    """
+    api_source = (ROOT / "arcade_scanner" / "database" / "sqlite_store.py").read_text(
+        encoding="utf-8"
+    )
+    block = api_source.split("def _row_to_api_dict", 1)[1].split("return {", 1)[1].split("\n        }", 1)[0]
+    api_fields = set(re.findall(r'"(\w+)":', block))
+
+    # Vom Client selbst gesetzte Hilfsfelder.
+    client_side = {"_fileName"}
+
+    main_panel = (ROOT / "tv_client" / "src" / "views" / "MainPanel.js").read_text(encoding="utf-8")
+    code = "\n".join(
+        line for line in main_panel.splitlines() if not line.strip().startswith("//")
+    )
+    read_fields = set(re.findall(r"\bv\.([A-Za-z_]\w*)", code))
+
+    unknown = read_fields - api_fields - client_side
+    assert not unknown, (
+        f"TV-Client liest Felder, die /api/videos nicht liefert: {sorted(unknown)}"
+    )

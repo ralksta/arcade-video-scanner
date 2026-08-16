@@ -158,6 +158,18 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **TV-Client: Server-Adresse war an neun Stellen fest verdrahtet.**
+  `http://192.168.2.183:8000` stand in `MainPanel.js`, `LoginPanel.js` und
+  `App.js` — der Client funktionierte damit nur in genau einem Netz mit genau
+  dieser IP. Vergibt der Router eine andere, laden weder Bibliothek noch
+  Vorschaubilder noch Videos, und die Ursache steht an neun Stellen statt an
+  einer. Jetzt in `tv_client/src/serverConfig.js` zusammengefasst, mit
+  Unterstützung für einen gespeicherten Wert; die Abfrage im Login-Bildschirm
+  ist der nächste Schritt und dort vermerkt.
+- **TV-Client: Auflösung fehlte still im Kachel-Label.** Gelesen wurde
+  `v.resolution`, ein Feld, das die API nicht liefert — der Wert war immer leer.
+  Wird jetzt wie im Browser aus `Width`/`Height` abgeleitet.
+
 - **TV-Client: Smart Collections filterten nach dem falschen Feld.** Der
   Matcher las `v.status`, die API liefert das Feld aber als `Status`. Der Wert
   war damit immer `undefined` — `optimized` traf nie, `pending` traf immer.

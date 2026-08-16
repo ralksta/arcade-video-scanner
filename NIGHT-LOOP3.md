@@ -105,13 +105,16 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
       - Wo wird ein Rückgabewert ignoriert, wo ein `except` verschluckt?
       - Wo hängt Korrektheit an einer Zusage, die kein Test prüft?
 
-- [ ] **Loop E — Konsistenz zwischen den Clients**
+- [x] **Loop E — Konsistenz zwischen den Clients** — ausgereizt
       - [x] Endpunkt-Abgleich: **iOS-Client seit `8c6008a` funktionsunfähig**
             (tote DeoVR-Routen + keine Sitzung). Dokumentiert statt blind
             repariert — keine Swift-Toolchain zum Prüfen. Vertrags-Test ergänzt
       - [x] Filter-Semantik: TV-Client las `v.status` statt `v.Status` — Status-
             Filter kehrten sich um. Plus Codec-Vergleich, `favorites: false` und
             Vault-Regel angeglichen; Differenztest gegen den Browser-Matcher
+      - [x] Antwortformat-Annahmen: `v.resolution` gibt es nicht (Auflösung
+            fehlte still im Label) — plus Server-Adresse an 9 Stellen fest
+            verdrahtet, jetzt in `serverConfig.js`
       `CLAUDE.md` warnt ausdrücklich davor, dass TV- und iOS-Client bei
       API-Änderungen mitgezogen werden müssen; frühere Commits haben genau das
       nachgeholt. Nach einer Nacht mit Änderungen an `/api/videos`,
@@ -123,6 +126,15 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 21 (Loop E, Feldnamen und Adressen)** — Nach dem `Status`-Fehler
+  systematisch alle Feldzugriffe des TV-Clients gegen die API-Antwort geprüft:
+  `v.resolution` existiert nicht, das Label blieb still leer. Beim Schreiben des
+  Wächters gegen fest verdrahtete Adressen fand der Test prompt eine neunte
+  Stelle, die ich beim Suchen übersehen hatte (Stream-URL in `App.js`) — und
+  einen Fehlalarm, den ich als solchen behandelt habe statt ihn wegzudrücken:
+  die iOS-Zeile ist Platzhaltertext in einem Eingabefeld. Loop E ist damit
+  ausgereizt.
 
 - **Iteration 20 (Loop E, Filter-Semantik)** — Dieselbe Semantik liegt dreimal
   im Projekt: Browser, Python-Port (an den Browser gepinnt) und TV-Client. Die
