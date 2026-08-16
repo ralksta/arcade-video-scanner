@@ -82,6 +82,17 @@ All notable changes to this project will be documented in this file.
   than from source footage) and `scripts/generate_proxies.py` (creates the proxies
   on a remote NVENC machine, reading originals only).
 
+### Performance
+- **`/api/videos`: ~105 ms CPU pro Request eingespart.** Gemessen an der echten
+  Bibliothek (8788 Einträge): der Endpunkt serialisierte bei *jedem* Request
+  4,95 MB JSON neu (~40 ms) und komprimierte sie neu (~54 ms), dazu ~10 ms
+  Pfadfilterung — obwohl sich zwischen zwei Requests meist nichts ändert, und
+  obwohl drei Clients (Browser, TV, iOS) denselben Posten unabhängig zahlen.
+  Fertige Bodies liegen jetzt roh *und* gzip-komprimiert im Speicher, geschlüsselt
+  nach Scan-Zielen und Admin-Flag; ein Treffer kostet noch einen Dict-Zugriff.
+  Der Cache hängt am Medien-Cache und verfällt mit ihm — auch bei den beiden
+  Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
+
 ### Fixed
 - **Ordner-Browser: echte Hierarchie statt flacher Liste**. `getSubfoldersAt(null)`
   hielt jeden Pfad für eine oberste Ebene, zu dem es keinen *anderen Ordner mit

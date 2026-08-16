@@ -47,9 +47,17 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
       - [x] Rückmeldungen vereinheitlicht: 30 `alert()` → Toasts; dabei
             Toast-z-index unter Optimizer-/GIF-Panel entdeckt und behoben
       - [x] ROADMAP-Haken für „Customizable grid layout" nachgezogen
-- [ ] **Loop B — Performance**: Messen, dann fixen. Kandidaten: SQLite-Indizes für die
-      heißen Query-Pfade, Thumbnail-/Static-Caching-Header, HTML-Dump-Größe, JS-Renderpfad
-      (DocumentFragment statt innerHTML-Konkatenation), N+1 in Routen.
+- [ ] **Loop B — Performance** (Messung an der echten DB: 8788 Einträge, 4,95 MB JSON)
+      - [x] `/api/videos`-Antwort-Cache: ~105 ms CPU/Request gespart
+      - Messwerte: `SELECT *` 40 ms · `_row_to_api_dict` 68 ms · `json.dumps` 42 ms ·
+        `gzip(6)` 54 ms (→ 0,56 MB) · Filterschleife 10,5 ms
+      - [ ] Indizes prüfen: 8 Stück auf `media`, aber keiner auf `file_path`-Präfix
+      - [ ] Thumbnail-/Static-Caching-Header prüfen
+      - [ ] HTML-Dump (`index.html`, 204 KB) — wird bei jeder Änderung neu erzeugt
+      - [ ] Filterschleife: `os.path.abspath` pro Eintrag kostet 8,8 der 10,5 ms.
+            Nach dem Antwort-Cache nur noch bei Cache-Miss relevant — bewusst
+            zurückgestellt, weil eine Semantikänderung (Normalisierung) riskanter
+            wäre als der Gewinn
 - [ ] **Loop C — Feature**: Ein abgeschlossenes, kleines Feature inkl. Tests + CHANGELOG.
 
 ## Zyklus 2 (Loops werden nach Zyklus 1 festgelegt)
@@ -60,6 +68,15 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 5 (Loop B, Performance)** — Erst gemessen, dann gefixt. Gelernt:
+  gzip und ein Medien-Cache waren längst da — die Lücke lag dazwischen, nämlich
+  dass beide teuren Schritte (Serialisieren, Komprimieren) trotz unveränderter
+  Daten jedes Mal neu liefen. Zweite Lehre beim Absichern: zwei Routen
+  invalidieren den Medien-Cache direkt, nicht über `register_on_change` — ein
+  zweiter Cache daneben wäre dort still veraltet. Deshalb hängt der abgeleitete
+  Cache jetzt am Medien-Cache statt an der DB. Nächstes: Indizes und
+  Caching-Header.
 
 - **Iteration 4 (Loop A, Rückmeldungen)** — `alert()` komplett abgelöst.
   Gelernt: Der eigentliche Fund kam nicht aus der Umstellung selbst, sondern aus
