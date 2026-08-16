@@ -148,10 +148,43 @@ def resolve_stream_path(
         return original_path, "original"
 
     candidate = proxy_path_for(original_path)
-    if candidate and os.path.isfile(candidate):
+    if candidate and os.path.isfile(candidate) and not is_proxy_stale(original_path, candidate):
         return candidate, "proxy"
 
     return original_path, "original"
+
+
+# Dateisysteme legen mtimes unterschiedlich genau ab (FAT rundet auf 2 Sekunden,
+# rsync und SMB verschieben sie um Sekundenbruchteile). Ohne Toleranz gälte ein
+# frisch erzeugter Proxy gelegentlich als veraltet.
+STALE_TOLERANCE_SEC = 2.0
+
+
+def is_proxy_stale(original_path: str, proxy_path: str) -> bool:
+    """True, wenn das Original nach dem Proxy geändert wurde.
+
+    Bis hierher prüfte die Auflösung nur, *ob* ein Proxy existiert. Wird ein
+    Original nachbearbeitet — neuer Schnitt, andere Tonspur —, bleibt der alte
+    Proxy liegen und wird unterwegs stillschweigend ausgeliefert: man sieht eine
+    Fassung, die es so nicht mehr gibt, ohne jeden Hinweis darauf.
+
+    Im Zweifel (Datei nicht lesbar) gilt der Proxy als veraltet: das Original
+    auszuliefern kostet Bandbreite, der veraltete Proxy kostet Korrektheit.
+
+    Args:
+        original_path: Pfad des Originals.
+        proxy_path: Pfad des zugehörigen Proxys.
+
+    Returns:
+        True, wenn der Proxy neu erzeugt werden sollte.
+    """
+    try:
+        original_mtime = os.path.getmtime(original_path)
+        proxy_mtime = os.path.getmtime(proxy_path)
+    except OSError:
+        return True
+
+    return original_mtime > proxy_mtime + STALE_TOLERANCE_SEC
 
 
 def client_ip_from_handler(handler) -> str:

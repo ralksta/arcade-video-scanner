@@ -1,6 +1,7 @@
 """Tests for arcade_scanner/core/proxy_resolver.py — proxy selection on stream."""
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -145,3 +146,76 @@ def test_override_false_short_circuits_before_config(monkeypatch):
         raise AssertionError("config should not be consulted")
     monkeypatch.setattr(pr, "is_proxy_streaming_enabled", boom)
     assert pr.resolve_stream_path("/a/b.MOV", client_ip="", override=False) == ("/a/b.MOV", "original")
+
+
+# ── Veraltete Proxys ────────────────────────────────────────────────────────
+#
+# Bis hierher prüfte die Auflösung nur, *ob* ein Proxy existiert. Wird ein
+# Original nachbearbeitet, bleibt der alte Proxy liegen und wurde unterwegs
+# stillschweigend ausgeliefert — man sah eine Fassung, die es nicht mehr gibt.
+
+def _touch(path, when):
+    os.utime(path, (when, when))
+
+
+def test_fresh_proxy_is_not_stale(library):
+    original, proxy = library
+    assert pr.is_proxy_stale(original, proxy) is False
+
+
+def test_proxy_older_than_the_original_is_stale(library):
+    original, proxy = library
+    _touch(proxy, 1_700_000_000)
+    _touch(original, 1_700_000_600)   # zehn Minuten später nachbearbeitet
+
+    assert pr.is_proxy_stale(original, proxy) is True
+
+
+def test_stale_proxy_is_not_served_to_a_remote_client(library):
+    """Korrektheit vor Bandbreite: lieber das große Original als die alte Fassung."""
+    original, proxy = library
+    _touch(proxy, 1_700_000_000)
+    _touch(original, 1_700_000_600)
+
+    path, variant = pr.resolve_stream_path(original, client_ip="100.121.203.26")
+    assert (path, variant) == (original, "original")
+
+
+def test_override_cannot_force_a_stale_proxy(library):
+    """?proxy=1 erzwingt den Proxy — aber keinen, der veraltete Inhalte zeigt."""
+    original, proxy = library
+    _touch(proxy, 1_700_000_000)
+    _touch(original, 1_700_000_600)
+
+    path, variant = pr.resolve_stream_path(original, client_ip="192.168.2.10", override=True)
+    assert (path, variant) == (original, "original")
+
+
+def test_small_mtime_differences_are_tolerated(library):
+    """
+    FAT rundet mtimes auf zwei Sekunden, rsync und SMB verschieben sie um
+    Bruchteile. Ohne Toleranz gälte ein frisch erzeugter Proxy gelegentlich
+    als veraltet und würde bei jedem Lauf neu erzeugt.
+    """
+    original, proxy = library
+    _touch(proxy, 1_700_000_000)
+    _touch(original, 1_700_000_001)   # eine Sekunde Versatz
+
+    assert pr.is_proxy_stale(original, proxy) is False
+
+
+def test_unreadable_file_counts_as_stale(library, tmp_path):
+    """Im Zweifel das Original: eine falsche Antwort ist teurer als Bandbreite."""
+    original, _ = library
+    assert pr.is_proxy_stale(original, str(tmp_path / "gibtsnicht.mp4")) is True
+
+
+def test_generator_regenerates_stale_proxies():
+    """
+    Der Generator übersprang jeden vorhandenen Proxy — ein veralteter wäre also
+    nie erneuert worden, und der Server hätte dauerhaft das Original geliefert.
+    """
+    source = (Path(__file__).parent.parent / "scripts" / "generate_proxies.py").read_text(
+        encoding="utf-8"
+    )
+    assert "is_proxy_stale(host_src, target)" in source

@@ -70,6 +70,8 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
             `/api/similar` gab es schon, nur die Oberfläche fehlte
       - [x] Index-Status (`/api/similar/status`) + Anzeige in den Einstellungen —
             macht sichtbar, ob die Ähnlich-Leiste überhaupt Daten haben kann
+      - [x] Veraltete Proxys erkennen (Roadmap-Punkt „automatische
+            Aktualisierung") — Server fällt zurück, Generator erneuert
       - [ ] Weitere Feature-Kandidaten suchen
 
 ## Zyklus 2 (Loops werden nach Zyklus 1 festgelegt)
@@ -80,6 +82,14 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 11 (Loop C, veraltete Proxys)** — Der offene Roadmap-Punkt war als
+  Feature notiert, ist aber ein Korrektheitsproblem: unterwegs bekam man eine
+  Videofassung zu sehen, die es nicht mehr gibt. Entscheidung dazu: bei
+  veraltetem Proxy auch dann das Original ausliefern, wenn `?proxy=1` ihn
+  erzwingt — Bandbreite ist ersetzbar, eine falsche Fassung nicht. Zweiter Teil
+  war nötig, damit es rund wird: der Generator übersprang jeden vorhandenen
+  Proxy, hätte den veralteten also nie erneuert.
 
 - **Iteration 10 (Loop C, Index-Status)** — Direkte Folge aus Iteration 9: Ein
   Feature, dessen Datengrundlage unsichtbar ist, wirkt kaputt statt leer. Der

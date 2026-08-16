@@ -41,6 +41,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
 from arcade_scanner.core.master_detect import MASTER, classify, session_of  # noqa: E402
+from arcade_scanner.core.proxy_resolver import is_proxy_stale  # noqa: E402
 
 DEFAULT_DB = str(SCRIPT_DIR.parent / "arcade_data" / "media_library.db")
 
@@ -214,8 +215,16 @@ def process_one(item, args, index, total):
 
     target = proxy_host_path(container_path, args.proxy_root)
     if os.path.isfile(target) and not args.force:
-        log(f"    {C}→ proxy already exists, skipped{N}")
-        return "skipped"
+        # Vorhandensein allein reicht nicht: wurde das Original nach dem Proxy
+        # geändert (neuer Schnitt, andere Tonspur), zeigt der Proxy eine Fassung,
+        # die es nicht mehr gibt. Der Server liefert dann ohnehin das Original
+        # aus — hier erneuern wir ihn, damit unterwegs wieder die kleine Datei
+        # greift.
+        if is_proxy_stale(host_src, target):
+            log(f"    {Y}→ proxy is older than the original, regenerating{N}")
+        else:
+            log(f"    {C}→ proxy already exists, skipped{N}")
+            return "skipped"
 
     if args.dry_run:
         log(f"    {C}would create: {target}{N}")

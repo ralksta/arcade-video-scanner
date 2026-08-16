@@ -37,7 +37,10 @@ This document outlines planned features and improvements for the Arcade Media Sc
 - **One entry per video**: the proxy tree lives outside the library and is excluded from the scan paths automatically — no duplicates, originals stay untouched.
 - **Raw material detection**: `core/master_detect.py` tells camera source files from edited versions using folders, keywords, camera filename schemes and device names.
 - **Generator**: `scripts/generate_proxies.py` encodes on a remote NVENC machine, reads originals only and is resumable.
-- Open: a `--local` mode for a GPU in the same machine; automatic refresh when an original changes.
+- **Automatische Aktualisierung erledigt** (2026-08-16): veraltete Proxys werden
+  über den mtime-Vergleich erkannt, der Server fällt auf das Original zurück und
+  `generate_proxies.py` erzeugt sie neu.
+- Open: a `--local` mode for a GPU in the same machine.
 
 ### ✅ Embedding Foundation — Ähnlichkeit Teil 1 (2026-08-08)
 - **Vektor-Speicher**: `embedding_meta`/`frame_embeddings` in SQLite, float32-Blobs, L2-normalisiert.

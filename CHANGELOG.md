@@ -132,6 +132,18 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **Veraltete Proxys wurden stillschweigend ausgeliefert.** Die Auflösung prüfte
+  nur, *ob* ein Proxy existiert. Wird ein Original nachbearbeitet — neuer
+  Schnitt, andere Tonspur — blieb der alte Proxy liegen und lief unterwegs
+  weiter: man sah eine Fassung, die es so nicht mehr gibt, ohne jeden Hinweis.
+  `resolve_stream_path()` vergleicht jetzt die Änderungszeiten und fällt bei
+  einem veralteten Proxy auf das Original zurück, auch bei erzwungenem
+  `?proxy=1` — Korrektheit vor Bandbreite. Zwei Sekunden Toleranz gegen
+  FAT-Rundung und rsync/SMB-Versatz. `scripts/generate_proxies.py` übersprang
+  jeden vorhandenen Proxy und hätte einen veralteten nie erneuert; es erzeugt
+  ihn jetzt neu. Damit ist der offene Roadmap-Punkt „automatische Aktualisierung,
+  wenn sich ein Original ändert" abgedeckt.
+
 - **Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump.** `index.html`
   wird einmal erzeugt und an jeden Nutzer ausgeliefert — enthielt aber
   `window.FOLDERS_DATA` mit der Ordner-Aggregation der *gesamten* Bibliothek,
