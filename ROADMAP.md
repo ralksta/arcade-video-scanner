@@ -16,7 +16,12 @@ This document outlines planned features and improvements for the Arcade Media Sc
 - [x] Database migration from JSON to SQLite for better performance with large libraries
 
 ### 🟢 User Experience
-- [ ] Customizable grid layout (card size, columns)
+- [x] **Customizable grid layout (card size, columns)** (bereits umgesetzt, hier
+      nur nachgetragen) — Slider in der Filter-Bar (`gridScaleSlider`) setzt
+      `--grid-min-width`; die Spaltenzahl ergibt sich daraus über
+      `repeat(auto-fill, minmax(...))`. Einstellung überlebt den Reload
+      (`localStorage`). Auf dem Handy bewusst ausgeblendet — ein Slider ist auf
+      Touch kaum präzise treffbar.
 - [x] **Stop a running scan from the UI.** (2026-08-08) `/api/scan/stop` +
       `/api/scan/status` Endpoints, Stop-Button neben dem Rescan-Button;
       `/api/rescan` läuft dafür jetzt als Hintergrund-Thread (202 + Polling

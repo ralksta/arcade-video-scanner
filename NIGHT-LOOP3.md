@@ -27,7 +27,7 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 
 ## Zyklus 1
 
-- [ ] **Loop A — UX** (wieder geöffnet: war nach 2 Punkten vorschnell abgehakt)
+- [x] **Loop A — UX** — ausgereizt (6 Punkte, 1 bewusst offen gelassen)
       - [x] Tastaturkürzel-Overlay `?` + globale Shortcuts (`/`, `1`–`4`) — `150eb83`
       - [x] Kontextbezogener Leer-Zustand statt weißer Fläche — `ae18a9a`
       - [x] Fehler-Zustände: 19/63 `fetch`-Aufrufe ohne Fehlerpfad, `apiWrite()`
@@ -46,8 +46,7 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
             geändert, das ist eine Design-Entscheidung.
       - [x] Rückmeldungen vereinheitlicht: 30 `alert()` → Toasts; dabei
             Toast-z-index unter Optimizer-/GIF-Panel entdeckt und behoben
-      - [ ] ROADMAP-Haken für „Customizable grid layout" nachziehen — ist längst
-            da (`gridScaleSlider` + `--grid-min-width`, `workspace.js:130`)
+      - [x] ROADMAP-Haken für „Customizable grid layout" nachgezogen
 - [ ] **Loop B — Performance**: Messen, dann fixen. Kandidaten: SQLite-Indizes für die
       heißen Query-Pfade, Thumbnail-/Static-Caching-Header, HTML-Dump-Größe, JS-Renderpfad
       (DocumentFragment statt innerHTML-Konkatenation), N+1 in Routen.
