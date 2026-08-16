@@ -75,10 +75,28 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
       - [x] Export der aktuellen Ansicht (CSV/M3U) — ein Inventar-Werkzeug ohne
             Export lässt jede Auswertung in der Oberfläche gefangen
 
-## Zyklus 2 (Loops werden nach Zyklus 1 festgelegt)
+## Zyklus 2
 
-- [ ] Loop D — ?
-- [ ] Loop E — ?
+Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
+
+- [ ] **Loop D — Stille Fehlerpfade und Randfälle**
+      Die ergiebigste Ader der Nacht: veraltete Proxys, ein Cache ohne
+      Invalidierung, `FOLDERS_DATA` mit fremden Pfaden, eine Test-Suite die ins
+      Produktivverzeichnis schrieb — alle vier hatten gemeinsam, dass nichts
+      abstürzte und niemand etwas merkte. Systematisch weitersuchen:
+      - Was passiert bei leerer Bibliothek / null Einträgen / Division durch null?
+      - Was passiert, wenn zwei Threads dasselbe tun (Scan + Request + Queue)?
+      - Wo wird ein Rückgabewert ignoriert, wo ein `except` verschluckt?
+      - Wo hängt Korrektheit an einer Zusage, die kein Test prüft?
+
+- [ ] **Loop E — Konsistenz zwischen den Clients**
+      `CLAUDE.md` warnt ausdrücklich davor, dass TV- und iOS-Client bei
+      API-Änderungen mitgezogen werden müssen; frühere Commits haben genau das
+      nachgeholt. Nach einer Nacht mit Änderungen an `/api/videos`,
+      `/api/similar` und der Proxy-Auflösung lohnt der Abgleich:
+      - Welche Filter-/Sortier-Semantik weicht ab?
+      - Welche neuen Endpunkte fehlen den Clients?
+      - Wo sind Annahmen über Antwortformate fest verdrahtet?
 
 ## Journal
 
