@@ -83,6 +83,9 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
       - [x] 46 nackte `except: pass` erfasst; vier davon schalteten sichtbares
             Verhalten ab (Auto-Tagging nach Scan, Laufzeitprüfung beim Upload,
             Bild-Scan, Resource-Watchdog) — laut gemacht, Rest ist legitim
+      - [x] 50 Divisionen mit variablem Divisor geprüft: die meisten sauber
+            abgesichert, aber `1/speed` im GIF-Export nicht — Parameter werden
+            jetzt an der Grenze validiert
       Die ergiebigste Ader der Nacht: veraltete Proxys, ein Cache ohne
       Invalidierung, `FOLDERS_DATA` mit fremden Pfaden, eine Test-Suite die ins
       Produktivverzeichnis schrieb — alle vier hatten gemeinsam, dass nichts
@@ -104,6 +107,14 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 14 (Loop D, Randfälle)** — 50 Divisionen mit variablem Divisor
+  durchgesehen. Erfreulich: `criteria_eval`, `similarity` und `media_probe` sind
+  sauber abgesichert. Der eine Treffer war `1/speed` im GIF-Export, hinter dem
+  Guard `speed != 1.0` — der für 0 wahr ist. Ein Guard, der die falsche Frage
+  stellt, sieht aus wie Absicherung. Beim Schreiben der Validierung gleich die
+  NaN-Falle mitgenommen: `not (low <= x <= high)` statt `x < low or x > high`,
+  sonst kommt NaN durch jede Grenze.
 
 - **Iteration 13 (Loop D, stumme Handler)** — Der beste Fund war ein
   *veralteter* Guard, kein falscher: `except ImportError: pass` mit dem

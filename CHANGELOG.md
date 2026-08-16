@@ -141,6 +141,16 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **GIF-Export: `speed=0` ließ den Auftrag an einer Division durch null
+  scheitern.** Die Zahlen aus dem Request-Body kamen ungeprüft durch; im Worker
+  steht `1/speed` hinter dem Guard `if speed != 1.0`, der für 0 wahr ist. Der
+  Auftrag endete als „error" mit der Meldung „division by zero" — nicht
+  abgestürzt, aber für den Nutzer nicht handhabbar. `fps`, `quality`, `loop`
+  und `speed` werden jetzt an der Grenze geprüft und mit einer Meldung
+  abgewiesen, die den Parameter, den Wert und den erlaubten Bereich nennt.
+  Abgedeckt sind auch `NaN` und `Infinity`, die eine naive Bereichsprüfung
+  passieren (NaN vergleicht sich mit allem als False).
+
 - **Auto-Tagging lief nach dem Scan stillschweigend nicht mehr.** Der Hook war
   mit `except ImportError: pass` abgesichert und dem Kommentar „landet mit
   PR #34; bis dahin fehlt das Modul". Der PR ist längst gelandet — seither

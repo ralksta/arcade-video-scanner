@@ -53,6 +53,39 @@ GIF_JOBS: dict[str, dict] = {}
 # Upload-Helfer für den Remote-Worker
 # ---------------------------------------------------------------------------
 
+def _bounded_int(data: dict, key: str, default: int, low: int, high: int) -> int:
+    """Ganzzahl aus dem Request-Body, auf einen sinnvollen Bereich beschränkt.
+
+    Raises:
+        ValueError: Wenn der Wert keine Zahl ist oder außerhalb liegt.
+    """
+    raw = data.get(key, default)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError(f"{key} muss eine ganze Zahl sein, war: {raw!r}") from None
+    if not low <= value <= high:
+        raise ValueError(f"{key} muss zwischen {low} und {high} liegen, war: {value}")
+    return value
+
+
+def _bounded_float(data: dict, key: str, default: float, low: float, high: float) -> float:
+    """Gleitkommazahl aus dem Request-Body, auf einen sinnvollen Bereich beschränkt.
+
+    Raises:
+        ValueError: Wenn der Wert keine Zahl ist, NaN/Inf oder außerhalb liegt.
+    """
+    raw = data.get(key, default)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        raise ValueError(f"{key} muss eine Zahl sein, war: {raw!r}") from None
+    # NaN vergleicht sich mit allem als False und käme sonst durch jede Grenze.
+    if not (low <= value <= high):
+        raise ValueError(f"{key} muss zwischen {low} und {high} liegen, war: {raw!r}")
+    return value
+
+
 def _unlink_quiet(path: str) -> None:
     try:
         if path and os.path.exists(path):
@@ -374,12 +407,22 @@ def handle_post(handler) -> bool:
 
             video_path = data.get("path")
             preset = data.get("preset", "720p")
-            fps = int(data.get("fps", 15))
-            quality = int(data.get("quality", 80))
             start_time = data.get("start_time")
             end_time = data.get("end_time")
-            loop = int(data.get("loop", 0))
-            speed = float(data.get("speed", 1.0))
+
+            # Zahlen aus dem Request-Body kamen bisher ungeprüft durch. Bei
+            # speed=0 rechnet der Worker 1/speed und stirbt an einer
+            # ZeroDivisionError; der Job landet dann als "error" mit der
+            # Meldung "division by zero" — für den Nutzer nicht handhabbar.
+            # Unsinnige Werte gehören an der Grenze abgewiesen, nicht im Thread.
+            try:
+                fps = _bounded_int(data, "fps", 15, 1, 50)
+                quality = _bounded_int(data, "quality", 80, 1, 100)
+                loop = _bounded_int(data, "loop", 0, -1, 1000)
+                speed = _bounded_float(data, "speed", 1.0, 0.1, 10.0)
+            except ValueError as e:
+                handler.send_error(400, str(e))
+                return True
 
             if not video_path:
                 handler.send_error(400, "Missing video path")
