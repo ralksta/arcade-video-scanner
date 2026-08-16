@@ -675,12 +675,21 @@ def _run_rescan_in_background(port: int) -> None:
             loop.close()
             asyncio.set_event_loop(None)
 
+        # Auto-Tagging nach jedem Scan.
+        #
+        # Hier stand `except ImportError: pass` mit dem Hinweis, das Modul komme
+        # erst mit PR #34. Der ist gelandet — der Guard verschluckte seither
+        # jeden echten Importfehler *innerhalb* von auto_tagger: die Regeln
+        # liefen nach dem Scan schlicht nicht mehr, ohne eine Zeile Ausgabe.
+        #
+        # Ein Fehler beim Tagging darf den Scan trotzdem nicht scheitern lassen,
+        # die Bibliothek ist zu dem Zeitpunkt bereits aktualisiert. Also fangen,
+        # aber laut.
         try:
-            # Auto-Tagging-Hook — landet mit PR #34; bis dahin fehlt das Modul
             from arcade_scanner.core.auto_tagger import run_post_scan_auto_tagging
             run_post_scan_auto_tagging()
-        except ImportError:
-            pass
+        except Exception as e:
+            print(f"⚠️ Auto-Tagging nach dem Scan fehlgeschlagen: {e!r}")
 
         media_cache = _get_media_cache()
         results = [e.model_dump(by_alias=True) for e in media_cache.get()]

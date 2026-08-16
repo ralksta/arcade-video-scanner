@@ -141,6 +141,18 @@ All notable changes to this project will be documented in this file.
   Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
 
 ### Fixed
+- **Auto-Tagging lief nach dem Scan stillschweigend nicht mehr.** Der Hook war
+  mit `except ImportError: pass` abgesichert und dem Kommentar „landet mit
+  PR #34; bis dahin fehlt das Modul". Der PR ist längst gelandet — seither
+  verschluckte der Guard jeden echten Importfehler *innerhalb* von
+  `auto_tagger`, ohne eine Zeile Ausgabe. Fehler beim Tagging lassen den Scan
+  weiterhin nicht scheitern (die Bibliothek ist zu dem Zeitpunkt schon
+  aktualisiert), werden jetzt aber gemeldet. Ebenfalls hörbar gemacht: eine
+  nicht ermittelbare Solldauer schaltete die Laufzeitprüfung hochgeladener
+  Encodes lautlos ab, und eine nicht lesbare Bild-Scan-Einstellung übersprang
+  Bilder ohne Hinweis. Der Resource-Watchdog meldet jetzt einmal, wenn
+  `os.getloadavg()` auf dem System fehlt, statt in jeder Schleife zu schweigen.
+
 - **Veraltete Proxys wurden stillschweigend ausgeliefert.** Die Auflösung prüfte
   nur, *ob* ein Proxy existiert. Wird ein Original nachbearbeitet — neuer
   Schnitt, andere Tonspur — blieb der alte Proxy liegen und lief unterwegs

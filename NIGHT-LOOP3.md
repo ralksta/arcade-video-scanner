@@ -80,6 +80,9 @@ Der 60-Sekunden-Wakeup ist nur der Selbst-Aufweck-Takt, kein Zeitbudget.
 Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 
 - [ ] **Loop D — Stille Fehlerpfade und Randfälle**
+      - [x] 46 nackte `except: pass` erfasst; vier davon schalteten sichtbares
+            Verhalten ab (Auto-Tagging nach Scan, Laufzeitprüfung beim Upload,
+            Bild-Scan, Resource-Watchdog) — laut gemacht, Rest ist legitim
       Die ergiebigste Ader der Nacht: veraltete Proxys, ein Cache ohne
       Invalidierung, `FOLDERS_DATA` mit fremden Pfaden, eine Test-Suite die ins
       Produktivverzeichnis schrieb — alle vier hatten gemeinsam, dass nichts
@@ -101,6 +104,14 @@ Beide Themen sind aus den Funden von Zyklus 1 abgeleitet, nicht frei erfunden.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 13 (Loop D, stumme Handler)** — Der beste Fund war ein
+  *veralteter* Guard, kein falscher: `except ImportError: pass` mit dem
+  Kommentar „landet mit PR #34". Der PR kam, der Guard blieb — und verschluckte
+  seither echte Fehler. Lehre: Kommentare, die auf einen künftigen Zustand
+  verweisen, überleben diesen Zustand und werden dann gefährlich; ein Test
+  darauf ist billiger als das Nachlesen. Der Zähler stummer Handler steht jetzt
+  als Bremse im Test (43), damit sich neue nicht Datei für Datei einschleichen.
 
 - **Iteration 12 (Loop C, Export)** — CSV-Maskierung gegen Pythons `csv`-Modul
   geprüft statt gegen die eigene Erwartung: ein unabhängiger RFC-4180-Leser muss

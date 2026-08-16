@@ -67,8 +67,11 @@ class ScannerManager:
             fs_scanner.allow_images = scan_images
             if scan_images:
                 print("📸 Image scanning enabled (Fast Lane Active)")
-        except Exception:
-            pass
+        except Exception as e:
+            # Ohne Meldung sähe der Nutzer nur, dass seine Bilder nicht
+            # auftauchen, obwohl die Option gesetzt ist — und hätte keinen
+            # Anhaltspunkt, woran es liegt.
+            print(f"⚠️ Bild-Scan-Einstellung nicht lesbar ({e!r}) — Bilder werden übersprungen")
 
         # 1. Load Cache
         db.load()
@@ -102,20 +105,30 @@ class ScannerManager:
         if num_workers < 1:
             num_workers = 1
 
+        # os.getloadavg() gibt es auf Windows nicht. Der Watchdog ist dort also
+        # wirkungslos — das darf der Nutzer, der ihn eingeschaltet hat, einmal
+        # erfahren. Danach schweigen wir, sonst steht es in jeder Schleife.
+        load_average_available = True
+
         async def _check_system_load():
             """Simple Watchdog using load average."""
-            if not config.settings.enable_resource_watchdog:
+            nonlocal load_average_available
+            if not config.settings.enable_resource_watchdog or not load_average_available:
                 return
 
             try:
                 load = os.getloadavg()[0]
-                cpu_count = os.cpu_count() or 1
-                if load > cpu_count * 1.5:
-                    if config.settings.verbose_scanning:
-                        print(f"⚠️ High system load ({load:.2f}), throttling scanner (5s cooldown)...")
-                    await asyncio.sleep(5)
-            except Exception:
-                pass
+            except (AttributeError, OSError) as e:
+                load_average_available = False
+                print(f"⚠️ Resource-Watchdog ist auf diesem System nicht verfügbar ({e!r}) — "
+                      "der Scanner drosselt nicht")
+                return
+
+            cpu_count = os.cpu_count() or 1
+            if load > cpu_count * 1.5:
+                if config.settings.verbose_scanning:
+                    print(f"⚠️ High system load ({load:.2f}), throttling scanner (5s cooldown)...")
+                await asyncio.sleep(5)
 
         async def _flush_batch():
             nonlocal batch_entries

@@ -555,12 +555,19 @@ def handle_post(handler) -> bool:
                 return True
 
             # Never let a corrupt encode replace or shadow the original.
+            #
+            # expected_duration = 0 schaltet die Laufzeitprüfung in
+            # verify_media_integrity ab. Das ist der Fallback, wenn wir die
+            # Solldauer nicht kennen — er darf aber nicht stillschweigend
+            # eintreten: dann liefe die schärfste Prüfung gegen einen
+            # abgeschnittenen Encode ins Leere, ohne eine Zeile Ausgabe.
             expected_duration = 0.0
             try:
                 orig_meta = db.get(original_path)
                 expected_duration = float(getattr(orig_meta, "duration_sec", 0) or 0)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"⚠️ Solldauer für {original_path} nicht ermittelbar ({e!r}) — "
+                      "Laufzeitprüfung des Uploads entfällt")
             ok, reason = verify_media_integrity(Path(part_path), expected_duration)
             if not ok:
                 _unlink_quiet(part_path)
