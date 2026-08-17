@@ -483,7 +483,7 @@ function getVideoOrientation(video) {
 function matchesDateFilter(video, dateFilter) {
     if (!dateFilter || dateFilter === 'all' || (dateFilter.type && dateFilter.type === 'all')) return true;
 
-    const timestamp = (video.imported_at > 0 ? video.imported_at : video.mtime) || 0;
+    const timestamp = entryDate(video);
     if (timestamp === 0) return false;
 
     const now = Math.floor(Date.now() / 1000);

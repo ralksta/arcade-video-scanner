@@ -28,7 +28,7 @@ function slice(startMarker, endMarker, label) {
     return src.slice(start, end + endMarker.length);
 }
 
-const helper = slice('const mtimeOf =', ';', 'mtimeOf');
+const helper = slice('const entryDate = (v) =>', ';', 'entryDate');
 const sorter = slice('const sortVideos = (list, sortKey) => {', '\n};', 'sortVideos');
 
 const context = vm.createContext({console});

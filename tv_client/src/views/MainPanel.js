@@ -18,9 +18,18 @@ const SORT_OPTIONS = [
 	{key: 'size_asc', label: '📦 Kleinste'}
 ];
 
-// Datum eines Eintrags, in Sekunden. Gleiche Quelle wie im Browser-Client,
-// der für seine 'date'-Sortierung `b.mtime - a.mtime` rechnet.
-const mtimeOf = (v) => v.mtime || 0;
+// Datum eines Eintrags, in Sekunden — dieselbe Regel wie entryDate() im
+// Browser-Client (arcade_scanner/server/static/utils.js) und wie
+// matches_date_filter() in arcade_scanner/core/criteria_eval.py.
+//
+// `imported_at` ist der Zeitpunkt des ersten Scans, `mtime` der der letzten
+// Änderung der Datei. „Neueste" meint das erste: wann das hier in der
+// Bibliothek aufgetaucht ist. `mtime` bleibt der Ersatz für Einträge aus der
+// Zeit vor dem Feld.
+//
+// Vorher stand hier nur `v.mtime`. Damit schob jedes Optimieren einen alten
+// Film nach oben, weil die Datei dabei neu geschrieben wird.
+const entryDate = (v) => (Number(v && v.imported_at) || 0) || (Number(v && v.mtime) || 0);
 
 const sortVideos = (list, sortKey) => {
 	const sorted = [...list];
@@ -43,7 +52,7 @@ const sortVideos = (list, sortKey) => {
 			// An der echten Bibliothek nachgemessen: Unter „newest" standen
 			// Aufnahmen vom Oktober 2025, während die tatsächlich neuesten vom
 			// August 2026 waren — null Überschneidung in den ersten zehn.
-			return sorted.sort((a, b) => mtimeOf(b) - mtimeOf(a));
+			return sorted.sort((a, b) => entryDate(b) - entryDate(a));
 	}
 };
 
@@ -286,7 +295,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		filterAndSort(
 			[...allVideos]
 				.filter(v => !v.hidden)
-				.sort((a, b) => mtimeOf(b) - mtimeOf(a))
+				.sort((a, b) => entryDate(b) - entryDate(a))
 				.slice(0, 48)
 		),
 	[allVideos, filterAndSort]);

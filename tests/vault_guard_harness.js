@@ -54,6 +54,9 @@ const context = vm.createContext({
 
     // Hilfsfunktionen aus anderen Dateien
     isSensitive: () => false,
+    // Aus utils.js. Hier wie die übrigen Fremdfunktionen nachgebildet — was
+    // entryDate() wirklich rechnet, prüft tests/test_entry_date.py am Original.
+    entryDate: (v) => (Number(v.imported_at) || 0) || (Number(v.mtime) || 0),
     evaluateCollectionMatch: () => true,
     formatSize: (n) => String(n),
     renderUI: () => { rendered.calls += 1; },

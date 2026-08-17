@@ -132,7 +132,7 @@ def test_the_recent_list_takes_the_newest_not_the_last_rows():
     block = code.split("const recent = useMemo(", 1)[1].split("[allVideos", 1)[0]
 
     assert "slice(-48)" not in block, "Nimmt weiterhin die letzten Datenbankzeilen"
-    assert "mtimeOf(b) - mtimeOf(a)" in block
+    assert "entryDate(b) - entryDate(a)" in block
     assert "slice(0, 48)" in block
 
 
@@ -164,13 +164,19 @@ def test_the_input_list_is_not_modified():
 
 # --- Gleichstand mit dem Browser-Client ---
 
-def test_both_clients_use_mtime_for_the_date_order():
+def test_both_clients_use_the_same_date_for_the_order():
+    """
+    Beide rechnen jetzt mit `imported_at`, ersatzweise `mtime` — dieselbe
+    Regel, die auch der Datumsfilter und die Sammlungen benutzen. Vorher stand
+    hier auf beiden Seiten das blosse `mtime`, und das ist eine andere Frage:
+    „zuletzt geschrieben" statt „in die Bibliothek gekommen".
+    """
     browser = (
         ROOT / "arcade_scanner" / "server" / "static" / "filter_engine.js"
     ).read_text(encoding="utf-8")
 
-    assert "(b.mtime || 0) - (a.mtime || 0)" in browser
-    assert "mtimeOf(b) - mtimeOf(a)" in MAIN_PANEL
+    assert "entryDate(b) - entryDate(a)" in browser
+    assert "entryDate(b) - entryDate(a)" in MAIN_PANEL
 
 
 def test_the_api_really_returns_an_unsorted_list():

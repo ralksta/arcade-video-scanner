@@ -198,6 +198,33 @@ function safeEncodePath(path) {
 }
 window.safeEncodePath = safeEncodePath;
 
+/**
+ * Wann ein Eintrag in der Bibliothek aufgetaucht ist, in Sekunden.
+ *
+ * `imported_at` ist der Zeitpunkt des ersten Scans, `mtime` der der letzten
+ * Änderung der Datei. Für „neu in meiner Bibliothek" ist das erste die
+ * Antwort; das zweite ist der Ersatz für Einträge, die noch aus der Zeit vor
+ * dem Feld stammen.
+ *
+ * Diese Regel stand an vier Stellen ausgeschrieben — im Datumsfilter, in den
+ * Sammlungen, in deren Python-Gegenstück und (unvollständig) in der
+ * Sortierung. Genau dort war sie dann anders: „Sortieren: Datum" rechnete
+ * allein mit `mtime`. Das ist nicht dieselbe Frage. Wer eine alte Aufnahme
+ * heute in die Bibliothek legt, steht im Filter „letzte 7 Tage" — und in der
+ * Sortierung ganz unten. Umgekehrt schiebt jedes Optimieren einen alten Film
+ * nach oben, weil die Datei neu geschrieben wurde.
+ *
+ * @param {Object} video - Eintrag aus ALL_VIDEOS
+ * @returns {number} Unix-Zeit in Sekunden, 0 wenn nichts bekannt ist
+ */
+function entryDate(video) {
+    if (!video) return 0;
+    const imported = Number(video.imported_at) || 0;
+    if (imported > 0) return imported;
+    return Number(video.mtime) || 0;
+}
+window.entryDate = entryDate;
+
 
 
 

@@ -258,7 +258,7 @@ function filterAndSort(scrollToTop = false) {
                 // Date filter
                 if (dateFilter !== 'all') {
                     const now = Date.now() / 1000;
-                    const fileTime = v.imported_at > 0 ? v.imported_at : (v.mtime || 0);
+                    const fileTime = entryDate(v);
                     const ageSec = now - fileTime;
                     const maxAge = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 }[dateFilter];
                     if (maxAge && ageSec > maxAge) return false;
@@ -301,7 +301,11 @@ function filterAndSort(scrollToTop = false) {
                 if (currentSort === 'size') return (b.Size_MB || 0) - (a.Size_MB || 0);
                 if (currentSort === 'runtime') return (b.Duration_Sec || 0) - (a.Duration_Sec || 0);
                 if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
-                if (currentSort === 'date') return (b.mtime || 0) - (a.mtime || 0);
+                // entryDate statt mtime: dieselbe Frage wie im Datumsfilter drei
+                // Dutzend Zeilen weiter oben — „wann kam das in die Bibliothek",
+                // nicht „wann wurde die Datei zuletzt geschrieben". Sonst schiebt
+                // jedes Optimieren einen alten Film nach oben.
+                if (currentSort === 'date') return entryDate(b) - entryDate(a);
                 return 0;
             });
         } else {

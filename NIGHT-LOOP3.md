@@ -510,6 +510,8 @@ nicht kontrolliert.
 - [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum** (läuft)
       Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
       Zeitzone steht es, und was passiert beim Rescan?
+      - [x] „Sortieren: Datum" und „hinzugefügt: letzte 7 Tage" meinten zwei
+            verschiedene Daten — Optimieren schob alte Filme nach oben
 
 ## Abschluss vor dem Morgen
 
@@ -520,6 +522,23 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 86 (Loop AE, zwei Daten unter einem Namen)** — Es gibt
+  `imported_at` (erster Scan) und `mtime` (letzte Änderung). Drei Stellen —
+  Datumsfilter, Sammlungen, deren Python-Port — benutzten dieselbe Regel:
+  `imported_at`, ersatzweise `mtime`. Die vierte, die Sortierung, rechnete
+  allein mit `mtime`, und in der Oberfläche heißen beide „Datum". Folge:
+  Optimieren schreibt die Datei neu, also steht ein Film von 2019 danach unter
+  „Sortieren: Datum" ganz oben — und mit dem Fernarbeiter kann das über Nacht
+  die halbe Bibliothek betreffen. Umgekehrt findet man frisch Hinzugefügtes
+  über die Sortierung nicht, obwohl der Filter es zeigt. Die Regel steht jetzt
+  einmal als `entryDate()` in utils.js; der TV-Client führt sie als eigene
+  Zeile mit (getrennter Build), ein Test hält beide Seiten zusammen. Gelernt:
+  Drei gleiche Kopien und eine abweichende sehen beim Lesen aus wie vier
+  richtige — was die Abweichung sichtbar macht, ist die Frage „meinen die
+  eigentlich dasselbe?", nicht der Vergleich der Zeilen. Ein Test verbietet
+  jetzt, die Regel erneut auszuschreiben. Nächstes: weiter in Loop AE —
+  Zeitzonen und die Anzeige von Datumsangaben.
 
 - **Iteration 85 (Loop AD, Optimieren = Umzug)** — Der Fund aus Iteration 80
   noch einmal, aber an einer Stelle, die man täglich benutzt: Beim Optimieren
