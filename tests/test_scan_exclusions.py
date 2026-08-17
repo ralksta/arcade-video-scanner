@@ -47,14 +47,26 @@ import pytest
 
 from arcade_scanner.scanner.file_system import AsyncFileSystem
 
+# Der Scanner filtert über os.path.getsize() gegen min_size_mb (unten auf 1
+# gesetzt) — er liest die Datei nie. Die Testdateien werden deshalb sparse
+# angelegt: gemeldete Größe 20 MB, belegte Blöcke null. Vorher wurden sie
+# wirklich geschrieben, was pro Testlauf ~1,3 GB in /tmp hinterließ.
+MEDIA_SIZE = 20 * 1024 * 1024
+
+
+def _media_file(path):
+    """Legt eine sparse Datei an, die dem Scanner groß genug erscheint."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f:
+        f.truncate(MEDIA_SIZE)
+    return path
+
 
 @pytest.fixture
 def tree(tmp_path):
     """Ein Baum mit öffentlichem und privatem Teil, plus zwei Symlinks."""
     for rel in ("public/a.mp4", "privat/geheim.mp4", "privat/tief/auch.mp4"):
-        path = tmp_path / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"\0" * (20 * 1024 * 1024))
+        _media_file(tmp_path / rel)
 
     (tmp_path / "public" / "link").symlink_to(tmp_path / "privat")
     (tmp_path / "alias").mkdir()
@@ -194,7 +206,7 @@ def test_a_bare_name_excludes_every_directory_with_that_name(tree, run):
     Mediendatei eine Miniatur, die Bibliothek wäre doppelt so groß.
     """
     (tree / "filme" / "@eaDir").mkdir(parents=True)
-    (tree / "filme" / "@eaDir" / "thumb.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+    _media_file(tree / "filme" / "@eaDir" / "thumb.mp4")
 
     results = run([tree], ["@eaDir"])
 
@@ -205,7 +217,7 @@ def test_a_bare_name_excludes_every_directory_with_that_name(tree, run):
 def test_a_bare_name_matches_at_any_depth(tree, run):
     deep = tree / "a" / "b" / "c" / "#recycle"
     deep.mkdir(parents=True)
-    (deep / "weg.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+    _media_file(deep / "weg.mp4")
 
     assert not any("#recycle" in r for r in run([tree], ["#recycle"]))
 
@@ -214,7 +226,7 @@ def test_a_relative_path_matches_as_a_suffix(tree, run):
     """`AppData/Local/Temp` aus den Windows-Voreinstellungen."""
     deep = tree / "nutzer" / "AppData" / "Local" / "Temp"
     deep.mkdir(parents=True)
-    (deep / "x.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+    _media_file(deep / "x.mp4")
 
     assert not any("Temp" in r for r in run([tree], [os.path.join("AppData", "Local", "Temp")]))
 
@@ -223,7 +235,7 @@ def test_a_suffix_only_matches_on_a_directory_boundary(tree, run):
     """`Local/Temp` darf nicht auf `…/NichtLocal/Temp` passen."""
     deep = tree / "NichtLocal" / "Temp"
     deep.mkdir(parents=True)
-    (deep / "x.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+    _media_file(deep / "x.mp4")
 
     results = run([tree], [os.path.join("XLocal", "Temp")])
     assert any("NichtLocal" in r for r in results)
@@ -235,7 +247,7 @@ def test_a_bare_name_does_not_match_a_partial_directory_name(tree, run):
     Pfadbestandteile, nicht über einen Teilstring.
     """
     (tree / "privatkram").mkdir()
-    (tree / "privatkram" / "x.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+    _media_file(tree / "privatkram" / "x.mp4")
 
     results = run([tree], ["privat"])
 
