@@ -114,6 +114,26 @@ function setSort(s) {
  */
 function filterAndSort(scrollToTop = false) {
     try {
+        // Ohne die Nutzerdaten ist unbekannt, welche Einträge im Vault liegen.
+        //
+        // `loadUserData()` setzt `v.hidden` aus `/api/user/data`. Schlägt der
+        // Aufruf fehl, protokolliert er das und kehrt zurück — `v.hidden`
+        // bleibt dann `undefined`, und die Zeile weiter unten
+        //
+        //     if (workspaceMode === 'lobby' && isHidden) return false;
+        //
+        // lässt jede versteckte Datei durch. Ein einzelner Serverfehler hätte
+        // also den gesamten Vault in der normalen Ansicht ausgebreitet.
+        //
+        // Die Prüfung steht hier und nicht an der Aufrufstelle, weil ganz am
+        // Ende von engine.js ein `setTimeout(..., 500)` noch einmal
+        // `filterAndSort()` anstösst — ein früher Abbruch dort wäre 500 ms
+        // später wieder überholt worden.
+        if (window.userDataLoaded === false) {
+            renderLibraryUnavailable();
+            return;
+        }
+
         // Duplicates/Candidates modes have their own rendering logic
         if (workspaceMode === 'duplicates' || workspaceMode === 'candidates') {
             return;
@@ -365,7 +385,24 @@ function _updateQuickStats(stats, workspaceMode) {
 }
 
 // --- EXPORTS ---
+/**
+ * Ersetzt das Raster durch einen Hinweis, statt eine Bibliothek zu zeigen,
+ * deren Vault-Zustand unbekannt ist. Gleiche Machart wie der Fehlerzweig der
+ * Verzeichnisliste im Einrichtungs-Assistenten.
+ */
+function renderLibraryUnavailable() {
+    const grid = document.getElementById('videoGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="col-span-full text-center py-16 text-danger">'
+        + '<div class="font-medium">Deine Nutzerdaten konnten nicht geladen werden.</div>'
+        + '<div class="text-sm text-text-muted mt-2">Die Bibliothek wird nicht angezeigt, '
+        + 'weil sonst auch Einträge aus dem Vault sichtbar wären.</div>'
+        + '<button onclick="location.reload()" class="underline mt-4">Neu laden</button>'
+        + '</div>';
+}
+
 window.filterAndSort  = filterAndSort;
+window.renderLibraryUnavailable = renderLibraryUnavailable;
 window.onSearchInput  = onSearchInput;
 window.setFilter      = setFilter;
 window.setCodecFilter = setCodecFilter;

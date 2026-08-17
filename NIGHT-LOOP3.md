@@ -366,7 +366,10 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       Datei verschwindet? Und was passiert bei einem Pfad, der kein gültiger
       Dateiname ist?
 
-- [ ] **Loop U — Der Filter im Frontend**
+- [ ] **Loop U — Der Filter im Frontend** (läuft)
+      - [x] Ein Fehler beim Laden der Nutzerdaten breitete den **gesamten
+            Vault** in der normalen Ansicht aus
+      - [ ] Offen: Paarbildung im „Optimiert"-Modus, `_opt`-Erkennung
       `filter_engine.js` entscheidet, was der Nutzer überhaupt sieht — ein
       Fehler dort versteckt Dateien, ohne dass irgendwo etwas fehlt. Über den
       node-Kontext ausführbar, also messbar statt gelesen.
@@ -380,6 +383,23 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 64 (Loop U, Vault-Sichtbarkeit)** — `loadUserData()` setzt
+  `v.hidden` aus `/api/user/data`. Schlägt der Aufruf fehl, protokolliert die
+  Funktion das und kehrt zurück; `v.hidden` bleibt `undefined`, und
+  `const isHidden = v.hidden || false` macht daraus „nicht versteckt". Ein
+  einzelner Serverfehler hätte also den gesamten Vault im normalen Raster
+  ausgebreitet — dieselbe Richtung des Fehlers wie beim abgesicherten Modus in
+  Iteration 42. Die Sperre sitzt in `filterAndSort()` und nicht an der
+  Aufrufstelle: Am Ende von engine.js steht ein `setTimeout(..., 500)`, das
+  noch einmal filtert; ein früher Abbruch wäre eine halbe Sekunde später
+  überholt worden. Gelernt beim Testschreiben, und zwar zweimal: Mein Harness
+  benutzte falsche Namen für die globalen Filterzustände — und weil
+  `filterAndSort()` in einem `try/catch` liegt, das jeden Fehler in einen Toast
+  verwandelt, sah der ReferenceError aus wie „alles herausgefiltert". Fünf
+  Tests waren grün gewesen, ohne etwas zu prüfen. Der Harness bricht jetzt ab,
+  sobald der Toast anschlägt; gegengeprüft, indem ich einen Namen wieder
+  entfernt habe. Nächstes: Paarbildung im „Optimiert"-Modus.
 
 - **Iteration 63 (Loop T, Aufräumen — Loop T abgeschlossen)** — Verwaiste
   Vorschaubilder werden jetzt dort entfernt, wo der Scanner ohnehin verwaiste
