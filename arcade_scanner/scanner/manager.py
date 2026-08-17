@@ -304,7 +304,16 @@ class ScannerManager:
             # identical to a deleted file from here, and these rows carry user
             # state — favorites, tags, vault flags — that no rescan can restore.
             # A stopped scan or an unmounted drive must therefore prune nothing.
-            if not discovery_complete:
+            if not scan_targets:
+                # Erreichbar, seit config.active_scan_targets bei unlesbarer
+                # Benutzerdatenbank eine leere Liste liefert statt ersatzweise
+                # das Home-Verzeichnis. Ohne Ziele hat der Walk nichts gesehen —
+                # das ist kein Beleg dafür, dass die Dateien weg sind. Der
+                # `elif found_paths` unten fängt das schon ab; hier steht es,
+                # damit es beim nächsten Umbau nicht versehentlich zu einem
+                # `else` wird, der die ganze Bibliothek löscht.
+                print("⏸ No scan targets — skipping orphan cleanup.")
+            elif not discovery_complete:
                 print("⏸ Scan stopped early — skipping orphan cleanup to protect existing entries.")
             elif unavailable_targets:
                 print(f"⏸ {len(unavailable_targets)} scan target(s) unavailable — "

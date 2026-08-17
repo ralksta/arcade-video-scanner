@@ -376,6 +376,24 @@ class TestOrphanPruning:
             f"a stopped scan deleted {len(db.removed)} rows it never re-checked"
         )
 
+    def test_an_empty_target_list_prunes_nothing(self):
+        """Ohne Ziele hat der Walk nichts gesehen — das ist kein Beleg dafür,
+        dass die Dateien weg sind.
+
+        Dieser Zustand ist neu erreichbar: `config.active_scan_targets` liefert
+        seit dem Fail-Closed-Fix eine leere Liste, wenn die Benutzerdatenbank
+        nicht lesbar ist (siehe tests/test_scan_targets_fallback.py). Genau dann
+        darf nicht die ganze Bibliothek als verschwunden gelten.
+        """
+        manager = ScannerManager()
+        db = FakeDB([make_cached(f"/media/{n}.mp4") for n in "abcdef"])
+
+        run_scan(manager, db, FakeScanner([]), make_config(targets=()))
+
+        assert db.removed == [], (
+            f"ohne Scan-Ziele wurden {len(db.removed)} Einträge gelöscht"
+        )
+
     def test_an_unavailable_scan_target_prunes_nothing(self, tmp_path):
         """An unmounted drive must not look like a mass deletion.
 
