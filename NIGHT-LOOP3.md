@@ -515,6 +515,8 @@ nicht kontrolliert.
       - [x] Korrektur dazu: beide Fragen sind berechtigt, jetzt zwei Optionen
       - [x] `imported_at=0` bei Bildern ist **kein** Fehler — der Scanner
             stempelt es im gemeinsamen Block
+      - [x] Sperrliste und Sitzungsliste wuchsen unbegrenzt — jeder
+            Fehlversuch legte einen Eintrag an, der nie verschwand
 
 ## Abschluss vor dem Morgen
 
@@ -525,6 +527,25 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 88 (Loop AE, Ablaufdaten, die niemand vollstreckt)** — Das
+  Themenfeld heißt „Zeit", und der eigentliche Fund war keine Zeitzone, sondern
+  eine Frist, die nirgends durchgesetzt wird. `record_failure()` legt bei jedem
+  gescheiterten Anmeldeversuch einen Eintrag an; der Schlüssel kommt aus der
+  Anfrage (`X-Forwarded-For` und der eingetippte Benutzername), und weg ging er
+  nur bei einer erfolgreichen Anmeldung mit **demselben** Schlüssel. Für
+  erfundene Werte nie. Damit konnte jeder, der den Anmeldeport erreicht, den
+  Arbeitsspeicher unbegrenzt wachsen lassen — ohne Konto, mit gewöhnlichen
+  Anfragen. Dabei war nichts an dieser Liste je dafür gedacht, länger als 900
+  Sekunden zu leben. Beim Deckeln fliegen nicht gesperrte Einträge zuerst: Eine
+  laufende Sperre hinauszudrängen wäre genau das Loch, das die Sperre schließen
+  soll — dafür gibt es einen eigenen Test. Zweite, mildere Stelle: abgelaufene
+  Sitzungen verfielen erst beim nächsten Vorzeigen ihres Tokens, bei einem
+  vergessenen Gerät also nie. Gelernt: Wo ein Zeitfenster steht, gehört die
+  Frage dazu, wer es vollstreckt — und dass eine Obergrenze selbst zur Lücke
+  werden kann, wenn sie das Falsche verwirft. Nächstes: `cleanup_old_jobs` ist
+  toter Code (nie aufgerufen) — nachsehen und im Bericht vermerken statt
+  eigenmächtig Verlauf zu löschen.
 
 - **Iteration 87 (Loop AE, Korrektur an mir selbst)** — Zwei Punkte auf der
   Liste, einer davon gegen die vorige Iteration.
