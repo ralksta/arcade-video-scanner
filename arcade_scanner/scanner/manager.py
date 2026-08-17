@@ -176,6 +176,12 @@ class ScannerManager:
         # "this file is gone" apart from "we never got that far".
         discovery_complete = True
 
+        # Zwei Zahlen, weil es zwei verschiedene sind: `seen_count` zählt jede
+        # Datei, die der Durchlauf betrachtet hat, `processed_count` nur die,
+        # die tatsächlich untersucht wurden. Vorher gab es nur die erste — und
+        # die Abschlusszeile nannte sie „new/updated". Bei dieser Bibliothek
+        # stand dort 9010, während in Wahrheit 222 Dateien Arbeit machten.
+        seen_count = 0
         processed_count = 0
         # Dateien, die der Scan nicht lesen konnte. Bisher stand dazu je eine
         # Zeile im Protokoll und sonst nichts: Wer nicht mitliest, erfährt nie,
@@ -235,7 +241,7 @@ class ScannerManager:
                 batch_entries = []
 
         async def _worker():
-            nonlocal processed_count
+            nonlocal seen_count
             while True:
                 try:
                     item = await queue.get()
@@ -248,7 +254,7 @@ class ScannerManager:
                     await _check_system_load()
                     await _process_path(path, dir_changed, idx, total)
 
-                    processed_count += 1
+                    seen_count += 1
                     queue.task_done()
                 except Exception as e:
                     print(f"❌ Worker error: {e}")
@@ -305,6 +311,9 @@ class ScannerManager:
             if not (needs_update or force_rescan):
                 return
 
+            nonlocal processed_count
+            processed_count += 1
+
             # --- HEAVY TASK (Inside Semaphore) ---
             async with sem:
                 if self._stop_event.is_set():
@@ -319,7 +328,7 @@ class ScannerManager:
                     print(f"🔍 {progress_prefix}Analyzing (FULL PATH): {path}")
                 elif (processed_count > 0 and processed_count % 10 == 0) or current_idx == total_count:
                     if processed_count > 0:
-                        print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
+                        print(f"📊 {progress_prefix}Indexing media... ({processed_count} neu oder geändert)")
 
                 # 3. Probe using Selected Inspector
                 entry: Optional[MediaAsset] = None
@@ -480,7 +489,8 @@ class ScannerManager:
         finally:
             self.is_scanning = False
             duration = time.time() - start_time
-            print(f"✅ Scan completed in {duration:.2f}s. Processed {processed_count} new/updated files.")
+            print(f"✅ Scan completed in {duration:.2f}s. "
+                  f"{seen_count} Dateien geprüft, davon {processed_count} neu oder geändert.")
 
         return processed_count
 

@@ -346,6 +346,65 @@ class TestStatusClassification:
 # noch tragen, stammen aus der Zeit davor.
 # ---------------------------------------------------------------------------
 
+class TestScanSummary:
+    """
+    Die Abschlusszeile nannte jede betrachtete Datei „new/updated". An dieser
+    Bibliothek stand dort 9010, während in Wahrheit 222 Dateien Arbeit
+    machten — nämlich die, die sich nie speichern liessen und deshalb bei
+    jedem Durchlauf wieder als neu gelten.
+
+    Zwei Zahlen sind es, also nennt sie die Zeile auch getrennt.
+    """
+
+    def test_unchanged_files_are_counted_as_seen_not_as_processed(self, capsys):
+        cached = make_cached("/media/a.mp4", size_mb=100.0, mtime=1000)
+        db = FakeDB([cached])
+
+        run_scan(ScannerManager(), db, FakeScanner([("/media/a.mp4", True)]),
+                 make_config(), stat_size=100.0, stat_mtime=1000)
+
+        out = capsys.readouterr().out
+        assert "1 Dateien geprüft, davon 0 neu oder geändert" in out
+
+    def test_a_new_file_counts_as_processed(self, capsys):
+        run_scan(ScannerManager(), FakeDB([]), FakeScanner([("/media/neu.mp4", True)]),
+                 make_config())
+
+        assert "1 Dateien geprüft, davon 1 neu oder geändert" in capsys.readouterr().out
+
+    def test_the_two_numbers_differ_when_most_files_are_skipped(self, capsys):
+        """Der Alltagsfall: viel bekannt, wenig neu."""
+        bekannt = [make_cached(f"/media/alt_{i}.mp4", size_mb=100.0, mtime=1000)
+                   for i in range(5)]
+        pfade = [(f"/media/alt_{i}.mp4", True) for i in range(5)]
+        pfade.append(("/media/neu.mp4", True))
+
+        run_scan(ScannerManager(), FakeDB(bekannt), FakeScanner(pfade),
+                 make_config(), stat_size=100.0, stat_mtime=1000)
+
+        assert "6 Dateien geprüft, davon 1 neu oder geändert" in capsys.readouterr().out
+
+    def test_the_old_misleading_wording_is_gone(self):
+        """
+        Auf entkommentiertem Text geprüft. Der Begriff steht weiterhin im
+        Kommentar (er beschreibt ja, was falsch war) und im Docstring von
+        `run_scan`, wo er jetzt sogar zutrifft: Zurückgegeben wird die Zahl
+        der tatsächlich untersuchten Dateien.
+
+        Das ist heute Nacht der achte Muster-Test, der über meine eigene
+        Begründung gestolpert ist — wer einen alten Weg abschafft, schreibt
+        seinen Namen in die Erklärung.
+        """
+        from pathlib import Path
+
+        from test_dump_isolation import _code_only
+
+        quelle = (Path(__file__).parent.parent / "arcade_scanner" / "scanner"
+                  / "manager.py").read_text(encoding="utf-8")
+
+        assert "new/updated" not in _code_only(quelle)
+
+
 class TestUnreadableFiles:
     def test_the_scan_reports_how_many_files_it_could_not_read(self, capsys):
         manager = ScannerManager()
