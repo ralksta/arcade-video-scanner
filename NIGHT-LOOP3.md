@@ -534,6 +534,7 @@ nicht kontrolliert.
       der geteilte Zwischenspeicher, gleichzeitige Anmeldungen.
       - [x] Eine Änderung während einer laufenden Anfrage ging verloren — der
             `/api/videos`-Cache hat keine Verfallszeit, also für immer
+      - [x] Zwei Anfragen konnten zwei vollständige Scans starten
 
 - [ ] **Loop AG — Die Grenzen: leer, eins, sehr viele**
       Was zeigt die Oberfläche bei null Einträgen, was bei einem, was bei
@@ -549,6 +550,22 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 92 (Loop AF, zwei Scans auf einmal)** — `run_scan()` begann mit
+  `if self.is_scanning: return` und `self.is_scanning = True` als zwei
+  einzelnen Zeilen. Dazwischen kann ein anderer Thread laufen, und er tut es:
+  Die Route prüft ihrerseits nur und startet dann einen eigenen Thread. Zweimal
+  geklickt oder Fernseher und Browser kurz hintereinander — beide sahen „läuft
+  nicht" und starteten je einen vollständigen Durchlauf über 8788 Dateien, mit
+  doppelten ffprobe-Prozessen und zwei Schreibern auf derselben SQLite-Datei.
+  Nachsehen und Belegen steckt jetzt in `_claim()` unter einer Sperre — als
+  eigene Methode, damit der Test den **Weg des Ablaufs** prüfen kann und nicht
+  eine Nachbildung davon. Genau das war der zweite Teil der Arbeit: Mein erster
+  Test hatte das Muster im Testcode nachgebaut und wäre auch ohne die Sperre
+  grün gewesen. Gelernt (zum zweiten Mal in diesem Lauf): Ein Test, der den
+  richtigen Ablauf *nachbildet* statt ihn aufzurufen, prüft mein Verständnis,
+  nicht den Code. Nächstes: weiter in Loop AF — gleichzeitige Optimierung
+  derselben Datei.
 
 - **Iteration 91 (Loop AF, die verlorene Invalidierung)** — `_MediaCache.get()`
   liest die Datenbank außerhalb des Locks — richtig so — und legte das Ergebnis

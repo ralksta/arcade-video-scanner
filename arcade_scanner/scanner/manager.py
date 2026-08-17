@@ -79,6 +79,9 @@ class ScannerManager:
     """
     def __init__(self):
         self.is_scanning = False
+        # Schützt genau das Paar „nachsehen und setzen" in run_scan(). Ohne
+        # die Sperre können zwei Anfragen beide den freien Zustand sehen.
+        self._state_lock = threading.Lock()
         # A threading.Event, not an asyncio one: main.py runs the scan inside a
         # daemon thread with its own event loop, so stop() is always called from
         # a different thread than the scan. asyncio.Event.set() is not
@@ -93,14 +96,35 @@ class ScannerManager:
         self.sem_video = None
         self.sem_image = None
 
+    def _claim(self) -> bool:
+        """Belegt den Scanner, wenn er frei ist. True heisst: Du darfst.
+
+        Eine eigene Methode, damit „nachsehen und setzen" **eine** Sache ist
+        und auch von aussen als solche geprüft werden kann. Stünden die beiden
+        Zeilen einzeln im Ablauf, wäre das Fenster wieder da.
+        """
+        with self._state_lock:
+            if self.is_scanning:
+                return False
+            self.is_scanning = True
+            return True
+
     async def run_scan(self, progress_callback: Optional[Callable[[str], None]] = None, force_rescan: bool = False) -> int:
         """
         Full scan pipeline. Returns number of new/updated files processed.
         """
-        if self.is_scanning:
+        # Nachsehen und Belegen muss zusammen passieren.
+        #
+        # Vorher standen die beiden Zeilen einzeln da, und die Route davor
+        # prüft ebenfalls nur und startet dann einen Thread. Zwei Anfragen
+        # kurz hintereinander — der Fernseher und der Browser, oder zweimal
+        # geklickt — sahen damit beide „läuft nicht" und starteten je einen
+        # vollständigen Durchlauf: doppelte ffprobe-Last auf allen Kernen und
+        # zwei Schreiber auf derselben Datenbank.
+        if not self._claim():
+            print("⏸ Scan bereits im Gang — zweite Anfrage übergangen.")
             return 0
 
-        self.is_scanning = True
         self._stop_event.clear()
 
         start_time = time.time()
