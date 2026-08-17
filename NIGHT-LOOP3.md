@@ -266,6 +266,10 @@ Gewählt nach demselben Maßstab wie bisher: Wo richtet ein Fehler echten
 Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
 - [ ] **Loop N — Die Warteschlange** (läuft)
+      - [x] Fertige Umwandlung konnte eine fremde Datei überschreiben
+            (zwei betroffene Paare in Ralfs Bibliothek)
+      - [x] Verwaiste Jobs blockierten ihre Datei dauerhaft — aufgeräumt wurde
+            nur, wenn ein Arbeiter nach Arbeit fragt
       In Ralfs Datenbank stehen 18 Jobs. Die Warteschlange ist der einzige
       Teil des Produkts, der *Dateien ersetzt* — ein Zustandsfehler heißt hier
       nicht „Anzeige falsch", sondern im schlimmsten Fall eine halb
@@ -288,6 +292,19 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 46 (Loop N, verwaiste Jobs)** — Dasselbe Muster wie in
+  Iteration 43, an ganz anderer Stelle: Die Aufräumfunktion für verwaiste Jobs
+  ist sorgfältig gebaut (Frist, Zählung der Versuche, Aufgeben nach dreien) und
+  hing an genau einer Stelle — `get_next_pending()`. Aufgeräumt wurde also nur,
+  wenn ein Arbeiter nach Arbeit fragt. Für den Fall, für den sie gedacht ist —
+  der Arbeiter ist weg —, gab es damit niemanden mehr, der sie auslöst. Der Job
+  blieb auf `encoding` stehen, das Dashboard zeigte ihn ewig als laufend, und
+  die Datei liess sich nie wieder einreihen. Gelernt: Eine Selbstheilung, die
+  nur der Gesunde auslösen kann, heilt nicht. Aufgeräumt wird jetzt auch beim
+  Lesen des Status — ein Lesezugriff, der schreibt, aber der Entwurf hat
+  bewusst keinen Hintergrund-Scheduler, und das Dashboard fragt ohnehin
+  regelmässig. Nächstes: doppelte Ausführung (Server neben `mac_worker.py`).
 
 - **Iteration 45 (Loop N, Zielkollision)** — Der Warteschlangen-Code ist gut
   abgesichert: Übernahme per Compare-and-Swap, Wiederaufnahme verwaister Jobs,

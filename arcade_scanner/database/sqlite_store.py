@@ -498,9 +498,27 @@ class SQLiteStore:
             return cursor.rowcount > 0
 
     def get_queue_status(self, limit: int = 20) -> List[dict]:
-        """Return active + recent jobs for the UI."""
+        """Return active + recent jobs for the UI.
+
+        Räumt dabei verwaiste Jobs auf. Das sah lange nach der falschen Stelle
+        aus — ein Lesezugriff, der schreibt —, ist aber die einzige, die im
+        entscheidenden Fall noch erreicht wird:
+
+        `_reclaim_stale_locked()` hing ausschließlich an `get_next_pending()`,
+        also daran, dass ein Arbeiter nach Arbeit fragt. Verschwindet der
+        letzte Arbeiter mitten im Encode (Neustart des Servers, Mac aus,
+        Batch-Controller abgeschossen), bleibt sein Job auf `encoding` stehen —
+        und niemand fragt mehr nach Arbeit, der ihn aufräumen könnte. Die
+        Datei zählte damit dauerhaft als „in Bearbeitung" und liess sich über
+        `queue_encode()` auch nicht neu einreihen. Der einzige Ausweg wäre die
+        Datenbank gewesen.
+
+        Das Dashboard fragt den Status regelmässig ab. Ein verwaister Job
+        heilt sich damit von selbst, sobald jemand hinsieht.
+        """
         conn = self._ensure_connection()
         with self._write_lock:
+            self._reclaim_stale_locked()
             cursor = conn.execute(
                 """SELECT id, file_path, status, size_bytes, created_at, started_at,
                           completed_at, worker_id, result_message, saved_bytes,
@@ -518,9 +536,15 @@ class SQLiteStore:
         return jobs
 
     def get_active_queue_paths(self) -> set[str]:
-        """file_paths of jobs currently pending or being processed."""
+        """file_paths of jobs currently pending or being processed.
+
+        Räumt vorher auf, damit ein verwaister Job eine Datei nicht dauerhaft
+        als belegt meldet — diese Menge entscheidet, ob sich eine Datei erneut
+        einreihen lässt.
+        """
         conn = self._ensure_connection()
         with self._write_lock:
+            self._reclaim_stale_locked()
             cursor = conn.execute(
                 "SELECT file_path FROM encoding_queue "
                 "WHERE status IN ('pending', 'downloading', 'encoding', 'uploading')"
