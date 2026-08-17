@@ -1,12 +1,12 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 114 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2080** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 122 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2174** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
 
-## Zuerst lesen: acht Punkte brauchen deine Entscheidung
+## Zuerst lesen: neun Punkte brauchen deine Entscheidung
 
 ### 1. Der iOS-Client ist seit Monaten funktionsunfähig
 
@@ -146,6 +146,27 @@ Zwei kleinere Punkte im selben Bereich, ebenfalls deine Entscheidung:
   zum Ablauf gültig. Das Skript sagt das jetzt hin, behebt es aber nicht — dafür
   bräuchte es eine Server-Route.
 
+### 9. Vorschaubilder sind ohne Anmeldung abrufbar — und das zu ändern kostet die TV-Vorschau
+
+`/stream` habe ich geschlossen (siehe Sicherheitsfunde, es lieferte **Dateien**
+ohne Anmeldung aus). `/thumbnails/` ist aus demselben Grund offen, und ich habe
+es **bewusst gelassen**: Der TV-Client baut seine Bild-Adressen in
+`tv_client/src/serverConfig.js` ohne Token zusammen (`thumbnailUrl()`), und ein
+Cookie hat er nicht. Eine Sitzungspflicht dort schaltet die Vorschaubilder auf
+dem Fernseher ab — bis der Client nachgezogen wird.
+
+Wie schlimm ist es: Die Dateinamen sind Hashes des Quellpfades, wer den Pfad
+nicht kennt, rät ihn nicht. Der Inhalt ist ein verkleinertes Standbild, kein
+Video. Es ist also deutlich weniger als `/stream` — aber es ist derselbe
+Mechanismus, und bei einer über Tailscale erreichbaren Installation ist „man
+muss den Pfad kennen" keine Zugriffskontrolle.
+
+Drei Wege, alle deine Entscheidung: Token im TV-Client anhängen und dann
+schließen (die saubere Lösung, braucht einen TV-Client-Build); so lassen;
+oder nur für Nicht-LAN-Adressen schließen. Der Testlauf hält den Zustand in
+einer begründeten Ausnahmeliste fest (`tests/test_stream_requires_session.py`),
+damit es nicht wieder aus dem Blick gerät.
+
 ---
 
 ## Sicherheitsfunde (behoben)
@@ -167,6 +188,7 @@ Zwei kleinere Punkte im selben Bereich, ebenfalls deine Entscheidung:
 | Abgesicherter Modus griff bei **eigenen** Tags nicht | Der Tag des Videos wurde kleingeschrieben, die eingestellte Liste nicht. Wer „NSFW" eintippte, bekam nie einen Treffer — unentdeckt, weil die Voreinstellungen klein geschrieben sind. Zweitens brach ein Eintrag ohne Pfad den ganzen Filter, womit der Modus *alles* zeigte. |
 | Tag- und Ordnernamen in interpolierten `onclick`-Handlern | Fünf Stellen. Der Breadcrumb-Handler war sogar abgesichert — aber nur gegen Apostrophe, während das Attribut von Anführungszeichen begrenzt wird. |
 | Dieselbe Sache noch einmal im **Wiedergabe-Dialog** | `cinema.js` baute beide Tag-Listen aus interpolierten `onclick`-Attributen — die sechste Stelle, übersehen, weil sie als einzige Datei `escapeHtml()` gar nicht benutzt. Hier genügt schon der harmlose Fall: Ein Tag namens „Ralfs Auswahl" macht den Knopf funktionsunfähig. Maskieren allein hätte übrigens nicht gereicht — der Browser dekodiert Entitäten im Attribut, *bevor* der Inhalt als JavaScript gelesen wird. Jetzt Knoten statt Zeichenketten, wie in `tag_manager.js`. |
+| **`/stream` lieferte Dateien ohne Anmeldung aus** | Geprüft wurde nur `is_path_allowed()` — ob der Pfad in einem Scan-Ziel liegt. Keine Sitzungsprüfung, weder GET noch HEAD. Wer die Adresse kannte, bekam die Datei: ohne Konto, an der Vault-Markierung vorbei. Die Metadaten waren geschützt, die Oberfläche, die Benutzerdaten — die Dateien selbst nicht, und die sind der Zweck des Programms. Am echten Handler belegt: vorher 200 samt Inhalt, jetzt 401. Beide Clients bringen ihre Kennung schon mit (Browser: Cookie, TV: `&token=`), die Wiedergabe bleibt heil. **Warum es vierzehn Zyklen überlebt hat:** Der Rundum-Test über alle Routen sucht nach `self.path == "/api/…"`, `/stream` wird per `startswith()` erkannt — der Wächter hatte eine Formlücke und meldete deshalb Ruhe. Der neue Test deckt beide Formen ab. |
 | Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump | `FOLDERS_DATA` enthielt die Ordner *aller* Nutzer, mit vollem Pfad im `title`-Attribut. |
 
 **Ursache hinter zwei dieser Funde:** Der Server hat kein globales Auth-Gate —
@@ -267,6 +289,16 @@ Hättest du die `.mkv` bzw. die `.mov` optimiert, wäre die daneben liegende
 `.mp4` überschrieben worden — ohne Meldung. Jetzt bricht der Job mit einer
 Begründung ab. **Was du damit machen willst, ist deine Entscheidung**: eine der
 beiden löschen, oder eine umbenennen. Ich habe nichts angefasst.
+
+---
+
+## Was beim Umziehen und Verschwinden von Dateien passiert (Loop AD)
+
+| Fund | Auswirkung |
+|---|---|
+| **Umbenennen war Datenverlust** | Favoriten, Vault-Marke und Tags hängen am Pfad. Wer eine Datei umbenennt oder in einen anderen Ordner schiebt, erzeugt aus Sicht der Bibliothek „alte weg, neue da" — der Aufräumschritt löschte die alte Zeile mitsamt allem, was daran hing. Ordnung in einer Mediathek *besteht* aus Umbenennen und Verschieben: Der Verlust trifft genau den, der aufräumt. Erkannt wird der Umzug jetzt an Größe, Änderungszeit und Laufzeit, und nur bei eindeutigen Paaren. Das Aufnahmedatum zieht mit, sonst stünde jede umbenannte Datei in „zuletzt hinzugefügt" ganz oben. |
+| Ein nicht eingehängtes Laufwerk stand nur im Protokoll | Der Scanner erkennt den Fall und verhält sich richtig (kein Aufräumen). Gesagt hat er es nur der Konsole — wer den Server als Dienst betreibt, sieht eine vollständige Bibliothek, in der jedes Video einen Fehler wirft, und sucht bei Codecs und Rechten. Die Einstellungen zeigen fehlende Scan-Ziele jetzt an. Nur die eigenen; scheitert die Prüfung selbst (hängender Mount), wird geschwiegen statt falsch gewarnt. |
+| Der Wiedergabe-Dialog schwieg bei einem Fehler | Kein error-Handler an `<video>` und `<img>`: schwarzes Bild, sonst nichts. Jetzt eine Meldung, deren Grund nachgeschlagen wird — ein HEAD trennt „Datei weg" von „Server sagt nein" von „Browser kann den Codec nicht". |
 
 ---
 
