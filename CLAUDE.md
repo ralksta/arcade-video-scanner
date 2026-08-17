@@ -33,6 +33,12 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # User management
 .venv/bin/python3 scripts/manage_users.py list|add <name> [--admin]|passwd <name>
 
+# Similarity index (optional; the "similar media" bar stays empty without it).
+# Standalone by design: torch/open_clip are lazy imports, never server deps.
+.venv/bin/pip install -e ".[indexer]"
+.venv/bin/python3 scripts/media_indexer.py [--rebuild] [--watch] [--model NAME]
+# Coverage is visible at GET /api/similar/status
+
 # webOS TV client (in tv_client/; Enact/React)
 npm run serve   # dev server
 npm run pack    # production build
