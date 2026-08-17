@@ -5,7 +5,7 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: 7 von 9 Punkten entschieden.
+Stand: 8 von 9 Punkten entschieden.
 
 ---
 
@@ -237,3 +237,53 @@ Zu beachten — das ist eine löschende Operation, entsprechend gehört dazu:
   Arbeitsspeicher weiterleben (siehe Punkt 8, zweiter Unterpunkt).
 - Der Server sollte danach neu geladen werden (Caches, `db.load()`), sonst
   zeigt die Oberfläche den alten Stand.
+
+---
+
+## 8. Standardkonto `admin`/`admin` — **Wechsel erzwingen**
+
+`create_default_admin()` legt bei jedem Start ein Konto `admin` mit dem
+Passwort `admin` an, sobald keines dieses Namens existiert — auch nach dem
+Löschen. Der Assistent weist auf den Wechsel hin, erzwingt ihn aber nicht.
+
+**Entschieden:** Das Konto bleibt, aber die Anmeldung mit dem Standardpasswort
+führt zwingend zum Wechsel, bevor irgendetwas anderes geht.
+
+Zu beachten:
+
+- Wirkt auch dort, wo niemand eine Konsole sieht (Server als Dienst) — das war
+  der Grund gegen das zufällige Startpasswort.
+- Woran der Zustand erkannt wird, muss festgelegt sein: ein Merker im
+  Nutzerdatensatz („Passwort nie geändert") ist ehrlicher als ein Vergleich
+  gegen das bekannte Standardpasswort, weil Letzteres auch dann greift, wenn
+  jemand `admin` bewusst wieder setzt.
+- Der Abbruchfall gehört beantwortet: Wer den Wechsel wegklickt, darf keine
+  angemeldete Sitzung behalten.
+- Das Docker-Onboarding hängt mit dran (`create_default_admin` setzt dort
+  `setup_complete = False`).
+- Gilt nur für das Standardpasswort, nicht für später von Hand gesetzte.
+
+### Nebenpunkte — **beide angehen**
+
+**Konto löschen und Rechte entziehen** (`scripts/manage_users.py` kann heute
+nur `list`, `add`, `passwd`):
+
+- `delete` muss den Nutzerzustand mit entfernen (Favoriten, Tags, Vault,
+  Scan-Ziele) — sonst bleibt er in `users.db` liegen wie die Pfade vor
+  `purge_paths_from_user_data()`.
+- Das letzte Admin-Konto darf sich nicht selbst entrechten oder löschen
+  lassen, sonst kommt niemand mehr an die Verwaltung.
+- Achtung auf die Wechselwirkung mit Punkt 8 oben: Ein gelöschtes `admin`
+  entsteht beim nächsten Start neu. Solange das so ist, ist „löschen" für
+  genau diesen Namen eine Illusion.
+
+**Sitzungen bei Passwortwechsel beenden:**
+
+- Braucht eine Server-Route — das CLI-Skript läuft in einem eigenen Prozess
+  und kommt an die Sitzungen im Arbeitsspeicher nicht heran. Heute sagt das
+  Skript den Zustand nur hin.
+- Der Fall, um den es geht: Du wechselst ein Passwort, **weil** es
+  abhandengekommen ist. Bleibt die fremde Sitzung gültig, hat der Wechsel
+  nichts bewirkt — bis zu 30 Tage lang.
+- `SessionManager` kennt bereits `revoke_session(token)`; gebraucht wird
+  „alle Sitzungen dieses Nutzers".
