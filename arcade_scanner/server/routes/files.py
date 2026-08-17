@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from arcade_scanner.config import IS_WIN, config
+from arcade_scanner.core.media_replace import TargetCollision, check_target_collision
 from arcade_scanner.database import db, user_db
 from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 
@@ -421,6 +422,17 @@ def _handle_keep_optimized(handler) -> None:
                     orig_path_obj = Path(orig_abs)
                     opt_path_obj = Path(opt_abs)
                     new_path = orig_path_obj.with_suffix(opt_path_obj.suffix)
+
+                    # os.rename überschreibt auf POSIX wortlos. Trägt der
+                    # Zielname bereits eine andere Datei (film.mkv neben
+                    # film.mp4), wäre sie danach weg — und das Original ist eine
+                    # Zeile vorher schon gelöscht.
+                    try:
+                        check_target_collision(orig_path_obj, new_path)
+                    except TargetCollision as e:
+                        print(f"❌ Keeping optimized file aborted: {e}")
+                        handler.send_error(409, str(e))
+                        return True
 
                     if os.path.exists(orig_abs):
                         os.remove(orig_abs)

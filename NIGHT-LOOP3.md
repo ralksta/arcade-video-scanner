@@ -289,6 +289,20 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
 
+- **Iteration 45 (Loop N, Zielkollision)** — Der Warteschlangen-Code ist gut
+  abgesichert: Übernahme per Compare-and-Swap, Wiederaufnahme verwaister Jobs,
+  Integritätsprüfung vor dem Ersetzen, Ablehnung nicht-atomarer Verschiebungen
+  über Dateisystemgrenzen. Genau deshalb war die Lücke dort, wo niemand
+  hinsieht: `atomic_replace` prüft, *wie* ersetzt wird, aber nicht, *was* am
+  Zielort liegt. Der Optimierer schreibt immer `.mp4`, aus `film.mkv` wird
+  `film.mp4` — liegt daneben schon eine, ist sie danach weg. `os.replace` und
+  `os.rename` schweigen dazu. Gelernt: Eine sorgfältig gebaute Prüfkette
+  erzeugt Vertrauen, das auf die Nachbarzeile abfärbt. In Ralfs Bibliothek
+  gibt es zwei solche Paare — der Fund ist nicht theoretisch. Beide
+  Ersetzungspfade brechen jetzt ab statt zu überschreiben; welche Datei bleibt,
+  kann nur er entscheiden. Nächstes: Warteschlangen-Zustände (Neustart mitten
+  im Encode, doppelte Ausführung).
+
 - **Iteration 44 (Loop M, die Voreinstellungen — Loop M abgeschlossen)** — Die
   Warnung aus Iteration 41 („relativer Ausschluss schließt vermutlich nichts
   aus") sprang bei den **mitgelieferten Voreinstellungen** an. Das war kein

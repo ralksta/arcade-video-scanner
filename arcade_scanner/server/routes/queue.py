@@ -34,7 +34,12 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from arcade_scanner.config import MAX_UPLOAD_SIZE, config
-from arcade_scanner.core.media_replace import atomic_replace, verify_media_integrity
+from arcade_scanner.core.media_replace import (
+    TargetCollision,
+    atomic_replace,
+    check_target_collision,
+    verify_media_integrity,
+)
 from arcade_scanner.database import db
 from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 from arcade_scanner.server.api_handler import _media_cache
@@ -737,6 +742,19 @@ def handle_post(handler) -> bool:
             else:
                 # Standard Mode: the optimized file takes the original's place.
                 opt_path = str(Path(original_path).with_suffix(".mp4"))
+
+                # Vor dem Ersetzen: Gehört der Zielname schon einer anderen
+                # Datei? Dann lieber den Job scheitern lassen, als sie
+                # kommentarlos zu überschreiben.
+                try:
+                    check_target_collision(Path(original_path), Path(opt_path))
+                except TargetCollision as e:
+                    _unlink_quiet(part_path)
+                    db.update_job_status(job_id, "failed", result_message=str(e))
+                    print(f"❌ Upload for job {job_id} rejected: {e}")
+                    send_json(handler, {"success": False, "error": str(e)})
+                    return True
+
                 atomic_replace(Path(part_path), Path(opt_path))
                 # A .mkv source becomes .mp4, so the old file survives the replace.
                 if opt_path != original_path:
