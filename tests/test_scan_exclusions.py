@@ -71,7 +71,7 @@ def scan(targets, excludes, hidden_dir):
 
     with patch("arcade_scanner.scanner.file_system.config", cfg):
         async def collect():
-            return [p async for p, _ in fs.scan_directories([str(t) for t in targets])]
+            return [p async for p, _, _ in fs.scan_directories([str(t) for t in targets])]
 
         return sorted(asyncio.run(collect()))
 

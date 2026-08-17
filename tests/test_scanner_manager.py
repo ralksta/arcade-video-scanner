@@ -57,6 +57,11 @@ class FakeScanner:
 
     async def scan_directories(self, targets):
         for index, item in enumerate(self.items):
+            # Der Walker liefert seit der Mindestgrössen-Korrektur
+            # (Pfad, dir_changed, too_small). Ältere Fixtures geben nur zwei
+            # Werte an — die dritte Stelle ist dann False, also „gross genug".
+            if len(item) == 2:
+                item = (item[0], item[1], False)
             yield item
             if self.on_yield:
                 self.on_yield(index)
@@ -120,7 +125,9 @@ def run_scan(manager, fake_db, fake_scanner, cfg, stat_size=100.0, stat_mtime=10
     # through to the real one — os.path.exists() is built on os.stat, and
     # faking it wholesale would make every path look like it exists, including
     # the deliberately absent scan targets.
-    media_paths = {path for path, _ in fake_scanner.items}
+    # Fixtures kommen als (Pfad, dir_changed) oder als
+    # (Pfad, dir_changed, too_small) — nur der Pfad zählt hier.
+    media_paths = {item[0] for item in fake_scanner.items}
     real_stat = os.stat
 
     def fake_stat(path, *args, **kwargs):

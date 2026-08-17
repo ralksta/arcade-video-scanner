@@ -196,6 +196,10 @@ class ScannerManager:
         # davor. Deshalb hier wenigstens eine Zählung mit Beispielen.
         # (Pfad, Grund) — der Grund kommt aus ffprobe, nicht aus einer Vermutung.
         failed_paths: List[Tuple[str, str]] = []
+        # Einträge, deren Datei unter die Mindestgrösse gerutscht ist. Getrennt
+        # von den verwaisten: Die Datei ist da, sie gehört nur nicht mehr in
+        # die Bibliothek.
+        undersized_paths: List[str] = []
         batch_entries: List[Any] = []
 
         # 2. Worker Queue Pattern
@@ -394,13 +398,27 @@ class ScannerManager:
 
             # 2. Discovery Loop -> Feed Queue (Streaming for better performance)
             idx = 0
-            async for file_path, dir_changed in fs_scanner.scan_directories(scan_targets):
+            async for file_path, dir_changed, too_small in fs_scanner.scan_directories(scan_targets):
                 if self._stop_event.is_set():
                     discovery_complete = False
                     break
 
                 idx += 1
+                # **Immer** als gefunden vermerken, auch wenn die Datei unter
+                # der Mindestgrösse liegt. Sonst hält der Aufräumschritt sie
+                # für gelöscht und wirft ihren Eintrag samt Vorschaubild weg,
+                # obwohl sie unverändert auf der Platte liegt.
                 found_paths.add(file_path)
+
+                if too_small:
+                    # Nichts zu untersuchen — aber wenn sie bisher in der
+                    # Bibliothek stand, gehört sie dort nicht mehr hin. Das
+                    # wird getrennt gezählt und getrennt gemeldet: „unter der
+                    # Mindestgrösse" ist etwas anderes als „gelöscht".
+                    if file_path in existing_paths:
+                        undersized_paths.append(file_path)
+                    continue
+
                 await queue.put((file_path, dir_changed, idx, 0)) # Stream it!
 
             # Stop Workers
@@ -459,6 +477,26 @@ class ScannerManager:
                 if removed_count > 0:
                     print(f"🗑 Removed {removed_count} files (deleted or now excluded), "
                           f"{thumbs_removed} thumbnails.")
+
+            # Unter die Mindestgrösse gerutscht: Die Datei liegt da, sie
+            # gehört nur nicht mehr in die Bibliothek. Bewusst **ausserhalb**
+            # der Verwaisten-Schutzbedingungen oben — hier ist nichts zu
+            # vermuten, die Datei wurde gesehen und vermessen.
+            if undersized_paths:
+                from arcade_scanner.core.video_processor import remove_thumbnail_for
+
+                for pfad in undersized_paths:
+                    db.remove(pfad)
+                    remove_thumbnail_for(pfad)
+
+                grenze = config.settings.min_size_mb
+                print(f"📏 {len(undersized_paths)} Eintrag/Einträge entfernt: "
+                      f"Datei liegt unter der Mindestgrösse von {grenze} MB. "
+                      "Die Dateien selbst bleiben unangetastet.")
+                for pfad in undersized_paths[:3]:
+                    print(f"   {pfad}")
+                if len(undersized_paths) > 3:
+                    print(f"   … und {len(undersized_paths) - 3} weitere")
 
             if failed_paths:
                 # Am Ende, wo die Zusammenfassung steht — die Einzelzeilen sind

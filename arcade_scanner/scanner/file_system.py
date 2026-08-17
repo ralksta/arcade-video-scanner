@@ -109,10 +109,15 @@ class AsyncFileSystem:
         except Exception as e:
             print(f"⚠️ Could not save scan time: {e}")
 
-    async def scan_directories(self, targets: List[str]) -> AsyncIterator[Tuple[str, bool]]:
+    async def scan_directories(self, targets: List[str]) -> AsyncIterator[Tuple[str, bool, bool]]:
         """
-        Asynchronously yields ``(absolute_path, dir_changed)`` tuples for valid
-        media files found in targets.
+        Asynchronously yields ``(absolute_path, dir_changed, too_small)`` tuples
+        for media files found in targets.
+
+        ``too_small`` heisst: Die Datei liegt unter der eingestellten
+        Mindestgrösse. Sie wird trotzdem gemeldet — wer sie nicht meldet,
+        macht sie für den Aufräumschritt ununterscheidbar von einer
+        gelöschten.
         """
         # Reload settings fresh (picks up any changes to exclusions/min_size)
         self._load_settings()
@@ -276,10 +281,27 @@ class AsyncFileSystem:
                         if not self._is_video(file):
                             continue
                         full_path = os.path.join(root, file)
-                        if dir_changed and not self._is_valid_size(full_path):
-                            continue
+
+                        # Unter der Mindestgröße: gemeldet wird sie trotzdem,
+                        # nur mit einem Vermerk.
+                        #
+                        # Vorher stand hier `continue`, und zwar nur für
+                        # geänderte Verzeichnisse. Damit war eine
+                        # herausgefilterte Datei für den Aufräumschritt nicht
+                        # von einer gelöschten zu unterscheiden — er entfernte
+                        # ihren Eintrag samt Vorschaubild. In unveränderten
+                        # Verzeichnissen griff der Filter gar nicht, dort
+                        # blieben die Einträge stehen.
+                        #
+                        # Ergebnis war ein schleichender Verlust ohne
+                        # erkennbaren Auslöser: An dieser Bibliothek
+                        # verschwanden 515 Einträge, weil in drei Ordnern
+                        # etwas gelöscht wurde — die Dateien selbst lagen
+                        # unverändert auf der Platte.
+                        too_small = not self._is_valid_size(full_path)
+
                         # Blocking put provides natural backpressure on the bounded queue
-                        if not put_blocking((full_path, dir_changed)):
+                        if not put_blocking((full_path, dir_changed, too_small)):
                             return
             except Exception as e:
                 print(f"❌ Error walking {root_dir}: {e}")

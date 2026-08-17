@@ -50,7 +50,7 @@ def collect(scanner, targets):
 
 
 def names(results):
-    return sorted(os.path.basename(path) for path, _ in results)
+    return sorted(os.path.basename(path) for path, _, _ in results)
 
 
 # ---------------------------------------------------------------------------
@@ -191,16 +191,20 @@ class TestScanDirectories:
 
         assert names(results) == ["a.mp4", "b.mkv", "c.mov"]
 
-    def test_yields_path_and_dir_changed_pairs(self, fs, fake_config, tmp_path):
-        """The consumer in scanner/manager.py unpacks two values per item."""
+    def test_yields_path_dir_changed_and_size_verdict(self, fs, fake_config, tmp_path):
+        """
+        Der Verbraucher in scanner/manager.py entpackt drei Werte je Eintrag.
+        Die dritte Stelle kam mit der Mindestgrössen-Korrektur dazu.
+        """
         write_file(tmp_path / "a.mp4")
 
         results = collect(fs, [str(tmp_path)])
 
         assert len(results) == 1
-        path, dir_changed = results[0]
+        path, dir_changed, too_small = results[0]
         assert path.endswith("a.mp4")
         assert dir_changed is True
+        assert too_small is False
 
     def test_missing_target_is_skipped_without_raising(self, fs, fake_config, tmp_path):
         write_file(tmp_path / "real" / "a.mp4")
@@ -245,14 +249,26 @@ class TestScanDirectories:
 
         assert names(results) == ["b.mp4"]
 
-    def test_size_filter_applies_during_the_walk(self, fs, fake_config, tmp_path):
+    def test_the_size_filter_marks_instead_of_dropping(self, fs, fake_config, tmp_path):
+        """
+        Zu kleine Dateien werden **gemeldet**, mit `too_small=True`.
+
+        Vorher wurden sie verschwiegen — und damit war eine herausgefilterte
+        Datei für den Aufräumschritt nicht von einer gelöschten zu
+        unterscheiden. An der echten Bibliothek hat das 515 Einträge samt
+        Vorschaubildern gekostet, während die Dateien unverändert auf der
+        Platte lagen.
+        """
         fake_config.settings.min_size_mb = 1
         write_file(tmp_path / "small.mp4", 1024)
         write_file(tmp_path / "large.mp4", 2 * 1024 * 1024)
 
         results = collect(fs, [str(tmp_path)])
+        marken = {os.path.basename(p): zu_klein for p, _, zu_klein in results}
 
-        assert names(results) == ["large.mp4"]
+        assert names(results) == ["large.mp4", "small.mp4"]
+        assert marken["small.mp4"] is True
+        assert marken["large.mp4"] is False
 
     def test_images_are_excluded_unless_enabled(self, fs, fake_config, tmp_path):
         write_file(tmp_path / "a.mp4")
@@ -317,13 +333,16 @@ class TestIncrementalScan:
         assert results[0][1] is True
         assert fs._skipped_dirs == 0
 
-    def test_unchanged_directories_bypass_the_size_filter(self, fs, fake_config, tmp_path):
-        """A file too small to qualify is still yielded from an unchanged dir.
+    def test_the_size_verdict_does_not_depend_on_the_directory(self, fs, fake_config, tmp_path):
+        """
+        Genau hier lag der Fehler: Die Grössenprüfung lief **nur** in
+        geänderten Verzeichnissen. Dieselbe Datei galt damit mal als zu klein
+        und mal nicht — je nachdem, ob zufällig jemand im selben Ordner etwas
+        angefasst hatte. Der Aufräumschritt machte daraus einen schleichenden
+        Verlust ohne erkennbaren Auslöser.
 
-        The walk only consults _is_valid_size when dir_changed is True, so on an
-        incremental pass an undersized file reaches the consumer with
-        dir_changed=False. Pinned as current behaviour: downstream is expected
-        to reuse its cached entry rather than re-probe.
+        Jetzt fällt das Urteil überall gleich aus; nur `dir_changed`
+        unterscheidet sich.
         """
         fake_config.settings.min_size_mb = 100
         media = tmp_path / "media"
@@ -333,7 +352,8 @@ class TestIncrementalScan:
         results = collect(fs, [str(media)])
 
         assert names(results) == ["tiny.mp4"]
-        assert results[0][1] is False
+        assert results[0][1] is False, "Verzeichnis gilt als unverändert"
+        assert results[0][2] is True, "zu klein — unabhängig vom Verzeichnis"
 
     def test_skipped_counter_resets_between_scans(self, fs, fake_config, tmp_path):
         media = tmp_path / "media"
