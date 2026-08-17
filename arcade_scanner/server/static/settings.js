@@ -1008,13 +1008,11 @@ async function loadQueueStatus() {
             return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-ink/10 text-gray-400'}">${s}</span>`;
         };
 
-        const timeAgo = (ts) => {
-            if (!ts) return '—';
-            const diff = Math.floor(Date.now() / 1000 - ts);
-            if (diff < 60) return `${diff}s ago`;
-            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-            return `${Math.floor(diff / 3600)}h ago`;
-        };
+        // Vorher stand hier eine eigene Fassung, die bei Stunden aufhörte:
+        // Ein Auftrag vom April stand als „2952h ago" in der Liste.
+        // formatRelativeTime() aus formatters.js kann Tage, Wochen und Monate
+        // und war schon da — nur benutzt hat sie niemand.
+        const timeAgo = (ts) => (ts ? formatRelativeTime(ts) : '—');
 
         const eta = (secs) => {
             if (!secs || secs <= 0) return '';

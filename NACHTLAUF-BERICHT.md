@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 129 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2227** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 132 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2242** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -332,6 +332,23 @@ am 07.08. Für die hätte die Vereinheitlichung „nach Datum" durch „nach
 Scan-Reihenfolge" ersetzt. Es sind zwei berechtigte Fragen, also stehen jetzt
 beide im Auswahlfeld: **„Sort: date added"** und **„Sort: file date"**.
 Gespeicherte Ansichten sind nicht betroffen, der Wert `date` blieb unverändert.
+
+Zwei weitere Funde in diesem Themenfeld:
+
+- **Was während eines Scans passiert, fiel dauerhaft durchs Raster.** Der
+  Scanner überspringt Verzeichnisse, die sich seit dem letzten Durchlauf nicht
+  geändert haben — und merkte sich dafür den Zeitpunkt am **Ende**. Wird um
+  02:10 eine Datei ersetzt, während der um 02:00 gestartete Scan bis 02:30
+  läuft, gilt der Ordner beim nächsten Mal als unverändert: `02:10 < 02:30`.
+  Die Änderung ist damit nicht einmal verpasst, sondern für immer, bis in
+  demselben Ordner zufällig etwas anderes passiert. Genau diese Lage entsteht
+  bei dir von selbst — der Fernarbeiter lädt optimierte Fassungen zurück,
+  während der nächtliche Scan läuft. Gemerkt wird jetzt der Beginn.
+- **Die Alters-Spalte der Warteschlange hörte bei Stunden auf**, ein Auftrag
+  vom April stand als „2952h ago" da. `formatRelativeTime()` in
+  `formatters.js` kann Tage, Wochen und Monate und hatte im ganzen Projekt
+  **keinen einzigen Aufrufer**, während daneben eine schlechtere Nachbildung
+  stand.
 
 Zwei Dinge in diesem Bereich habe ich geprüft und **nicht** angefasst:
 

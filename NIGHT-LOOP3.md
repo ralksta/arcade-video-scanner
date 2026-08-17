@@ -507,7 +507,7 @@ nicht kontrolliert.
       - [x] Optimieren verlor Favoriten, Vault und Tags — `film.mkv` wird
             `film.mp4`, und der Nutzerzustand hängt am Pfad
 
-- [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum** (läuft)
+- [x] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum**
       Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
       Zeitzone steht es, und was passiert beim Rescan?
       - [x] „Sortieren: Datum" und „hinzugefügt: letzte 7 Tage" meinten zwei
@@ -519,6 +519,24 @@ nicht kontrolliert.
             Fehlversuch legte einen Eintrag an, der nie verschwand
       - [x] Was **während** eines Scans passiert, fiel dauerhaft durchs
             Raster — der Zeitstempel wurde am Ende genommen
+      - [x] Alters-Anzeige der Warteschlange hörte bei Stunden auf, obwohl
+            `formatRelativeTime()` seit jeher ungenutzt danebenlag
+      - [x] Geprüft und in Ordnung: Datumsanzeige gibt es sonst nirgends
+            (keine Zeitzonen-Frage), `_reclaim_stale_locked` deckt hängende
+            Aufträge bereits ab (Loop N)
+
+## Zyklus 16
+
+- [ ] **Loop AF — Was passiert bei zwei gleichzeitigen Nutzern?** (läuft)
+      Der Server ist ein ThreadingTCPServer, die Clients pollen. Loop W hat
+      die Schreibpfade in der Benutzerdatenbank abgesichert; offen ist der
+      Rest: gleichzeitige Scans, gleichzeitige Optimierungen derselben Datei,
+      der geteilte Zwischenspeicher, gleichzeitige Anmeldungen.
+
+- [ ] **Loop AG — Die Grenzen: leer, eins, sehr viele**
+      Was zeigt die Oberfläche bei null Einträgen, was bei einem, was bei
+      hunderttausend? Was macht eine Datei ohne Endung, ein Ordner mit 50.000
+      Dateien, ein Pfad an der Längengrenze des Dateisystems?
 
 ## Abschluss vor dem Morgen
 
@@ -529,6 +547,22 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 90 (Loop AE abgeschlossen, die ungenutzte Antwort)** — Die
+  Alters-Spalte der Warteschlange hörte bei Stunden auf; ein Auftrag vom April
+  stand als „2952h ago" da. In `formatters.js` liegt seit jeher
+  `formatRelativeTime()` mit Tagen, Wochen und Monaten — mit **null**
+  Aufrufern im ganzen Projekt, während daneben in `settings.js` eine
+  schlechtere Nachbildung stand. Dasselbe Muster wie beim gesperrten
+  `localStorage` im TV-Client: Die Antwort lag im Repo, sie war nur nicht
+  angewandt. Mitgenommen: ein Zeitstempel aus der Zukunft (falsch gestellte
+  Uhr auf einem entfernten Arbeiter) ergab „-3 minutes ago". Damit ist AE
+  ausgereizt: Datumsanzeigen gibt es sonst nirgends in der Oberfläche, also
+  auch keine Zeitzonen-Frage; hängende Aufträge deckt `_reclaim_stale_locked`
+  seit Loop N ab. Gelernt — und das gilt jetzt für zwei Funde dieser Nacht:
+  „Gibt es dafür schon etwas, das keiner benutzt?" ist eine eigene Suchfrage,
+  und sie findet Dinge, die kein Fehlerbericht liefert. Nächstes: Zyklus 16,
+  Loop AF (Gleichzeitigkeit).
 
 - **Iteration 89 (Loop AE, das Fenster während des Scans)** — Der Scanner
   überspringt Verzeichnisse, deren mtime älter ist als der letzte Durchlauf.
