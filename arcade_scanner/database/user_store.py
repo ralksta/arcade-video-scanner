@@ -192,10 +192,31 @@ class UserStore:
     def hash_password(self, password: str, salt: bytes) -> bytes:
         return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
 
+    # Fester Salt für den Leerlauf-Durchgang unten. Er schützt nichts — sein
+    # einziger Zweck ist, dieselbe Rechenzeit zu verbrauchen wie ein echter
+    # Versuch.
+    _DUMMY_SALT = b"\x00" * 16
+
     def verify_password(self, username: str, password: str) -> bool:
+        """Prüft ein Passwort. False auch für unbekannte Benutzernamen.
+
+        Zur Laufzeit: Bei einem unbekannten Namen kehrte die Funktion früher
+        sofort zurück, bei einem bekannten lief die PBKDF2-Ableitung. Gemessen
+        waren das 0,28 ms gegen 62 ms — Faktor 220, über Netzwerk mühelos
+        unterscheidbar. Damit ließen sich gültige Benutzernamen erraten, ohne
+        ein Passwort zu kennen.
+
+        Das wiegt hier schwerer, seit die Anmeldesperre auch am Benutzernamen
+        hängt: Wer die gültigen Namen kennt, kann gezielt Konten aussperren.
+
+        Deshalb läuft die Ableitung auch für unbekannte Namen — mit einem
+        Wegwerf-Salt, dessen Ergebnis niemand ansieht. Die Antwort ist
+        dieselbe, die Dauer ebenfalls.
+        """
         import hmac as _hmac
         user = self.get_user(username)
         if not user:
+            self.hash_password(password, self._DUMMY_SALT)
             return False
 
         try:

@@ -232,6 +232,8 @@ jetzt systematisch.
       - [x] Brute-Force-Sperre war per `X-Forwarded-For` aushebelbar — Sperre
             auf den Benutzernamen ergänzt
       - [x] Sitzungsverfall, Token-Erzeugung, Abmeldung geprüft: **korrekt**
+      - [x] Benutzernamen waren über die Antwortzeit erratbar (Faktor 220) —
+            Ableitung läuft jetzt auch für unbekannte Namen
       `security/auth.py` speichert bei jeder Sitzung ein `created_at` — ob es je
       ausgewertet wird, ist offen. Ein Token, das nie verfällt, ist nach dem
       Fund „Token im Zugriffslog" (Loop F) besonders relevant: was einmal
@@ -253,6 +255,20 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 39 (Loop L, Passwortprüfung)** — Das Hashing selbst ist in
+  Ordnung: PBKDF2-HMAC-SHA256, 100.000 Iterationen, Zufallssalz je Nutzer,
+  konstantzeitiger Vergleich — im Code sogar ausdrücklich als Schutz gegen
+  Timing-Angriffe kommentiert. Genau eine Ebene darüber galt der Schutz nicht:
+  Bei unbekanntem Benutzernamen kehrte `verify_password()` sofort zurück, ohne
+  zu rechnen. Gemessen 62,39 ms gegen 0,28 ms — Faktor 220, über Netzwerk
+  trivial unterscheidbar. Gelernt: Eine Gegenmaßnahme schützt nur den Zweig, in
+  dem sie steht; der Kommentar über der Funktion sagt nichts über den Zweig
+  darüber. Und die Sperre aus Iteration 38 machte es schlimmer, nicht besser —
+  seit sie am Benutzernamen hängt, verwandelt eine Namensliste sich in eine
+  Liste gezielt sperrbarer Konten. Nach der Korrektur 62,28 ms gegen 62,54 ms,
+  Faktor 1,00. Nächstes: Nutzerverwaltung (`scripts/manage_users.py`), dann
+  Loop M.
 
 - **Iteration 38 (Loop L, Anmeldung)** — Meine Ausgangsvermutung („Sitzungen
   verfallen nie") war falsch: Verfall, Gleitfenster und Sperrzeit sind sauber
