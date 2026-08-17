@@ -58,3 +58,39 @@ def test_js_syntax_valid(js_file, node_binary):
     assert result.returncode == 0, (
         f"Syntax error in {js_file.name}:\n{result.stderr.strip()}"
     )
+
+
+def test_the_syntax_check_is_not_blind(js_file, node_binary, tmp_path):
+    """Prüft den Prüfer: Fängt `node --check` in dieser Datei überhaupt etwas?
+
+    `node --check` meldet für Dateien, die es als ES-Modul erkennt (also alles
+    mit `import`/`export`), **Erfolg — auch bei offensichtlich kaputtem Code**.
+    Nachgemessen mit node 26:
+
+        import x from 'y';
+        const a = (((;          →  node --check … ; echo $?  →  0
+
+    Für die Dateien in `static/` stimmt das heute nicht: keine benutzt
+    Modul-Syntax, alle 28 werden wirklich geprüft. Es genügt aber ein einziges
+    `import` in einer dieser Dateien, und der Test oben wird für sie
+    stillschweigend wertlos — grün, ohne etwas geprüft zu haben.
+
+    Deshalb wird hier jeder Datei ein Syntaxfehler angehängt und verlangt, dass
+    er auffällt.
+    """
+    broken = tmp_path / js_file.name
+    broken.write_text(
+        js_file.read_text(encoding="utf-8") + "\nconst __kaputt = (((;\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [node_binary, "--check", str(broken)],
+        capture_output=True, text=True, timeout=30,
+    )
+
+    assert result.returncode != 0, (
+        f"{js_file.name}: node --check übersieht einen eingebauten Syntaxfehler. "
+        "Vermutlich enthält die Datei jetzt Modul-Syntax (import/export) — dann "
+        "prüft der Test darüber nichts mehr und braucht ein anderes Werkzeug."
+    )

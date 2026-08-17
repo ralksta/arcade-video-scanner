@@ -375,6 +375,24 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       Fehler dort versteckt Dateien, ohne dass irgendwo etwas fehlt. Über den
       node-Kontext ausführbar, also messbar statt gelesen.
 
+## Zyklus 11
+
+- [ ] **Loop V — Der TV-Client** (läuft)
+      - [x] Derselbe Vault-Fehler wie im Browser-Client — auf dem Fernseher
+      - [x] `node --check` prüft ESM-Dateien gar nicht; der Syntaxtest sichert
+            sich jetzt selbst ab
+      - [ ] Offen: Login-Pfad und Sortierung des TV-Clients
+      Einer von drei Clients, und der einzige, den Ralf laut Commit-Historie
+      tatsächlich pflegt. Schon einmal fiel dort auf, dass Smart Collections
+      nach dem falschen Feld filterten (`v.status` statt `v.Status`) — solche
+      Abweichungen fallen nicht auf, weil niemand beide Clients nebeneinander
+      hält. Über node ausführbar.
+
+- [ ] **Loop W — Nebenläufigkeit im Server**
+      Eine geteilte SQLite-Verbindung hinter einem wiedereintrittsfähigen
+      Lock, dazu ein ThreadingTCPServer. Der letzte grosse Bereich, in dem ein
+      Fehler nicht falsch aussieht, sondern selten.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
@@ -384,6 +402,22 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 66 (Loop V, TV-Client)** — Die erste Frage an den zweiten Client
+  war die, die ich gerade beim ersten beantwortet hatte — und die Antwort war
+  dieselbe: Fällt `/api/user/data` aus, bleibt `v.hidden` undefined, und jeder
+  der vier Filter prüft `!v.hidden`. Der gesamte Vault stand auf der
+  Startseite; auf einem Fernseher im Wohnzimmer. Besonders unauffällig, weil die
+  Vault-Ansicht dann leer ist — es sah aus, als sei nichts versteckt, statt als
+  sei etwas kaputt. Gelernt: Ein Fund in einem Client ist eine Frage an alle
+  anderen, und genau dafür lohnt der Loop.
+  Zweiter Fund, beim Absichern: **`node --check` prüft ESM-Dateien überhaupt
+  nicht** — `import x from 'y'; const a = (((;` kommt mit Rückgabewert 0 durch
+  (node 26). Für die 28 Dateien in `static/` stimmt der Test heute noch, weil
+  keine Modul-Syntax benutzt; ich habe das durch Anhängen eines Syntaxfehlers
+  an jede einzelne nachgemessen. Ein einziges `import` würde die Prüfung
+  stillschweigend wertlos machen — der Test prüft jetzt sich selbst.
+  Nächstes: Login-Pfad und Sortierung des TV-Clients.
 
 - **Iteration 65 (Loop U, drei Verdachtsfälle — Loop U abgeschlossen)** — Die
   erste Iteration dieser Nacht ohne Korrektur, und das ist das Ergebnis, nicht

@@ -149,6 +149,10 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [selectedCollectionId, setSelectedCollectionId] = useState(null);
 	const [tabIndex, setTabIndex] = useState(0);
 	const [loading, setLoading] = useState(true);
+	// Ohne die Nutzerdaten ist unbekannt, welche Einträge im Vault liegen —
+	// dann wird nichts angezeigt statt alles. Siehe den Kommentar bei
+	// setUserDataFailed unten.
+	const [userDataFailed, setUserDataFailed] = useState(false);
 	const [sortKey, setSortKey] = useState('newest');
 	const [filterText, setFilterText] = useState('');
 
@@ -205,6 +209,20 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						v.hidden = vaultSet.has(v.FilePath);
 						v.tags = tagMap[v.FilePath] || [];
 					});
+				}
+
+				// `userData` ist null, wenn /api/user/data nicht erreichbar war.
+				// Dann bleibt `v.hidden` auf jedem Eintrag undefined, und jeder
+				// Filter unten prüft `!v.hidden` — undefined ist falsy, also
+				// stünde der gesamte Vault im Raster. Auf einem Fernseher im
+				// Wohnzimmer ist das die denkbar falscheste Richtung.
+				//
+				// Derselbe Fehler steckte im Browser-Client; dort ist er in
+				// filter_engine.js behoben.
+				if (!userData) {
+					setUserDataFailed(true);
+					setLoading(false);
+					return;
 				}
 
 				setAllVideos(videosData);
@@ -316,7 +334,9 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		setTabIndex(ev.index);
 	}, []);
 
-	const subtitle = loading
+	const subtitle = userDataFailed
+		? 'Nutzerdaten nicht abrufbar'
+		: loading
 		? 'Lade Mediathek...'
 		: filterText
 			? `${videos.length} Treffer für "${filterText}"`
@@ -349,7 +369,18 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				))}
 			</div>
 
-			{!loading && (
+			{userDataFailed && (
+				<div style={{padding: ri.scale(48) + 'px', textAlign: 'center'}}>
+					<div style={{fontSize: ri.scale(24) + 'px', color: '#ff0090'}}>
+						Deine Nutzerdaten konnten nicht geladen werden.
+					</div>
+					<div style={{fontSize: ri.scale(16) + 'px', color: 'gray', marginTop: ri.scale(12) + 'px'}}>
+						Die Mediathek wird nicht angezeigt, weil sonst auch Einträge aus dem Vault sichtbar wären.
+					</div>
+				</div>
+			)}
+
+			{!loading && !userDataFailed && (
 				<TabLayout index={tabIndex} onSelect={handleTabSelect}>
 					<Tab title="Home" icon="home">
 						<div style={{overflowY: 'auto', height: '100%', padding: `${ri.scale(16)}px ${ri.scale(24)}px`, display: 'flex', flexDirection: 'column', gap: ri.scale(32) + 'px'}}>
