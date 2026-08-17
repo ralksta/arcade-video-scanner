@@ -480,6 +480,16 @@ def _handle_keep_optimized(handler) -> None:
                     db.remove(opt_abs)
                     if orig_abs != str(new_path):
                         db.remove(orig_abs)
+                        # Favoriten, Vault und Tags hängen am Pfad, und aus
+                        # `film.mkv` wird hier `film.mp4`. Ohne das Umtragen
+                        # verliert der Nutzer sie beim Behalten der
+                        # optimierten Fassung — bei einer Datei, die für ihn
+                        # dieselbe ist.
+                        try:
+                            from arcade_scanner.database.user_store import user_db
+                            user_db.remap_paths_in_user_data({orig_abs: str(new_path)})
+                        except Exception as e:
+                            print(f"⚠️ Nutzerzustand nicht übernommen ({e!r}): {orig_abs}")
 
                 db.save()
                 _get_media_cache().invalidate()

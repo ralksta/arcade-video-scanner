@@ -203,6 +203,18 @@ def _replace_media_entry(original_path: str, new_path: str, codec: str) -> None:
     from arcade_scanner.models.video_entry import VideoEntry
     db.upsert(VideoEntry(**entry_dict))
 
+    # Der Nutzerzustand hängt nicht an der Zeile in `media`, sondern am Pfad —
+    # und aus `film.mkv` wird hier `film.mp4`. Ohne diesen Schritt verliert
+    # jeder, der ein Video optimiert, dessen Favoriten-, Vault- und
+    # Tag-Zuordnung. Still: In der Oberfläche steht danach dieselbe Datei mit
+    # demselben Namen, nur ohne alles, was der Nutzer daran gemacht hat.
+    if new_path != original_path:
+        try:
+            from arcade_scanner.database.user_store import user_db
+            user_db.remap_paths_in_user_data({original_path: new_path})
+        except Exception as e:
+            print(f"⚠️ Nutzerzustand nicht übernommen ({e!r}): {original_path}")
+
 
 # ---------------------------------------------------------------------------
 # GIF-Konvertierung (früher inline Closure in do_POST)

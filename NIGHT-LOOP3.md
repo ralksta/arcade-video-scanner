@@ -504,6 +504,8 @@ nicht kontrolliert.
       - [x] Der Wiedergabe-Dialog schwieg, wenn die Datei nicht mehr da war
       - [x] TV-Client: `localStorage` an sechs Stellen ungeschützt, zwei davon
             im Rumpf der App-Komponente
+      - [x] Optimieren verlor Favoriten, Vault und Tags — `film.mkv` wird
+            `film.mp4`, und der Nutzerzustand hängt am Pfad
 
 - [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum**
       Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
@@ -518,6 +520,21 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 85 (Loop AD, Optimieren = Umzug)** — Der Fund aus Iteration 80
+  noch einmal, aber an einer Stelle, die man täglich benutzt: Beim Optimieren
+  wird aus `film.mkv` die Datei `film.mp4`. Die Zeile in `media` wird sorgfältig
+  übertragen — Größe, Codec, Aufnahmedatum. Favoriten, Vault und Tags liegen
+  aber in `users.db` am Pfad, und der ändert sich. Für den Nutzer: dieselbe
+  Datei, derselbe Name, ohne alles, was er daran gemacht hat. Zwei Stellen
+  (`_replace_media_entry` für den Fernarbeiter, `keep_optimized` für den
+  Handbetrieb) hatten denselben Mangel; der Prüfmodus ist durch Zufall heil,
+  weil die behaltene Fassung an genau den Pfad zurückkehrt, auf dem der Zustand
+  liegen geblieben ist — jetzt festgehalten, damit es nicht unbemerkt kippt.
+  Gelernt: Eine Ursache ist erst dann erledigt, wenn man alle Stellen gesucht
+  hat, an denen sich ein Pfad ändert — nicht nur die, an der man sie gefunden
+  hat. Genau dafür war der Helfer aus Iteration 80 schon da. Nächstes: Loop AD
+  schließen, dann Loop AE (Zeit).
 
 - **Iteration 84 (Loop AD, der TV-Client)** — Beim Nachsehen, wie der
   TV-Client mit einer verschwundenen Datei umgeht, stand zwei Zeilen darüber
