@@ -331,6 +331,74 @@ class TestStatusClassification:
 
 
 # ---------------------------------------------------------------------------
+# Nicht lesbare Dateien
+#
+# Schlägt die Untersuchung fehl, stand dazu eine Zeile im Protokoll und sonst
+# nichts. Bei einem Durchlauf über tausende Dateien ist die längst
+# weggescrollt, wenn der Scan fertig ist — und das Ergebnis ist leise: Ein
+# bereits bekannter Eintrag behält seine **alten** Angaben, ein neuer entsteht
+# gar nicht erst. Von aussen sieht beides aus wie „alles in Ordnung".
+#
+# Einen Status dafür gibt es nicht mehr. "CORRUPT" kommt im gesamten Code
+# nicht vor, seit die Tiefenprüfung zugunsten der Scan-Geschwindigkeit
+# entfernt wurde ("Deep decoding pass was removed to optimize scan speed",
+# media_probe.py). Die wenigen Einträge, die den Status in dieser Installation
+# noch tragen, stammen aus der Zeit davor.
+# ---------------------------------------------------------------------------
+
+class TestUnreadableFiles:
+    def test_the_scan_reports_how_many_files_it_could_not_read(self, capsys):
+        manager = ScannerManager()
+        db = FakeDB([])
+        scanner = FakeScanner([("/media/kaputt.mp4", True)])
+
+        run_scan(manager, db, scanner, make_config(), inspect_result=None)
+
+        out = capsys.readouterr().out
+        assert "1 Datei(en) konnten nicht gelesen werden" in out
+        assert "/media/kaputt.mp4" in out
+
+    def test_a_clean_scan_says_nothing_about_failures(self, capsys):
+        manager = ScannerManager()
+        db = FakeDB([])
+        scanner = FakeScanner([("/media/gut.mp4", True)])
+
+        run_scan(manager, db, scanner, make_config())
+
+        assert "konnten nicht gelesen werden" not in capsys.readouterr().out
+
+    def test_the_list_is_capped_but_says_so(self, capsys):
+        """
+        Bei einer defekten Platte wären es tausende Zeilen — die Zahl ist die
+        Nachricht, die Beispiele sind nur der Einstieg.
+        """
+        manager = ScannerManager()
+        db = FakeDB([])
+        paths = [(f"/media/kaputt_{i}.mp4", True) for i in range(15)]
+
+        run_scan(manager, db, FakeScanner(paths), make_config(), inspect_result=None)
+
+        out = capsys.readouterr().out
+        assert "15 Datei(en) konnten nicht gelesen werden" in out
+        assert "und 5 weitere" in out
+
+    def test_an_unreadable_file_leaves_the_old_entry_alone(self):
+        """
+        Festgehalten, wie es ist: Der alte Eintrag bleibt mit seinen alten
+        Angaben stehen. Ihn zu verwerfen wäre schlimmer — dann verschwände die
+        Datei aus der Bibliothek, weil sie einmal nicht lesbar war.
+        """
+        manager = ScannerManager()
+        cached = make_cached("/media/kaputt.mp4", size_mb=123.0)
+        db = FakeDB([cached])
+
+        run_scan(manager, db, FakeScanner([("/media/kaputt.mp4", True)]),
+                 make_config(), inspect_result=None)
+
+        assert db.removed == []
+
+
+# ---------------------------------------------------------------------------
 # Orphan pruning — deletes rows, so the guard conditions matter most
 # ---------------------------------------------------------------------------
 

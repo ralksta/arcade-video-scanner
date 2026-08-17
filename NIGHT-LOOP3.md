@@ -434,6 +434,24 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       `purge_thumbnails`. Alles hinter Kommandozeilen-Schaltern, alles ohne
       Netz. Der letzte löschende Bereich, den ich noch nicht angesehen habe.
 
+## Zyklus 13
+
+- [ ] **Loop Z — Bitraten-Bewertung und Optimierungs-Empfehlung** (läuft)
+      - [x] Nicht lesbare Dateien verschwanden lautlos aus der Wahrnehmung —
+            jetzt Zählung mit Beispielen am Ende des Scans
+      - [x] „CORRUPT" kommt im Code nirgends mehr vor; die Tiefenprüfung wurde
+            für Scan-Geschwindigkeit entfernt → im Bericht
+      - [ ] Offen: die Schwellenwerte selbst und der optimization_advisor
+      `Status` (OK/HIGH/SOURCE) entscheidet, was zum Optimieren vorgeschlagen
+      wird — und optimieren heisst hier: Datei ersetzen. An 8788 echten
+      Einträgen nachrechenbar.
+
+- [ ] **Loop AA — Der Scanner bei kaputten Dateien**
+      `media_probe`, `video_inspector`, `image_inspector`. Was landet in der
+      Bibliothek, wenn ffprobe nichts liefert, Unsinn liefert oder die Datei
+      abgeschnitten ist? Eine Null an der falschen Stelle wandert von dort in
+      jede Bewertung weiter.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
@@ -443,6 +461,24 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 72 (Loop Z, unlesbare Dateien)** — Eine Iteration, in der ich
+  mich fast selbst hereingelegt hätte. Die Statusverteilung zeigt 13 Einträge
+  mit „CORRUPT", und „CORRUPT" kommt im gesamten Code nicht mehr vor — die
+  Tiefenprüfung wurde für Scan-Geschwindigkeit entfernt, sagt der Kommentar in
+  `media_probe.py`. Ich prüfte, ob die 13 Dateien noch existieren: keine
+  einzige. Beinahe hätte ich das als Fund gemeldet — dann habe ich die
+  **gesamte** Bibliothek geprüft, und es sind **alle 8788**. Die Medienpfade
+  sind auf diesem Rechner schlicht nicht eingehängt. Gelernt, zum zweiten Mal
+  heute Nacht (nach den 1141 Vorschaubildern): Ein Ergebnis, das zu gut zur
+  These passt, gehört gegen die Gesamtmenge geprüft, nicht gegen die
+  Erwartung. Nebenbei hat der `unavailable_targets`-Schutz im Scanner damit
+  seine Berechtigung eindrücklich bewiesen.
+  Der echte Fund: Schlägt die Untersuchung fehl, steht dazu eine Zeile im
+  Protokoll — bei tausenden Dateien längst weggescrollt, wenn der Scan fertig
+  ist. Und das Ergebnis ist leise: Ein bekannter Eintrag behält seine **alten**
+  Angaben, ein neuer entsteht gar nicht. Jetzt zählt der Scan sie und nennt sie
+  am Ende. Nächstes: die Schwellenwerte und der optimization_advisor.
 
 - **Iteration 71 (Loop Y, Wartungsfunktionen — Loop Y abgeschlossen)** — Drei
   Funde in 91 Zeilen, die vorher keinen Test hatten und Dateien löschen. Der

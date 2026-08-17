@@ -94,6 +94,18 @@ class ScannerManager:
         discovery_complete = True
 
         processed_count = 0
+        # Dateien, die der Scan nicht lesen konnte. Bisher stand dazu je eine
+        # Zeile im Protokoll und sonst nichts: Wer nicht mitliest, erfährt nie,
+        # dass etwas fehlt. Und fehlen tut es leise — ein bereits bekannter
+        # Eintrag behält seine alten Angaben, ein neuer entsteht gar nicht
+        # erst.
+        #
+        # Einen Status dafür gibt es nicht mehr: "CORRUPT" kommt im gesamten
+        # Code nicht vor, seit die Tiefenprüfung zugunsten der
+        # Scan-Geschwindigkeit entfernt wurde (media_probe.py). Die wenigen
+        # Einträge, die ihn in der Datenbank noch tragen, stammen aus der Zeit
+        # davor. Deshalb hier wenigstens eine Zählung mit Beispielen.
+        failed_paths: List[str] = []
         batch_entries: List[Any] = []
 
         # 2. Worker Queue Pattern
@@ -239,6 +251,7 @@ class ScannerManager:
                     entry = None
 
                 if not entry:
+                    failed_paths.append(path)
                     print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
                 else:
                     parent_dir = os.path.basename(os.path.dirname(path)).lower()
@@ -340,6 +353,17 @@ class ScannerManager:
                 if removed_count > 0:
                     print(f"🗑 Removed {removed_count} files (deleted or now excluded), "
                           f"{thumbs_removed} thumbnails.")
+
+            if failed_paths:
+                # Am Ende, wo die Zusammenfassung steht — die Einzelzeilen sind
+                # bei einem Durchlauf über tausende Dateien längst
+                # weggescrollt.
+                print(f"⚠️ {len(failed_paths)} Datei(en) konnten nicht gelesen werden. "
+                      "Ihre Angaben in der Bibliothek sind entweder alt oder fehlen ganz:")
+                for path in failed_paths[:10]:
+                    print(f"   {path}")
+                if len(failed_paths) > 10:
+                    print(f"   … und {len(failed_paths) - 10} weitere")
 
             # Save scan timestamp for incremental scanning
             fs_scanner.save_last_scan_time()
