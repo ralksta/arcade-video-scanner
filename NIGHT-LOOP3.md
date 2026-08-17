@@ -366,10 +366,11 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       Datei verschwindet? Und was passiert bei einem Pfad, der kein gültiger
       Dateiname ist?
 
-- [ ] **Loop U — Der Filter im Frontend** (läuft)
+- [x] **Loop U — Der Filter im Frontend**
       - [x] Ein Fehler beim Laden der Nutzerdaten breitete den **gesamten
             Vault** in der normalen Ansicht aus
-      - [ ] Offen: Paarbildung im „Optimiert"-Modus, `_opt`-Erkennung
+      - [x] Paarbildung und `_opt`-Erkennung nachgemessen: **nichts zu
+            ändern**, Messungen als Tests festgehalten
       `filter_engine.js` entscheidet, was der Nutzer überhaupt sieht — ein
       Fehler dort versteckt Dateien, ohne dass irgendwo etwas fehlt. Über den
       node-Kontext ausführbar, also messbar statt gelesen.
@@ -383,6 +384,24 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 65 (Loop U, drei Verdachtsfälle — Loop U abgeschlossen)** — Die
+  erste Iteration dieser Nacht ohne Korrektur, und das ist das Ergebnis, nicht
+  ein Ausbleiben davon. Drei Stellen sahen nach Fehlern aus: Die Paarbildung
+  überschreibt gleiche Stämme in einer Map (folgenlos — aus zwei Dateien ohne
+  `_opt`-Suffix entsteht ohnehin kein Paar). Die `_opt`-Erkennung sucht im
+  ganzen Pfad statt im Dateinamen (an der echten Bibliothek nachgezählt: 94
+  Treffer, alle im Dateinamen, kein einziger über einen Ordner; zwei ohne
+  Suffix-Bedeutung — enger zu fassen hiesse zu entscheiden, was „optimiert"
+  heisst, und das steht Ralf zu). Und die Spalten `vaulted`/`favorite` in der
+  Medientabelle tragen die Aliasse `hidden`/`favorite`, also genau die Namen,
+  die das Frontend pro Nutzer überschreibt — das sah nach einem Leck zwischen
+  Konten aus, alle 8788 Zeilen tragen dort aber 0. Gelernt: Der Unterschied
+  zwischen „sieht falsch aus" und „ist falsch" kostet jedes Mal eine Messung,
+  und ohne sie hätte ich hier dreimal etwas verschlimmbessert. Die Messungen
+  stehen als Tests da, damit sie niemand ein zweites Mal machen muss — der zu
+  `vaulted`/`favorite` schlägt an, sobald jemand anfängt, dorthin zu
+  schreiben. Nächstes: Zyklus 11 planen.
 
 - **Iteration 64 (Loop U, Vault-Sichtbarkeit)** — `loadUserData()` setzt
   `v.hidden` aus `/api/user/data`. Schlägt der Aufruf fehl, protokolliert die
