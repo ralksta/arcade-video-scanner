@@ -532,6 +532,8 @@ nicht kontrolliert.
       die Schreibpfade in der Benutzerdatenbank abgesichert; offen ist der
       Rest: gleichzeitige Scans, gleichzeitige Optimierungen derselben Datei,
       der geteilte Zwischenspeicher, gleichzeitige Anmeldungen.
+      - [x] Eine Änderung während einer laufenden Anfrage ging verloren — der
+            `/api/videos`-Cache hat keine Verfallszeit, also für immer
 
 - [ ] **Loop AG — Die Grenzen: leer, eins, sehr viele**
       Was zeigt die Oberfläche bei null Einträgen, was bei einem, was bei
@@ -547,6 +549,22 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 91 (Loop AF, die verlorene Invalidierung)** — `_MediaCache.get()`
+  liest die Datenbank außerhalb des Locks — richtig so — und legte das Ergebnis
+  danach bedingungslos ab. Passiert dazwischen ein `invalidate()`, ist es
+  wirkungslos: Der überholte Stand landet trotzdem im Cache. Für den
+  Medien-Cache heißt das 30 Sekunden alte Daten, für den daraus abgeleiteten
+  `/api/videos`-Cache **für immer** — der hat keine Verfallszeit, er lebt
+  allein von der Invalidierung. Genau die Umgebung, in der das eintritt, ist
+  der Haushalt: Der Fernseher fragt regelmäßig ab, während im Browser gelöscht
+  oder optimiert wird. Behoben mit einem Zähler, der jede Invalidierung
+  mitzählt; wer beim Lesen überholt wurde, legt nichts ab und die Antwort geht
+  trotzdem hinaus. Gelernt: Ein Lesevorgang außerhalb des Locks ist nicht das
+  Problem — das bedingungslose *Zurückschreiben* danach ist es. Und ein Cache
+  ohne Verfallszeit macht aus einem kurzen Fehler einen dauerhaften. Nächstes:
+  weiter in Loop AF — gleichzeitige Scans und gleichzeitige Optimierung
+  derselben Datei.
 
 - **Iteration 90 (Loop AE abgeschlossen, die ungenutzte Antwort)** — Die
   Alters-Spalte der Warteschlange hörte bei Stunden auf; ein Auftrag vom April

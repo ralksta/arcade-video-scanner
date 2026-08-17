@@ -65,6 +65,10 @@ class _MediaCache:
         self._lock = threading.Lock()
         self._data: list | None = None
         self._timestamp: float = 0.0
+        # Zählt jede Invalidierung mit. Wer außerhalb des Locks liest, kann
+        # damit hinterher feststellen, ob sich die Datenlage inzwischen
+        # geändert hat — siehe get_with_version().
+        self._version: int = 0
         # Caches, die aus diesen Daten abgeleitet sind und darum gemeinsam
         # verfallen müssen.
         self._dependents: list = []
@@ -81,22 +85,52 @@ class _MediaCache:
 
     def get(self) -> list:
         """Gibt gecachte Resultate zurück (max. TTL alt) oder liest frisch aus DB."""
+        return self.get_with_version()[1]
+
+    def get_with_version(self) -> tuple[int, list]:
+        """Wie ``get()``, dazu der Stand, aus dem die Daten stammen.
+
+        Der Lesevorgang läuft absichtlich **außerhalb** des Locks — sonst
+        stünde jede andere Anfrage währenddessen. Genau darin lag aber ein
+        Fehler: Wird zwischen dem Lesen und dem Zurückschreiben etwas
+        geändert, landete der veraltete Stand trotzdem im Cache, und die
+        Invalidierung dazwischen war wirkungslos.
+
+            Anfrage A: get() → Cache leer → liest die Datenbank
+            Anfrage B: löscht eine Datei → invalidate()
+            Anfrage A: schreibt das *alte* Ergebnis in den Cache
+
+        Für diesen Cache hieß das bis zu 30 Sekunden alte Daten. Für den
+        daraus abgeleiteten ``/api/videos``-Cache hieß es **für immer**: Der
+        hat keine Verfallszeit, er lebt allein von der Invalidierung.
+
+        Der Zähler macht das entscheidbar: Ist er nach dem Lesen ein anderer,
+        wird nichts abgelegt. Die Antwort selbst geht trotzdem hinaus — sie
+        ist dann eben so alt wie der Augenblick, in dem sie begonnen wurde.
+        """
         now = time.monotonic()
         with self._lock:
             if self._data is not None and (now - self._timestamp) < self.TTL:
-                return self._data
+                return self._version, self._data
+            version = self._version
         # Cache-Miss: außerhalb des Locks lesen um Blocking zu minimieren
         fresh = db.get_all_dicts()
         with self._lock:
-            self._data = fresh
-            self._timestamp = time.monotonic()
-        return fresh
+            if version == self._version:
+                self._data = fresh
+                self._timestamp = time.monotonic()
+        return version, fresh
+
+    def version(self) -> int:
+        with self._lock:
+            return self._version
 
     def invalidate(self) -> None:
         """Muss nach jeder Schreiboperation aufgerufen werden."""
         with self._lock:
             self._data = None
             self._timestamp = 0.0
+            self._version += 1
         # Außerhalb des eigenen Locks, damit sich die Locks nicht verschränken.
         for dependent in self._dependents:
             dependent.invalidate()
@@ -123,19 +157,34 @@ class _VideosResponseCache:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._entries: dict[tuple, tuple[bytes, bytes]] = {}
+        # key -> (raw, gzipped, version), wobei `version` der Stand des
+        # Medien-Caches ist, aus dem die Antwort gebaut wurde.
+        self._entries: dict[tuple, tuple[bytes, bytes, int]] = {}
 
-    def get(self, key: tuple) -> tuple[bytes, bytes] | None:
-        """Liefert ``(raw, gzipped)`` oder None."""
+    def get(self, key: tuple, version: int | None = None) -> tuple[bytes, bytes] | None:
+        """Liefert ``(raw, gzipped)`` oder None.
+
+        Mit ``version`` wird nur geliefert, was aus genau diesem Stand stammt.
+        Dieser Cache hat keine Verfallszeit — er lebt allein von der
+        Invalidierung. Ein Eintrag, der aus einem überholten Stand hineingeriet
+        (siehe ``_MediaCache.get_with_version``), bliebe deshalb **für immer**
+        stehen.
+        """
         with self._lock:
-            return self._entries.get(key)
+            entry = self._entries.get(key)
+            if entry is None:
+                return None
+            raw, gzipped, entry_version = entry
+            if version is not None and version != entry_version:
+                return None
+            return raw, gzipped
 
-    def put(self, key: tuple, raw: bytes, gzipped: bytes) -> None:
+    def put(self, key: tuple, raw: bytes, gzipped: bytes, version: int = 0) -> None:
         with self._lock:
             if len(self._entries) >= self.MAX_ENTRIES:
                 # Ältesten Eintrag verwerfen (dict behält Einfügereihenfolge).
                 self._entries.pop(next(iter(self._entries)))
-            self._entries[key] = (raw, gzipped)
+            self._entries[key] = (raw, gzipped, version)
 
     def invalidate(self) -> None:
         """Muss nach jeder Schreiboperation auf der Medien-Tabelle laufen."""
@@ -858,7 +907,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 # serialisiert und komprimiert vor, sparen wir uns json.dumps
                 # und gzip komplett (zusammen ~90 ms bei 8788 Einträgen).
                 cache_key = (tuple(user_targets), bool(u.is_admin))
-                cached = _videos_response_cache.get(cache_key)
+                cached = _videos_response_cache.get(cache_key, _media_cache.version())
                 if cached is not None:
                     send_json_precompressed(self, cached[0], cached[1])
                     return
@@ -866,7 +915,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"🔍 API Debug: User '{user_name}' targets: {user_targets}")
 
                 filtered_videos = []
-                all_entries = _media_cache.get()
+                media_version, all_entries = _media_cache.get_with_version()
 
                 # ADMIN OVERRIDE: If no targets defined, Admin sees all.
                 if not user_targets and u.is_admin:
@@ -893,7 +942,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 # Requests mit gleichem Target-Satz wiederverwenden.
                 raw = json.dumps(filtered_videos, default=str).encode("utf-8")
                 gzipped = gzip.compress(raw, compresslevel=6)
-                _videos_response_cache.put(cache_key, raw, gzipped)
+                _videos_response_cache.put(cache_key, raw, gzipped, media_version)
                 send_json_precompressed(self, raw, gzipped)
 
             elif self.path == "/api/debug/dump":
