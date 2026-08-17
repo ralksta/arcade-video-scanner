@@ -72,6 +72,22 @@ def run_auto_tag_rules(username: str, *, user_db: Any, media_db: Any,
         counts[rule_id] = len(newly)
 
     if changed:
+        # Bewusst `add_user()` und nicht `update_user()`.
+        #
+        # Der Lauf liest den Nutzer ganz oben, geht dann über die gesamte
+        # Bibliothek und schreibt hier zurück. Dieses Fenster mit einer Sperre
+        # zu schliessen hiesse, sie über einen kompletten Durchlauf zu halten —
+        # jede Anfrage aus dem Browser stünde so lange still.
+        #
+        # `update_user()` mit einem Änderer, der die Felder aus diesem Objekt
+        # in den frisch gelesenen kopiert, sähe nach einer Lösung aus, ist aber
+        # keine: Er würde die zwischenzeitliche Änderung eines Nutzers
+        # trotzdem überschreiben, nur weniger sichtbar.
+        #
+        # Was hier stattdessen gilt: Der Lauf startet nach dem Scan, also zu
+        # einem Zeitpunkt, an dem üblicherweise niemand zusieht. Und er hängt
+        # Tags an, statt Felder zu ersetzen. Wer das sauber lösen will, braucht
+        # ein Schreiben pro Pfad statt eines Schreibens pro Lauf.
         user_db.add_user(user)  # upsert; exactly one write per run
     return counts
 

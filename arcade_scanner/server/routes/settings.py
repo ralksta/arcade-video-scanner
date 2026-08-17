@@ -81,6 +81,21 @@ def handle_post_settings(handler) -> None:
     """Save global config and user-specific overrides, then schedule report rebuild."""
     config, user_db, report_debouncer, MAX_REQUEST_SIZE = _get_singletons()
 
+    # Sitzungsprüfung vor allem anderen.
+    #
+    # Sie stand bisher *hinter* `config.save(new_settings)` — eine anonyme
+    # Anfrage konnte also die globalen Einstellungen schreiben (Scan-Schwellen,
+    # ffmpeg-Pfade, proxy_root, review_dir) und scheiterte erst danach still am
+    # fehlenden Nutzer. Es gibt kein globales Auth-Gate in diesem Server; jede
+    # Route prüft selbst, und diese prüfte zu spät.
+    #
+    # Der Mangel war seit einem früheren Nachtlauf als xfail in
+    # tests/test_routes_settings.py dokumentiert und ungefixt geblieben.
+    user_name = handler.get_current_user()
+    if not user_name:
+        handler.send_error(401, "Unauthorized")
+        return
+
     try:
         content_length = int(handler.headers.get("Content-Length", 0))
         if content_length > MAX_REQUEST_SIZE:
@@ -106,37 +121,28 @@ def handle_post_settings(handler) -> None:
         user_sensitive_collections = new_settings.pop("sensitive_collections", None)
 
         if config.save(new_settings):
-            user_name = handler.get_current_user()
             if user_name:
-                u = user_db.get_user(user_name)
-                if u:
-                    modified = False
-                    if user_collections is not None:
-                        u.data.smart_collections = user_collections
-                        modified = True
-                    if user_targets is not None:
-                        u.data.scan_targets = user_targets
-                        modified = True
-                    if user_excludes is not None:
-                        u.data.exclude_paths = user_excludes
-                        modified = True
-                    if user_tags is not None:
-                        u.data.available_tags = user_tags
-                        modified = True
-                    if user_scan_images is not None:
-                        u.data.scan_images = user_scan_images
-                        modified = True
-                    if user_sensitive_dirs is not None:
-                        u.data.sensitive_dirs = user_sensitive_dirs
-                        modified = True
-                    if user_sensitive_tags is not None:
-                        u.data.sensitive_tags = user_sensitive_tags
-                        modified = True
-                    if user_sensitive_collections is not None:
-                        u.data.sensitive_collections = user_sensitive_collections
-                        modified = True
-                    if modified:
-                        user_db.add_user(u)
+                # Über update_user(): Der Datensatz wird als Ganzes
+                # zurückgeschrieben, eine gleichzeitige Anfrage desselben
+                # Kontos verwürfe sonst die Änderung der jeweils anderen.
+                changes = {
+                    "smart_collections": user_collections,
+                    "scan_targets": user_targets,
+                    "exclude_paths": user_excludes,
+                    "available_tags": user_tags,
+                    "scan_images": user_scan_images,
+                    "sensitive_dirs": user_sensitive_dirs,
+                    "sensitive_tags": user_sensitive_tags,
+                    "sensitive_collections": user_sensitive_collections,
+                }
+                pending = {k: v for k, v in changes.items() if v is not None}
+
+                if pending:
+                    def apply_settings(u):
+                        for field, value in pending.items():
+                            setattr(u.data, field, value)
+
+                    user_db.update_user(user_name, apply_settings)
 
             # Schedule HTML report regeneration (picks up theme changes, etc.)
             try:
@@ -261,11 +267,6 @@ def handle_post_setup_complete(handler) -> None:
             handler.send_error(401)
             return
 
-        u = user_db.get_user(user_name)
-        if not u:
-            handler.send_error(401)
-            return
-
         scan_targets = payload.get("scan_targets", [])
         scan_images  = payload.get("scan_images", False)
 
@@ -273,10 +274,14 @@ def handle_post_setup_complete(handler) -> None:
             handler.send_error(400, "At least one scan target required")
             return
 
-        u.data.scan_targets   = scan_targets
-        u.data.scan_images    = scan_images
-        u.data.setup_complete = True
-        user_db.add_user(u)
+        def finish_setup(u):
+            u.data.scan_targets   = scan_targets
+            u.data.scan_images    = scan_images
+            u.data.setup_complete = True
+
+        if not user_db.update_user(user_name, finish_setup):
+            handler.send_error(401)
+            return
 
         print(f"✅ Setup completed for {user_name}: {scan_targets}")
 

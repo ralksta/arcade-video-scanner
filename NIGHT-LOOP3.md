@@ -393,11 +393,15 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       Abweichungen fallen nicht auf, weil niemand beide Clients nebeneinander
       hält. Über node ausführbar.
 
-- [ ] **Loop W — Nebenläufigkeit im Server** (läuft)
+- [x] **Loop W — Nebenläufigkeit im Server**
       - [x] Gleichzeitige Anfragen desselben Kontos verwarfen einander:
             60 gesetzt, **4 angekommen**
       - [x] Geteilte SQLite-Verbindung geprüft: alle 67 Zugriffe sind gedeckt
-      - [ ] Offen: Tags, Einstellungen, Auto-Tag-Regeln auf `update_user()`
+      - [x] Tags, Einstellungen und Auto-Tag-Regeln umgestellt; der
+            Auto-Tagger bleibt bewusst außen vor, mit Begründung im Code
+      - [x] **Nebenbei behoben:** `POST /api/settings` schrieb die globalen
+            Einstellungen *vor* der Sitzungsprüfung — seit einem früheren
+            Nachtlauf als xfail dokumentiert und liegengeblieben
       Eine geteilte SQLite-Verbindung hinter einem wiedereintrittsfähigen
       Lock, dazu ein ThreadingTCPServer. Der letzte grosse Bereich, in dem ein
       Fehler nicht falsch aussieht, sondern selten.
@@ -411,6 +415,27 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 69 (Loop W, die übrigen Wege — Loop W abgeschlossen)** — Tags,
+  Einstellungen und Auto-Tag-Regeln laufen jetzt ebenfalls über `update_user()`.
+  Zwei davon prüfen vor dem Schreiben und antworten mit einem Fehler („Tag gibt
+  es schon", „Regel nicht gefunden"); diese Prüfungen gehören mit unter die
+  Sperre, sonst stellen zwei gleichzeitige Anfragen beide fest, dass es den Tag
+  noch nicht gibt. Der **Auto-Tagger** bleibt bei `add_user()`, und das ist die
+  Entscheidung, nicht die Bequemlichkeit: Er liest oben, geht über die gesamte
+  Bibliothek und schreibt unten — das Fenster mit einer Sperre zu schliessen
+  hiesse, sie über einen kompletten Durchlauf zu halten. Mein erster Versuch
+  kopierte die Felder in einem Änderer zusammen; das sah aus wie eine Lösung
+  und hätte eine zwischenzeitliche Änderung genauso überschrieben, nur
+  unsichtbarer. Zurückgenommen und die Begründung hingeschrieben.
+  Beim Umbau fielen **drei Test-Attrappen** auf, die `update_user()` nicht
+  kannten: MagicMock gibt stumm etwas Wahres zurück, der Änderer läuft nie —
+  die Tests wären grün geblieben, ohne die Route zu prüfen. Jetzt gibt es
+  `tests/fake_user_store.py` als eine Stelle dafür.
+  Und beim Anfassen von `settings.py` stand dort ein xfail aus einem früheren
+  Nachtlauf: `POST /api/settings` schrieb die globalen Einstellungen *vor* der
+  Sitzungsprüfung. Der Befund stimmte und war nie behoben worden — jetzt schon.
+  Nächstes: Zyklus 12 planen.
 
 - **Iteration 68 (Loop W, verlorene Änderungen)** — Die geteilte
   SQLite-Verbindung habe ich per AST durchgezählt: 67 Zugriffe, 27 davon ohne

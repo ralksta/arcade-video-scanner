@@ -3,6 +3,8 @@
 import json
 from unittest.mock import MagicMock, patch
 
+from fake_user_store import make_fake_user_db
+
 from arcade_scanner.models.user import User, UserVideoData
 from arcade_scanner.server.routes import autotag
 
@@ -62,8 +64,9 @@ def _rule(rule_id="r1", tag="gopro", enabled=True):
 
 def run(handler, user=None, media_db=None, post=False):
     user = user if user is not None else _user()
-    user_db = MagicMock()
-    user_db.get_user.return_value = user
+    # Die Attrappe muss `update_user()` wirklich ausführen — sonst prüfen die
+    # Tests darunter nichts mehr. Siehe tests/fake_user_store.py.
+    user_db, user = make_fake_user_db(user)
     media_db = media_db or MagicMock()
     with patch.object(autotag, "_get_deps", return_value=(media_db, user_db)):
         handled = autotag.handle_post(handler) if post else autotag.handle_get(handler)

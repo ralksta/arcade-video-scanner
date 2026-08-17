@@ -31,6 +31,7 @@ mitbenutzt, und dort stimmt sie. Geprüft wird beim **Anlegen** der Regel.
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fake_user_store import make_fake_user_db
 
 from arcade_scanner.core.criteria_eval import narrows_the_selection, video_matches
 
@@ -163,8 +164,7 @@ def _post(handler_body, route_module):
 
     user = MagicMock()
     user.data.auto_tag_rules = []
-    user_db = MagicMock()
-    user_db.get_user.return_value = user
+    user_db, user = make_fake_user_db(user)
 
     with patch.object(route_module, "_get_deps",
                       return_value=(MagicMock(), user_db)):

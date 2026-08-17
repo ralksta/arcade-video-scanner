@@ -225,7 +225,11 @@ def test_settings_written_per_user_would_be_overwritten_by_an_empty_list():
     settings_py = (ROUTES / "settings.py").read_text(encoding="utf-8")
 
     assert 'new_settings.pop("scan_targets", None)' in settings_py
-    assert "if user_targets is not None:" in settings_py
+    # Die Unterscheidung „nicht angegeben" (None) gegen „leer" ([]) steckt seit
+    # dem Umbau auf update_user() in dieser Filterzeile statt in acht
+    # `if ... is not None:`-Blöcken. Die Bedeutung ist dieselbe: None fällt
+    # weg, eine leere Liste wird durchgeschrieben.
+    assert "if v is not None" in settings_py
 
 
 def test_the_import_button_is_recorded_as_unfinished():

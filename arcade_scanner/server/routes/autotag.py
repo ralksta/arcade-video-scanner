@@ -76,32 +76,48 @@ def handle_post(handler) -> bool:
             rule = {"id": uuid.uuid4().hex,
                     "name": str(body.get("name") or tag),
                     "tag": tag, "criteria": criteria, "enabled": True}
-            u.data.auto_tag_rules.append(rule)
-            user_db.add_user(u)
+            # Über update_user(): Der Datensatz wird als Ganzes zurückgeschrieben,
+            # eine gleichzeitige Anfrage desselben Kontos verwürfe sonst die
+            # Änderung der jeweils anderen.
+            user_db.update_user(user_name, lambda usr: usr.data.auto_tag_rules.append(rule))
             send_json(handler, {"success": True, "rule": rule})
             return True
 
         if action == "delete":
             rule_id = str(body.get("id") or "")
-            before = len(u.data.auto_tag_rules)
-            u.data.auto_tag_rules = [r for r in u.data.auto_tag_rules if r.get("id") != rule_id]
-            if len(u.data.auto_tag_rules) == before:
+            outcome = {"removed": False}
+
+            def drop_rule(usr):
+                before = len(usr.data.auto_tag_rules)
+                usr.data.auto_tag_rules = [
+                    r for r in usr.data.auto_tag_rules if r.get("id") != rule_id
+                ]
+                outcome["removed"] = len(usr.data.auto_tag_rules) != before
+
+            user_db.update_user(user_name, drop_rule)
+            if not outcome["removed"]:
                 handler.send_error(404, "Rule not found")
                 return True
             media_db.clear_auto_tag_applied(user_name, rule_id)
-            user_db.add_user(u)
             send_json(handler, {"success": True})
             return True
 
         if action == "toggle":
             rule_id = str(body.get("id") or "")
-            for r in u.data.auto_tag_rules:
-                if r.get("id") == rule_id:
-                    r["enabled"] = bool(body.get("enabled"))
-                    user_db.add_user(u)
-                    send_json(handler, {"success": True, "rule": r})
-                    return True
-            handler.send_error(404, "Rule not found")
+            outcome = {"rule": None}
+
+            def flip(usr):
+                for r in usr.data.auto_tag_rules:
+                    if r.get("id") == rule_id:
+                        r["enabled"] = bool(body.get("enabled"))
+                        outcome["rule"] = r
+                        break
+
+            user_db.update_user(user_name, flip)
+            if outcome["rule"] is None:
+                handler.send_error(404, "Rule not found")
+                return True
+            send_json(handler, {"success": True, "rule": outcome["rule"]})
             return True
 
         handler.send_error(400, "Unknown action")

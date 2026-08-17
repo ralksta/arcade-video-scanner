@@ -23,17 +23,15 @@ def handle_get(handler) -> bool:
         if action == "delete":
             tag_name = params.get("name", [None])[0]
             if tag_name:
-                 u = user_db.get_user(user_name)
-                 if u:
-                     current_tags = list(u.data.available_tags)
-                     updated_tags = [t for t in current_tags if t.get("name") != tag_name]
-                     u.data.available_tags = updated_tags
-
+                 def drop_tag(u):
+                     u.data.available_tags = [
+                         t for t in u.data.available_tags if t.get("name") != tag_name
+                     ]
                      for path, tags in u.data.tags.items():
                          if tag_name in tags:
                              u.data.tags[path] = [t for t in tags if t != tag_name]
 
-                     user_db.add_user(u)
+                 if user_db.update_user(user_name, drop_tag):
                      print(f"🏷️ Deleted tag for user {user_name}: {tag_name}")
 
                  send_json(handler, {"success": True})
@@ -78,21 +76,27 @@ def handle_post(handler) -> bool:
                 handler.send_error(401, "Unauthorized")
                 return True
 
-            u = user_db.get_user(user_name)
-            if not u:
+            # Die Prüfung auf einen bereits vorhandenen Namen gehört mit unter
+            # die Sperre: Getrennt gelesen könnten zwei gleichzeitige Anfragen
+            # beide „gibt es noch nicht" feststellen und den Tag doppelt
+            # anlegen.
+            outcome = {"duplicate": False}
+            new_tag = {"name": tag_name, "color": tag_color}
+
+            def add_tag(u):
+                existing = [t.get("name", "").lower() for t in u.data.available_tags]
+                if tag_name.lower() in existing:
+                    outcome["duplicate"] = True
+                    return
+                u.data.available_tags.append(new_tag)
+
+            if not user_db.update_user(user_name, add_tag):
                 handler.send_error(404, "User not found")
                 return True
 
-            current_tags = u.data.available_tags
-            existing_names = [t.get("name", "").lower() for t in current_tags]
-
-            if tag_name.lower() in existing_names:
+            if outcome["duplicate"]:
                 handler.send_error(409, "Tag already exists")
                 return True
-
-            new_tag = {"name": tag_name, "color": tag_color}
-            u.data.available_tags.append(new_tag)
-            user_db.add_user(u)
 
             print(f"🏷️ Created tag: {tag_name} ({tag_color})")
             handler.send_response(201)
@@ -131,10 +135,10 @@ def handle_post(handler) -> bool:
                  return True
 
             abs_path = os.path.abspath(video_path)
-            u = user_db.get_user(user_name)
-            if u:
+            def set_tags(u):
                 u.data.tags[abs_path] = tags
-                user_db.add_user(u)
+
+            if user_db.update_user(user_name, set_tags):
                 print(f"Updated tags for {user_name} on {os.path.basename(abs_path)}: {tags}")
 
             handler.send_response(200)
@@ -162,23 +166,22 @@ def handle_post(handler) -> bool:
                 handler.send_error(400, "Missing tag name")
                 return True
 
-            u = user_db.get_user(user_name)
-            if not u:
+            outcome = {"found": False}
+
+            def set_shortcut(u):
+                for tag in u.data.available_tags:
+                    if tag.get("name") == tag_name:
+                        tag["shortcut"] = new_shortcut
+                        outcome["found"] = True
+                        break
+
+            if not user_db.update_user(user_name, set_shortcut):
                 handler.send_error(404, "User not found")
                 return True
 
-            tag_found = False
-            for tag in u.data.available_tags:
-                if tag.get("name") == tag_name:
-                    tag["shortcut"] = new_shortcut
-                    tag_found = True
-                    break
-
-            if not tag_found:
+            if not outcome["found"]:
                 handler.send_error(404, "Tag not found")
                 return True
-
-            user_db.add_user(u)
 
             handler.send_response(200)
             handler.send_header("Content-Type", "application/json")

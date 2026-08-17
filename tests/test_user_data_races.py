@@ -202,9 +202,11 @@ def test_the_remaining_routes_are_listed_as_open():
 
     base = Path(__file__).parent.parent / "arcade_scanner"
     still_open = {
-        "server/routes/tags.py",
-        "server/routes/settings.py",
-        "server/routes/autotag.py",
+        # Bewusst so, nicht vergessen: Der Auto-Tagger liest den Nutzer, geht
+        # dann über die gesamte Bibliothek und schreibt am Ende zurück. Dieses
+        # Fenster mit einer Sperre zu schliessen hiesse, sie über einen
+        # kompletten Durchlauf zu halten — jede Anfrage stünde so lange still.
+        # Die Begründung steht ausführlich im Code.
         "core/auto_tagger.py",
     }
 
@@ -213,3 +215,24 @@ def test_the_remaining_routes_are_listed_as_open():
         assert "add_user(" in source, (
             f"{rel} schreibt nicht mehr einzeln — Eintrag aus der Liste nehmen"
         )
+
+
+def test_the_converted_routes_no_longer_write_directly():
+    """
+    Die Gegenrichtung: Wer hier wieder `add_user()` einbaut, umgeht die Sperre
+    und verliert bei gleichzeitigen Anfragen Änderungen.
+    """
+    from pathlib import Path
+
+    base = Path(__file__).parent.parent / "arcade_scanner"
+
+    for rel in ("server/routes/files.py", "server/routes/tags.py",
+                "server/routes/settings.py", "server/routes/autotag.py"):
+        source = (base / rel).read_text(encoding="utf-8")
+        code = "\n".join(
+            ln for ln in source.splitlines() if not ln.lstrip().startswith("#")
+        )
+        assert "user_db.add_user(" not in code, (
+            f"{rel} schreibt wieder einzeln statt über update_user()"
+        )
+        assert "user_db.update_user(" in code
