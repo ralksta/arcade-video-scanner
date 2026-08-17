@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 85 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 1886** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 88 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 1910** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -118,6 +118,12 @@ Route zu bauen, ist deine Wahl; beides wäre besser als der jetzige Zustand.
 Passwort `admin` und Admin-Rechten an, sobald kein Nutzer dieses Namens
 existiert (`user_store.py:25`, `create_default_admin`). Das heißt auch: Löschst
 du es je, ist es beim nächsten Start wieder da.
+
+**Richtigstellung gegenüber einer früheren Fassung dieses Berichts:** Der
+Einrichtungsassistent verschweigt das nicht. Er schreibt beim Einrichten
+ausdrücklich hin: „Default password: admin (change this after first login!)".
+Erzwungen wird der Wechsel allerdings nicht, und nach einem eigenen
+Admin-Passwort fragt der Assistent nie — für zusätzliche Konten tut er es.
 
 Ob das bei dir noch das gesetzte Passwort ist, kannst du in einem Satz prüfen —
 melde dich mit `admin`/`admin` an. Ich habe es **nicht** nachgesehen: Der
@@ -301,6 +307,20 @@ Der Vollständigkeit halber, weil es das Vertrauen in den Rest kalibriert:
   Muster war zu streng; es waren zwei, und beide korrekt.
 - Eine Analyse meldete **sechs weggeworfene `save()`-Rückgabewerte** — es waren
   `db.save()`-Aufrufe (dokumentierter No-Op), nicht `config.save()`.
+- **Ein Test von mir hat in deine `users.db` geschrieben.** Aufgefallen ist es
+  der mtime-Prüfung, die ich nach jeder Iteration laufen lasse. Ursache:
+  `apply_configuration()` holt sich `user_db` *innerhalb* ihres Rumpfes aus dem
+  Modul, und diese Instanz zeigt seit dem Import auf dein echtes
+  Datenverzeichnis — ein Patch der Konfiguration erreicht sie nicht. Ich habe
+  die Daten sofort nachgeprüft: unversehrt, dieselben Zahlen wie bei der
+  Messung Stunden vorher (9 Favoriten, 1 Vault-Marke, 93 Tags, 6
+  Tag-Definitionen, Ziele `/media` und `/media_nas`). Es war ein identisches
+  Neuschreiben derselben Zeile. In `conftest.py` steht jetzt eine Sperre, die
+  so einen Zugriff sofort scheitern lässt — das Gegenstück zu der für den
+  Report-Debouncer.
+- Ich hatte das Standardpasswort `admin` im Bericht als verstecktes Problem
+  beschrieben. Der Assistent sagt es ausdrücklich an und fordert zum Wechsel
+  auf; oben richtiggestellt.
 - Mein Auth-Durchlauf meldete `/api/settings/remove-photos` als ungeschützt. Die
   Prüfung steht im delegierten Handler; ich habe den Test genauer gemacht statt
   die Meldung wegzudrücken.
