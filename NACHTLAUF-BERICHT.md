@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 63 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 1710** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 66 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 1733** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -179,6 +179,28 @@ bekannt, wofür `~` steht.
 - Vier stille Fehlerpfade hörbar gemacht; 19 von 63 `fetch`-Aufrufen im
   Frontend hatten keinen Fehlerpfad, davon mehrere mit optimistischem
   UI-Update ohne Rollback.
+
+---
+
+## Die Warteschlange (behoben)
+
+Das ist der einzige Teil des Produkts, der **Dateien ersetzt**. Entsprechend
+sind das die teuersten Fehler dieser Nacht.
+
+| Fund | Auswirkung |
+|---|---|
+| Die fertige Umwandlung konnte eine **fremde Datei überschreiben** | Der Optimierer schreibt immer `.mp4`. Aus `film.mkv` wird `film.mp4` — liegt daneben schon eine, ist sie danach ersatzlos weg. `os.replace` und `os.rename` schweigen dazu. Zweiter Weg: zwei Quellen mit gleichem Stamm (`film.mkv`, `film.avi`) in derselben Warteschlange — die zweite Umwandlung überschreibt die erste, und beide Originale sind dann schon gelöscht. **In deiner Bibliothek gibt es zwei solche Paare** (siehe unten). Beide Ersetzungspfade brechen jetzt ab. |
+| Verwaiste Jobs blockierten ihre Datei **dauerhaft** | Aufgeräumt wurde nur, wenn ein Arbeiter nach Arbeit fragt — also nie, wenn der Arbeiter gerade weg ist. Nach einem Neustart mitten im Encode blieb der Job auf „läuft", und die Datei liess sich nie wieder einreihen. |
+
+### Die zwei betroffenen Dateipaare bei dir
+
+    pantyhose13219                     .mkv  +  .mp4
+    April_2026_Shiny_in_Polen_POV      .mov  +  .mp4
+
+Hättest du die `.mkv` bzw. die `.mov` optimiert, wäre die daneben liegende
+`.mp4` überschrieben worden — ohne Meldung. Jetzt bricht der Job mit einer
+Begründung ab. **Was du damit machen willst, ist deine Entscheidung**: eine der
+beiden löschen, oder eine umbenennen. Ich habe nichts angefasst.
 
 ---
 
