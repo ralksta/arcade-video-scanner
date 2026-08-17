@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 106 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2042** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 107 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2046** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -320,6 +320,13 @@ Der Vollständigkeit halber, weil es das Vertrauen in den Rest kalibriert:
   Neuschreiben derselben Zeile. In `conftest.py` steht jetzt eine Sperre, die
   so einen Zugriff sofort scheitern lässt — das Gegenstück zu der für den
   Report-Debouncer.
+- Ich habe fast gemeldet, dass **13 Dateien deiner Bibliothek verschwunden
+  sind** — sie ließen sich auf der Platte nicht finden. Dann habe ich die
+  gesamte Bibliothek geprüft: Es sind **alle 8788**, weil `/media`,
+  `/media_nas` und `/media_ralf` auf diesem Rechner nicht eingehängt sind. Ein
+  Ergebnis, das zu gut zur These passt, gehört gegen die Gesamtmenge geprüft.
+  (Die Zahl zu den Vorschaubildern ist davon unberührt — die vergleicht
+  Dateinamen gegen Datenbankpfade, nicht gegen die Platte.)
 - Ich hatte das Standardpasswort `admin` im Bericht als verstecktes Problem
   beschrieben. Der Assistent sagt es ausdrücklich an und fordert zum Wechsel
   auf; oben richtiggestellt.
