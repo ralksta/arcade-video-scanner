@@ -85,6 +85,24 @@ class SQLiteStore:
         self.on_change_callbacks.append(callback)
 
     def _notify_change(self):
+        """Meldet allen Beobachtern, dass sich die Daten geändert haben.
+
+        **Immer ausserhalb von ``_write_lock`` aufrufen.** Die Beobachter sind
+        fremde Objekte mit eigenen Sperren, und einer von ihnen hält seine
+        genau dann, wenn er hier hereinliest:
+
+            Anfrage A  /api/similar → SimilarityCache.get() nimmt seine Sperre
+                       und liest dann get_mean_vectors() → will _write_lock
+            Anfrage B  irgendein Schreibvorgang hält _write_lock
+                       und ruft hier hinein → will die Sperre von A
+
+        Beide warten auf den jeweils anderen. Und weil ``_write_lock`` dabei
+        gehalten bleibt, steht danach **jeder** weitere Schreibvorgang: Der
+        Server ist nicht langsam, er ist tot.
+
+        ``store_embedding`` hat es von Anfang an richtig gemacht; ``upsert``,
+        ``bulk_upsert`` und ``remove`` riefen innerhalb der Sperre.
+        """
         for cb in self.on_change_callbacks:
             try:
                 cb()
@@ -775,7 +793,8 @@ class SQLiteStore:
                 f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                 values,
             )
-            self._notify_change()
+        # Benachrichtigen erst nach der Sperre — siehe _notify_change().
+        self._notify_change()
 
     def bulk_upsert(self, entries) -> None:
         """Insert or replace multiple entries in a single transaction."""
@@ -805,7 +824,7 @@ class SQLiteStore:
             except Exception:
                 conn.execute("ROLLBACK")
                 raise
-            self._notify_change()
+        self._notify_change()
 
     def remove(self, path: str) -> None:
         """Delete an entry by file_path."""
@@ -813,7 +832,7 @@ class SQLiteStore:
             conn = self._ensure_connection()
             safe_path = self._get_safe_path(path)
             conn.execute("DELETE FROM media WHERE file_path = ?", (safe_path,))
-            self._notify_change()
+        self._notify_change()
 
     def delete_all_photos(self) -> int:
         """Delete all entries where media_type = 'image'. Returns the number of deleted rows."""

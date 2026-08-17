@@ -22,22 +22,46 @@ class SimilarityCache:
         self._lock = threading.Lock()
         self._vectors: Optional[dict[str, list[float]]] = None
         self._hooked = False
+        self._version = 0
 
     def invalidate(self) -> None:
         with self._lock:
             self._vectors = None
+            self._version += 1
 
     def get(self, media_db: Any) -> dict[str, list[float]]:
+        """Lädt die Vektoren — **ohne** die eigene Sperre zu halten.
+
+        Vorher lief das Lesen innerhalb der Sperre. Das ist die eine Hälfte
+        einer Verklemmung: ``get_mean_vectors()`` will die Schreibsperre der
+        Datenbank, und ein gleichzeitiger Schreibvorgang hält sie und will
+        über ``_notify_change`` hier herein. Die andere Hälfte ist im Store
+        behoben (dort wird jetzt ausserhalb der Sperre benachrichtigt); diese
+        Seite gehört trotzdem geradegezogen — eine Verklemmung braucht beide
+        Richtungen, und wer nur eine repariert, verlässt sich darauf, dass die
+        andere so bleibt.
+
+        Der Zähler übernimmt dabei dieselbe Aufgabe wie in ``_MediaCache``:
+        Wird während des Lesens invalidiert, wird das Ergebnis zwar geliefert,
+        aber nicht abgelegt.
+        """
         with self._lock:
             if not self._hooked:
                 # store_embedding fires _notify_change, so fresh indexer runs
                 # are picked up without a server restart
                 media_db.register_on_change(self.invalidate)
                 self._hooked = True
-            if self._vectors is None:
-                self._vectors = {path: decode_vector(blob)
-                                 for path, _model, blob in media_db.get_mean_vectors()}
-            return self._vectors
+            if self._vectors is not None:
+                return self._vectors
+            version = self._version
+
+        vectors = {path: decode_vector(blob)
+                   for path, _model, blob in media_db.get_mean_vectors()}
+
+        with self._lock:
+            if version == self._version:
+                self._vectors = vectors
+        return vectors
 
 
 _cache = SimilarityCache()

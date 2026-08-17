@@ -539,6 +539,8 @@ nicht kontrolliert.
             HTML-Dump wurde direkt in die ausgelieferte Datei geschrieben
       - [x] Zwei Anfragen konnten zwei Duplikat-Suchen starten — dieselbe
             Stelle wie beim Scanner, zweites Vorkommen
+      - [x] **Verklemmung**: Schreibvorgang und `/api/similar` gleichzeitig
+            konnten den Server dauerhaft anhalten
       - [x] Geprüft und stehen gelassen: Zwei **lokale** Optimierungen
             derselben Datei bleiben ungeschützt (siehe Bericht)
 
@@ -556,6 +558,26 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 95 (Loop AF, die Verklemmung — schwerster Fund des Laufs)** —
+  `upsert()`, `bulk_upsert()` und `remove()` riefen `_notify_change()`
+  **innerhalb** von `_write_lock`. Die Beobachter sind fremde Objekte mit
+  eigenen Sperren, und `SimilarityCache` hielt seine genau dann, wenn er über
+  `get_mean_vectors()` in die Datenbank hineinliest — also in die
+  Schreibsperre. Zwei Threads, entgegengesetzte Reihenfolge, beide warten für
+  immer. Und weil `_write_lock` dabei gehalten bleibt, steht danach *jeder*
+  weitere Schreibvorgang: kein langsamer Server, ein toter. Auslöser genügt:
+  jemand öffnet ein Video mit der Ähnlich-Leiste, während der Scanner
+  schreibt. `store_embedding()` hat es von Anfang an richtig gemacht — die
+  richtige Form stand also im selben Modul (vierter Fall dieser Nacht).
+  Beide Richtungen begradigt: im Store ausserhalb der Sperre benachrichtigen,
+  im Cache ausserhalb der eigenen Sperre lesen. Eine Verklemmung braucht beide
+  Seiten; wer nur eine repariert, verlässt sich darauf, dass die andere so
+  bleibt. Gegenprobe: Mit der alten Cache-Seite **hängt** der Test, statt zu
+  scheitern — dasselbe wie beim alten `image_inspector` früher in dieser
+  Nacht, und der Grund, warum ein `cp`-Rücksicherungsschritt danach nicht mehr
+  lief. Ein AST-Test verbietet künftig jedes `_notify_change()` unter der
+  Sperre, mit Gegenprobe an einem erfundenen Rückfall.
 
 - **Iteration 94 (Loop AF, derselbe Fehler ein zweites Mal)** — Nachdem der
   Scanner sein `_claim()` hatte, war die Frage naheliegend: Wo steht dasselbe
