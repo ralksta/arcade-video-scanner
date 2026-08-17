@@ -283,7 +283,7 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       einem Neustart mitten im Encode? Kann ein Job zweimal laufen (Server +
       `mac_worker.py`)? Bleiben Jobs für immer auf „running" stehen?
 
-- [ ] **Loop O — Duplikaterkennung** (läuft)
+- [x] **Loop O — Duplikaterkennung**
       - [x] Löschrouten prüften gegen die Ziele *aller* Nutzer
       - [x] `is_path_allowed` verglich per `startswith` ohne Verzeichnisgrenze
             — `/media` erlaubte `/media_nas` und `/media_ralf`
@@ -294,7 +294,10 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
             wurden von neuen Dateien desselben Pfads geerbt
       - [ ] **Für Ralf:** 15 bereits verwaiste Einträge in seinen Nutzerdaten →
             im Bericht, nicht angefasst
-      - [ ] Offen: `recommended_keep` bei Gleichstand, Re-Encode-Erkennung
+      - [x] `recommended_keep` fiel bei Punktgleichstand auf die
+            Eingabereihenfolge — bei Re-Encodes der Normalfall
+      - [ ] **Für Ralf:** Bitrate wiegt schwerer als Auflösung (50 gegen
+            30 Punkte) → Beobachtung im Bericht, nichts geändert
       Der zweite Bereich mit einer löschenden Aktion. Was gilt als Duplikat,
       wie oft irrt sich das, und was passiert beim Zusammenführen mit Tags und
       Favoriten des unterlegenen Eintrags? Perceptual Hashing ist reine Logik,
@@ -309,6 +312,21 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 52 (Loop O, Empfehlung — Loop O abgeschlossen)** — Die
+  Re-Encode-Erkennung lässt den Codec-Bonus bewusst weg, weil der moderne
+  Codec dort die verlustbehaftete Kopie kennzeichnet. Gut überlegt — und
+  dadurch bleibt bei zwei 4K-Dateien nur noch Bitrate und Auflösung übrig. Der
+  Bitratenanteil ist aber bei 50 Punkten gedeckelt, also ab 25 Mbps: Eine
+  80-Mbps-Quelle und ihr 26-Mbps-Re-Encode bekommen beide 85,0. Nachgerechnet,
+  nicht geschätzt. Bei Punktgleichstand entschied die stabile Sortierung, also
+  die Reihenfolge aus der Datenbank — bei Re-Encodes genau die Frage, um die es
+  geht. Gelernt: Wer einen Term absichtlich entfernt, sollte prüfen, ob die
+  verbleibenden noch trennscharf sind. Der Deckel bleibt, damit sich die
+  Punktwerte nicht verschieben; bei Gleichstand entscheiden jetzt Bitrate,
+  Größe, Pfad. Nebenbei: Mein Test „Auflösung schlägt Bitrate" wurde rot — sie
+  tut es nicht, 50 gegen 30 Punkte. Bestehendes Verhalten, nicht angefasst,
+  aber im Bericht. Nächstes: Zyklus 8 planen.
 
 - **Iteration 51 (Loop O, Nutzerzustand beim Löschen)** — `db.remove()` löscht
   die Zeile in `media`; Favoriten, Tags und Vault-Marken hängen aber am Pfad

@@ -796,8 +796,29 @@ class DuplicateDetector:
             )
             dup_files.append(dup_file)
 
-        # Sort by quality (best first)
-        dup_files.sort(key=lambda f: f.quality_score, reverse=True)
+        # Sort by quality (best first). Bei Gleichstand entscheidet die Bitrate,
+        # dann die Größe, zuletzt der Pfad.
+        #
+        # Der Gleichstand ist hier nicht der Ausnahmefall, sondern der
+        # Regelfall: Der Bitratenanteil ist bei 50 Punkten gedeckelt, also ab
+        # 25 Mbps. Eine 4K-Quelle mit 80 Mbps und ihr 4K-Re-Encode mit 26 Mbps
+        # bekommen beide 50 + 30 = 80 Punkte — und in einer Re-Encode-Gruppe
+        # fällt der Codec-Anteil zusätzlich weg, der sie sonst getrennt hätte.
+        # Nachgerechnet: 85,0 gegen 85,0.
+        #
+        # Vorher entschied dann die Reihenfolge, in der die Dateien aus der
+        # Datenbank kamen, welche als „behalten" empfohlen wird. Bei
+        # Re-Encodes ist das genau die Frage, um die es geht — die Empfehlung
+        # konnte auf das Original zeigen oder auf die verlustbehaftete Kopie,
+        # je nachdem.
+        #
+        # Der Deckel bleibt, damit sich die Punktwerte insgesamt nicht
+        # verschieben; die Bitrate entscheidet nur noch dort, wo die Punkte
+        # ohnehin gleich sind. Der Pfad zuletzt, damit zwei Scans dieselbe
+        # Antwort geben.
+        dup_files.sort(
+            key=lambda f: (-f.quality_score, -(f.bitrate_mbps or 0), -f.size_mb, f.path)
+        )
 
         # Calculate savings (sum of all but the best)
         total_size = sum(f.size_mb for f in dup_files)
@@ -1125,8 +1146,10 @@ class DuplicateDetector:
             )
             dup_files.append(dup_file)
 
-        # Sort by quality (best first)
-        dup_files.sort(key=lambda f: f.quality_score, reverse=True)
+        # Sort by quality (best first). Bilder haben keine Bitrate, hier
+        # entscheidet bei Gleichstand die Dateigröße und zuletzt der Pfad —
+        # damit zwei Scans dieselbe Empfehlung geben.
+        dup_files.sort(key=lambda f: (-f.quality_score, -f.size_mb, f.path))
 
         # Calculate savings
         total_size = sum(f.size_mb for f in dup_files)
