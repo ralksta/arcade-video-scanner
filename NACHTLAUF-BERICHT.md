@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 104 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2022** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 106 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2042** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
