@@ -283,7 +283,13 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       einem Neustart mitten im Encode? Kann ein Job zweimal laufen (Server +
       `mac_worker.py`)? Bleiben Jobs für immer auf „running" stehen?
 
-- [ ] **Loop O — Duplikaterkennung**
+- [ ] **Loop O — Duplikaterkennung** (läuft)
+      - [x] Löschrouten prüften gegen die Ziele *aller* Nutzer
+      - [x] `is_path_allowed` verglich per `startswith` ohne Verzeichnisgrenze
+            — `/media` erlaubte `/media_nas` und `/media_ralf`
+      - [ ] **Für Ralf:** die übrigen fünf `is_path_allowed`-Aufrufe sind
+            weiterhin installationsweit → im Bericht
+      - [ ] Offen: Gruppenbildung, `recommended_keep`, Re-Encode-Erkennung
       Der zweite Bereich mit einer löschenden Aktion. Was gilt als Duplikat,
       wie oft irrt sich das, und was passiert beim Zusammenführen mit Tags und
       Favoriten des unterlegenen Eintrags? Perceptual Hashing ist reine Logik,
@@ -298,6 +304,22 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 49 (Loop O, Löschumfang)** — Der Duplikat-Scan reicht die
+  Scan-Ziele des angemeldeten Nutzers durch, die beiden **löschenden** Routen
+  daneben nicht: `is_path_allowed(abs_path)` ohne zweites Argument fällt auf die
+  Vereinigung der Ziele aller Nutzer zurück. Ein Zweitkonto konnte über die API
+  Dateien löschen, die es in der Oberfläche nie zu sehen bekommt. Beim
+  Testschreiben fiel der eigentliche Fund auf: Die Prüfung vergleicht per
+  `startswith` **ohne Verzeichnisgrenze**. `/media` galt damit als Erlaubnis für
+  `/media_nas` und `/media_ralf` — genau die drei Scan-Ziele dieser
+  Installation. Solange niemand eigene Verzeichnisse übergab, entschied die
+  Zeile über nichts; die Vereinigung enthielt alle drei ohnehin. Gelernt:
+  Ein latenter Fehler wird nicht dadurch entdeckt, dass man ihn liest, sondern
+  dadurch, dass etwas anfängt, sich auf ihn zu verlassen. Mein erster
+  Negativtest bestand aus dem falschen Grund (der erfundene Pfad existierte
+  nicht) — mit echten Dateien wurde er rot. Nächstes: Gruppenbildung und
+  `recommended_keep`.
 
 - **Iteration 48 (Loop N, Zustände — Loop N abgeschlossen)** — `update_job_status`
   nahm jede Zeichenkette an, und `/api/queue/complete` reicht das Feld ungeprüft
