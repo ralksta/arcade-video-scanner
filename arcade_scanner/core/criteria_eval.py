@@ -88,6 +88,56 @@ def _is_excluded(video_val: str, arr: list) -> bool:
     return any(str(v).lower() in low or video_val == v for v in arr)
 
 
+# Die Bedingungen, die `video_matches()` tatsächlich auswertet. Alles andere
+# in einem Kriterien-Objekt ist wirkungslos — ein Tippfehler im Schlüssel wird
+# stillschweigend ignoriert.
+_LIST_CONDITIONS = ("media_type", "format", "status", "codec", "tags",
+                    "resolution", "orientation")
+_RANGE_CONDITIONS = ("duration", "size")
+
+
+def narrows_the_selection(criteria: Optional[dict]) -> bool:
+    """Schränkt dieses Kriterium überhaupt etwas ein?
+
+    Für Smart Collections ist „keine Angabe = alles zeigen" die richtige
+    Vorgabe. Für eine **Auto-Tag-Regel** ist dieselbe Antwort gefährlich: Sie
+    schreibt den Tag dann an jede Datei der Bibliothek, und weil jeder Tag nur
+    einmal vergeben wird, müsste man ihn anschließend einzeln von Hand wieder
+    entfernen. Bei 8788 Einträgen ist das keine Reparatur mehr.
+
+    Erreichbar war das nicht nur über ein leeres Objekt: Ein Kriterium mit
+    ausschließlich unbekannten Schlüsseln — ein Tippfehler genügt — passt
+    ebenfalls auf alles, weil `video_matches()` nur nach den Schlüsseln sieht,
+    die es kennt.
+    """
+    if not isinstance(criteria, dict):
+        return False
+
+    for section in ("include", "exclude"):
+        block = criteria.get(section)
+        if isinstance(block, dict) and any(block.get(k) for k in _LIST_CONDITIONS):
+            return True
+
+    for key in _RANGE_CONDITIONS:
+        block = criteria.get(key)
+        if isinstance(block, dict) and (block.get("min") is not None
+                                        or block.get("max") is not None):
+            return True
+
+    if criteria.get("favorites") in (True, False, "true", "false"):
+        return True
+
+    date_filter = criteria.get("date")
+    if date_filter and not (isinstance(date_filter, dict)
+                            and date_filter.get("type") == "all"):
+        return True
+
+    if str(criteria.get("search") or "").strip():
+        return True
+
+    return False
+
+
 def video_matches(video: dict, criteria: Optional[dict], now: Optional[int] = None) -> bool:
     """Return True when `video` (API-dict shape) matches `criteria`."""
     # JS: `if (!criteria) return true` — only null/undefined skip evaluation;

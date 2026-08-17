@@ -5,6 +5,7 @@ import uuid
 
 from arcade_scanner.config import MAX_REQUEST_SIZE
 from arcade_scanner.core.auto_tagger import run_auto_tag_rules
+from arcade_scanner.core.criteria_eval import narrows_the_selection
 from arcade_scanner.server.response_helpers import send_json
 
 
@@ -59,6 +60,18 @@ def handle_post(handler) -> bool:
             criteria = body.get("criteria")
             if not tag or not isinstance(criteria, dict):
                 handler.send_error(400, "tag and criteria required")
+                return True
+            # Ein Kriterium, das nichts einschränkt, passt auf jede Datei der
+            # Bibliothek. Die Regel würde den Tag an alles schreiben, und weil
+            # jeder Tag nur einmal vergeben wird, wäre er anschliessend nur
+            # einzeln von Hand wieder zu entfernen. Ein leeres Objekt reicht
+            # dafür — und ein Tippfehler im Schlüsselnamen ebenso.
+            if not narrows_the_selection(criteria):
+                handler.send_error(
+                    400,
+                    "criteria must narrow the selection - a rule that matches "
+                    "everything would tag the entire library"
+                )
                 return True
             rule = {"id": uuid.uuid4().hex,
                     "name": str(body.get("name") or tag),

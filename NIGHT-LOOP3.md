@@ -334,6 +334,8 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 - [ ] **Loop R — Auto-Tagging** (läuft)
       - [x] Eigener Fehler aus Iteration 51 gefunden und behoben: Tags wurden
             beim Löschen aufgeräumt, die Auto-Tag-Buchführung nicht
+      - [x] Eine Regel mit leeren oder vertippten Kriterien vertaggte die
+            gesamte Bibliothek
       Regeln, die selbsttätig Tags in die Nutzerdaten schreiben. Ein Fehler
       hier ist bleibend und sichtbar: falsche Tags an echten Dateien, und
       niemand weiss, woher sie kommen. In Loop C fiel schon auf, dass der
@@ -354,6 +356,20 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 58 (Loop R, Regelumfang)** — `video_matches({})` gibt `True`
+  zurück, und das ist für Smart Collections genau richtig: „nichts
+  eingeschränkt" heisst „alles zeigen". Dieselbe Funktion trägt aber auch die
+  Auto-Tag-Regeln, und dort heisst dieselbe Antwort: schreibe den Tag an jede
+  Datei der Bibliothek — bei Ralf 8788 — und weil jeder Tag nur einmal vergeben
+  wird, nur einzeln von Hand wieder abnehmbar. Erreichbar nicht nur über ein
+  leeres Objekt: Ein Kriterium mit ausschliesslich unbekannten Schlüsseln, also
+  ein Tippfehler, passt ebenfalls auf alles. Gelernt: Eine geteilte Funktion
+  erbt ihre Vorgabe, nicht ihren Kontext — „keine Angabe" bedeutet beim Anzeigen
+  etwas Harmloses und beim Schreiben etwas Endgültiges. Die Auswertung bleibt
+  unangetastet; geprüft wird jetzt beim Anlegen der Regel. Nebenbei lag ich bei
+  `{"search": "   "}` falsch — das passt auf fast nichts statt auf alles; der
+  Test hat es gezeigt und hält es jetzt fest. Nächstes: Loop S (Erstlauf).
 
 - **Iteration 57 (Loop R, Auto-Tagging)** — Der erste Fund dieser Nacht, den
   ich selbst verursacht habe. Der Auto-Tagger vergibt jeden Tag nur einmal je
