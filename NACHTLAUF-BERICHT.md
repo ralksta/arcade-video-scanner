@@ -1,12 +1,12 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 73 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 1789** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 76 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 1810** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
 
-## Zuerst lesen: sieben Punkte brauchen deine Entscheidung
+## Zuerst lesen: acht Punkte brauchen deine Entscheidung
 
 ### 1. Der iOS-Client ist seit Monaten funktionsunfähig
 
@@ -73,7 +73,46 @@ hätte dort Schaden angerichtet, wo bereits maskiert wird.
 
 → `dev-docs/frontend-escaping.md`, priorisiert.
 
-### 7. Das Standardkonto heißt `admin` mit dem Passwort `admin`
+### 7. Deine Sicherung sichert fast nichts
+
+Der Einstellungsbereich „Backup & Restore" hatte **zwei** Knöpfe, und beide
+zeigten auf Routen, die es im Server nie gab (`/api/user/export`,
+`/api/user/import`) — eingeführt in einem reinen Frontend-Commit, die
+Gegenstücke wurden nie geschrieben. Der Export lud eine 404-Seite herunter, der
+Import meldete „Invalid file format" und schob die Schuld auf deine Datei.
+
+**Export repariert.** Es gab die ganze Zeit eine funktionierende Route
+(`/api/backup`) ohne einen einzigen Aufrufer; die Beschriftung im Dialog nennt
+sogar den Dateinamen, den genau sie setzt. Eine falsch verdrahtete Leitung.
+
+**Zwei Dinge bleiben deine Entscheidung:**
+
+*Erstens, was drin ist.* Die Sicherung enthält **nur `settings.json`** — 2,8 KB.
+Nicht dabei:
+
+    users.db          Konten, Passwörter, Favoriten, Tags, Vault-Marken,
+                      Scan-Ziele, Ausschlüsse, Smart Collections
+    media_library.db  die Bibliothek selbst, 8788 Einträge
+
+Seit der Mehrbenutzer-Umstellung liegt praktisch alles, was du von Hand
+eingerichtet hast, in `users.db`. Wenn du eine echte Sicherung willst, ist das
+die Datei, auf die es ankommt — sie ist 53 KB groß, ein `cp` genügt.
+
+*Zweitens, ob es eine Wiederherstellung geben soll.* Ich habe sie **nicht
+gebaut**. Eine Route, die eine hochgeladene Datei über die Einstellungen
+schreibt, ist eine löschende Operation, und ihre Bedeutung ist eine
+Entscheidung: Welche Konten sind betroffen, ersetzen oder mischen? Dazu kommt
+eine Falle: `settings.json` führt `scan_targets`, `exclude_paths`,
+`available_tags` und die `sensitive_*`-Listen noch als **leere Hüllen**, während
+die echten Werte pro Nutzer in `users.db` stehen. Ein naiver Import würde sie
+mit leeren Listen überschreiben — der Einstellungs-Handler unterscheidet „nicht
+angegeben" von „leer" und schreibt Letzteres durch. Aus einer Wiederherstellung
+würde so ein Datenverlust.
+
+Der Import-Knopf ist noch da und tut weiterhin nichts. Ihn zu entfernen oder die
+Route zu bauen, ist deine Wahl; beides wäre besser als der jetzige Zustand.
+
+### 8. Das Standardkonto heißt `admin` mit dem Passwort `admin`
 
 `UserStore.__init__` legt bei **jedem Start** ein Konto `admin` mit dem
 Passwort `admin` und Admin-Rechten an, sobald kein Nutzer dieses Namens
