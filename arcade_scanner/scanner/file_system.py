@@ -28,25 +28,39 @@ class AsyncFileSystem:
         """Reload settings from config (called at scan start)."""
         self.min_size_bytes = config.settings.min_size_mb * 1024 * 1024
 
-        # Resolve excluded paths to absolute for robust matching
+        # Ausschlüsse kommen in drei Schreibweisen, und alle drei sind gewollt:
+        #
+        #   /home/ralf/privat     absoluter Pfad — genau dieser Baum
+        #   @eaDir                nackter Name   — jeder Ordner, der so heißt
+        #   AppData/Local/Temp    Teilpfad       — jeder Ordner, der so endet
+        #
+        # Vorher lief alles durch os.path.abspath(). Aus "@eaDir" wurde damit
+        # "<Arbeitsverzeichnis des Servers>/@eaDir" — ein Pfad, den es nicht
+        # gibt. Sämtliche mitgelieferten Voreinstellungen waren dadurch
+        # wirkungslos: @eaDir und #recycle (Synology), Temporary Items und
+        # Network Trash Folder, $RECYCLE.BIN und die Temp-Ordner unter Windows.
+        # Nachgemessen an einem Baum mit genau diesen Ordnern: alle vier
+        # Dateien landeten in der Bibliothek.
+        #
+        # Auf einem Synology-NAS ist das gut sichtbar — @eaDir enthält zu jeder
+        # Mediendatei eine Miniatur, die Bibliothek wäre doppelt so groß.
         self.exclude_abs: Set[str] = set()
+        self.exclude_names: Set[str] = set()
+        self.exclude_suffixes: Set[str] = set()
+
         for p in config.active_exclude_paths:
-            expanded = os.path.expanduser(p)
-            resolved = os.path.abspath(expanded)
+            expanded = os.path.expanduser(p).strip()
+            if not expanded:
+                continue
 
-            # Ein relativer Ausschluss wird gegen das Arbeitsverzeichnis des
-            # Servers aufgelöst — nicht gegen das Scan-Ziel. „privat" schließt
-            # damit nichts aus und schlägt trotzdem nicht fehl. Für eine
-            # Datenschutz-Funktion ist ein stiller Nichtausschluss das
-            # schlechteste Ergebnis, also wird es wenigstens gesagt.
-            if not os.path.isabs(expanded):
-                print(
-                    f"⚠️ Exclusion '{p}' is not an absolute path. It was "
-                    f"resolved to '{resolved}' relative to the server's working "
-                    "directory and probably excludes nothing."
-                )
+            normalized = expanded.replace("\\", os.sep).rstrip(os.sep)
 
-            self.exclude_abs.add(resolved)
+            if os.path.isabs(expanded):
+                self.exclude_abs.add(os.path.abspath(expanded))
+            elif os.sep in normalized:
+                self.exclude_suffixes.add(normalized)
+            else:
+                self.exclude_names.add(normalized)
 
         # Load last scan time
         self._scan_time_file = os.path.join(config.hidden_data_dir, ".last_scan_time")
@@ -120,6 +134,19 @@ class AsyncFileSystem:
         if self._skipped_dirs > 0:
             print(f"\n⚡ Skipped {self._skipped_dirs} unchanged directories (incremental scan)")
 
+    def _matches_name_or_suffix(self, abs_path: str) -> bool:
+        """Trifft ein Name-Ausschluss oder ein Teilpfad-Ausschluss auf diesen Ordner?"""
+        if self.exclude_names:
+            parts = abs_path.split(os.sep)
+            if self.exclude_names.intersection(parts):
+                return True
+
+        for suffix in self.exclude_suffixes:
+            if abs_path == suffix or abs_path.endswith(os.sep + suffix):
+                return True
+
+        return False
+
     def _exclusions_for_target(self, abs_target: str) -> Optional[Set[str]]:
         """Ausschlüsse in der Schreibweise dieses Ziels. None = Ziel ganz überspringen.
 
@@ -139,6 +166,9 @@ class AsyncFileSystem:
         umzuschreiben würde bestehende Einträge, Favoriten und Tags entwerten.
         """
         real_target = os.path.realpath(abs_target)
+        if self._matches_name_or_suffix(abs_target) or self._matches_name_or_suffix(real_target):
+            return None
+
         if real_target == abs_target and not any(
             os.path.realpath(ex) != ex for ex in self.exclude_abs
         ):
@@ -193,8 +223,9 @@ class AsyncFileSystem:
                     abs_root = os.path.abspath(root)
 
                     # 1. Skip root if it matches any exclusion (O(n_excludes))
-                    if any(abs_root == ex or abs_root.startswith(ex + os.sep)
-                           for ex in exclude_abs):
+                    if self._matches_name_or_suffix(abs_root) or any(
+                            abs_root == ex or abs_root.startswith(ex + os.sep)
+                            for ex in exclude_abs):
                         dirs.clear()  # Don't descend into excluded subtrees
                         continue
 
@@ -202,6 +233,7 @@ class AsyncFileSystem:
                     dirs[:] = [
                         d for d in dirs
                         if os.path.abspath(os.path.join(root, d)) not in exclude_abs
+                        and d not in self.exclude_names
                     ]
 
                     # 3. Incremental scan: skip dirs unchanged since last scan

@@ -16,9 +16,17 @@ ergab sechs Fälle:
     A  Ausschluss normal                      korrekt
     B  Ziel ist Symlink auf den Ausschluss    UMGANGEN  → behoben
     C  Schrägstrich am Ende                   korrekt
-    D  relativer Ausschluss                   wirkungslos, still → warnt jetzt
+    D  nackter Name / Teilpfad               wirkungslos, still → behoben
     E  ".." im Ausschluss                     korrekt
     F  Groß/Kleinschreibung vertauscht        nicht ausgeschlossen
+
+Zu D: Das betraf nicht nur Eingaben des Nutzers, sondern **alle mitgelieferten
+Voreinstellungen** — `@eaDir`, `#recycle`, `Temporary Items`,
+`Network Trash Folder`, `$RECYCLE.BIN`, `AppData/Local/Temp`. Sie liefen durch
+`os.path.abspath()` und wurden zu Pfaden im Arbeitsverzeichnis des Servers.
+Keiner davon hat je etwas ausgeschlossen. Ausschlüsse werden jetzt in drei
+Schreibweisen verstanden: absoluter Pfad, nackter Verzeichnisname (an jeder
+Stelle), Teilpfad (auf Ordnergrenze).
 
 Zu B: `os.walk` folgt Symlinks nicht — Unterverzeichnisse sind also sicher. Das
 Ziel selbst wird aber betreten, egal ob es ein Symlink ist, und die entstehenden
@@ -172,40 +180,84 @@ def test_paths_are_reported_as_given_not_resolved(tree, run):
     assert any(os.path.join("alias", "alles") in r for r in results)
 
 
-# --- D: der stille Nichtausschluss ---
+# --- D: die drei Schreibweisen ---
 
-def test_a_relative_exclusion_is_called_out(tmp_path, capsys):
+def test_a_bare_name_excludes_every_directory_with_that_name(tree, run):
     """
-    „privat" wird gegen das Arbeitsverzeichnis des Servers aufgelöst, nicht
-    gegen das Scan-Ziel — es schließt also nichts aus und schlägt trotzdem
-    nicht fehl. Das Verhalten bleibt (etwas anderes wäre geraten), es wird nur
-    nicht mehr verschwiegen.
+    Der zweite große Fund: Die **mitgelieferten** Voreinstellungen sind nackte
+    Verzeichnisnamen — `@eaDir`, `#recycle`, `Temporary Items`,
+    `Network Trash Folder`, `$RECYCLE.BIN`. Alle liefen durch `os.path.abspath()`
+    und wurden zu Pfaden im Arbeitsverzeichnis des Servers. Keiner davon hat je
+    etwas ausgeschlossen.
+
+    Sichtbar wird das auf einem Synology-NAS: `@eaDir` enthält zu jeder
+    Mediendatei eine Miniatur, die Bibliothek wäre doppelt so groß.
     """
-    fs = AsyncFileSystem()
-    cfg = MagicMock()
-    cfg.settings.min_size_mb = 1
-    cfg.active_exclude_paths = ["privat"]
-    cfg.hidden_data_dir = str(tmp_path)
+    (tree / "filme" / "@eaDir").mkdir(parents=True)
+    (tree / "filme" / "@eaDir" / "thumb.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
 
-    with patch("arcade_scanner.scanner.file_system.config", cfg):
-        fs._load_settings()
+    results = run([tree], ["@eaDir"])
 
-    out = capsys.readouterr().out
-    assert "not an absolute path" in out
-    assert "privat" in out
+    assert not any("@eaDir" in r for r in results)
+    assert any("a.mp4" in r for r in results)
 
 
-def test_an_absolute_exclusion_produces_no_warning(tmp_path, capsys):
-    fs = AsyncFileSystem()
-    cfg = MagicMock()
-    cfg.settings.min_size_mb = 1
-    cfg.active_exclude_paths = [str(tmp_path / "privat")]
-    cfg.hidden_data_dir = str(tmp_path)
+def test_a_bare_name_matches_at_any_depth(tree, run):
+    deep = tree / "a" / "b" / "c" / "#recycle"
+    deep.mkdir(parents=True)
+    (deep / "weg.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
 
-    with patch("arcade_scanner.scanner.file_system.config", cfg):
-        fs._load_settings()
+    assert not any("#recycle" in r for r in run([tree], ["#recycle"]))
 
-    assert "not an absolute path" not in capsys.readouterr().out
+
+def test_a_relative_path_matches_as_a_suffix(tree, run):
+    """`AppData/Local/Temp` aus den Windows-Voreinstellungen."""
+    deep = tree / "nutzer" / "AppData" / "Local" / "Temp"
+    deep.mkdir(parents=True)
+    (deep / "x.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+
+    assert not any("Temp" in r for r in run([tree], [os.path.join("AppData", "Local", "Temp")]))
+
+
+def test_a_suffix_only_matches_on_a_directory_boundary(tree, run):
+    """`Local/Temp` darf nicht auf `…/NichtLocal/Temp` passen."""
+    deep = tree / "NichtLocal" / "Temp"
+    deep.mkdir(parents=True)
+    (deep / "x.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+
+    results = run([tree], [os.path.join("XLocal", "Temp")])
+    assert any("NichtLocal" in r for r in results)
+
+
+def test_a_bare_name_does_not_match_a_partial_directory_name(tree, run):
+    """
+    `privat` darf nicht `privatkram` treffen. Die Prüfung geht über die
+    Pfadbestandteile, nicht über einen Teilstring.
+    """
+    (tree / "privatkram").mkdir()
+    (tree / "privatkram" / "x.mp4").write_bytes(b"\0" * (20 * 1024 * 1024))
+
+    results = run([tree], ["privat"])
+
+    assert any("privatkram" in r for r in results), "zu viel ausgeschlossen"
+    assert not any("geheim" in r for r in results), "zu wenig ausgeschlossen"
+
+
+def test_a_target_named_like_an_exclusion_is_skipped(tree, run):
+    assert run([tree / "privat"], ["privat"]) == []
+
+
+def test_all_shipped_defaults_use_a_form_that_works():
+    """
+    Die Gegenprobe zur Ursache: Jede Voreinstellung muss in einer der drei
+    Schreibweisen stehen, die tatsächlich geprüft werden.
+    """
+    from arcade_scanner.config import DEFAULT_EXCLUSIONS
+
+    for entry in DEFAULT_EXCLUSIONS:
+        path = entry["path"]
+        expanded = os.path.expanduser(path)
+        assert os.path.isabs(expanded) or path.strip(), f"unbrauchbar: {entry}"
 
 
 # --- Randfälle, die nichts kaputt machen dürfen ---

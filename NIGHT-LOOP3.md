@@ -244,9 +244,11 @@ jetzt systematisch.
       irgendwo landete, gilt dann für immer. Weiter: Passwort-Hashing,
       Abmeldung, Sitzungen über Neustarts.
 
-- [ ] **Loop M — Der Scanner: was wird tatsächlich gescannt?** (läuft)
+- [x] **Loop M — Der Scanner: was wird tatsächlich gescannt?**
       - [x] Drei Wege, über Symlinks in einen ausgeschlossenen Baum zu gelangen
-      - [x] Relative Ausschlüsse verpufften still — sagt es jetzt
+      - [x] **Alle mitgelieferten Standard-Ausschlüsse waren wirkungslos**
+            (`@eaDir`, `#recycle`, `$RECYCLE.BIN`, …) — drei Schreibweisen
+            werden jetzt verstanden
       - [ ] **Für Ralf:** Groß/Kleinschreibung auf case-insensitiven
             Dateisystemen (macOS) → im Bericht
       - [x] Abgesicherter Modus: Tag-Vergleich einseitig case-sensitiv,
@@ -267,6 +269,22 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 44 (Loop M, die Voreinstellungen — Loop M abgeschlossen)** — Die
+  Warnung aus Iteration 41 („relativer Ausschluss schließt vermutlich nichts
+  aus") sprang bei den **mitgelieferten Voreinstellungen** an. Das war kein
+  Fehlalarm: `@eaDir`, `#recycle`, `Temporary Items`, `Network Trash Folder`,
+  `$RECYCLE.BIN`, `AppData/Local/Temp` sind Verzeichnis*namen*, liefen aber
+  durch `os.path.abspath()` und wurden zu Pfaden im Arbeitsverzeichnis des
+  Servers. Keine einzige Voreinstellung hat je etwas ausgeschlossen — an einem
+  Baum mit genau diesen Ordnern nachgemessen. Gelernt: Der beste Ort für einen
+  Fund ist eine Warnung, die man selbst eingebaut hat und die dann bei den
+  eigenen Daten anschlägt; ich war einen Schritt davon entfernt, sie als
+  „laut, aber harmlos" abzutun. Ausschlüsse werden jetzt in drei Schreibweisen
+  verstanden: absoluter Pfad, nackter Name (an jeder Stelle), Teilpfad (auf
+  Ordnergrenze). Ralfs Einstellungen geprüft: keine eigenen Ausschlüsse, keine
+  betroffenen Einträge — die Korrektur wirkt bei ihm rein vorbeugend.
+  Nächstes: Zyklus 7 planen.
 
 - **Iteration 43 (Loop M, Fehlerfall)** — Der schwerste Fund des Loops, und er
   steckte nicht in einer Funktion, sondern zwischen zweien. `active_scan_targets`
