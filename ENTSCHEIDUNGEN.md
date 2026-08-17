@@ -5,7 +5,7 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: 6 von 9 Punkten entschieden.
+Stand: 7 von 9 Punkten entschieden.
 
 ---
 
@@ -183,3 +183,57 @@ Was bei der Umsetzung zu beachten ist:
   der alte Stil beim nächsten Feature zurück.
 - Der ungeprüfte Rest bleibt in `dev-docs/frontend-escaping.md` stehen, damit
   die Zahl 87 nicht als „alles erledigt" missverstanden wird.
+
+---
+
+## 7. Sicherung und Wiederherstellung
+
+Der Export war auf eine Route verdrahtet, die es nie gab, und ist inzwischen
+auf die vorhandene `/api/backup` gelegt. Zwei Fragen blieben offen.
+
+### 7a. Inhalt — **settings.json + users.db**
+
+**Entschieden:** Die Sicherung enthält künftig beides (~56 KB).
+`media_library.db` bleibt draußen — ihr Inhalt ist aus den Medien
+reproduzierbar, ein Scan baut sie neu auf.
+
+Zu beachten:
+
+- `users.db` ist die Datei, auf die es ankommt: Konten, Passwort-Hashes,
+  Favoriten, Tags (bei dir 93), Scan-Ziele, Ausschlüsse, Collections.
+- Die Datei enthält **Passwort-Hashes und Salts**. Die Sicherung ist damit
+  vertraulicher als bisher; das gehört im Dialog hingeschrieben, und der
+  Download bleibt sitzungspflichtig.
+- Format: Ein Archiv (zip) statt einer nackten JSON-Datei, sonst passt der
+  zweite Bestandteil nicht hinein. Der Dateiname im Dialog muss mitgeändert
+  werden — er nennt heute `arcade_settings_backup.json`.
+- `users.db` darf nicht mitten im Schreiben kopiert werden. Über die
+  SQLite-Backup-API oder unter derselben Schreibsperre, die der User-Store
+  ohnehin hat.
+
+### 7b. Wiederherstellung — **Route bauen, vollständig ersetzen**
+
+**Entschieden:** Es gibt eine echte Wiederherstellung. Ihre Bedeutung ist
+„zurück auf den Zeitpunkt X": Der Stand aus der Sicherung gilt, alles danach
+Entstandene fällt weg.
+
+Zu beachten — das ist eine löschende Operation, entsprechend gehört dazu:
+
+- **Vor dem Einspielen automatisch den Ist-Zustand sichern**, an einen festen
+  Ort mit Zeitstempel. Ohne das ist „vollständig ersetzen" eine Einbahnstraße.
+- **Deutliche Warnung mit Zahlen** vor dem Ausführen: wie viele Konten und
+  Einträge ersetzt werden. Nicht nur „sind Sie sicher?".
+- **Die Falle der leeren Hüllen:** `settings.json` führt `scan_targets`,
+  `exclude_paths`, `available_tags` und die `sensitive_*`-Listen noch als
+  leere Listen, während die echten Werte in `users.db` stehen. Der
+  Einstellungs-Handler unterscheidet „nicht angegeben" von „leer" und schreibt
+  Letzteres durch. Ein Import, der diese Schlüssel einfach durchreicht, löscht
+  damit genau die Werte, die er wiederherstellen soll. Diese Schlüssel müssen
+  beim Einspielen von `settings.json` **übersprungen** werden.
+- Der Import ist sitzungspflichtig **und** admin-pflichtig — er ersetzt fremde
+  Konten mit.
+- Laufende Sitzungen nach dem Einspielen verwerfen: Die Konten in der
+  Sicherung können andere Passwörter haben, während die Sitzungen im
+  Arbeitsspeicher weiterleben (siehe Punkt 8, zweiter Unterpunkt).
+- Der Server sollte danach neu geladen werden (Caches, `db.load()`), sonst
+  zeigt die Oberfläche den alten Stand.
