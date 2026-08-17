@@ -341,7 +341,10 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       niemand weiss, woher sie kommen. In Loop C fiel schon auf, dass der
       Aufruf nach dem Scan jahrelang stillschweigend gar nicht lief.
 
-- [ ] **Loop S — Erstlauf und Einrichtung**
+- [ ] **Loop S — Erstlauf und Einrichtung** (läuft)
+      - [x] Der Assistent lief über bestehenden Installationen los — bei
+            unlesbarem `settings.json` und ohne Terminal sogar stillschweigend
+      - [ ] Offen: `apply_configuration` und der Rest der 532 Zeilen
       `onboarding.py` schreibt Einstellungen, legt das Admin-Konto an und
       entscheidet, was gescannt wird. Es läuft genau einmal — deshalb sieht es
       niemand nochmal an, und deshalb fällt dort nichts auf. Hängt am
@@ -356,6 +359,23 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 59 (Loop S, Erstlauf)** — 532 Zeilen ohne einen einzigen Test,
+  und sie entscheiden, was gescannt wird, legen das Admin-Konto an und bieten
+  an, sämtliche Datenbanken zu löschen. Zwei Wege führten über eine
+  **bestehende** Installation: `should_run_wizard()` beantwortete jede
+  Leseausnahme mit „frische Installation" (`except Exception: return True`) —
+  zusammen mit dem gekürzten Schreiben aus Iteration 54 genügte ein
+  Stromausfall beim Speichern. Und ohne Terminal lief der Assistent nicht etwa
+  auf einen Fehler, sondern **still durch**: `prompt()` fängt EOFError ab und
+  liefert den Vorgabewert, also beantwortet er sich mit stdin auf /dev/null
+  jede Frage selbst und schreibt anschliessend die Konfiguration. Nachgemessen.
+  Gelernt: Ein defensiv gemeintes `except` ist eine Aussage über die Welt — hier
+  „ich kann die Datei nicht lesen, also gibt es hier nichts". Der bessere Beleg
+  lag danebenan: Es liegen Datenbanken da. Der Löschzweig selbst war nie das
+  Problem, er hängt an einer ausdrücklichen Rückfrage mit Vorgabe „nein"; das
+  Problem war, dass die Frage überhaupt gestellt wurde. Nächstes:
+  `apply_configuration`.
 
 - **Iteration 58 (Loop R, Regelumfang)** — `video_matches({})` gibt `True`
   zurück, und das ist für Smart Collections genau richtig: „nichts
