@@ -1,5 +1,6 @@
 import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {serverUrl, thumbnailUrl} from '../serverConfig';
+import {getItem, removeItem} from '../safeStorage';
 import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import TabLayout, {Tab} from '@enact/limestone/TabLayout';
@@ -170,7 +171,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 
 	// Daten und Collections laden
 	useEffect(() => {
-		const token = localStorage.getItem('arcade_session_token');
+		const token = getItem('arcade_session_token');
 		const headers = {
 			'Content-Type': 'application/json'
 		};
@@ -182,7 +183,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		const videosPromise = fetch(serverUrl('/api/videos'), { headers })
 			.then(res => {
 				if (res.status === 401) {
-					localStorage.removeItem('arcade_session_token');
+					removeItem('arcade_session_token');
 					if (onAuthFailed) onAuthFailed();
 					throw new Error('Unauthorized');
 				}

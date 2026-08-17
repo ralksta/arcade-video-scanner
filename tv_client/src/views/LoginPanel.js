@@ -1,5 +1,6 @@
 import React, {useState, useCallback, useEffect} from 'react';
 import {serverUrl} from '../serverConfig';
+import {setItem} from '../safeStorage';
 import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import {InputField} from '@enact/limestone/Input';
@@ -56,7 +57,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 			})
 			.then(data => {
 				if (data.success && data.token) {
-					localStorage.setItem('arcade_session_token', data.token);
+					setItem('arcade_session_token', data.token);
 					onLoginSuccess(data.token);
 				} else {
 					throw new Error('Login fehlgeschlagen.');
@@ -90,7 +91,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 				})
 				.then(data => {
 					if (data.success && data.token) {
-						localStorage.setItem('arcade_session_token', data.token);
+						setItem('arcade_session_token', data.token);
 						onLoginSuccess(data.token);
 					} else {
 						throw new Error('Automatischer Login fehlgeschlagen.');

@@ -502,6 +502,8 @@ nicht kontrolliert.
             Browser sah es aus wie eine kaputte Bibliothek
       - [x] `/stream` lieferte Dateien **ohne Anmeldung** aus
       - [x] Der Wiedergabe-Dialog schwieg, wenn die Datei nicht mehr da war
+      - [x] TV-Client: `localStorage` an sechs Stellen ungeschützt, zwei davon
+            im Rumpf der App-Komponente
 
 - [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum**
       Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
@@ -516,6 +518,21 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 84 (Loop AD, der TV-Client)** — Beim Nachsehen, wie der
+  TV-Client mit einer verschwundenen Datei umgeht, stand zwei Zeilen darüber
+  etwas Größeres: `localStorage.getItem` im Rumpf der App-Komponente,
+  ungeschützt. Insgesamt sechs Stellen in drei Dateien. Auf webOS kann der
+  Speicher gesperrt sein — und der Client **weiß** das: In `serverConfig.js`
+  steht seit jeher ein try/catch mit genau dieser Begründung im Kommentar. Eine
+  Ausnahme im Rumpf einer React-Komponente heißt kein halb aufgebauter
+  Bildschirm, sondern gar keiner, und auf einem Fernseher gibt es keine
+  Konsole, in der man nachsähe. Derselbe Fund und dieselbe Lösung wie im
+  Browser-Client (`safe_storage.js`, früherer Lauf) — beide Clients hatten ihn
+  getrennt voneinander. Gelernt: Wenn eine Erkenntnis im Repo als Kommentar
+  steht, aber nur an einer Stelle angewandt ist, ist das eine Fundstelle. Der
+  Test sucht deshalb im ganzen `tv_client/src`, nicht in einer Dateiliste.
+  Nächstes: der `<Video>`-Fehlerfall im TV-Client, dann Loop AE.
 
 - **Iteration 82 (Loop AD, `/stream` ohne Anmeldung)** — Beim Nachsehen, ob
   `/stream` HEAD beantwortet (für die Fehlermeldung aus Iteration 83), stand
