@@ -50,6 +50,20 @@ def data_dir(tmp_path, monkeypatch):
     return tmp_path
 
 
+def code_only(source: str) -> str:
+    """Kommentarzeilen raus, bevor nach Mustern gesucht wird.
+
+    Sonst prüft der Test die Erklärung statt des Codes — der Kommentar über der
+    Änderung nennt `json.dump` beim Namen, also genau das, was darunter nicht
+    mehr stehen soll. Mir ist das in dieser Nacht viermal passiert; es ist kein
+    Zufall, sondern die Regel: Wer einen alten Weg abschafft, schreibt seinen
+    Namen in die Begründung.
+    """
+    return "\n".join(
+        line for line in source.splitlines() if not line.lstrip().startswith("#")
+    )
+
+
 def write_settings(data_dir, **values):
     (data_dir / "settings.json").write_text(json.dumps(values), encoding="utf-8")
 
@@ -222,3 +236,91 @@ def test_settings_written_by_the_wizard_end_up_in_the_data_directory(data_dir):
 
     assert "SETTINGS_FILE" in source or "settings.json" in source
     assert os.path.basename(str(data_dir / "settings.json")) == "settings.json"
+
+
+# --- Wie der Assistent die Einstellungen schreibt ---
+#
+# apply_configuration() hatte die Lese-mischen-Schreiben-Logik ein zweites Mal,
+# mit eigenem json.dump -- also ohne das Schreiben über eine Zwischendatei, das
+# `config._save_json_raw()` inzwischen macht. Genau diese Datei wäre bei einem
+# Abbruch als Fragment zurückgeblieben, und ein Fragment liess vor der
+# Absicherung oben den Assistenten beim nächsten Start erneut loslaufen.
+#
+# Das ist wieder dasselbe Muster wie an fünf anderen Stellen dieser Nacht: eine
+# Stelle hat die Lehre gezogen, die zweite Kopie daneben nicht.
+
+def test_the_wizard_writes_settings_through_the_shared_saver():
+    import inspect
+
+    source = code_only(inspect.getsource(onboarding.apply_configuration))
+
+    assert "app_config.save(" in source
+    assert "json.dump" not in source, (
+        "Der Assistent schreibt wieder an config._save_json_raw vorbei"
+    )
+
+
+def test_the_wizard_settings_survive_a_failed_write(data_dir):
+    """
+    Derselbe Anspruch wie in tests/test_settings_durability.py, nur über den
+    Weg des Assistenten.
+    """
+    from arcade_scanner.config import ConfigManager
+
+    (data_dir / "settings.json").write_text(
+        json.dumps({"theme": "light", "min_size_mb": 250}), encoding="utf-8")
+
+    # Erst den Konfigurationsleser bauen: Er ergänzt fehlende Vorgabewerte und
+    # schreibt die Datei dabei einmal. Der Vergleich muss gegen *diesen* Stand
+    # laufen, nicht gegen die drei Zeilen oben — sonst prüft der Test die
+    # Normalisierung statt des misslungenen Schreibens.
+    cfg = ConfigManager()
+    before = (data_dir / "settings.json").read_text(encoding="utf-8")
+
+    with patch("json.dump", side_effect=OSError("Kein Speicherplatz")), \
+         patch("arcade_scanner.config.config", cfg), \
+         patch.object(onboarding, "print_error") as complained:
+        onboarding.apply_configuration({
+            "min_size_mb": 500, "bitrate_threshold_kbps": 15000,
+            "scan_targets": [], "exclude_paths": [],
+        })
+
+    assert (data_dir / "settings.json").read_text(encoding="utf-8") == before
+    assert json.loads(before)["min_size_mb"] == 250, "Der alte Wert steht nicht mehr da"
+    complained.assert_called()
+
+
+def test_the_wizard_announces_the_default_admin_password():
+    """
+    Festgehalten, weil ich es zunächst schärfer formuliert hatte, als es ist:
+    Der Assistent **sagt** das Standardpasswort an und fordert zum Wechsel auf.
+
+        print_info("The 'admin' account will be created automatically.")
+        print_dim("Default password: admin (change this after first login!)")
+
+    Es ist also nicht versteckt. Erzwungen wird der Wechsel aber nicht, und der
+    Assistent fragt auch nie nach einem eigenen Admin-Passwort — für weitere
+    Konten tut er es. Ob das so bleiben soll, steht im Übergabebericht; hier
+    steht nur, wie es ist.
+    """
+    import inspect
+
+    source = inspect.getsource(onboarding.run_setup_wizard)
+
+    assert "Default password: admin" in source
+    assert "change this after first login" in source
+
+
+def test_the_wizard_does_not_set_an_admin_password(data_dir):
+    """
+    Die Kehrseite desselben Befunds: apply_configuration() fasst am
+    Admin-Konto nur Scan-Ziele und Ausschlüsse an.
+    """
+    import inspect
+
+    source = inspect.getsource(onboarding.apply_configuration)
+    admin_block = source.split('get_user("admin")', 1)[1].split("create_users", 1)[0]
+
+    assert "scan_targets" in admin_block
+    assert "password_hash" not in admin_block
+    assert "hash_password" not in admin_block

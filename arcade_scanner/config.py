@@ -242,7 +242,7 @@ class ConfigManager:
 
         return settings
 
-    def _save_json_raw(self, data: Dict[str, Any]):
+    def _save_json_raw(self, data: Dict[str, Any]) -> bool:
         """Schreibt settings.json — erst daneben, dann an die Stelle.
 
         `open(..., "w")` kürzt die Datei sofort auf null. Bricht der Vorgang
@@ -264,6 +264,7 @@ class ConfigManager:
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp_path, SETTINGS_FILE)
+            return True
         except Exception as e:
             print(f"❌ Error saving settings: {e}")
             try:
@@ -271,6 +272,7 @@ class ConfigManager:
                     os.remove(tmp_path)
             except OSError:
                 pass
+            return False
 
     def save(self, updates: Dict[str, Any]) -> bool:
         """
@@ -287,8 +289,16 @@ class ConfigManager:
             # Update raw dict
             current_raw.update(updates)
 
-            # Save raw dict
-            self._save_json_raw(current_raw)
+            # Save raw dict.
+            #
+            # Der Rückgabewert wurde bis hierher verworfen: `_save_json_raw()`
+            # fängt seine Fehler selbst ab, und `save()` meldete anschliessend
+            # in jedem Fall Erfolg. Bei voller Platte oder fehlenden Rechten
+            # stand in der Oberfläche „gespeichert", während auf der Platte der
+            # alte Stand lag — und im Arbeitsspeicher der neue, sodass es bis
+            # zum nächsten Neustart auch stimmte.
+            if not self._save_json_raw(current_raw):
+                return False
 
             # Update internal model
             self.settings = AppSettings(**current_raw)

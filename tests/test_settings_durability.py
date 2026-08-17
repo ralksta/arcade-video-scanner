@@ -160,3 +160,59 @@ def test_the_duplicate_cache_writes_the_same_way():
     from arcade_scanner.core.duplicate_detector import _StatValidatedHashCache
 
     assert "os.replace" in inspect.getsource(_StatValidatedHashCache.save)
+
+
+# --- Der Rückgabewert ---
+#
+# `_save_json_raw()` fängt seine Fehler selbst ab. `save()` verwarf das
+# Ergebnis und meldete anschliessend in jedem Fall Erfolg -- und die beiden
+# Aufrufer in routes/settings.py hängen genau daran:
+#
+#     if config.save(new_settings):
+#         ... "success": True
+#
+# Bei voller Platte oder fehlenden Schreibrechten stand in der Oberfläche
+# "gespeichert", während auf der Platte der alte Stand lag. Im Arbeitsspeicher
+# stand der neue, also stimmte es bis zum nächsten Neustart sogar -- und danach
+# war die Änderung weg, ohne dass irgendwo etwas gemeldet worden wäre.
+
+def test_a_successful_save_reports_success(cfg, settings_file):
+    assert cfg.save({"min_size_mb": 300}) is True
+    assert json.loads(settings_file.read_text(encoding="utf-8"))["min_size_mb"] == 300
+
+
+def test_a_failed_save_reports_failure(cfg, settings_file):
+    settings_file.write_text(json.dumps({"min_size_mb": 100}), encoding="utf-8")
+
+    with patch("json.dump", side_effect=OSError("Kein Speicherplatz")):
+        assert cfg.save({"min_size_mb": 300}) is False
+
+
+def test_a_failed_save_does_not_change_the_in_memory_settings(cfg, settings_file):
+    """
+    Sonst zeigt die Oberfläche den neuen Wert an, die Platte trägt den alten,
+    und beim nächsten Start springt die Einstellung scheinbar grundlos zurück.
+    """
+    settings_file.write_text(json.dumps({"min_size_mb": 100}), encoding="utf-8")
+    cfg._load_settings()
+    before = cfg.settings.min_size_mb
+
+    with patch("json.dump", side_effect=OSError("Kein Speicherplatz")):
+        cfg.save({"min_size_mb": 300})
+
+    assert cfg.settings.min_size_mb == before
+
+
+def test_the_settings_route_still_checks_the_return_value():
+    """
+    Die Aufrufer prüften schon immer richtig — nur gab es nichts zu prüfen.
+    Festgehalten, damit die Prüfung nicht wegoptimiert wird, jetzt wo sie
+    etwas bedeutet.
+    """
+    from pathlib import Path
+
+    source = (
+        Path(__file__).parent.parent / "arcade_scanner" / "server" / "routes" / "settings.py"
+    ).read_text(encoding="utf-8")
+
+    assert source.count("if config.save(") == 2

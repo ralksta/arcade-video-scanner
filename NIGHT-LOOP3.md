@@ -341,10 +341,11 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       niemand weiss, woher sie kommen. In Loop C fiel schon auf, dass der
       Aufruf nach dem Scan jahrelang stillschweigend gar nicht lief.
 
-- [ ] **Loop S — Erstlauf und Einrichtung** (läuft)
+- [x] **Loop S — Erstlauf und Einrichtung**
       - [x] Der Assistent lief über bestehenden Installationen los — bei
             unlesbarem `settings.json` und ohne Terminal sogar stillschweigend
-      - [ ] Offen: `apply_configuration` und der Rest der 532 Zeilen
+      - [x] `apply_configuration` schrieb an der abgesicherten Stelle vorbei
+      - [x] `config.save()` meldete Erfolg, auch wenn das Schreiben scheiterte
       `onboarding.py` schreibt Einstellungen, legt das Admin-Konto an und
       entscheidet, was gescannt wird. Es läuft genau einmal — deshalb sieht es
       niemand nochmal an, und deshalb fällt dort nichts auf. Hängt am
@@ -359,6 +360,22 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 60 (Loop S, Speichern — Loop S abgeschlossen)** — `apply_configuration`
+  hatte die Lese-mischen-Schreiben-Logik ein zweites Mal, mit eigenem
+  `json.dump` und damit ohne die Zwischendatei aus Iteration 54. Beim Umbauen
+  auf `config.save()` fiel der eigentliche Fund an: Die Methode meldet **immer**
+  Erfolg. `_save_json_raw()` fängt seine Fehler selbst ab, und `save()`
+  verwarf das Ergebnis — obwohl beide Aufrufer in `routes/settings.py` genau
+  daran hängen (`if config.save(...)`). Bei voller Platte stand in der
+  Oberfläche „gespeichert", während auf der Platte der alte Stand lag; im
+  Arbeitsspeicher der neue, also stimmte es bis zum nächsten Neustart sogar.
+  Gelernt: Ein `except`, das nur druckt, verwandelt einen Fehler in eine
+  Meinung — und wer den Rückgabewert nicht führt, kann ihn oben auch nicht
+  prüfen, so richtig die Prüfung dort aussieht. Ausserdem richtiggestellt: Der
+  Assistent **sagt** das Standardpasswort `admin` an und fordert zum Wechsel
+  auf; ich hatte es im Bericht schärfer formuliert, als es ist. Nächstes:
+  Zyklus 10 planen.
 
 - **Iteration 59 (Loop S, Erstlauf)** — 532 Zeilen ohne einen einzigen Test,
   und sie entscheiden, was gescannt wird, legen das Admin-Konto an und bieten
