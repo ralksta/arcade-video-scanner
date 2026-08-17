@@ -188,7 +188,8 @@ class ScannerManager:
         # Scan-Geschwindigkeit entfernt wurde (media_probe.py). Die wenigen
         # Einträge, die ihn in der Datenbank noch tragen, stammen aus der Zeit
         # davor. Deshalb hier wenigstens eine Zählung mit Beispielen.
-        failed_paths: List[str] = []
+        # (Pfad, Grund) — der Grund kommt aus ffprobe, nicht aus einer Vermutung.
+        failed_paths: List[Tuple[str, str]] = []
         batch_entries: List[Any] = []
 
         # 2. Worker Queue Pattern
@@ -323,6 +324,7 @@ class ScannerManager:
                 # 3. Probe using Selected Inspector
                 entry: Optional[MediaAsset] = None
                 scan_start_time = time.time()
+                grund = ""
                 try:
                     entry = await inspector.inspect(path)
                     scan_duration = time.time() - scan_start_time
@@ -330,12 +332,16 @@ class ScannerManager:
                         print(f"⏱️  Finished in {scan_duration:.2f}s: {os.path.basename(path)}")
                 except Exception as e:
                     scan_duration = time.time() - scan_start_time
-                    print(f"❌ {progress_prefix}Inspect failed in {scan_duration:.2f}s for {path}: {e}")
+                    # Der Grund kommt jetzt aus ffprobe selbst (ProbeError) —
+                    # vorher stand hier pauschal „timeout or corrupt", und das
+                    # war bei fehlenden Leserechten schlicht falsch.
+                    grund = str(e) or type(e).__name__
                     entry = None
 
                 if not entry:
-                    failed_paths.append(path)
-                    print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
+                    grund = grund or "kein Ergebnis von ffprobe"
+                    failed_paths.append((path, grund))
+                    print(f"❌ {progress_prefix}{os.path.basename(path)}: {grund}")
                 else:
                     parent_dir = os.path.basename(os.path.dirname(path)).lower()
                     is_source_dir = parent_dir in ['source', 'originals', 'raw']
@@ -450,11 +456,21 @@ class ScannerManager:
                 # bei einem Durchlauf über tausende Dateien längst
                 # weggescrollt.
                 print(f"⚠️ {len(failed_paths)} Datei(en) konnten nicht gelesen werden. "
-                      "Ihre Angaben in der Bibliothek sind entweder alt oder fehlen ganz:")
-                for path in failed_paths[:10]:
-                    print(f"   {path}")
-                if len(failed_paths) > 10:
-                    print(f"   … und {len(failed_paths) - 10} weitere")
+                      "Ihre Angaben in der Bibliothek sind entweder alt oder fehlen ganz.")
+
+                # Nach Grund gruppiert: 222 Zeilen „Permission denied"
+                # untereinander sagen weniger als eine Zeile mit der Zahl.
+                nach_grund: dict = {}
+                for pfad, grund in failed_paths:
+                    nach_grund.setdefault(grund, []).append(pfad)
+
+                for grund, pfade in sorted(nach_grund.items(),
+                                           key=lambda kv: -len(kv[1])):
+                    print(f"   {len(pfade)}× {grund}")
+                    for pfad in pfade[:3]:
+                        print(f"      {pfad}")
+                    if len(pfade) > 3:
+                        print(f"      … und {len(pfade) - 3} weitere")
 
             # Save scan timestamp for incremental scanning
             fs_scanner.save_last_scan_time()

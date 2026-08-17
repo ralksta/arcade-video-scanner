@@ -160,12 +160,22 @@ def test_the_timeout_matches_the_shape_used_for_video():
 
     from arcade_scanner.scanner import media_probe
 
+    # Bei media_probe steckt das Einsammeln seit der Fehlermeldungs-Korrektur
+    # in `_reap()` — geprüft wird also, dass die Funktion es aufruft **und**
+    # dass der Helfer beides tut, töten und abholen. Nur auf `kill()` im
+    # Rumpf zu schauen hätte die Auslagerung als Rückschritt gemeldet, obwohl
+    # sich nichts verschlechtert hat.
     video = _inspect.getsource(media_probe.MediaProbe._run_ffprobe)
+    reaper = _inspect.getsource(media_probe._reap)
     images = _inspect.getsource(ImageInspector._flush_batch)
 
     for source, name in ((video, "media_probe"), (images, "image_inspector")):
         assert "wait_for" in source, f"{name}: kein Zeitlimit"
-        assert "kill()" in source, f"{name}: der Prozess wird nicht eingesammelt"
+
+    assert "_reap(process)" in video, "media_probe: der Prozess wird nicht eingesammelt"
+    assert "kill()" in reaper, "_reap: tötet den Prozess nicht"
+    assert "wait()" in reaper, "_reap: holt den beendeten Prozess nicht ab (Zombie)"
+    assert "kill()" in images, "image_inspector: der Prozess wird nicht eingesammelt"
 
 
 # --- Die Ausgabe-Auswertung ---

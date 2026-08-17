@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from arcade_scanner.scanner.media_probe import MediaProbe
+from arcade_scanner.scanner.media_probe import MediaProbe, ProbeError
 
 # ---------------------------------------------------------------------------
 # Fake ffprobe process
@@ -40,10 +40,10 @@ class FakeProcess:
 
 
 def run_probe(payload=None, *, returncode=0, raw_stdout=None, ffprobe_path="",
-              process=None, capture=None):
+              process=None, capture=None, stderr=b""):
     """Run _run_ffprobe against a fake process; returns its result."""
     stdout = raw_stdout if raw_stdout is not None else json.dumps(payload or {}).encode()
-    proc = process or FakeProcess(stdout=stdout, returncode=returncode)
+    proc = process or FakeProcess(stdout=stdout, returncode=returncode, stderr=stderr)
 
     cfg = MagicMock()
     cfg.settings.ffprobe_path = ffprobe_path
@@ -116,13 +116,42 @@ class TestRunFfprobe:
         assert capture[0][-1] == "/fake/clip.mp4"
         assert "-of" in capture[0] and "json" in capture[0]
 
-    def test_nonzero_exit_yields_empty_dict(self):
-        assert run_probe({"streams": [{"codec_type": "video"}]}, returncode=1) == {}
+    def test_nonzero_exit_reports_ffprobes_own_reason(self):
+        """
+        Vorher gab jeder Fehlschlag ein leeres Dict zurück, und der Scanner
+        machte daraus „(timeout or corrupt)". In dieser Bibliothek scheiterten
+        222 Dateien in Wahrheit an fehlenden Leserechten — wer der Meldung
+        glaubte, suchte nach kaputten Dateien und fand nichts.
 
-    def test_malformed_json_yields_empty_dict(self):
-        assert run_probe(raw_stdout=b"not json at all") == {}
+        `stderr` wurde dabei schon abgefangen und dann weggeworfen.
+        """
+        with pytest.raises(ProbeError) as fehler:
+            run_probe({"streams": [{"codec_type": "video"}]}, returncode=1,
+                      stderr=b"/media/clip.mp4: Permission denied\n")
 
-    def test_spawn_failure_yields_empty_dict(self):
+        assert "Permission denied" in str(fehler.value)
+
+    def test_a_reason_without_stderr_still_names_the_exit_code(self):
+        with pytest.raises(ProbeError) as fehler:
+            run_probe({}, returncode=69, stderr=b"")
+
+        assert "69" in str(fehler.value)
+
+    def test_only_the_first_line_of_stderr_is_used(self):
+        """ffmpeg schreibt gern fünf Zeilen. Die erste sagt, worum es geht."""
+        with pytest.raises(ProbeError) as fehler:
+            run_probe({}, returncode=1,
+                      stderr=b"moov atom not found\nnoch eine Zeile\nund noch eine\n")
+
+        assert str(fehler.value) == "moov atom not found"
+
+    def test_malformed_json_reports_the_reason(self):
+        with pytest.raises(ProbeError) as fehler:
+            run_probe(raw_stdout=b"not json at all")
+
+        assert "JSON" in str(fehler.value)
+
+    def test_spawn_failure_says_ffprobe_is_missing(self):
         cfg = MagicMock()
         cfg.settings.ffprobe_path = ""
 
@@ -132,7 +161,10 @@ class TestRunFfprobe:
         with patch("arcade_scanner.scanner.media_probe.config", cfg), \
              patch("arcade_scanner.scanner.media_probe.asyncio.create_subprocess_exec",
                    side_effect=boom):
-            assert asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4")) == {}
+            with pytest.raises(ProbeError) as fehler:
+                asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
+
+        assert "nicht gefunden" in str(fehler.value)
 
 
 class TestFfprobeTimeout:
@@ -162,9 +194,10 @@ class TestFfprobeTimeout:
                    side_effect=fake_exec), \
              patch("arcade_scanner.scanner.media_probe.asyncio.wait_for",
                    side_effect=instant_timeout):
-            result = asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
+            with pytest.raises(ProbeError) as fehler:
+                asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
 
-        assert result == {}
+        assert "Zeitüberschreitung" in str(fehler.value)
         assert proc.kill_calls == 1, "timed-out ffprobe process was never killed"
         assert proc.wait_calls == 1, "killed process was never reaped"
 
@@ -180,9 +213,9 @@ class TestFfprobeTimeout:
         with patch("arcade_scanner.scanner.media_probe.config", cfg), \
              patch("arcade_scanner.scanner.media_probe.asyncio.create_subprocess_exec",
                    side_effect=fake_exec):
-            result = asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
+            with pytest.raises(ProbeError):
+                asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
 
-        assert result == {}
         assert proc.kill_calls == 0
 
 

@@ -26,6 +26,47 @@ def _as_int(value, default: int = 0) -> int:
         return default
 
 
+def _first_line(stderr: bytes) -> str:
+    """Die erste aussagekräftige Zeile aus ffprobes Fehlerausgabe."""
+    try:
+        text = (stderr or b"").decode("utf-8", "replace")
+    except Exception:
+        return ""
+    for zeile in text.splitlines():
+        zeile = zeile.strip()
+        if zeile:
+            return zeile[:200]
+    return ""
+
+
+async def _reap(process) -> None:
+    """Beendet einen noch laufenden ffprobe-Prozess und sammelt ihn ein.
+
+    Beides gehört zusammen: `kill()` allein beendet ihn, hinterlässt aber
+    einen Zombie, bis jemand seinen Rückgabewert abholt. Bei einer Bibliothek
+    mit vielen unlesbaren Dateien wäre das einer pro Datei.
+    """
+    if process is not None and process.returncode is None:
+        try:
+            process.kill()
+            await process.wait()
+        except Exception:
+            pass
+
+
+class ProbeError(Exception):
+    """Die Datei liess sich nicht auslesen — mit dem Grund, den ffprobe nennt.
+
+    Vorher gab `_run_ffprobe` bei jedem Fehler ein leeres Dict zurück, und der
+    Scanner machte daraus die Meldung „(timeout or corrupt)". Beides war oft
+    falsch: In dieser Bibliothek scheiterten 222 Dateien an fehlenden
+    Leserechten. Wer der Meldung glaubt, sucht nach kaputten Dateien und
+    findet nichts — die Meldung war eine Vermutung im Gewand einer Diagnose.
+
+    `stderr` wurde dabei sogar schon abgefangen und dann weggeworfen.
+    """
+
+
 class MediaProbe:
     """
     Asynchronous wrapper for media analysis tools (FFmpeg/FFprobe).
@@ -56,21 +97,26 @@ class MediaProbe:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=20.0)
 
             if process.returncode != 0:
-                return {}
+                raise ProbeError(_first_line(stderr) or
+                                 f"ffprobe endete mit Code {process.returncode}")
 
             data = json.loads(stdout.decode('utf-8'))
             return data
-        except Exception:
+        except ProbeError:
+            raise
+        except asyncio.TimeoutError:
             # A timeout only cancels communicate() — ffprobe itself keeps
             # running. Reap it, or a library with a few unreadable files leaves
             # one stray process behind per probe.
-            if process is not None and process.returncode is None:
-                try:
-                    process.kill()
-                    await process.wait()
-                except Exception:
-                    pass
-            return {}
+            await _reap(process)
+            raise ProbeError("Zeitüberschreitung nach 20 s") from None
+        except FileNotFoundError:
+            raise ProbeError(
+                f"ffprobe nicht gefunden ({cmd[0]}) — Pfad in den Einstellungen prüfen"
+            ) from None
+        except Exception as e:
+            await _reap(process)
+            raise ProbeError(f"{type(e).__name__}: {e}") from None
 
 
 
@@ -163,6 +209,10 @@ class MediaProbe:
                 FrameRate=round(fps, 2)
             )
 
+        except ProbeError:
+            # Der Grund ist die ganze Aufgabe dieser Ausnahme — hier
+            # abzufangen hiesse, ihn wieder wegzuwerfen.
+            raise
         except Exception:
             return None
 

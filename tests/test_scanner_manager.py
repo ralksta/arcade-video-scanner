@@ -371,6 +371,10 @@ class TestUnreadableFiles:
         """
         Bei einer defekten Platte wären es tausende Zeilen — die Zahl ist die
         Nachricht, die Beispiele sind nur der Einstieg.
+
+        Gruppiert wird nach Grund: 222 Zeilen „Permission denied"
+        untereinander sagen weniger als eine Zeile mit der Zahl davor. Genau
+        das ist an dieser Bibliothek passiert.
         """
         manager = ScannerManager()
         db = FakeDB([])
@@ -380,7 +384,27 @@ class TestUnreadableFiles:
 
         out = capsys.readouterr().out
         assert "15 Datei(en) konnten nicht gelesen werden" in out
-        assert "und 5 weitere" in out
+        assert "15× " in out, "der Grund wird nicht gezählt"
+        assert "und 12 weitere" in out
+
+    def test_the_reason_from_ffprobe_reaches_the_summary(self, capsys):
+        """
+        Der eigentliche Fund: Vorher stand dort pauschal „timeout or corrupt".
+        In dieser Bibliothek scheiterten 222 Dateien an fehlenden Leserechten
+        — wer der Meldung glaubte, suchte nach kaputten Dateien.
+        """
+        from arcade_scanner.scanner.media_probe import ProbeError
+
+        manager = ScannerManager()
+        db = FakeDB([])
+
+        run_scan(manager, db, FakeScanner([("/media/gesperrt.mp4", True)]),
+                 make_config(),
+                 inspect_result=ProbeError("/media/gesperrt.mp4: Permission denied"))
+
+        out = capsys.readouterr().out
+        assert "Permission denied" in out
+        assert "timeout or corrupt" not in out
 
     def test_an_unreadable_file_leaves_the_old_entry_alone(self):
         """
