@@ -175,6 +175,63 @@ def test_a_failed_job_frees_the_file_again(store):
     assert store.queue_encode("/media/film.mkv", size_bytes=100) is not None
 
 
+# --- Unbekannte Zustände ---
+
+def test_an_unknown_status_is_rejected(store, capsys):
+    """
+    `/api/queue/complete` übernimmt den Status ungeprüft aus dem Rumpf der
+    Anfrage. Ein Tippfehler im Arbeiter — `"encoded"` statt `"done"` — hätte
+    den Job in ein Nirgendwo versetzt: nicht aktiv, also nie aufgeräumt; nicht
+    endgültig, also weiterhin als laufend gewertet. Eine Zeile, die keine
+    Stelle der Warteschlange mehr anfasst.
+    """
+    store.queue_encode("/media/film.mkv", size_bytes=100)
+    job_id = store.get_next_pending(worker_id="mac")["id"]
+
+    assert store.update_job_status(job_id, "encoded") is False
+    assert status_of(store, job_id) == "downloading", "Der Zustand wurde trotzdem gesetzt"
+    assert "Unbekannter Job-Status" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("status", [
+    "pending", "downloading", "encoding", "uploading", "done", "failed", "cancelled",
+])
+def test_every_known_status_is_accepted(store, status):
+    store.queue_encode("/media/film.mkv", size_bytes=100)
+    job_id = store.get_next_pending(worker_id="mac")["id"]
+
+    assert store.update_job_status(job_id, status) is True
+    assert status_of(store, job_id) == status
+
+
+def test_the_two_status_sets_do_not_overlap():
+    """
+    Jeder Zustand gehört in genau eine der beiden Mengen. Überschneiden sie
+    sich, wäre ein Job gleichzeitig laufend und abgeschlossen.
+    """
+    from arcade_scanner.database.sqlite_store import SQLiteStore
+
+    assert not (SQLiteStore.ACTIVE_STATUSES & SQLiteStore.TERMINAL_STATUSES)
+
+
+def test_the_sql_conditions_use_the_same_states_as_the_constants():
+    """
+    Die Mengen stehen als Konstante da, die Abfragen zählen die Zustände
+    einzeln auf. Läuft beides auseinander, gilt ein Job je nach befragter
+    Stelle als etwas anderes.
+    """
+    from pathlib import Path
+
+    source = (
+        Path(__file__).parent.parent / "arcade_scanner" / "database" / "sqlite_store.py"
+    ).read_text(encoding="utf-8")
+
+    from arcade_scanner.database.sqlite_store import SQLiteStore
+
+    for state in SQLiteStore.ACTIVE_STATUSES:
+        assert f"'{state}'" in source, f"{state} kommt in keiner Abfrage vor"
+
+
 # --- Der Weg, der schon vorher funktionierte ---
 
 def test_a_new_worker_still_reclaims_when_asking_for_work(store):

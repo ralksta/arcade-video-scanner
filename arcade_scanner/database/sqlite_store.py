@@ -450,6 +450,14 @@ class SQLiteStore:
         job["file_path"] = self._decode_safe_path(job["file_path"])
         return job
 
+    # Jeder Zustand gehört in genau eine dieser beiden Mengen. Die
+    # Warteschlange entscheidet an mehreren Stellen anhand der Zugehörigkeit:
+    # ob eine Datei belegt ist, ob ein Job aufgeräumt werden darf, ob ein
+    # Fortschrittsbericht noch zählt.
+    ACTIVE_STATUSES = frozenset({"pending", "downloading", "encoding", "uploading"})
+    TERMINAL_STATUSES = frozenset({"done", "failed", "cancelled"})
+    VALID_STATUSES = ACTIVE_STATUSES | TERMINAL_STATUSES
+
     def update_job_status(self, job_id: int, status: str, guard_active: bool = False,
                           **kwargs: Any) -> bool:
         """Update a job's status and optional fields. Returns True if a row changed.
@@ -457,7 +465,19 @@ class SQLiteStore:
         With `guard_active` the update only fires while the job is still running,
         so a late status report from the worker cannot resurrect a job the user
         cancelled in the meantime.
+
+        Ein unbekannter Zustand wird abgelehnt. `/api/queue/complete` übernimmt
+        das Feld ungeprüft aus dem Rumpf der Anfrage, und ein Wert wie
+        ``"encoded"`` (statt ``"done"``) hätte den Job in ein Nirgendwo
+        versetzt: nicht aktiv, also wird er nie aufgeräumt — nicht endgültig,
+        also gilt er weiter als laufend, nimmt Fortschrittsmeldungen an und
+        bekommt nie ein ``completed_at``. Eine Zeile, die keine Stelle der
+        Warteschlange mehr anfasst.
         """
+        if status not in self.VALID_STATUSES:
+            print(f"⚠️ Unbekannter Job-Status '{status}' für Job {job_id} — abgelehnt")
+            return False
+
         conn = self._ensure_connection()
 
         sets = ["status = ?", "last_seen = ?"]

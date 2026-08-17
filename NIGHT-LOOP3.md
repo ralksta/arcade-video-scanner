@@ -265,13 +265,15 @@ jetzt systematisch.
 Gewählt nach demselben Maßstab wie bisher: Wo richtet ein Fehler echten
 Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
-- [ ] **Loop N — Die Warteschlange** (läuft)
+- [x] **Loop N — Die Warteschlange**
       - [x] Fertige Umwandlung konnte eine fremde Datei überschreiben
             (zwei betroffene Paare in Ralfs Bibliothek)
       - [x] Verwaiste Jobs blockierten ihre Datei dauerhaft — aufgeräumt wurde
             nur, wenn ein Arbeiter nach Arbeit fragt
       - [x] Lokale Umwandlung liess sich für eine Datei starten, an der die
             Warteschlange gerade arbeitet
+      - [x] Unbekannte Job-Zustände erzeugten Zeilen, die keine Stelle mehr
+            anfasst
       - [ ] **Für Ralf:** zwei *lokale* Läufe derselben Datei bleiben möglich —
             dafür müssten lokale Umwandlungen in die Warteschlange
       In Ralfs Datenbank stehen 18 Jobs. Die Warteschlange ist der einzige
@@ -296,6 +298,18 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 48 (Loop N, Zustände — Loop N abgeschlossen)** — `update_job_status`
+  nahm jede Zeichenkette an, und `/api/queue/complete` reicht das Feld ungeprüft
+  aus dem Rumpf der Anfrage durch. Ein `"encoded"` statt `"done"` hätte den Job
+  in ein Nirgendwo versetzt: Die Warteschlange entscheidet überall anhand von
+  Zugehörigkeit zu zwei Mengen — aktiv (`pending`, `downloading`, `encoding`,
+  `uploading`) und endgültig (`done`, `failed`, `cancelled`) —, und ein Wert
+  ausserhalb beider ist weder aufräumbar noch abgeschlossen. Gelernt: Wenn
+  Logik über Mengenzugehörigkeit statt über Gleichheit entscheidet, ist der
+  gefährliche Wert nicht der falsche, sondern der, der in keine Menge fällt.
+  Die beiden Mengen stehen jetzt als Konstanten da statt in jeder Abfrage neu
+  aufgezählt. Nächstes: Loop O (Duplikaterkennung).
 
 - **Iteration 47 (Loop N, doppelte Ausführung)** — Die Warteschlange sichert
   ihre Übernahme per Compare-and-Swap ab, und der Kommentar begründet es
