@@ -228,12 +228,16 @@ jetzt systematisch.
 
 ## Zyklus 6
 
-- [ ] **Loop L — Sitzungen und Anmeldung** (läuft)
+- [x] **Loop L — Sitzungen und Anmeldung**
       - [x] Brute-Force-Sperre war per `X-Forwarded-For` aushebelbar — Sperre
             auf den Benutzernamen ergänzt
       - [x] Sitzungsverfall, Token-Erzeugung, Abmeldung geprüft: **korrekt**
       - [x] Benutzernamen waren über die Antwortzeit erratbar (Faktor 220) —
             Ableitung läuft jetzt auch für unbekannte Namen
+      - [x] Nutzerverwaltung: Skript war unausführbar (fremder absoluter Pfad
+            in der Shebang-Zeile), leeres Passwort wurde angenommen
+      - [ ] **Für Ralf:** Standardkonto `admin`/`admin`, kein Löschen/Entziehen,
+            Passwortwechsel beendet laufende Sitzungen nicht → im Bericht
       `security/auth.py` speichert bei jeder Sitzung ein `created_at` — ob es je
       ausgewertet wird, ist offen. Ein Token, das nie verfällt, ist nach dem
       Fund „Token im Zugriffslog" (Loop F) besonders relevant: was einmal
@@ -255,6 +259,22 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 40 (Loop L, Nutzerverwaltung — Loop L abgeschlossen)** — Das
+  Skript, mit dem alle Konten dieser Installation angelegt wurden, war gar
+  nicht ausführbar: Die Shebang-Zeile zeigte auf einen absoluten Pfad einer
+  anderen Maschine, mit einem Verzeichnisnamen, den dieses Repo nicht hat. Über
+  den in CLAUDE.md dokumentierten Aufruf lief es immer — deshalb ist es nie
+  aufgefallen. Der Test prüft jetzt alle acht Skripte auf dieselbe Zeile; das
+  eine abweichende war zwischen sieben gleichen unsichtbar. Zweiter Fund:
+  Zweimal Enter an der Passwortabfrage legte ein Konto **ohne Passwort** an —
+  die Gleichheitsprüfung war erfüllt, die Leerprüfung fehlte.
+  Nicht angefasst und in den Bericht gegeben: das Standardkonto `admin`/`admin`,
+  das bei jedem Start neu entsteht, sobald kein Nutzer „admin" existiert.
+  Der Versuch, gegen Ralfs echte Datenbank zu prüfen, ob dieses Passwort dort
+  noch gilt, wurde blockiert — richtig so, das ist Hash-Knacken, auch wenn die
+  Absicht eine andere war. Er kann es selbst in einem Satz feststellen.
+  Nächstes: Loop M (Scanner-Ausschlüsse).
 
 - **Iteration 39 (Loop L, Passwortprüfung)** — Das Hashing selbst ist in
   Ordnung: PBKDF2-HMAC-SHA256, 100.000 Iterationen, Zufallssalz je Nutzer,

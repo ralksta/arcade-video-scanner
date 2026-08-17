@@ -1,4 +1,4 @@
-#!/Users/ralfo/git/arcade-video-scanner/.venv/bin/python3
+#!/usr/bin/env python3
 import argparse
 import binascii
 import getpass
@@ -10,6 +10,37 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from arcade_scanner.database import user_db
 from arcade_scanner.models.user import User
+
+
+def read_new_password(username: str, label: str = "password") -> str | None:
+    """Fragt ein Passwort zweimal ab. None heisst: nicht weitermachen.
+
+    Ein leeres Passwort wurde vorher angenommen -- zweimal Enter genuegte, und
+    das Konto war ohne Passwort angelegt. Beide Eingaben waren ja gleich.
+    """
+    password = getpass.getpass(f"Enter {label} for {username}: ")
+    confirm = getpass.getpass(f"Confirm {label} for {username}: ")
+
+    if password != confirm:
+        print("❌ Passwords do not match.")
+        return None
+    if not password:
+        print("❌ Password cannot be empty.")
+        return None
+    return password
+
+
+def password_from_args(args, username: str, label: str = "password") -> str | None:
+    if args.password is None:
+        return read_new_password(username, label)
+    if not args.password:
+        print("❌ Password cannot be empty.")
+        return None
+    print(
+        "⚠️  Das Passwort stand auf der Kommandozeile. Es steht damit in der\n"
+        "    Shell-History und war waehrend des Aufrufs in `ps` sichtbar."
+    )
+    return args.password
 
 
 def list_users(args):
@@ -33,13 +64,9 @@ def add_user(args):
         print(f"❌ User '{username}' already exists.")
         return
 
-    password = args.password
-    if not password:
-        password = getpass.getpass(f"Enter password for {username}: ")
-        confirm = getpass.getpass(f"Confirm password for {username}: ")
-        if password != confirm:
-            print("❌ Passwords do not match.")
-            return
+    password = password_from_args(args, username)
+    if password is None:
+        return
 
     salt = os.urandom(16)
     pwd_hash = user_db.hash_password(password, salt)
@@ -62,13 +89,9 @@ def change_password(args):
         print(f"❌ User '{username}' not found.")
         return
 
-    password = args.password
-    if not password:
-        password = getpass.getpass(f"Enter NEW password for {username}: ")
-        confirm = getpass.getpass(f"Confirm NEW password for {username}: ")
-        if password != confirm:
-            print("❌ Passwords do not match.")
-            return
+    password = password_from_args(args, username, "NEW password")
+    if password is None:
+        return
 
     salt = os.urandom(16)
     pwd_hash = user_db.hash_password(password, salt)
@@ -78,6 +101,12 @@ def change_password(args):
 
     user_db.add_user(user)
     print(f"✅ Password for '{username}' updated successfully.")
+    print(
+        "ℹ️  Laufende Sitzungen bleiben gueltig. Der Server haelt sie im "
+        "Arbeitsspeicher;\n    dieses Skript laeuft in einem eigenen Prozess "
+        "und erreicht sie nicht.\n    Wer bereits angemeldet ist, bleibt es -- "
+        "bis zum Sitzungsablauf oder\n    einem Neustart des Servers."
+    )
 
 def main():
     parser = argparse.ArgumentParser(description="Arcade User Management Tool")
