@@ -238,6 +238,35 @@ def _handle_mark_optimized(handler) -> None:
     handler.end_headers()
 
 
+def _busy_in_queue(paths: list[str]) -> set[str]:
+    """Welche dieser Dateien werden gerade über die Warteschlange bearbeitet?
+
+    Es gibt zwei voneinander unabhängige Wege, eine Datei umzuwandeln:
+
+        Warteschlange   /api/queue/next  →  mac_worker.py auf einem anderen Rechner
+        direkt          video_optimizer.py bzw. batch_controller.py, lokal
+
+    Nur der erste kennt eine Übernahme (`get_next_pending` per
+    Compare-and-Swap). Der zweite fragt nirgends nach. Eine Datei, die ein
+    Mac gerade umwandelt, liess sich hier also ein zweites Mal starten — zwei
+    Encoder auf derselben Quelle, beide mit demselben Zielnamen, und einer
+    löscht das Original, während der andere noch daraus liest.
+
+    Was diese Prüfung *nicht* abdeckt: zwei lokale Läufe derselben Datei. Die
+    tauchen in keiner Warteschlange auf. Dafür müssten lokale Umwandlungen dort
+    eingetragen werden — eine Entwurfsänderung, keine Korrektur.
+    """
+    try:
+        active = db.get_active_queue_paths()
+    except Exception as e:
+        # Im Zweifel nicht blockieren: Die Prüfung soll einen Doppellauf
+        # verhindern, nicht die Funktion lahmlegen, wenn die Warteschlange
+        # gerade nicht lesbar ist.
+        print(f"⚠️ Warteschlange nicht lesbar, Doppellauf-Prüfung entfällt: {e}")
+        return set()
+    return {p for p in paths if p in active}
+
+
 def _handle_compress(handler) -> None:
     user_name = handler.get_current_user()
     if not user_name:
@@ -275,6 +304,15 @@ def _handle_compress(handler) -> None:
         if video_mode not in ["compress", "copy"]:
             print(f"🚨 Invalid video mode: {video_mode}")
             handler.send_error(400, "Invalid video mode")
+            return
+
+        if _busy_in_queue([file_path]):
+            print(f"⛔ {file_path} steht bereits in der Warteschlange — kein zweiter Lauf")
+            handler.send_error(
+                409,
+                "Diese Datei wird bereits über die Warteschlange umgewandelt. "
+                "Ein zweiter Lauf würde dieselbe Datei gleichzeitig überschreiben."
+            )
             return
 
         current_port = handler.server.server_address[1]
@@ -675,6 +713,14 @@ def _handle_batch_compress(handler) -> None:
             except (SecurityError, ValueError) as e:
                 print(f"🚨 Skipping invalid path in batch: {p} - {e}")
                 continue
+
+        busy = _busy_in_queue(validated_paths)
+        if busy:
+            # Übersprungen statt abgebrochen: Der Rest der Auswahl soll laufen.
+            print(f"⛔ {len(busy)} Datei(en) stehen bereits in der Warteschlange, übersprungen:")
+            for p in sorted(busy):
+                print(f"   {p}")
+            validated_paths = [p for p in validated_paths if p not in busy]
 
         if not validated_paths:
             print("❌ No valid files to process in batch")

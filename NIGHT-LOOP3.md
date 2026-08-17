@@ -270,6 +270,10 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
             (zwei betroffene Paare in Ralfs Bibliothek)
       - [x] Verwaiste Jobs blockierten ihre Datei dauerhaft — aufgeräumt wurde
             nur, wenn ein Arbeiter nach Arbeit fragt
+      - [x] Lokale Umwandlung liess sich für eine Datei starten, an der die
+            Warteschlange gerade arbeitet
+      - [ ] **Für Ralf:** zwei *lokale* Läufe derselben Datei bleiben möglich —
+            dafür müssten lokale Umwandlungen in die Warteschlange
       In Ralfs Datenbank stehen 18 Jobs. Die Warteschlange ist der einzige
       Teil des Produkts, der *Dateien ersetzt* — ein Zustandsfehler heißt hier
       nicht „Anzeige falsch", sondern im schlimmsten Fall eine halb
@@ -292,6 +296,21 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 47 (Loop N, doppelte Ausführung)** — Die Warteschlange sichert
+  ihre Übernahme per Compare-and-Swap ab, und der Kommentar begründet es
+  ausdrücklich: sonst „two workers encode the same file and race on the same
+  output path". Genau dieser Zustand liess sich trotzdem herstellen — nur nicht
+  über die Warteschlange. `/compress` und `/batch_compress` starten den
+  Optimierer direkt und fragten nirgends nach, ob ein Mac gerade an derselben
+  Datei arbeitet. Am aufschlussreichsten: `candidates.py:42` benutzt
+  `get_active_queue_paths()` längst, um belegte Dateien aus den Vorschlägen zu
+  nehmen. Die Information lag bereit — nur die beiden Stellen, die tatsächlich
+  einen Encoder starten, haben sie nicht abgefragt. Gelernt: Eine Absicherung
+  schützt den Weg, auf dem sie steht; ein zweiter Weg zum selben Ziel erbt sie
+  nicht. Dritter Fund dieser Nacht nach demselben Muster (Iterationen 43, 46).
+  Zwei lokale Läufe derselben Datei bleiben möglich — das wäre eine
+  Entwurfsänderung, steht im Bericht. Nächstes: Loop O (Duplikaterkennung).
 
 - **Iteration 46 (Loop N, verwaiste Jobs)** — Dasselbe Muster wie in
   Iteration 43, an ganz anderer Stelle: Die Aufräumfunktion für verwaiste Jobs
