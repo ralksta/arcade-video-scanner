@@ -318,15 +318,30 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       daraus überhaupt ein lauffähiger Zustand herstellen? Eine Sicherung, die
       nur fast vollständig ist, merkt man am schlechtesten Tag.
 
-- [ ] **Loop Q — Auslieferung: Streaming und Proxys** (läuft)
+- [x] **Loop Q — Auslieferung: Streaming und Proxys**
       - [x] Verkürzt gelieferte Streams liessen den Client hängen —
             erreichbar, wenn der Optimierer die Datei währenddessen ersetzt
       - [x] Kein Validator: Bereiche aus zwei verschiedenen Fassungen konnten
             in einer Wiedergabe landen — jetzt `ETag` und `If-Range`
-      - [ ] Offen: Proxy-Entscheidung selbst prüfen
+      - [x] Proxy-Entscheidung geprüft: HEAD und GET treffen dieselbe,
+            Veraltungsprüfung vorhanden, Adressbereiche korrekt — nichts offen
       Jede Wiedergabe läuft hier durch. Range-Requests, Teilinhalte, Springen
       im Video, und die Entscheidung LAN → Original / Tailscale → Proxy. Reine
       Protokoll-Logik, ohne Mediendateien prüfbar.
+
+## Zyklus 9
+
+- [ ] **Loop R — Auto-Tagging** (läuft)
+      Regeln, die selbsttätig Tags in die Nutzerdaten schreiben. Ein Fehler
+      hier ist bleibend und sichtbar: falsche Tags an echten Dateien, und
+      niemand weiss, woher sie kommen. In Loop C fiel schon auf, dass der
+      Aufruf nach dem Scan jahrelang stillschweigend gar nicht lief.
+
+- [ ] **Loop S — Erstlauf und Einrichtung**
+      `onboarding.py` schreibt Einstellungen, legt das Admin-Konto an und
+      entscheidet, was gescannt wird. Es läuft genau einmal — deshalb sieht es
+      niemand nochmal an, und deshalb fällt dort nichts auf. Hängt am
+      Standardkonto-Punkt aus dem Bericht.
 
 ## Abschluss vor dem Morgen
 
