@@ -5,7 +5,7 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: 8 von 9 Punkten entschieden.
+Stand: alle 9 Punkte entschieden (17.08.2026).
 
 ---
 
@@ -287,3 +287,49 @@ nur `list`, `add`, `passwd`):
   nichts bewirkt — bis zu 30 Tage lang.
 - `SessionManager` kennt bereits `revoke_session(token)`; gebraucht wird
   „alle Sitzungen dieses Nutzers".
+
+---
+
+## 9. Vorschaubilder ohne Anmeldung — **nur für Nicht-LAN schließen**
+
+`/thumbnails/` prüft Dateinamen und Pfad, aber keine Sitzung. Eine
+Sitzungspflicht würde die Vorschaubilder im TV-Client abschalten:
+`thumbnailUrl()` in `tv_client/src/serverConfig.js` hängt keinen Token an, und
+ein Cookie hat der Client nicht.
+
+**Entschieden:** Aus dem lokalen Netz bleibt die Route offen; von außerhalb
+(Tailscale) verlangt sie eine Sitzung.
+
+Zu beachten:
+
+- Die Unterscheidung existiert bereits: `core/proxy_resolver.py` entscheidet
+  pro Anfrage anhand der Client-Adresse zwischen LAN und Tailscale. Diese
+  Logik wird mitbenutzt, nicht nachgebaut — sonst laufen zwei Begriffe von
+  „lokal" auseinander.
+- **Der schwache Punkt der Entscheidung, ausdrücklich festgehalten:** Wer im
+  LAN ist, kommt weiterhin ohne Anmeldung an alle Vorschaubilder, deren Pfad
+  er kennt. Das ist bewusst in Kauf genommen, um die TV-Vorschau nicht zu
+  verlieren. Sollte der TV-Client ohnehin einmal neu gebaut werden, ist der
+  saubere Weg (Token anhängen, Route ganz schließen) die bessere Lösung — die
+  Reihenfolge wäre dann zwingend: erst Client, dann Server.
+- Die Client-Adresse darf **nicht** aus `X-Forwarded-For` kommen. Der Header
+  ist vom Client setzbar; genau darüber war in dieser Nacht schon die
+  Brute-Force-Sperre aushebelbar. Sonst genügt eine erfundene Kopfzeile, um
+  „im LAN" zu behaupten.
+- Die begründete Ausnahmeliste in `tests/test_stream_requires_session.py` muss
+  angepasst werden: Aus „bewusst offen" wird „offen nur im LAN", und der Test
+  sollte beide Fälle abdecken.
+
+---
+
+## Was als Nächstes ansteht
+
+Keine Entscheidung mehr offen. Vor einer Umsetzung sinnvoll zu klären:
+
+1. **Reihenfolge.** Punkt 4 (Vault entfernen) berührt viele derselben Dateien
+   wie Punkt 2 (Ansichten pro Nutzer) und Punkt 7 (Sicherung mit `users.db`).
+   Vault zuerst zu entfernen erspart es, Vault-Anteile zweimal anzufassen.
+2. **Punkt 3** (Tailwind lokal) bringt einen Build-Schritt ins Projekt und
+   sollte für sich stehen, nicht mit anderem vermischt.
+3. **Punkt 7b** (Wiederherstellung) ist die einzige löschende Neuentwicklung
+   auf dieser Liste und gehört ans Ende, wenn der Rest stabil ist.
