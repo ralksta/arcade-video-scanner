@@ -18,6 +18,12 @@ class ImageInspector(MediaInspector):
     """
     BATCH_SIZE = 100  # Max files per sips call
 
+    # Wie im Video-Probe (media_probe.py): Ein hängender Aufruf darf den Scan
+    # nicht anhalten. Hier wiegt es schwerer, weil an einem Aufruf bis zu 100
+    # wartende Futures hängen — ohne Zeitlimit steht mit ihnen der ganze
+    # Bilddurchlauf.
+    SIPS_TIMEOUT_SEC = 30.0
+
     def __init__(self):
         self.IMAGE_EXTENSIONS = (
             # Standard formats
@@ -110,6 +116,7 @@ class ImageInspector(MediaInspector):
             return
 
         # Run single sips call for the entire batch
+        proc = None
         try:
             cmd = ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', '-g', 'format'] + files
 
@@ -118,18 +125,34 @@ class ImageInspector(MediaInspector):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await proc.communicate()
+            try:
+                stdout, _stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=self.SIPS_TIMEOUT_SEC)
+            except asyncio.TimeoutError:
+                # Das Zeitlimit bricht nur communicate() ab — sips läuft
+                # weiter. Einsammeln, sonst bleibt pro Stapel ein Prozess
+                # zurück. Gleiche Behandlung wie bei ffprobe.
+                if proc.returncode is None:
+                    try:
+                        proc.kill()
+                        await proc.wait()
+                    except Exception:
+                        pass
+                raise
 
-            if proc.returncode != 0:
-                # Some files may have failed — resolve with None
-                for filepath in files:
-                    future = self._batch_results.pop(filepath, None)
-                    if future and not future.done():
-                        future.set_result(None)
-                return
-
-            # Parse multi-file sips output
-            output = stdout.decode()
+            # Die Ausgabe wird auch bei einem Fehlerkode ausgewertet.
+            #
+            # Vorher genügte **eine** unlesbare Datei, damit der gesamte Stapel
+            # verworfen wurde: sips liefert dann einen Rückgabewert ungleich
+            # null, und alle bis zu 100 Futures wurden mit None beantwortet.
+            # Die betroffenen Bilder gelangten damit gar nicht in die
+            # Bibliothek — und beim nächsten Scan wieder nicht, weil derselbe
+            # Stapel dieselbe kaputte Datei enthält.
+            #
+            # sips schreibt die Eigenschaften der lesbaren Dateien trotzdem
+            # nach stdout. Wer keine liefert, bekommt weiter unten None; wer
+            # welche liefert, kommt durch.
+            output = stdout.decode(errors="replace")
             file_properties = self._parse_batch_sips_output(output)
 
             # Create MediaAssets and resolve futures

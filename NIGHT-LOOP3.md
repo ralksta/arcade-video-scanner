@@ -449,10 +449,12 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       wird — und optimieren heisst hier: Datei ersetzen. An 8788 echten
       Einträgen nachrechenbar.
 
-- [ ] **Loop AA — Der Scanner bei kaputten Dateien** (läuft)
+- [x] **Loop AA — Der Scanner bei kaputten Dateien**
       - [x] Fehlt die Gesamtbitrate im Container, blieb der Eintrag bei 0 —
             und war damit für den gesamten Optimierungs-Weg unsichtbar
-      - [ ] Offen: image_inspector, Zeitüberschreitungen
+      - [x] Eine unlesbare Bilddatei verwarf den **gesamten Stapel** von bis
+            zu 100 — dauerhaft, weil derselbe Stapel sie wieder enthält
+      - [x] Kein Zeitlimit auf `sips`; der Video-Probe hatte längst eines
       `media_probe`, `video_inspector`, `image_inspector`. Was landet in der
       Bibliothek, wenn ffprobe nichts liefert, Unsinn liefert oder die Datei
       abgeschnitten ist? Eine Null an der falschen Stelle wandert von dort in
@@ -467,6 +469,23 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 75 (Loop AA, Bild-Inspektor — Loop AA abgeschlossen)** — Der
+  Inspektor fasst bis zu 100 Dateien in einen `sips`-Aufruf. Das ist gut für
+  die Geschwindigkeit und macht zwei Fehler teuer. Erstens: `sips` liefert
+  einen Fehlerkode, sobald **eine** Datei nicht lesbar ist — schreibt die
+  Eigenschaften der übrigen aber trotzdem nach stdout. Verworfen wurden alle.
+  Ein einziges defektes Bild konnte damit bis zu 99 andere **dauerhaft** aus
+  der Bibliothek halten, weil derselbe Stapel beim nächsten Scan dieselbe
+  kaputte Datei enthält. Zweitens fehlte jedes Zeitlimit, obwohl der
+  Video-Probe zwei Dateien weiter genau dafür eines hat — samt Begründung, dass
+  der Prozess danach eingesammelt werden muss. Hier wiegt es schwerer: An einem
+  Aufruf hängen bis zu 100 wartende Futures.
+  Der Beleg war deutlicher als geplant: Gegen den alten Stand **hängt die
+  Test-Suite**, statt fehlzuschlagen. Ich musste den Lauf abbrechen und die
+  Datei von Hand zurückspielen. Gelernt: Wenn eine Datei zwei Dateien weiter
+  eine Lehre aufgeschrieben hat, ist die Frage nicht, ob sie hier auch gilt,
+  sondern warum sie noch nicht gezogen wurde. Nächstes: Zyklus 14 planen.
 
 - **Iteration 74 (Loop AA, fehlende Bitrate)** — `media_probe` ist sorgfältig
   gebaut: `_as_float`-Helfer überall, Division geprüft, „N/A" pro Feld
