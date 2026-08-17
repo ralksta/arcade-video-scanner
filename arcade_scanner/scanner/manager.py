@@ -14,6 +14,61 @@ from .media_probe import MediaProbe
 from .video_inspector import VideoInspector
 
 
+def _apply_detected_moves(existing_entries, orphans, newcomers) -> dict:
+    """Trägt Favoriten, Vault, Tags und das Aufnahmedatum auf den neuen Pfad um.
+
+    `existing_entries` ist der Stand **vor** dem Scan, `orphans` sind die
+    daraus verschwundenen Pfade, `newcomers` die neu hinzugekommenen.
+
+    Der Aufruf steht unmittelbar vor dem Löschen der verwaisten Zeilen — das
+    ist der letzte Zeitpunkt, zu dem der alte Zustand noch existiert.
+
+    Fehler hier dürfen den Scan nicht abbrechen: Das Aufräumen danach ist
+    wichtiger als das Umtragen, und ein nicht umgetragener Eintrag ist genau
+    der Zustand, den es vorher immer gab.
+    """
+    if not orphans or not newcomers:
+        return {}
+
+    try:
+        from ..database.user_store import user_db
+        from .move_detect import detect_moves
+
+        gone = {p: existing_entries[p] for p in orphans if p in existing_entries}
+        arrived = {}
+        for path in newcomers:
+            entry = db.get(path)
+            if entry is not None:
+                arrived[path] = entry
+
+        moves = detect_moves(gone, arrived)
+        if not moves:
+            return {}
+
+        umgetragen = user_db.remap_paths_in_user_data(moves)
+
+        # Das Aufnahmedatum gehört zur Datei, nicht zum Pfad. Ohne diesen
+        # Schritt stünde jede verschobene Datei in „zuletzt hinzugefügt" ganz
+        # oben — obwohl sich nur ihr Name geändert hat.
+        for alt, neu in moves.items():
+            altes_datum = getattr(existing_entries[alt], "imported_at", 0) or 0
+            neuer_eintrag = db.get(neu)
+            if neuer_eintrag is None or not altes_datum:
+                continue
+            if not (getattr(neuer_eintrag, "imported_at", 0) or 0) or \
+                    altes_datum < neuer_eintrag.imported_at:
+                neuer_eintrag.imported_at = altes_datum
+                db.upsert(neuer_eintrag)
+
+        print(f"↪ {len(moves)} Datei(en) umgezogen — Tags, Favoriten und "
+              f"Aufnahmedatum übernommen ({umgetragen} Nutzereinträge).")
+        return moves
+    except Exception as e:
+        print(f"⚠️ Umzugserkennung übersprungen ({e!r}) — "
+              "verschobene Dateien verlieren ihre Tags wie bisher.")
+        return {}
+
+
 class ScannerManager:
     """
     Orchestrates the scanning process:
@@ -75,7 +130,11 @@ class ScannerManager:
 
         # 1. Load Cache
         db.load()
-        existing_paths = {entry.file_path for entry in db.get_all()}
+        # Nicht nur die Pfade: Um einen Umzug zu erkennen, braucht der
+        # Aufräumschritt unten den Fingerabdruck der Einträge, wie sie **vor**
+        # diesem Scan aussahen. Danach ist die alte Zeile weg.
+        existing_entries = {entry.file_path: entry for entry in db.get_all()}
+        existing_paths = set(existing_entries)
         found_paths: Set[str] = set()
 
         # Snapshot the targets once: the orphan cleanup below decides whether it
@@ -335,6 +394,14 @@ class ScannerManager:
                 from arcade_scanner.core.video_processor import remove_thumbnail_for
 
                 orphans = existing_paths - found_paths
+
+                # Umzüge zuerst: Wer eine Datei umbenennt oder verschiebt,
+                # sieht von hier aus aus wie „alte weg, neue da". Der
+                # Nutzerzustand hängt aber am Pfad — er wäre mit der alten
+                # Zeile verloren, und die neue Datei stünde ohne Tags da.
+                _apply_detected_moves(existing_entries, orphans,
+                                      found_paths - existing_paths)
+
                 removed_count = 0
                 thumbs_removed = 0
                 for orphan in orphans:

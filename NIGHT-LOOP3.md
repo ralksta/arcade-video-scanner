@@ -485,6 +485,24 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       `cinema.js`, `store.js`, `collections.js`. Der Rest des Browser-Clients,
       den noch kein Loop angefasst hat.
 
+## Zyklus 15
+
+Zwei Themenfelder, die in vierzehn Zyklen nie an der Reihe waren — beide
+betreffen den Kern des Werkzeugs: ein Inventar über Dateien, die es selbst
+nicht kontrolliert.
+
+- [ ] **Loop AD — Wenn Dateien draußen verschwinden, umziehen oder umbenannt werden** (läuft)
+      Das Inventar steht in SQLite, die Wahrheit auf der Platte. Zwischen
+      beiden liegt alles, was der Nutzer außerhalb der App tut: verschieben,
+      umbenennen, Platte abhängen, Netzlaufwerk nicht gemountet. Was macht
+      der Scanner daraus — und was macht die Oberfläche?
+      - [x] Umzug = Datenverlust: Tags, Favoriten und Vault-Marke hängen am
+            Pfad und wurden mit der verwaisten Zeile gelöscht
+
+- [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum**
+      Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
+      Zeitzone steht es, und was passiert beim Rescan?
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
@@ -494,6 +512,21 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 80 (Loop AD, Umzüge)** — Der Aufräumschritt nach dem Scan war
+  schon zweimal Thema (Loop M), und beide Male ging es darum, wann er
+  *nichts* löschen darf. Übersehen wurde der Fall, in dem er zu Recht löscht
+  und trotzdem Schaden anrichtet: Datei umbenannt. Der Kommentar an der Stelle
+  benennt den Verlust sogar selbst — „user state that no rescan can restore" —
+  und wurde bisher als Begründung fürs Vorsichtigsein gelesen, nicht als
+  offenes Problem. Ordnung in einer Mediathek *besteht* aus Umbenennen und
+  Verschieben; der Nutzer verliert also genau beim Aufräumen die Arbeit, die er
+  vorher hineingesteckt hat. Erkannt wird der Umzug an dem, was er nicht
+  verändert: Größe, mtime, Laufzeit. Nur eindeutige Paare — eine falsche
+  Zuordnung hinge fremde Tags an, eine fehlende kostet nur das, was ohnehin
+  weg war. Gelernt: Ein Kommentar, der einen Verlust beschreibt, ist eine
+  Fundstelle, keine Entwarnung. Nächstes: weiter in Loop AD — was zeigt die
+  Oberfläche bei nicht eingehängtem Laufwerk?
 
 - **Iteration 79 (Loop AC, Tag-Namen im Cinema — Loop AC abgeschlossen)** — Ein
   früherer Lauf hat dieses Muster an fünf Stellen behoben; `cinema.js` blieb

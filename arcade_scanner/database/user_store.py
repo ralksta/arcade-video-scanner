@@ -450,6 +450,61 @@ class UserStore:
         except Exception as e:
             print(f"⚠️ Error migrating sensitive settings: {e}")
 
+    def remap_paths_in_user_data(self, mapping) -> int:
+        """Schreibt Favoriten, Vault und Tags von einem Pfad auf einen anderen um.
+
+        `mapping` ist `{alter Pfad: neuer Pfad}`. Zurückgegeben wird die Zahl
+        der umgeschriebenen Einträge.
+
+        Gedacht für den Fall, dass eine Datei **umgezogen** ist: Der
+        Nutzerzustand hängt hier ausschließlich am Pfad, ein Umbenennen im
+        Dateimanager sieht für die Bibliothek deshalb aus wie „alte Datei weg,
+        neue Datei da". Favoriten, Vault-Markierung und Tags blieben dabei auf
+        dem alten Pfad liegen — unsichtbar, aber für immer, und die neue Datei
+        stand ohne alles da.
+
+        Wer den Zustand des neuen Pfades **schon** gesetzt hat, behält ihn: Der
+        Umzug ergänzt, er überschreibt nicht. Sonst könnte ein Scan eine
+        Entscheidung zurücknehmen, die der Nutzer inzwischen getroffen hat.
+        """
+        pairs = {old: new for old, new in dict(mapping).items()
+                 if old and new and old != new}
+        if not pairs:
+            return 0
+
+        changed = 0
+        # Dieselbe Sperre und dasselbe Muster wie beim Aufräumen darunter:
+        # lesen, ändern, zurückschreiben — am Stück.
+        with self._write_lock:
+            for user in self.get_all_users():
+                before = changed
+
+                for old, new in pairs.items():
+                    if old in user.data.favorites:
+                        user.data.favorites.remove(old)
+                        if new not in user.data.favorites:
+                            user.data.favorites.append(new)
+                        changed += 1
+
+                    if old in user.data.vaulted:
+                        user.data.vaulted.remove(old)
+                        if new not in user.data.vaulted:
+                            user.data.vaulted.append(new)
+                        changed += 1
+
+                    if old in user.data.tags:
+                        alte_tags = user.data.tags.pop(old)
+                        vorhanden = user.data.tags.get(new, [])
+                        user.data.tags[new] = vorhanden + [
+                            t for t in alte_tags if t not in vorhanden
+                        ]
+                        changed += 1
+
+                if changed > before:
+                    self.add_user(user)
+
+        return changed
+
     def purge_paths_from_user_data(self, paths) -> int:
         """Entfernt gelöschte Pfade aus Favoriten, Vault und Tags aller Nutzer.
 
