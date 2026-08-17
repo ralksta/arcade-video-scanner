@@ -40,7 +40,7 @@ const context = vm.createContext({
     workspaceMode: fixtures.workspaceMode || 'lobby',
     currentFilter: 'all',
     currentCodec: 'all',
-    currentSort: 'name',
+    currentSort: fixtures.sortKey || 'name',
     currentFolder: 'all',
     searchTerm: '',
     minSizeMB: null,

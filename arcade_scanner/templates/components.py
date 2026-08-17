@@ -2232,7 +2232,8 @@ FILTER_BAR_COMPONENT = """
                 <option value="bitrate">Sort: bitrate</option>
                 <option value="size">Sort: size</option>
                 <option value="runtime">Sort: runtime</option>
-                <option value="date">Sort: date</option>
+                <option value="date">Sort: date added</option>
+                <option value="file_date">Sort: file date</option>
             </select>
         </div>
 

@@ -305,7 +305,16 @@ function filterAndSort(scrollToTop = false) {
                 // Dutzend Zeilen weiter oben — „wann kam das in die Bibliothek",
                 // nicht „wann wurde die Datei zuletzt geschrieben". Sonst schiebt
                 // jedes Optimieren einen alten Film nach oben.
+                // Zwei Fragen, zwei Sortierungen — vorher hieß beides „date"
+                // und antwortete auf die zweite.
+                //
+                //   'date'       wann kam das in die Bibliothek (entryDate)
+                //   'file_date'  wann wurde die Datei zuletzt geschrieben
+                //
+                // Der Wert 'date' bleibt, wie er ist: Gespeicherte Ansichten
+                // tragen ihn.
                 if (currentSort === 'date') return entryDate(b) - entryDate(a);
+                if (currentSort === 'file_date') return (b.mtime || 0) - (a.mtime || 0);
                 return 0;
             });
         } else {

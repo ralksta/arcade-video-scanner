@@ -512,6 +512,9 @@ nicht kontrolliert.
       Zeitzone steht es, und was passiert beim Rescan?
       - [x] „Sortieren: Datum" und „hinzugefügt: letzte 7 Tage" meinten zwei
             verschiedene Daten — Optimieren schob alte Filme nach oben
+      - [x] Korrektur dazu: beide Fragen sind berechtigt, jetzt zwei Optionen
+      - [x] `imported_at=0` bei Bildern ist **kein** Fehler — der Scanner
+            stempelt es im gemeinsamen Block
 
 ## Abschluss vor dem Morgen
 
@@ -522,6 +525,26 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 87 (Loop AE, Korrektur an mir selbst)** — Zwei Punkte auf der
+  Liste, einer davon gegen die vorige Iteration.
+  Erstens: `imported_at=0` im `image_inspector` ist kein Fehler. Der Wert wird
+  im gemeinsamen Block in `manager.py` gestempelt, den Bilder und Videos
+  gleichermaßen durchlaufen — ich hatte den Aufruf auf der Liste, ohne den
+  Weg zu Ende gelesen zu haben. Nichts geändert.
+  Zweitens, und wichtiger: Die Umstellung der Sortierung in Iteration 86 war
+  zu kurz gedacht. Der Grund stimmte, die Folge nicht: Beim **ersten** Scan
+  bekommen alle Dateien ihr `imported_at` binnen Minuten, die Reihenfolge
+  innerhalb eines solchen Blocks ist die des Verzeichnisdurchlaufs — also
+  keine. An der echten Bibliothek nachgesehen: 8788 Einträge auf zehn
+  Import-Tage, aber 2858 allein am 07.08. Für die hätte ich „nach Datum" durch
+  „nach Scan-Reihenfolge" ersetzt. Es sind eben zwei berechtigte Fragen
+  („zuletzt hinzugefügt" gegen „neueste Aufnahme"); jetzt stehen beide im
+  Auswahlfeld, der gespeicherte Wert `date` bleibt unverändert. Gelernt: Bevor
+  man eine Regel vereinheitlicht, nachsehen, wie die Daten in der Praxis
+  aussehen — die Verteilung entscheidet, ob aus einer Vereinheitlichung eine
+  Verschlechterung wird. Nächstes: Aufräumfristen der Warteschlange und
+  Sitzungsablauf.
 
 - **Iteration 86 (Loop AE, zwei Daten unter einem Namen)** — Es gibt
   `imported_at` (erster Scan) und `mtime` (letzte Änderung). Drei Stellen —
