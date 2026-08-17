@@ -412,6 +412,55 @@ class UserStore:
         except Exception as e:
             print(f"⚠️ Error migrating sensitive settings: {e}")
 
+    def purge_paths_from_user_data(self, paths) -> int:
+        """Entfernt gelöschte Pfade aus Favoriten, Vault und Tags aller Nutzer.
+
+        Zurückgegeben wird die Zahl der entfernten Einträge.
+
+        `db.remove()` löscht nur die Zeile in `media`. Der Nutzerzustand hängt
+        aber am **Pfad** und blieb unangetastet, für immer. Zwei Folgen:
+
+        1. Die Listen wachsen mit jeder gelöschten Datei. In dieser
+           Installation stehen bereits 12 Tag-Einträge und drei
+           Favoriten/Vault-Einträge auf Pfaden, die es nicht mehr gibt.
+
+        2. Die gefährlichere: Entsteht später **dieselbe Pfadangabe erneut** —
+           und beim Optimieren entsteht sie regelmäßig neu, weil aus
+           ``film.mkv`` wieder ``film.mp4`` wird —, erbt die neue Datei
+           stillschweigend den alten Zustand. Ein Video, das als „vaulted"
+           galt, ist nach dem Neuanlegen sofort wieder versteckt, ohne dass
+           irgendwo steht, warum.
+
+        Aufgerufen wird das bei **ausdrücklichen** Löschungen durch den
+        Nutzer. Nicht beim Aufräumen verwaister Einträge nach einem Scan: Dort
+        warnt der Code selbst, dass diese Angaben „no rescan can restore" —
+        und ein Scan, der sich irrt, würde sie sonst mitnehmen.
+        """
+        targets = {p for p in paths if p}
+        if not targets:
+            return 0
+
+        removed = 0
+        for user in self.get_all_users():
+            before = removed
+
+            keep_fav = [p for p in user.data.favorites if p not in targets]
+            removed += len(user.data.favorites) - len(keep_fav)
+            user.data.favorites = keep_fav
+
+            keep_vault = [p for p in user.data.vaulted if p not in targets]
+            removed += len(user.data.vaulted) - len(keep_vault)
+            user.data.vaulted = keep_vault
+
+            keep_tags = {p: t for p, t in user.data.tags.items() if p not in targets}
+            removed += len(user.data.tags) - len(keep_tags)
+            user.data.tags = keep_tags
+
+            if removed > before:
+                self.add_user(user)
+
+        return removed
+
     def cleanup_legacy_settings(self):
         """Removes migrated keys from settings.json."""
         settings_path = os.path.join(config.hidden_data_dir, "settings.json")

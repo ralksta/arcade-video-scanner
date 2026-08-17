@@ -290,7 +290,11 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       - [ ] **Für Ralf:** die übrigen fünf `is_path_allowed`-Aufrufe sind
             weiterhin installationsweit → im Bericht
       - [x] Bild-Rückfallweg erklärte „ähnlich groß" zu „exaktes Duplikat"
-      - [ ] Offen: `recommended_keep` und Nutzerzustand, Re-Encode-Erkennung
+      - [x] Favoriten, Tags und Vault-Marken überlebten das Löschen und
+            wurden von neuen Dateien desselben Pfads geerbt
+      - [ ] **Für Ralf:** 15 bereits verwaiste Einträge in seinen Nutzerdaten →
+            im Bericht, nicht angefasst
+      - [ ] Offen: `recommended_keep` bei Gleichstand, Re-Encode-Erkennung
       Der zweite Bereich mit einer löschenden Aktion. Was gilt als Duplikat,
       wie oft irrt sich das, und was passiert beim Zusammenführen mit Tags und
       Favoriten des unterlegenen Eintrags? Perceptual Hashing ist reine Logik,
@@ -305,6 +309,21 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 51 (Loop O, Nutzerzustand beim Löschen)** — `db.remove()` löscht
+  die Zeile in `media`; Favoriten, Tags und Vault-Marken hängen aber am Pfad
+  und blieben liegen. In Ralfs Daten stehen dadurch bereits 12 Tag-Einträge,
+  zwei Favoriten und eine Vault-Marke auf Pfaden, die es nicht mehr gibt — der
+  Fund liess sich also direkt an den echten Daten belegen. Der eigentliche
+  Schaden ist nicht das Anwachsen, sondern die **Wiederverwendung**: Beim
+  Optimieren entsteht aus `film.mkv` wieder `film.mp4`, also genau der Name der
+  gelöschten Datei — und die neue erbt stillschweigend deren Zustand. Ein
+  Video, das einmal versteckt war, ist sofort wieder versteckt, ohne dass
+  irgendwo steht, warum. Gelernt: Zustand, der an einem Namen hängt statt an
+  einer Sache, überlebt die Sache. Aufgeräumt wird nur bei **ausdrücklichen**
+  Löschungen, nicht beim Aufräumen verwaister Einträge nach einem Scan — dort
+  warnt der Code selbst, dass ein Scan sich irren kann. Nächstes:
+  `recommended_keep` bei Gleichstand.
 
 - **Iteration 50 (Loop O, Bild-Duplikate)** — Der Video-Zweig filtert mit der
   Signatur nur vor und vergleicht danach die Bytes; der Kommentar sagt es

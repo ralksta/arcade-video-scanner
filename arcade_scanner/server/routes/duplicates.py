@@ -16,6 +16,26 @@ def _get_deps():
     )
     return _dup_mgr, db, user_db, MAX_REQUEST_SIZE, background_duplicate_scan, clear_duplicate_cache, is_path_allowed
 
+def _purge_user_state(paths) -> None:
+    """Favoriten, Vault-Marken und Tags gelöschter Dateien mit entfernen.
+
+    `db.remove()` löscht nur die Zeile in `media`; der Nutzerzustand hängt am
+    Pfad und blieb liegen. Entsteht später dieselbe Pfadangabe erneut — beim
+    Optimieren wird aus `film.mkv` wieder `film.mp4` —, erbt die neue Datei
+    stillschweigend den alten Zustand. Eine als „vaulted" markierte Datei wäre
+    sofort wieder versteckt, ohne erkennbaren Grund.
+    """
+    _, _, user_db, _, _, _, _ = _get_deps()
+    try:
+        removed = user_db.purge_paths_from_user_data(paths)
+        if removed:
+            print(f"🧹 {removed} verwaiste Favoriten/Tags/Vault-Einträge entfernt")
+    except Exception as e:
+        # Die Dateien sind zu diesem Zeitpunkt schon weg — ein Fehler beim
+        # Aufräumen darf die Antwort nicht in einen Fehler verwandeln.
+        print(f"⚠️ Nutzerzustand konnte nicht aufgeräumt werden: {e}")
+
+
 def _deletable_scope(user_name: str):
     """Verzeichnisse, in denen dieser Nutzer löschen darf. None = alle.
 
@@ -166,6 +186,7 @@ def handle_post(handler) -> bool:
 
             if deleted:
                 db.save()
+                _purge_user_state(deleted)
 
             response = {
                 "success": True,
@@ -229,6 +250,7 @@ def handle_post(handler) -> bool:
 
             if deleted:
                 db.save()
+                _purge_user_state(deleted)
             response = {"success": True, "deleted": deleted, "failed": failed}
             handler.send_response(200)
             handler.send_header("Content-Type", "application/json")
