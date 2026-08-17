@@ -32,26 +32,11 @@ def generated_html(tmp_path_factory):
     from arcade_scanner.templates.dashboard_template import generate_html_report
 
     out_file = tmp_path_factory.mktemp("reports") / "index.html"
-    # Minimal stub results — we only care about the HTML shell here
-    stub_results = [
-        {
-            "FilePath": "/tmp/test_video.mp4",
-            "Size_MB": 100.0,
-            "Bitrate_Mbps": 4.0,
-            "Duration_Sec": 120.0,
-            "Resolution": "1920x1080",
-            "codec": "h264",
-            "Status": "HIGH",
-            "thumb": "placeholder.jpg",
-            "favorite": False,
-            "hidden": False,
-            "tags": [],
-            "mtime": int(time.time()),
-            "imported_at": int(time.time()),
-            "media_type": "video",
-        }
-    ]
-    generate_html_report(stub_results, str(out_file), server_port=8000)
+    # Hier standen Stub-Einträge, die an generate_html_report() gingen.
+    # Die Funktion nimmt keine mehr entgegen: Der Dump enthält keine
+    # Medien-Einträge, `window.ALL_VIDEOS` startet leer. Geprüft wird hier
+    # ohnehin nur die HTML-Hülle.
+    generate_html_report(str(out_file), server_port=8000)
     return out_file.read_text(encoding="utf-8")
 
 

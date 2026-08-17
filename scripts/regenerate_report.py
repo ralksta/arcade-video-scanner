@@ -12,11 +12,10 @@ from arcade_scanner.templates.dashboard_template import generate_html_report
 def main():
     print("Loading DB...")
     db.load()
-    results = [e.model_dump(by_alias=True) for e in db.get_all()]
-    print(f"Found {len(results)} items in DB.")
+    print(f"Found {len(db.get_all())} items in DB.")
 
     print(f"Generating report to {config.report_file}...")
-    generate_html_report(results, config.report_file, server_port=8002)
+    generate_html_report(config.report_file, server_port=8002)
     print("Done.")
 
 if __name__ == "__main__":

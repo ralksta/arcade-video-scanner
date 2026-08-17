@@ -462,12 +462,14 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 
 ## Zyklus 14
 
-- [ ] **Loop AB — Der Report-Dump** (läuft)
+- [x] **Loop AB — Der Report-Dump**
       - [x] Geprüft: `ALL_VIDEOS` ist leer, nur ein Pfad wird eingebettet —
             die Mehrbenutzer-Trennung hält
       - [x] Die Kopfzeile bekam Anzahl und Größe der **gesamten** Bibliothek
             übergeben und benutzte beides nicht — eine Einladung
-      - [ ] Offen: wann der Report angestoßen wird
+      - [x] **Der Hintergrund-Rescan scheiterte jedes Mal** an einer
+            `model_dump()`-Zeile über bereits fertige Dicts — Cache blieb
+            stehen, Report wurde nie erzeugt, „Rescan complete" nie gedruckt
       `index.html` wird auf die Platte geschrieben und von allen Konten
       geteilt. In Loop A war schon einmal Thema, dass dort nichts
       Nutzerspezifisches hineingehört. Jetzt die Erzeugung selbst: Was steht
@@ -486,6 +488,24 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 77 (Loop AB, der Rescan-Weg — Loop AB abgeschlossen)** — Der
+  Faden aus der vorigen Iteration führte weiter, als ich dachte. Nachdem
+  `results` in `generate_html_report()` unbenutzt war, habe ich die fünf
+  Aufrufer angesehen: Jeder beschaffte den Wert mit
+  `[e.model_dump(by_alias=True) for e in db.get_all()]` — 8788 Pydantic-Modelle
+  plus 8788 Umwandlungen, für nichts. **An einer Stelle lief es über
+  `media_cache.get()`, das bereits Dicts liefert.** Dort warf die Zeile jedes
+  Mal einen `AttributeError`, das umgebende `except` machte daraus ein
+  „❌ Rescan failed" — nachdem der Scan längst durch war —, und die zwei Zeilen
+  danach wurden nie erreicht: Der Medien-Cache blieb stehen, der Report wurde
+  nicht neu erzeugt, „✅ Rescan complete." nie gedruckt. Der Fehler ist damit
+  behoben, indem der Parameter verschwand: Es gibt nichts mehr zu beschaffen.
+  Gelernt: Toter Code ist nicht nur Ballast — er wird gefüttert, und das
+  Füttern kann kaputtgehen, ohne dass jemand den Verlust bemerkt, weil das
+  Ergebnis ohnehin niemand liest. Die Trennung ist jetzt strukturell statt
+  verhaltensbasiert: Man *kann* dem Dump keine Einträge mehr übergeben.
+  Nächstes: Loop AC (cinema.js, store.js, collections.js).
 
 - **Iteration 76 (Loop AB, Report-Dump)** — Zuerst nachgesehen statt vermutet:
   In der erzeugten `index.html` ist `ALL_VIDEOS` tatsächlich leer, und von 23

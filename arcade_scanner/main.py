@@ -51,8 +51,7 @@ def run_scanner(args_list=None):
     server, port = start_server(use_ssl=args.ssl)
 
     # 3. Generate initial report from cache
-    results = [e.model_dump(by_alias=True) for e in db.get_all()]
-    generate_html_report(results, config.report_file, server_port=port)
+    generate_html_report(config.report_file, server_port=port)
 
     # 4. Open browser immediately
     protocol = "https" if args.ssl else "http"
@@ -93,8 +92,7 @@ def run_scanner(args_list=None):
             run_post_scan_auto_tagging()
 
             # Regenerate report with fresh data
-            results = [e.model_dump(by_alias=True) for e in db.get_all()]
-            generate_html_report(results, config.report_file, server_port=port)
+            generate_html_report(config.report_file, server_port=port)
 
         except KeyboardInterrupt:
             print("\n⚠️ Scan interrupted.")

@@ -204,9 +204,7 @@ class ReportDebouncer:
 
     def _generate(self, port):
         try:
-            # Re-fetch results to ensure freshness (already dicts from cache)
-            results = _media_cache.get()
-            generate_html_report(results, config.report_file, server_port=port)
+            generate_html_report(config.report_file, server_port=port)
             # print(f"✅ HTML Report regenerated (debounced)")
         except Exception as e:
             print(f"⚠️ Report generation failed: {e}")

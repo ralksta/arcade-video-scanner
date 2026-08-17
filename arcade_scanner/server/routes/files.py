@@ -796,10 +796,14 @@ def _run_rescan_in_background(port: int) -> None:
         except Exception as e:
             print(f"⚠️ Auto-Tagging nach dem Scan fehlgeschlagen: {e!r}")
 
-        media_cache = _get_media_cache()
-        results = [e.model_dump(by_alias=True) for e in media_cache.get()]
-        media_cache.invalidate()
-        generate_html_report(results, config.report_file, server_port=port)
+        # `media_cache.get()` liefert bereits Dicts; hier stand darüber ein
+        # `e.model_dump(by_alias=True)`, das deshalb jedes Mal einen
+        # AttributeError warf. Das umgebende `except` machte daraus ein
+        # „Rescan failed", obwohl der Scan durch war — und die beiden Zeilen
+        # danach wurden nie erreicht: Der Medien-Cache blieb stehen und der
+        # Report wurde nicht neu erzeugt.
+        _get_media_cache().invalidate()
+        generate_html_report(config.report_file, server_port=port)
         print("✅ Rescan complete.")
     except Exception as e:
         print(f"❌ Rescan failed: {e}")

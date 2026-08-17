@@ -19,30 +19,39 @@ import pytest
 
 from arcade_scanner.templates.dashboard_template import generate_html_report
 
+# Diese Angaben werden dem Dump **nicht mehr übergeben** — die Funktion nimmt
+# gar keine Einträge mehr entgegen. Sie stehen hier trotzdem, weil die Tests
+# unten prüfen, dass nichts davon in der erzeugten Datei auftaucht: Der Dump
+# könnte sie sich auch selbst beschaffen.
+GEHEIM = {
+    "pfad": "/geheim/privat/urlaub_2019.mp4",
+    "tags": ["intim", "nicht_teilen"],
+}
+
 
 @pytest.fixture
 def rendered(tmp_path):
-    entries = [
-        {
-            "FilePath": "/geheim/privat/urlaub_2019.mp4",
-            "Size_MB": 512.0,
-            "Bitrate_Mbps": 8.0,
-            "Status": "OK",
-            "media_type": "video",
-            "codec": "h264",
-            "Duration_Sec": 120.0,
-            "Width": 1920,
-            "Height": 1080,
-            "favorite": True,
-            "hidden": True,
-            "tags": ["intim", "nicht_teilen"],
-            "thumb": "thumb_x.jpg",
-            "mtime": 1_700_000_000.0,
-        }
-    ]
     out = tmp_path / "index.html"
-    generate_html_report(entries, str(out), server_port=8000)
+    generate_html_report(str(out), server_port=8000)
     return out.read_text(encoding="utf-8")
+
+
+def test_the_dump_cannot_be_handed_any_entries():
+    """
+    Die stärkste Form der Trennung: nicht „die Einträge werden nicht
+    eingebettet", sondern „es gibt keine Einträge zu übergeben".
+
+    Der Parameter existierte noch, wurde aber von keiner Zeile mehr gelesen —
+    und von fünf Aufrufern mit 8788 Pydantic-Umwandlungen befüllt. Ein
+    Parameter, der Mediendaten annimmt und nichts damit tut, ist eine
+    Einladung, ihn zu benutzen.
+    """
+    import inspect
+
+    parameters = inspect.signature(generate_html_report).parameters
+
+    assert "results" not in parameters
+    assert list(parameters) == ["report_file", "server_port"]
 
 
 def test_no_media_entries_are_embedded(rendered):
@@ -55,6 +64,7 @@ def test_no_media_entries_are_embedded(rendered):
 def test_no_file_paths_leak_into_the_dump(rendered):
     assert "urlaub_2019.mp4" not in rendered
     assert "/geheim/privat" not in rendered
+    assert GEHEIM["pfad"] not in rendered
 
 
 @pytest.mark.parametrize("secret", ["intim", "nicht_teilen"])

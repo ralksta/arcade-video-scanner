@@ -99,11 +99,26 @@ def asset_url(filename: str) -> str:
     return f"/static/{filename}?v={version}"
 
 
-def generate_html_report(results, report_file, server_port=8000):
-    # Hier stand `total_mb = sum(r["Size_MB"] for r in results)` — ein
-    # vollständiger Durchlauf über die Bibliothek, dessen Ergebnis nur an
-    # `render_header()` ging, das es nie benutzt hat. Zweiter Fund dieser Art
-    # in dieser Datei (siehe die Anmerkung zu `clean_results` weiter unten).
+def generate_html_report(report_file, server_port=8000):
+    """Schreibt den statischen Dashboard-Dump.
+
+    Nimmt **keine** Medien-Einträge mehr entgegen. Der Dump enthält keine —
+    `window.ALL_VIDEOS` startet leer und wird zur Laufzeit über `/api/videos`
+    gefüllt, pro Nutzer gefiltert.
+
+    Der frühere Parameter `results` wurde zuletzt nirgends mehr gelesen, aber
+    von fünf Aufrufern beschafft, und zwar so::
+
+        results = [e.model_dump(by_alias=True) for e in db.get_all()]
+
+    Das sind 8788 Pydantic-Modelle plus 8788 Umwandlungen je Aufruf, für
+    nichts. An einer Stelle (`routes/files.py`, Hintergrund-Rescan) lief es
+    sogar über `media_cache.get()`, das bereits Dicts liefert — der Aufruf warf
+    dort jedes Mal einen `AttributeError`, und das umgebende `except` machte
+    daraus ein „❌ Rescan failed", nachdem der Scan längst durch war. Die
+    Zeilen danach — Cache verwerfen und Report neu erzeugen — wurden nie
+    erreicht.
+    """
     #
     # Keine Ordner-Aggregation mehr im Dump: Diese Datei wird EINMAL erzeugt und
     # an jeden Nutzer ausgeliefert. Die Aggregation enthielt die Ordnerpfade der
