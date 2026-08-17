@@ -39,6 +39,9 @@ STYLESHEETS = [
 ]
 
 SCRIPT_MODULES = [
+    # Muss vorn stehen: store.js, utils.js, workspace.js, collections.js und
+    # settings.js greifen über `window.safeStorage` auf localStorage zu.
+    "safe_storage.js",
     "store.js",
     "formatters.js",
     "api.js",

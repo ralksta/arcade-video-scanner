@@ -87,7 +87,7 @@ window.AppState = new Store({
         showVideosHere: false
     },
     ui: {
-        safeMode: localStorage.getItem('safe_mode') === 'true',
+        safeMode: window.safeStorage.get('safe_mode') === 'true',
         renderedCount: 0
     },
     data: {
@@ -133,7 +133,7 @@ window.activeTags = [];
 window.filterUntaggedOnly = false;
 window.activeSmartCollectionCriteria = null;
 window.activeCollectionId = null;
-window.safeMode = localStorage.getItem('safe_mode') === 'true';
+window.safeMode = window.safeStorage.get('safe_mode') === 'true';
 window.renderedCount = 0;
 window.folderBrowserState = { currentPath: null, showVideosHere: false };
 window.folderBrowserPath = null;

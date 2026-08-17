@@ -475,7 +475,11 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       Nutzerspezifisches hineingehört. Jetzt die Erzeugung selbst: Was steht
       wirklich drin, und wann wird sie angestossen?
 
-- [ ] **Loop AC — Die verbliebenen Frontend-Dateien**
+- [ ] **Loop AC — Die verbliebenen Frontend-Dateien** (läuft)
+      - [x] `localStorage` wurde ungeschützt beim Laden gelesen — in der
+            **ersten** Datei der Seite; ein gesperrter Speicher hätte gar keine
+            Oberfläche ergeben
+      - [ ] Offen: cinema.js
       `cinema.js`, `store.js`, `collections.js`. Der Rest des Browser-Clients,
       den noch kein Loop angefasst hat.
 
@@ -488,6 +492,25 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 78 (Loop AC, gesperrter Speicher)** — `localStorage` wirft in
+  manchen Browsern schon beim **Lesen** (blockierte Cookies, privater Modus).
+  Der Browser-Client las es ungeschützt an drei Stellen beim Laden, darunter in
+  `store.js` — dem ersten Skript der Seite. Eine Ausnahme dort ergibt keine
+  halb geladene Oberfläche, sondern gar keine. Der TV-Client fängt genau diesen
+  Fall seit jeher ab, mit Begründung im Kommentar; der Browser-Client nicht.
+  Dazu ein zweiter, unabhängiger Weg ins Aus: ein `JSON.parse` über einen
+  gespeicherten Wert ohne Netz, das die Sammlungsansicht bei jedem Aufruf
+  erneut lahmgelegt hätte.
+  Mein erster Entwurf legte den Helfer in `store.js` — und liess damit **25
+  Tests** auflaufen, die einzelne Frontend-Dateien bewusst für sich laden. Zur
+  Laufzeit hätte es gehalten (store.js steht vorn), aber eine stillschweigende
+  Ladereihenfolge-Abhängigkeit in einem Projekt ohne Modulsystem ist genau die
+  Art Fessel, die man später nicht mehr sieht. Jetzt eine eigene Datei
+  `safe_storage.js` als erstes Skript, und die Reihenfolge steht ausdrücklich
+  im Template und in einem Test. Gelernt: Dass die Tests einzelne Dateien
+  isoliert laden, ist kein Testartefakt, sondern die einzige Stelle, an der
+  eine solche Abhängigkeit überhaupt auffällt. Nächstes: cinema.js.
 
 - **Iteration 77 (Loop AB, der Rescan-Weg — Loop AB abgeschlossen)** — Der
   Faden aus der vorigen Iteration führte weiter, als ich dachte. Nachdem

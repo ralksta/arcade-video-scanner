@@ -51,7 +51,10 @@ def _escape(value: str) -> str:
         const vm = require('vm');
         const fs = require('fs');
 
-        const src = fs.readFileSync({json.dumps(str(STATIC_DIR / "utils.js"))}, 'utf8');
+        // safe_storage.js zuerst — utils.js benutzt es beim Laden.
+        const src = [{json.dumps(str(STATIC_DIR / "safe_storage.js"))},
+                     {json.dumps(str(STATIC_DIR / "utils.js"))}]
+            .map((p) => fs.readFileSync(p, 'utf8')).join('\\n');
         const noop = () => {{}};
         const context = vm.createContext({{
             console,

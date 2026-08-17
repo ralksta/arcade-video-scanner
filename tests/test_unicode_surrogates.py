@@ -206,7 +206,7 @@ def test_candidates_view_renders_surrogate_paths():
     # utils.js muss mit geladen werden: candidates.js nutzt das dort definierte
     # globale escapeHtml() — im Browser über window, hier über den gemeinsamen
     # VM-Kontext. Ohne die Datei testet man eine Umgebung, die es nicht gibt.
-    result = _run_view_js(["utils.js", "candidates.js"], """
+    result = _run_view_js(["safe_storage.js", "utils.js", "candidates.js"], """
         const mk = p => ({ file_path: p, codec: 'h264', height: 1080,
             bitrate_mbps: 8.5, size_mb: 2048, reason: 'test',
             estimated_saved_mb: 900, estimated_saved_pct: 44,
@@ -237,7 +237,7 @@ def test_duplicates_view_renders_surrogate_paths():
     Adressiert wird jetzt über (Gruppen-Index, Datei-Index); deleteDuplicate
     löst das sofort in den Pfad auf, bevor es etwas awaited.
     """
-    result = _run_view_js(["utils.js", "duplicates.js"], """
+    result = _run_view_js(["safe_storage.js", "utils.js", "duplicates.js"], """
         const mkFile = p => ({ path: p, thumb: null, size_mb: 100, width: 1920,
             height: 1080, bitrate_mbps: 8.5, quality_score: 50 });
         duplicateData = {
@@ -274,7 +274,7 @@ def test_optimize_button_handles_surrogate_path():
     errors='surrogateescape' ohnehin nicht), also wird der Button deaktiviert —
     statt dass encodeURIComponent beim Rendern wirft.
     """
-    result = _run_view_js(["utils.js", "engine.js"], """
+    result = _run_view_js(["safe_storage.js", "utils.js", "engine.js"], """
         const mk = p => ({ FilePath: p, codec: 'h264', hidden: false });
         window.IS_DOCKER = false;
         const kaputt = _optimizeButton(mk(PATHS[0]));
@@ -298,7 +298,7 @@ def test_optimize_button_handles_surrogate_path():
 
 def test_safe_encode_path_returns_null_on_lone_surrogate():
     """safeEncodePath fängt genau URIError ab und verschluckt nichts anderes."""
-    result = _run_view_js(["utils.js"], """
+    result = _run_view_js(["safe_storage.js", "utils.js"], """
         out({ kaputt: safeEncodePath(PATHS[0]),
               heil: safeEncodePath('/a/b c.mp4') });
     """, [SURROGATE_PATH])

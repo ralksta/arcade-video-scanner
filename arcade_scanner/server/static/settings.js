@@ -228,7 +228,7 @@ async function saveSettings() {
             const newSafeMode = document.getElementById('settingsSafeMode').checked;
             if (newSafeMode !== window.safeMode) {
                 window.safeMode = newSafeMode;
-                localStorage.setItem('safe_mode', window.safeMode);
+                window.safeStorage.set('safe_mode', window.safeMode);
             }
 
             // Always refresh content to reflect potential changes in sensitive lists or other settings

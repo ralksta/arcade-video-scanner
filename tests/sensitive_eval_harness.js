@@ -10,10 +10,12 @@ const vm = require('vm');
 const path = require('path');
 
 const fixtures = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const src = fs.readFileSync(
-    path.join(__dirname, '..', 'arcade_scanner', 'server', 'static', 'utils.js'),
-    'utf8'
-);
+// safe_storage.js zuerst: utils.js greift beim Laden über `window.safeStorage`
+// auf localStorage zu — in derselben Reihenfolge wie die Seite selbst.
+const staticDir = path.join(__dirname, '..', 'arcade_scanner', 'server', 'static');
+const src = ['safe_storage.js', 'utils.js']
+    .map((name) => fs.readFileSync(path.join(staticDir, name), 'utf8'))
+    .join('\n');
 
 const noopElement = { classList: { add() {}, remove() {} }, textContent: '', value: '' };
 const context = vm.createContext({

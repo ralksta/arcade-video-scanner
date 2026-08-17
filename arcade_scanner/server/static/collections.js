@@ -990,7 +990,7 @@ function renderCollections() {
         groups[cat].push(col);
     });
 
-    const collapsed = JSON.parse(localStorage.getItem('collapsedCategories') || '{}');
+    const collapsed = window.safeStorage.getJSON('collapsedCategories', {});
 
     const sortedCategories = Object.keys(groups).sort((a, b) => {
         if (a === 'Uncategorized') return 1;
@@ -1061,9 +1061,9 @@ function renderCollectionItem(col) {
  * @param {string} category - Category name
  */
 function toggleCategoryCollapse(category) {
-    const collapsed = JSON.parse(localStorage.getItem('collapsedCategories') || '{}');
+    const collapsed = window.safeStorage.getJSON('collapsedCategories', {});
     collapsed[category] = !collapsed[category];
-    localStorage.setItem('collapsedCategories', JSON.stringify(collapsed));
+    window.safeStorage.set('collapsedCategories', JSON.stringify(collapsed));
 
     const safeKey = category.replace(/[^a-zA-Z0-9]/g, '_');
     const items = document.getElementById('cat-items-' + safeKey);

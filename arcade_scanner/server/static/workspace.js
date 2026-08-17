@@ -131,12 +131,12 @@ function toggleLayout() {
 function updateGridScale(value) {
     document.documentElement.style.setProperty('--grid-min-width', `${value}px`);
     // Optionally, save preference
-    localStorage.setItem('gridScale', value);
+    window.safeStorage.set('gridScale', value);
 }
 
 // Initialize grid scale from localStorage if available
 (function initGridScale() {
-    const saved = localStorage.getItem('gridScale');
+    const saved = window.safeStorage.get('gridScale');
     if (saved) {
         document.documentElement.style.setProperty('--grid-min-width', `${saved}px`);
         window.addEventListener('DOMContentLoaded', () => {

@@ -8,7 +8,7 @@
  */
 function toggleTheme() {
     const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    window.safeStorage.set('theme', isDark ? 'dark' : 'light');
 
     const icon = document.getElementById('themeIcon');
     if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
@@ -61,7 +61,7 @@ function isSensitive(video) {
 
 // Init Theme
 (function initTheme() {
-    const saved = localStorage.getItem('theme');
+    const saved = window.safeStorage.get('theme');
     const isDark = saved ? saved === 'dark' : true; // Default to dark
 
     if (isDark) {
