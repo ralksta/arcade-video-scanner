@@ -318,7 +318,10 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       daraus überhaupt ein lauffähiger Zustand herstellen? Eine Sicherung, die
       nur fast vollständig ist, merkt man am schlechtesten Tag.
 
-- [ ] **Loop Q — Auslieferung: Streaming und Proxys**
+- [ ] **Loop Q — Auslieferung: Streaming und Proxys** (läuft)
+      - [x] Verkürzt gelieferte Streams liessen den Client hängen —
+            erreichbar, wenn der Optimierer die Datei währenddessen ersetzt
+      - [ ] Offen: Proxy-Entscheidung LAN/Tailscale, Zwischenspeicher-Köpfe
       Jede Wiedergabe läuft hier durch. Range-Requests, Teilinhalte, Springen
       im Video, und die Entscheidung LAN → Original / Tailscale → Proxy. Reine
       Protokoll-Logik, ohne Mediendateien prüfbar.
@@ -332,6 +335,20 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 55 (Loop Q, verkürzte Streams)** — Die Range-Behandlung ist gut
+  gebaut und gut getestet; die Kommentare warnen ausdrücklich davor, eine
+  falsche `Content-Length` anzukündigen, weil ein Keep-Alive-Client sonst ewig
+  wartet. Genau dieser Zustand entsteht trotzdem — nur nicht durch falsches
+  Rechnen, sondern weil `socket.sendfile()` bei einer zwischenzeitlich
+  gekürzten Datei einfach weniger liefert. Mit einem echten Socket-Paar
+  nachgemessen: 100 statt 10000 Bytes, ohne Ausnahme, ohne Fehlerwert.
+  Erreichbar ist das hier ganz konkret, weil der Optimierer Mediendateien an
+  Ort und Stelle ersetzt. Gelernt: Eine Zusage, die man selbst richtig
+  berechnet, kann trotzdem gebrochen werden — von der Wirklichkeit zwischen
+  `stat()` und `send()`. Verhindern lässt es sich nicht; jetzt wird die
+  Verbindung geschlossen und die Verkürzung gemeldet, statt den Client hängen
+  zu lassen. Nächstes: Proxy-Entscheidung LAN/Tailscale.
 
 - **Iteration 54 (Loop P, Haltbarkeit — Loop P abgeschlossen)** — Wenn schon
   Datensicherung, dann auch die Frage, ob die Einstellungsdatei einen

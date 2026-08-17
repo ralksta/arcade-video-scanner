@@ -207,3 +207,122 @@ class TestServeFileRange:
         h = FakeHandler()
         serve_file_range(h, str(big))
         assert len(h.wfile.getvalue()) == CHUNK_SIZE + 4096
+
+
+# ---------------------------------------------------------------------------
+# Kurz gelieferte Streams
+#
+# `socket.sendfile()` wirft nicht, wenn die Datei kürzer ist als erwartet — sie
+# gibt die tatsächlich gesendete Zahl zurück. Nachgemessen mit einem echten
+# Socket-Paar: bei einer auf 100 Bytes gekürzten Datei meldet sie 100, obwohl
+# 10000 angefordert waren. Kein Fehler, keine Ausnahme.
+#
+# Der Content-Length-Kopf ist zu dem Zeitpunkt längst raus. Der Client wartet
+# also auf Bytes, die nie kommen: bei Keep-Alive bis zum Timeout, und danach
+# wird die Verbindung in verdorbenem Zustand wiederverwendet — genau das
+# Szenario, gegen das die Clamping-Tests weiter oben schützen sollten.
+#
+# Erreichbar ist das hier ganz konkret: Zwischen `os.stat()` und dem Senden
+# liegt ein Zeitfenster, und der Optimierer ersetzt Mediendateien an Ort und
+# Stelle (`atomic_replace`, `keep_optimized`). Wer ein Video ansieht, während
+# es umgewandelt wird, landet hier.
+#
+# Verhindern lässt es sich nicht — die Datei *ist* dann kürzer. Aus einem
+# hängenden Client wird aber ein sauber abgebrochener.
+# ---------------------------------------------------------------------------
+
+class _ShortSendConnection(_FakeConnection):
+    """Ein sendfile, das weniger liefert als angefordert."""
+
+    def __init__(self, wfile, actually_sends):
+        super().__init__(wfile)
+        self._actually_sends = actually_sends
+
+    def sendfile(self, f, offset=0, count=None):
+        self.sendfile_calls.append((offset, count))
+        f.seek(offset)
+        self._wfile.write(f.read(self._actually_sends))
+        return self._actually_sends
+
+
+class TestShortSend:
+    def test_a_short_sendfile_closes_the_connection(self, video_file):
+        h = FakeHandler(with_sendfile=True)
+        h.connection = _ShortSendConnection(h.wfile, actually_sends=100)
+
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is True, (
+            "Der Client wartet sonst auf 10140 Bytes, die nie kommen"
+        )
+
+    def test_a_complete_sendfile_keeps_the_connection(self, video_file):
+        h = FakeHandler(with_sendfile=True)
+
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is False
+
+    def test_the_short_send_is_reported(self, video_file, capsys):
+        h = FakeHandler(with_sendfile=True)
+        h.connection = _ShortSendConnection(h.wfile, actually_sends=100)
+
+        serve_file_range(h, str(video_file))
+
+        out = capsys.readouterr().out
+        assert "verkürzt" in out
+        assert "100" in out and "10240" in out
+
+    def test_a_short_range_send_closes_the_connection(self, video_file):
+        """Auch im 206-Fall — dort ist die angekündigte Länge der Bereich."""
+        h = FakeHandler(range_header="bytes=0-999", with_sendfile=True)
+        h.connection = _ShortSendConnection(h.wfile, actually_sends=10)
+
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is True
+
+    def test_a_truncated_file_in_the_chunk_loop_also_closes(self, tmp_path):
+        """
+        Der Rückfallweg ohne sendfile bricht bei EOF genauso still ab. Hier
+        wird die Datei zwischen `os.stat()` und dem Lesen wirklich gekürzt.
+        """
+        path = tmp_path / "clip.mp4"
+        path.write_bytes(b"X" * 10000)
+
+        h = FakeHandler()  # kein `connection` → Leseschleife
+
+        import arcade_scanner.server.streaming_util as su
+
+        real_open = open
+
+        def shrinking_open(p, *args, **kwargs):
+            # Genau im Moment des Öffnens ist die Datei nur noch 100 Bytes lang
+            if str(p) == str(path):
+                path.write_bytes(b"X" * 100)
+            return real_open(p, *args, **kwargs)
+
+        su_open = getattr(su, "open", None)
+        try:
+            su.open = shrinking_open
+            serve_file_range(h, str(path))
+        finally:
+            if su_open is None:
+                del su.open
+            else:
+                su.open = su_open
+
+        assert h.close_connection is True
+
+    def test_a_client_that_hangs_up_still_closes_the_connection(self, video_file):
+        """Das Verhalten, das schon vorher stimmte, darf nicht verloren gehen."""
+        h = FakeHandler()
+
+        class Exploding(io.BytesIO):
+            def write(self, data):
+                raise BrokenPipeError("client weg")
+
+        h.wfile = Exploding()
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is True
