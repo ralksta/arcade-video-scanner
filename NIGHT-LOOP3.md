@@ -332,6 +332,8 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Zyklus 9
 
 - [ ] **Loop R — Auto-Tagging** (läuft)
+      - [x] Eigener Fehler aus Iteration 51 gefunden und behoben: Tags wurden
+            beim Löschen aufgeräumt, die Auto-Tag-Buchführung nicht
       Regeln, die selbsttätig Tags in die Nutzerdaten schreiben. Ein Fehler
       hier ist bleibend und sichtbar: falsche Tags an echten Dateien, und
       niemand weiss, woher sie kommen. In Loop C fiel schon auf, dass der
@@ -352,6 +354,20 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 57 (Loop R, Auto-Tagging)** — Der erste Fund dieser Nacht, den
+  ich selbst verursacht habe. Der Auto-Tagger vergibt jeden Tag nur einmal je
+  (Nutzer, Regel, Pfad); diese Buchführung hängt am Pfad. Solange auch die Tags
+  liegen blieben, war das stimmig: Datei weg, Tag noch da, Regel greift nicht
+  mehr. Seit Iteration 51 die Tags beim ausdrücklichen Löschen aufräumt, fielen
+  beide auseinander — entsteht später eine Datei unter demselben Pfad, hätte
+  sie keinen Tag und bekäme auch keinen mehr, weil die Regel sich für erledigt
+  hält. Gelernt: Ich habe in Iteration 51 nach *allem* gesucht, was am Pfad
+  hängt, und dabei nur in den Nutzerdaten nachgesehen — die zweite Stelle liegt
+  in der Mediendatenbank. Eine Aufräumung ist nur so vollständig wie die Suche
+  danach, was sonst noch an derselben Kennung hängt. Beide Schritte stehen
+  jetzt beieinander, und ein Test besteht darauf. Nächstes: die Regelauswertung
+  selbst.
 
 - **Iteration 56 (Loop Q, Validator)** — Die Auslieferung schickte weder `ETag`
   noch wertete sie `If-Range` aus. Für einen gewöhnlichen Dateiserver wäre das

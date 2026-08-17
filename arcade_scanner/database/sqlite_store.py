@@ -338,6 +338,35 @@ class SQLiteStore:
                 (username, rule_id),
             )
 
+    def forget_auto_tag_paths(self, file_paths) -> int:
+        """Buchführung für gelöschte Pfade vergessen. Gibt die Zahl der Zeilen zurück.
+
+        Der Auto-Tagger vergibt jeden Tag nur **einmal** je (Nutzer, Regel,
+        Pfad) — damit ein von Hand entfernter Tag entfernt bleibt. Diese
+        Buchführung hängt am Pfad, nicht an einem Eintrag; `remove()` fasst sie
+        nicht an.
+
+        Solange auch die Tags selbst liegen blieben, war das stimmig: Datei
+        weg, Tag noch da, Regel greift nicht mehr. Seit die Tags beim
+        ausdrücklichen Löschen mit aufgeräumt werden
+        (`user_store.purge_paths_from_user_data`), fielen beide auseinander —
+        entsteht später eine Datei unter demselben Pfad, hätte sie keinen Tag
+        und bekäme auch keinen mehr, weil die Regel sich für erledigt hält.
+
+        Die beiden Aufräumschritte gehören deshalb zusammen.
+        """
+        paths = [p for p in file_paths if p]
+        if not paths:
+            return 0
+
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.executemany(
+                "DELETE FROM auto_tag_applied WHERE file_path = ?",
+                [(self._get_safe_path(p),) for p in paths],
+            )
+            return cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+
     # ------------------------------------------------------------------
     # Encoding Queue methods
     # ------------------------------------------------------------------

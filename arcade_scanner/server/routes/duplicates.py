@@ -25,11 +25,17 @@ def _purge_user_state(paths) -> None:
     stillschweigend den alten Zustand. Eine als „vaulted" markierte Datei wäre
     sofort wieder versteckt, ohne erkennbaren Grund.
     """
-    _, _, user_db, _, _, _, _ = _get_deps()
+    _, db, user_db, _, _, _, _ = _get_deps()
     try:
         removed = user_db.purge_paths_from_user_data(paths)
-        if removed:
-            print(f"🧹 {removed} verwaiste Favoriten/Tags/Vault-Einträge entfernt")
+        # Muss mit: Der Auto-Tagger vergibt jeden Tag nur einmal je Pfad.
+        # Bliebe seine Buchführung stehen, während die Tags verschwinden,
+        # bekäme eine später unter demselben Pfad entstehende Datei nie wieder
+        # einen Tag.
+        forgotten = db.forget_auto_tag_paths(paths)
+        if removed or forgotten:
+            print(f"🧹 {removed} verwaiste Favoriten/Tags/Vault-Einträge entfernt, "
+                  f"{forgotten} Auto-Tag-Vermerke vergessen")
     except Exception as e:
         # Die Dateien sind zu diesem Zeitpunkt schon weg — ein Fehler beim
         # Aufräumen darf die Antwort nicht in einen Fehler verwandeln.

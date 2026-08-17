@@ -197,3 +197,90 @@ def test_the_scan_orphan_cleanup_deliberately_does_not():
         "Das Aufräumen hängt jetzt am Scan — dann bitte auch die Begründung "
         "hier anpassen, statt den Test zu löschen"
     )
+
+
+# --- Die Buchführung des Auto-Taggers muss mitgehen ---
+#
+# Der Auto-Tagger vergibt jeden Tag nur einmal je (Nutzer, Regel, Pfad) -- damit
+# ein von Hand entfernter Tag entfernt bleibt. Diese Buchführung hängt am Pfad
+# und wird von `db.remove()` nicht angefasst.
+#
+# Solange auch die Tags selbst liegen blieben, war das stimmig: Datei weg, Tag
+# noch da, Regel greift nicht mehr. Mit dem Aufräumen weiter oben fielen beide
+# auseinander -- die Tags verschwinden, der Vermerk bleibt. Entsteht später eine
+# Datei unter demselben Pfad, hätte sie keinen Tag und bekäme auch keinen mehr.
+#
+# Das ist ein Fehler, den das Aufräumen selbst erzeugt hat. Deshalb gehören die
+# beiden Schritte zusammen, und deshalb steht der Test hier und nicht woanders.
+
+@pytest.fixture
+def media(tmp_path):
+    mock_config = MagicMock()
+    mock_config.hidden_data_dir = str(tmp_path)
+    with patch("arcade_scanner.database.sqlite_store.config", mock_config):
+        from arcade_scanner.database.sqlite_store import SQLiteStore
+
+        s = SQLiteStore()
+        s._ensure_connection()
+        yield s
+
+
+def test_the_auto_tag_record_is_forgotten_for_a_deleted_path(media):
+    media.mark_auto_tag_applied("ralf", "regel-1", ["/media/weg.mp4", "/media/bleibt.mp4"])
+
+    media.forget_auto_tag_paths(["/media/weg.mp4"])
+
+    assert media.get_auto_tag_applied("ralf", "regel-1") == {"/media/bleibt.mp4"}
+
+
+def test_a_rule_can_tag_a_recreated_path_again(media):
+    """
+    Der Ablauf, um den es geht: Datei gelöscht, später entsteht unter demselben
+    Pfad eine neue. Ohne das Vergessen bliebe sie für immer ungetaggt.
+    """
+    media.mark_auto_tag_applied("ralf", "regel-1", ["/media/film.mp4"])
+    assert "/media/film.mp4" in media.get_auto_tag_applied("ralf", "regel-1")
+
+    media.forget_auto_tag_paths(["/media/film.mp4"])
+
+    assert "/media/film.mp4" not in media.get_auto_tag_applied("ralf", "regel-1")
+
+
+def test_every_user_and_rule_forgets_the_path(media):
+    """Der Pfad kann in mehreren Regeln und Konten vermerkt sein."""
+    media.mark_auto_tag_applied("ralf", "regel-1", ["/media/weg.mp4"])
+    media.mark_auto_tag_applied("ralf", "regel-2", ["/media/weg.mp4"])
+    media.mark_auto_tag_applied("gast", "regel-1", ["/media/weg.mp4"])
+
+    media.forget_auto_tag_paths(["/media/weg.mp4"])
+
+    assert media.get_auto_tag_applied("ralf", "regel-1") == set()
+    assert media.get_auto_tag_applied("ralf", "regel-2") == set()
+    assert media.get_auto_tag_applied("gast", "regel-1") == set()
+
+
+def test_forgetting_nothing_is_harmless(media):
+    media.mark_auto_tag_applied("ralf", "regel-1", ["/media/a.mp4"])
+
+    assert media.forget_auto_tag_paths([]) == 0
+    assert media.forget_auto_tag_paths(["", None]) == 0
+    assert media.get_auto_tag_applied("ralf", "regel-1") == {"/media/a.mp4"}
+
+
+def test_the_delete_routes_do_both_steps():
+    """
+    Die eine Hälfte ohne die andere ist schlechter als keine von beiden --
+    deshalb wird hier geprüft, dass beide Aufrufe beieinander stehen.
+    """
+    from pathlib import Path
+
+    source = (
+        Path(__file__).parent.parent / "arcade_scanner" / "server" / "routes" / "duplicates.py"
+    ).read_text(encoding="utf-8")
+    block = source.split("def _purge_user_state", 1)[1].split("\ndef ", 1)[0]
+
+    assert "purge_paths_from_user_data" in block
+    assert "forget_auto_tag_paths" in block, (
+        "Tags werden aufgeräumt, der Auto-Tag-Vermerk nicht — die Datei bliebe "
+        "danach dauerhaft ungetaggt"
+    )
