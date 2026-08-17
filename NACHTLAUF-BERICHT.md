@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 100 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2002** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 102 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2004** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -156,6 +156,7 @@ Zwei kleinere Punkte im selben Bereich, ebenfalls deine Entscheidung:
 | `/api/debug/dump` war **unauthentifiziert** | Gab ohne Anmeldung Scan-Pfade, sämtliche Benutzernamen mit Admin-Flag und Scan-Zielen sowie echte Dateipfade heraus. Der Rundum-Test fand dabei sofort eine zweite offene Route (`/api/cache-stats`). |
 | Sitzungs-Token im Zugriffslog | `/stream`-Zeilen wurden nur unterdrückt, solange `verbose_scanning` **aus** war. Die Diagnose-Option schrieb also gültige Zugangs-Token mit — genau dann, wenn man Logs weitergibt. |
 | Dateinamen führten Code aus | `createVideoCard()` setzte den Namen unmaskiert per `innerHTML`. Ein Video namens `<img src=x onerror=…>.mp4` führt beim Aufbau des Grids Code aus. |
+| `POST /api/settings` schrieb **vor** der Sitzungsprüfung | `config.save()` lief vor `get_current_user()`: Eine anonyme Anfrage konnte Scan-Schwellen, ffmpeg-Pfade, `proxy_root` und `review_dir` setzen und scheiterte erst danach still am fehlenden Nutzer. Der Mangel war seit einem **früheren** Nachtlauf als xfail im Testcode dokumentiert und nie behoben worden — mir aufgefallen, weil ich die Datei für etwas anderes anfasste. |
 | Brute-Force-Sperre per Header aushebelbar | `/api/login` nahm die Kennung aus `X-Forwarded-For` — vom Client gesetzt. Mit wechselndem Wert: fünf Versuche je Fantasie-IP, beliebig viele. Jetzt zählt zusätzlich der Benutzername mit. |
 | Benutzernamen waren über die **Antwortzeit** erratbar | `verify_password()` rechnete bei unbekanntem Namen gar nicht: 62,39 ms gegen 0,28 ms, Faktor 220 — über Netzwerk trivial zu unterscheiden. Seit die Sperre (Zeile darüber) am Benutzernamen hängt, wird aus so einer Namensliste eine Liste gezielt sperrbarer Konten. Jetzt 62,28 gegen 62,54 ms. |
 | `manage_users.py` nahm **leere Passwörter** an | Zweimal Enter an der Abfrage genügte — die Eingaben waren gleich, eine Leerprüfung gab es nicht. Das Konto stand danach ohne Passwort in der Datenbank. Dasselbe Skript war außerdem gar nicht ausführbar: Die Shebang-Zeile zeigte auf einen absoluten Pfad einer fremden Maschine. |
