@@ -27,13 +27,24 @@ function isSensitive(video) {
     if (!video) return false;
 
     // 1. Check Tags
-    const sensitiveTags = window.userSettings?.sensitive_tags || ['nsfw', 'adult', '18+'];
-    if (video.tags && video.tags.some(t => sensitiveTags.includes(t.toLowerCase()))) {
+    //
+    // Beide Seiten kleinschreiben. Vorher wurde nur der Tag des Videos
+    // normalisiert, die eingestellte Liste nicht — wer "NSFW" in die
+    // Einstellungen tippte (die naheliegende Schreibweise), bekam den Vergleich
+    // 'NSFW'.includes('nsfw') und damit nie einen Treffer. Die Voreinstellungen
+    // sind klein geschrieben, deshalb fiel es nur eigenen Eingaben auf.
+    const configuredTags = window.userSettings?.sensitive_tags || ['nsfw', 'adult', '18+'];
+    const sensitiveTags = configuredTags.map(t => String(t).trim().toLowerCase());
+    if (video.tags && video.tags.some(t => sensitiveTags.includes(String(t).toLowerCase()))) {
         return true;
     }
 
     // 2. Check Paths
     const sensitiveDirs = window.userSettings?.sensitive_dirs || [];
+    // Ohne Pfad lässt sich nur der Tag-Teil beurteilen. Vorher warf die
+    // nächste Zeile hier — und zwar mitten in filterAndSort(), womit der
+    // gesamte Filter ausfiel und der abgesicherte Modus alles zeigte.
+    if (!video.FilePath) return false;
     // Normalize paths for comparison (forward slashes)
     const vPath = video.FilePath.replace(/\\/g, '/').toLowerCase();
 

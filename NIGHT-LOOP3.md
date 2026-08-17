@@ -249,7 +249,9 @@ jetzt systematisch.
       - [x] Relative Ausschlüsse verpufften still — sagt es jetzt
       - [ ] **Für Ralf:** Groß/Kleinschreibung auf case-insensitiven
             Dateisystemen (macOS) → im Bericht
-      - [ ] Offen: `sensitive_dirs`, Scan-Ziele, `default_exclusions`
+      - [x] Abgesicherter Modus: Tag-Vergleich einseitig case-sensitiv,
+            Eintrag ohne Pfad legte den ganzen Filter lahm
+      - [ ] Offen: Scan-Ziele, `default_exclusions`, Fehlerfall beim Laden
       Ausschlüsse sind bei diesem Produkt eine Datenschutz-Funktion
       (`exclude_paths`, `sensitive_dirs`). Ein Fehler dort heißt: Verzeichnisse
       landen in der Bibliothek, die der Nutzer ausdrücklich ausgenommen hat.
@@ -264,6 +266,21 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 42 (Loop M, abgesicherter Modus)** — `sensitive_dirs` hatte ich
+  zunächst für ungenutzt gehalten — die Python-Suche fand keinen Leser. Der
+  Leser steht im Frontend (`utils.js:isSensitive`), und dort waren zwei Fehler.
+  Der schönere: Der Tag des Videos wurde kleingeschrieben, die *eingestellte
+  Liste* nicht. Wer „NSFW" eintippte — die naheliegende Schreibweise —, bekam
+  `['NSFW'].includes('nsfw')` und nie einen Treffer. Unentdeckt blieb es, weil
+  die Voreinstellungen klein geschrieben sind und für die der Vergleich zufällig
+  aufging: Der eingebaute Fall belegte den kaputten Pfad nicht. Der zweite:
+  `video.FilePath` ungeprüft dereferenziert — ein Eintrag ohne Pfad warf mitten
+  in `filterAndSort()`, der Filter fiel ganz aus, und der abgesicherte Modus
+  zeigte *alles*. Ein Schutz, der in die offene Richtung versagt.
+  Festgehalten, nicht geändert: Der Modus blendet aus, er hält nichts zurück —
+  die Daten stehen vollständig in der API-Antwort. Nächstes: Scan-Ziele und der
+  Fehlerfall beim Laden der Ausschlüsse.
 
 - **Iteration 41 (Loop M, Ausschlüsse und Symlinks)** — Statt die Logik zu
   lesen, habe ich zuerst einen echten Verzeichnisbaum gebaut und sechs
