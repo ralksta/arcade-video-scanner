@@ -59,6 +59,7 @@ function openCinema(container) {
     const sourceMsg = document.getElementById('cinemaSourceMessage');
 
     // Reset visibility
+    hideCinemaPlaybackError();
     video.classList.add('hidden');
     if (image) image.classList.add('hidden');
     if (sourceMsg) {
@@ -100,14 +101,18 @@ function openCinema(container) {
         video.src = streamUrl;
         video.load();
         video.play().catch(() => {
+            // Der übliche Grund ist die Autoplay-Sperre des Browsers: stumm
+            // geht es dann doch. Scheitert auch das, liegt es nicht am Ton —
+            // dann übernimmt der error-Handler am Element.
             video.muted = true;
-            video.play();
+            video.play().catch(() => {});
         });
     }
 
     modal.classList.add('active');
 
     // Update UI components
+    initCinemaErrorReporting();
     initCinemaTransport();
     updateCinemaMeta();
     updateCinemaTransport();
@@ -125,6 +130,81 @@ function openCinema(container) {
     if (modal) {
         modal.tabIndex = -1;
         modal.focus();
+    }
+}
+
+/**
+ * Sagt, warum gerade nichts abspielt.
+ *
+ * Bisher gab es dafür gar nichts: Weder `<video>` noch `<img>` hatten einen
+ * error-Handler. Ist die Datei verschoben, gelöscht oder das Laufwerk nicht
+ * eingehängt, öffnete sich der Wiedergabe-Dialog mit einem schwarzen Bild und
+ * schwieg. Genau der Fall, in dem der Nutzer das Programm für kaputt hält.
+ *
+ * Der Grund wird nachgeschlagen statt geraten: Ein HEAD auf dieselbe Adresse
+ * unterscheidet „Datei nicht da" (404) von „Server sagt nein" (403) und von
+ * allem anderen — etwa einem Codec, den der Browser nicht kann.
+ */
+function showCinemaPlaybackError(path) {
+    const box = document.getElementById('cinemaPlaybackError');
+    const text = document.getElementById('cinemaPlaybackErrorText');
+    const pathBox = document.getElementById('cinemaPlaybackErrorPath');
+    if (!box || !text || !pathBox) return;
+
+    text.textContent = 'The file could not be played.';
+    pathBox.textContent = path || '';
+    box.classList.remove('hidden');
+    box.classList.add('flex');
+
+    if (!path) return;
+
+    fetch('/stream?path=' + encodeURIComponent(path), { method: 'HEAD' })
+        .then(response => {
+            if (response.status === 404) {
+                text.textContent = 'This file is no longer where the library '
+                    + 'expects it. It may have been moved, renamed or deleted — '
+                    + 'or its drive is not mounted right now.';
+            } else if (response.status === 403) {
+                text.textContent = 'The server refused access to this path.';
+            } else if (response.ok) {
+                text.textContent = 'The file is there, but this browser cannot '
+                    + 'play it — most likely an unsupported codec or container.';
+            }
+        })
+        .catch(() => {
+            // Auch der HEAD kommt nicht durch: dann ist die Verbindung das
+            // Problem, nicht die Datei. Die allgemeine Meldung bleibt stehen.
+        });
+}
+
+function hideCinemaPlaybackError() {
+    const box = document.getElementById('cinemaPlaybackError');
+    if (!box) return;
+    box.classList.remove('flex');
+    box.classList.add('hidden');
+}
+
+/**
+ * Hängt die error-Handler an. Zuweisung statt addEventListener, damit ein
+ * zweiter Aufruf nicht einen zweiten Handler anhängt.
+ */
+function initCinemaErrorReporting() {
+    const video = document.getElementById('cinemaVideo');
+    const image = document.getElementById('cinemaImage');
+
+    if (video) {
+        video.onerror = () => {
+            // Ein leeres src ist kein Fehler, sondern das Aufräumen beim
+            // Schließen und beim Umschalten auf Bild.
+            if (!video.getAttribute('src')) return;
+            showCinemaPlaybackError(currentCinemaPath);
+        };
+    }
+    if (image) {
+        image.onerror = () => {
+            if (!image.getAttribute('src')) return;
+            showCinemaPlaybackError(currentCinemaPath);
+        };
     }
 }
 
@@ -157,6 +237,7 @@ function closeCinema() {
         sourceMsg.classList.remove('flex');
         sourceMsg.classList.add('hidden');
     }
+    hideCinemaPlaybackError();
 
     currentCinemaPath = null;
     currentCinemaVideo = null;

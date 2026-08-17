@@ -500,6 +500,8 @@ nicht kontrolliert.
             Pfad und wurden mit der verwaisten Zeile gelöscht
       - [x] Ein nicht eingehängtes Laufwerk stand nur im Protokoll — im
             Browser sah es aus wie eine kaputte Bibliothek
+      - [x] `/stream` lieferte Dateien **ohne Anmeldung** aus
+      - [x] Der Wiedergabe-Dialog schwieg, wenn die Datei nicht mehr da war
 
 - [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum**
       Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
@@ -514,6 +516,32 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 82 (Loop AD, `/stream` ohne Anmeldung)** — Beim Nachsehen, ob
+  `/stream` HEAD beantwortet (für die Fehlermeldung aus Iteration 83), stand
+  der eigentliche Fund daneben: Die Route prüft `is_path_allowed()` und sonst
+  nichts. Keine Sitzung, weder GET noch HEAD. Die Metadaten waren geschützt,
+  die Oberfläche, die Benutzerdaten — die Dateien selbst nicht, und die sind
+  der Zweck des Programms. Belegt am echten Handler: vorher 200 samt Inhalt,
+  jetzt 401. Der Grund, warum es vierzehn Zyklen überlebt hat, ist der
+  lehrreiche Teil: Der Rundum-Test über alle Routen sucht nach
+  `self.path == "/api/…"`, und `/stream` wird per `startswith()` erkannt. Der
+  Wächter hatte eine Formlücke und meldete deshalb Ruhe. Gelernt: Ein Test,
+  der „alle X" prüft, ist nur so vollständig wie sein Begriff von X — das
+  gehört mitgeprüft, nicht nur das Ergebnis. Offen gelassen und im Bericht
+  vermerkt: `/thumbnails/` ist aus demselben Grund offen, eine Sitzungspflicht
+  dort schaltet die Vorschaubilder im TV-Client ab. Das entscheidet Ralf.
+
+- **Iteration 83 (Loop AD, der schweigende Wiedergabe-Dialog)** — Weder
+  `<video>` noch `<img>` hatten einen error-Handler: fehlt die Datei, öffnet
+  sich ein schwarzer Kasten und sonst nichts. Ein Netzlaufwerk, das nach dem
+  Ruhezustand nicht wieder da ist, reicht dafür. Der Grund wird jetzt
+  nachgeschlagen statt geraten — ein HEAD trennt „Datei weg" (404) von „Server
+  sagt nein" (403) und von „Browser kann den Codec nicht" (200); kommt auch
+  der HEAD nicht durch, bleibt es bei der allgemeinen Meldung. Gelernt: Drei
+  Ursachen, die für den Nutzer identisch aussehen, aber völlig verschiedene
+  Reaktionen verlangen — sie zu unterscheiden kostet eine Anfrage. Nächstes:
+  Loop AD schließen oder noch offene Punkte? Danach Loop AE (Zeit).
 
 - **Iteration 81 (Loop AD, das abgehängte Laufwerk)** — Der Scanner erkennt
   den Fall seit Loop M und schützt sich richtig davor: kein Aufräumen, keine

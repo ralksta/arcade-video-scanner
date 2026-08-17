@@ -280,6 +280,13 @@ CINEMA_MODAL_COMPONENT = """
         </div>
     </div>
 
+    <div id="cinemaPlaybackError" class="hidden flex-col items-center justify-center bg-surface rounded-ds-md p-8 border border-[var(--ds-hairline-strong)] text-center max-w-md w-full mx-4 z-40">
+        <span class="material-icons text-amber-400 text-5xl mb-4" aria-hidden="true">error_outline</span>
+        <h3 class="text-text-main text-lg font-semibold mb-2" id="cinemaPlaybackErrorTitle">Playback failed</h3>
+        <p class="text-body-text text-[13px] mb-2 leading-relaxed" id="cinemaPlaybackErrorText"></p>
+        <p class="text-text-muted text-[11px] font-mono break-all mb-6" id="cinemaPlaybackErrorPath"></p>
+    </div>
+
     <!-- Top overlay: Dateiname + Mono-Metadaten links, Close rechts -->
     <div class="cinema-overlay-top absolute top-0 left-0 right-0 px-5 pt-4 pb-10 z-40 flex items-start justify-between gap-4 pointer-events-none">
         <div class="min-w-0 pointer-events-auto">
