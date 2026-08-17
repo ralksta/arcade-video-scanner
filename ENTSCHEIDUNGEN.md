@@ -5,7 +5,7 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: 3 von 9 Punkten entschieden.
+Stand: 4 von 9 Punkten entschieden.
 
 ---
 
@@ -94,3 +94,39 @@ Was bei der Umsetzung zu beachten ist:
   ist keine.
 - README/`dev-docs` anpassen: Die dort präzisierte Einschränkung wird nach der
   Umstellung wieder falsch, nur in die andere Richtung.
+
+---
+
+## 4. Bottom-Nav / Vault — **Vault als Funktion entfernen**
+
+Gefragt war, ob Vault zurück in die Bottom-Nav soll (der Grund für seinen
+Rauswurf war weggefallen). Die Antwort geht weiter: Die Funktion soll ganz weg.
+Damit erübrigt sich die Nav-Frage — der Ordner-Browser behält seinen Platz.
+
+**Entschieden:** Vault entfernen. Die aktuell versteckten Dateien werden dabei
+**einfach wieder sichtbar**; keine Überführung in sensitive Tags, keine
+Vorab-Liste.
+
+Was dabei bekannt sein muss:
+
+- **Der Vault ist in Benutzung.** Stand 17.08.2026 in `users.db`:
+  `admin` 1 Eintrag, `privat` 2 Einträge. Diese drei Dateien erscheinen nach
+  dem Umbau normal in der Bibliothek des jeweiligen Kontos. Das ist so
+  gewollt.
+- **Vault und abgesicherter Modus sind zwei verschiedene Funktionen.** Der
+  Vault versteckt einzelne Dateien pro Konto; der abgesicherte Modus blendet
+  Kategorien aus (`sensitive_tags`, `sensitive_dirs`, `sensitive_collections`).
+  Letzterer ist ebenfalls in Benutzung (`admin`: 8 sensitive Tags, 1 sensitive
+  Collection) und **bleibt bestehen**. Nur der Vault fällt.
+- **Umfang:** `vaulted` bzw. `hidden` steckt in 10 Backend-Dateien, 9
+  JS-Modulen, beiden Template-Dateien, dem TV-Client (`MainPanel.js`) und 20
+  Testdateien. Das ist ein eigener Umbau, kein Aufräumen nebenbei.
+- Offen und bei der Umsetzung zu entscheiden: ob das Feld `vaulted` in
+  `users.db` per Migration verschwindet oder unbenutzt stehenbleibt.
+  Stehenlassen ist ungefährlich und rückholbar; entfernen ist sauberer, aber
+  eine Einbahnstraße.
+- Beim Umbau fallen zwei Funde dieser Nacht mit weg, weil ihr Gegenstand
+  verschwindet: der Vault-Ausfall bei einem Serverfehler (`v.hidden || false`
+  in beiden Clients) und die Vault-Anteile der Umzugs- und
+  Optimier-Umtragung. Die Tests dazu gehören dann mit entfernt — nicht
+  auskommentiert.
