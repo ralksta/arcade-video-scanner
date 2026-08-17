@@ -5,7 +5,7 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: 2 von 9 Punkten entschieden.
+Stand: 3 von 9 Punkten entschieden.
 
 ---
 
@@ -63,3 +63,34 @@ Was bei der Umsetzung zu beachten ist:
 - Schreibpfad über `user_db.update_user(name, mutate)`, nicht get + add —
   sonst gehen bei gleichzeitigen Anfragen Änderungen verloren (Loop W).
 - Der TV-Client kennt gespeicherte Ansichten nicht; dort ist nichts zu tun.
+
+---
+
+## 3. Cloudflare und Google — **beides lokal**
+
+Das Dashboard lädt Tailwind von `cdn.tailwindcss.com` und Schriften von Google,
+bei jedem Aufruf und auch auf der Anmeldeseite vor dem Login. Hinaus gehen IP,
+User-Agent und Nutzungszeitpunkt; der Tailwind-CDN liefert zusätzlich
+ausführbares JavaScript in die angemeldete Sitzung.
+
+**Entschieden:** Schriften mitliefern **und** Tailwind durch vorgebautes CSS
+ersetzen. Danach läuft das Dashboard vollständig ohne Internet.
+
+Was bei der Umsetzung zu beachten ist:
+
+- Reihenfolge: erst die Schriften (klein, sofort wirksam, unabhängig testbar),
+  dann Tailwind. Der Weg nach Aufwand sortiert steht in
+  `dev-docs/external-resources.md`.
+- **Der Build-Schritt ist die eigentliche Änderung.** Das Projekt hat bewusst
+  keinen; ein vorgebautes `styles.css` bringt einen ein — mit der stillen
+  Falle, dass eine neu verwendete Tailwind-Klasse ohne Neubau einfach nicht
+  wirkt. Dagegen braucht es einen Test, der aus den Templates die verwendeten
+  Klassen zieht und gegen das gebaute CSS prüft; sonst fällt es erst im
+  Browser auf, und dort nur dem, der genau hinsieht.
+- Das gebaute CSS gehört eingecheckt (kein Bundler zur Laufzeit), und der
+  Build-Befehl in `CLAUDE.md` unter „Commands" dokumentiert.
+- Content-Security-Policy erst danach verschärfen — solange ein CDN nötig ist,
+  müsste sie ihn erlauben, und eine Regel mit Ausnahme für genau das Problem
+  ist keine.
+- README/`dev-docs` anpassen: Die dort präzisierte Einschränkung wird nach der
+  Umstellung wieder falsch, nur in die andere Richtung.
