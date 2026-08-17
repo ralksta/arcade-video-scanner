@@ -9,6 +9,11 @@ from arcade_scanner.config import config
 
 logger = logging.getLogger(__name__)
 
+# Dieselbe Toleranz wie bei den Proxys: FAT rundet mtimes auf zwei Sekunden,
+# rsync und SMB verschieben sie um Sekundenbruchteile. Ohne sie gälte ein
+# frisch erzeugtes Vorschaubild gelegentlich sofort wieder als veraltet.
+THUMB_STALE_TOLERANCE_SEC = 2.0
+
 # Module-level constants (not recreated on every call)
 IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif'})
 
@@ -41,13 +46,41 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
         logger.debug("get_video_metadata failed for %s: %s", filepath, e)
     return {}
 
+def _thumbnail_needs_rebuild(thumb_path: str, video_path: str) -> bool:
+    """Fehlt das Vorschaubild, ist es leer — oder zeigt es einen alten Stand?
+
+    Der Dateiname ist ``md5(pfad)``. Er hängt am **Pfad**, nicht am Inhalt.
+    Geprüft wurde bis hierher nur, *ob* eine Datei da ist und ob sie grösser
+    als null ist. Ändert sich das Video unter demselben Pfad, blieb das alte
+    Bild also für immer stehen.
+
+    Und es ändert sich hier regelmässig: Der Optimierer ersetzt Originale an
+    Ort und Stelle, und ein Zuschnitt (``--ss``/``--to``) macht aus derselben
+    Datei tatsächlich ein anderes Video. Im Raster stand danach ein Bild, das
+    es so nicht mehr gibt.
+
+    Dieselbe Frage ist für die Proxy-Dateien längst beantwortet
+    (``proxy_resolver.is_proxy_stale``) — mit derselben Begründung und
+    derselben Toleranz gegen Dateisysteme, die mtimes unterschiedlich genau
+    ablegen.
+    """
+    try:
+        if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+            return True
+        return os.path.getmtime(video_path) > os.path.getmtime(thumb_path) + THUMB_STALE_TOLERANCE_SEC
+    except OSError:
+        # Quelle nicht lesbar: Neu erzeugen bringt nichts, das vorhandene Bild
+        # ist besser als keins.
+        return not os.path.exists(thumb_path)
+
+
 def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
     # Use surrogateescape to handle Windows-originating surrogate characters in paths
     file_hash = hashlib.md5(video_path.encode('utf-8', 'surrogateescape')).hexdigest()
     thumb_name = f"thumb_{file_hash}.jpg"
     thumb_path = os.path.join(config.thumb_dir, thumb_name)
 
-    if not os.path.exists(thumb_path) or os.path.getsize(thumb_path) == 0:
+    if _thumbnail_needs_rebuild(thumb_path, video_path):
         print(f"🖼️  Generating thumbnail: {os.path.basename(video_path)}")
         # Check if image (Image processing without seeking)
         is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)

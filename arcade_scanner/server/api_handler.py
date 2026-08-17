@@ -607,7 +607,17 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     file_path = os.path.abspath(os.path.join(thumb_dir_abs, rel_path))
 
                     # Ensure result is still inside thumb_dir (prevents ../ attacks)
-                    if not file_path.startswith(thumb_dir_abs):
+                    #
+                    # Der Vergleich muss auf einer Verzeichnisgrenze enden.
+                    # `startswith(thumb_dir_abs)` allein liess ein
+                    # Nachbarverzeichnis durch, dessen Name mit demselben
+                    # Präfix beginnt: `../thumbnails_alt/thumb_x.jpg` landet
+                    # nach dem Zusammensetzen bei `/…/thumbnails_alt/…` und
+                    # fängt buchstäblich mit `/…/thumbnails` an.
+                    #
+                    # Derselbe Grenzfehler steckte in `is_path_allowed()`.
+                    if file_path != thumb_dir_abs and not file_path.startswith(
+                            thumb_dir_abs + os.sep):
                         print(f"🚨 Path traversal attempt blocked: {rel_path}")
                         self.send_error(403, "Forbidden")
                         return

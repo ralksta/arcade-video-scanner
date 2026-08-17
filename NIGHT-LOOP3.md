@@ -351,6 +351,25 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       niemand nochmal an, und deshalb fällt dort nichts auf. Hängt am
       Standardkonto-Punkt aus dem Bericht.
 
+## Zyklus 10
+
+- [ ] **Loop T — Vorschaubilder** (läuft)
+      - [x] Ein geändertes Video behielt sein altes Vorschaubild für immer
+      - [x] Der Traversal-Schutz verglich ohne Verzeichnisgrenze — derselbe
+            Fehler wie in `is_path_allowed`
+      - [ ] **Für Ralf:** 1141 verwaiste Vorschaubilder, 17,3 MB → im Bericht
+      - [ ] Offen: Aufräumen beim Entfernen verwaister Einträge
+      Jede Karte im Raster zeigt eines, und sie sind das einzige, was auf der
+      Platte mitwächst, ohne dass jemand hinsieht. Fragen: Werden sie
+      erneuert, wenn sich die Datei ändert? Werden sie aufgeräumt, wenn die
+      Datei verschwindet? Und was passiert bei einem Pfad, der kein gültiger
+      Dateiname ist?
+
+- [ ] **Loop U — Der Filter im Frontend**
+      `filter_engine.js` entscheidet, was der Nutzer überhaupt sieht — ein
+      Fehler dort versteckt Dateien, ohne dass irgendwo etwas fehlt. Über den
+      node-Kontext ausführbar, also messbar statt gelesen.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
@@ -360,6 +379,22 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 62 (Loop T, Vorschaubilder)** — Der Name ist `md5(pfad)`, also
+  hängt er am Pfad und nicht am Inhalt; erneuert wurde nur, wenn die Datei
+  fehlte oder leer war. Ein optimiertes oder zugeschnittenes Video behielt sein
+  altes Bild damit für immer — und weil eine Vorschau immer irgendwie plausibel
+  aussieht, merkt das niemand. Für die Proxys ist dieselbe Frage längst
+  beantwortet (`is_proxy_stale`, samt Toleranz gegen ungenaue mtimes); für die
+  Vorschaubilder galt sie nicht. Zum wiederholten Mal dasselbe Muster.
+  Nebenbei gemessen: Von 1141 Bildern auf der Platte gehört **keines** zu einem
+  der 8788 Einträge — 17,3 MB für Pfade, die es nicht mehr gibt. Ich habe die
+  Messung gegen das gespeicherte `thumb`-Feld gegengeprüft, weil ein so glattes
+  Ergebnis eher nach Messfehler aussieht als nach Befund; die berechneten Namen
+  stimmen exakt. Angefasst habe ich nichts. Ausserdem: Der Traversal-Schutz der
+  Auslieferung verglich per `startswith` ohne Verzeichnisgrenze — derselbe
+  Fehler, den ich heute Nacht schon in `is_path_allowed()` behoben habe.
+  Nächstes: Aufräumen verwaister Bilder beim Entfernen verwaister Einträge.
 
 - **Iteration 61 (Absicherung der Test-Suite)** — Die mtime-Prüfung nach der
   vorigen Iteration schlug an: `users.db` war angefasst worden. Verursacher war
