@@ -1,12 +1,12 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 55 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 1623** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 57 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 1656** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
 
-## Zuerst lesen: sechs Punkte brauchen deine Entscheidung
+## Zuerst lesen: sieben Punkte brauchen deine Entscheidung
 
 ### 1. Der iOS-Client ist seit Monaten funktionsunfähig
 
@@ -73,6 +73,34 @@ hätte dort Schaden angerichtet, wo bereits maskiert wird.
 
 → `dev-docs/frontend-escaping.md`, priorisiert.
 
+### 7. Das Standardkonto heißt `admin` mit dem Passwort `admin`
+
+`UserStore.__init__` legt bei **jedem Start** ein Konto `admin` mit dem
+Passwort `admin` und Admin-Rechten an, sobald kein Nutzer dieses Namens
+existiert (`user_store.py:25`, `create_default_admin`). Das heißt auch: Löschst
+du es je, ist es beim nächsten Start wieder da.
+
+Ob das bei dir noch das gesetzte Passwort ist, kannst du in einem Satz prüfen —
+melde dich mit `admin`/`admin` an. Ich habe es **nicht** nachgesehen: Der
+Versuch, das gegen deine echte `users.db` zu rechnen, wurde blockiert, und zu
+Recht — von außen ist das nicht von Hash-Knacken zu unterscheiden.
+
+**Nicht geändert**, weil jede Alternative eine Produktentscheidung ist: ein
+zufälliges Startpasswort in die Konsole schreiben, einen Zwang zum Wechsel bei
+der ersten Anmeldung, oder gar kein Standardkonto. Das Docker-Onboarding hängt
+mit dran (`create_default_admin` setzt dort `setup_complete = False`).
+
+Zwei kleinere Punkte im selben Bereich, ebenfalls deine Entscheidung:
+
+- **Es gibt kein Löschen und keinen Rechte-Entzug.** `manage_users.py` kann
+  `list`, `add`, `passwd` — mehr nicht. Ein Konto wird man nur über die
+  Datenbank wieder los.
+- **Ein Passwortwechsel beendet laufende Sitzungen nicht.** Der Server hält sie
+  im Arbeitsspeicher, das CLI-Skript läuft in einem eigenen Prozess. Wechselst
+  du ein Passwort, *weil* es abhandengekommen ist, bleibt die fremde Sitzung bis
+  zum Ablauf gültig. Das Skript sagt das jetzt hin, behebt es aber nicht — dafür
+  bräuchte es eine Server-Route.
+
 ---
 
 ## Sicherheitsfunde (behoben)
@@ -84,6 +112,8 @@ hätte dort Schaden angerichtet, wo bereits maskiert wird.
 | Sitzungs-Token im Zugriffslog | `/stream`-Zeilen wurden nur unterdrückt, solange `verbose_scanning` **aus** war. Die Diagnose-Option schrieb also gültige Zugangs-Token mit — genau dann, wenn man Logs weitergibt. |
 | Dateinamen führten Code aus | `createVideoCard()` setzte den Namen unmaskiert per `innerHTML`. Ein Video namens `<img src=x onerror=…>.mp4` führt beim Aufbau des Grids Code aus. |
 | Brute-Force-Sperre per Header aushebelbar | `/api/login` nahm die Kennung aus `X-Forwarded-For` — vom Client gesetzt. Mit wechselndem Wert: fünf Versuche je Fantasie-IP, beliebig viele. Jetzt zählt zusätzlich der Benutzername mit. |
+| Benutzernamen waren über die **Antwortzeit** erratbar | `verify_password()` rechnete bei unbekanntem Namen gar nicht: 62,39 ms gegen 0,28 ms, Faktor 220 — über Netzwerk trivial zu unterscheiden. Seit die Sperre (Zeile darüber) am Benutzernamen hängt, wird aus so einer Namensliste eine Liste gezielt sperrbarer Konten. Jetzt 62,28 gegen 62,54 ms. |
+| `manage_users.py` nahm **leere Passwörter** an | Zweimal Enter an der Abfrage genügte — die Eingaben waren gleich, eine Leerprüfung gab es nicht. Das Konto stand danach ohne Passwort in der Datenbank. Dasselbe Skript war außerdem gar nicht ausführbar: Die Shebang-Zeile zeigte auf einen absoluten Pfad einer fremden Maschine. |
 | Tag- und Ordnernamen in interpolierten `onclick`-Handlern | Fünf Stellen. Der Breadcrumb-Handler war sogar abgesichert — aber nur gegen Apostrophe, während das Attribut von Anführungszeichen begrenzt wird. |
 | Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump | `FOLDERS_DATA` enthielt die Ordner *aller* Nutzer, mit vollem Pfad im `title`-Attribut. |
 
