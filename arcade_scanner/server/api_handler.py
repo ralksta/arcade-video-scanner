@@ -213,6 +213,26 @@ class DuplicateScanManager:
         }
         self._cache = None
 
+    def try_begin(self, **kwargs) -> bool:
+        """Belegt den Duplikat-Lauf, wenn keiner läuft. True heisst: Du darfst.
+
+        Nachsehen und Setzen muss zusammen passieren. Die Route davor prüft
+        nur ``is_running`` und startet dann einen Thread — zwei Anfragen kurz
+        hintereinander sahen also beide „läuft nicht" und starteten je einen
+        vollständigen Durchlauf. Der ist teuer (Wahrnehmungs-Hashes über die
+        ganze Bibliothek), und beide schreiben in denselben Fortschritt und
+        dieselbe Ergebnisliste: Der Balken springt, und wer zuletzt fertig
+        wird, überschreibt die Funde des anderen.
+
+        Dieselbe Stelle wie ``ScannerManager._claim()`` — dort stand derselbe
+        Fehler.
+        """
+        with self._lock:
+            if self._state.get("is_running"):
+                return False
+            self._state.update(is_running=True, **kwargs)
+            return True
+
     def update_state(self, **kwargs) -> None:
         with self._lock:
             self._state.update(kwargs)
@@ -316,13 +336,14 @@ def background_duplicate_scan(
     """
     from arcade_scanner.core.duplicate_detector import DuplicateDetector
 
-    _dup_mgr.update_state(
-        is_running=True,
+    if not _dup_mgr.try_begin(
         progress=0,
         message="Initializing scan...",
         has_more=False,
         batch_offset=batch_offset,
-    )
+    ):
+        print("⏸ Duplikat-Suche läuft bereits — zweite Anfrage übergangen.")
+        return
 
     try:
         def progress_cb(msg: str, pct: float) -> None:

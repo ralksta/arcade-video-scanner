@@ -537,6 +537,8 @@ nicht kontrolliert.
       - [x] Zwei Anfragen konnten zwei vollständige Scans starten
       - [x] Wer die Seite im falschen Moment lud, bekam eine halbe — der
             HTML-Dump wurde direkt in die ausgelieferte Datei geschrieben
+      - [x] Zwei Anfragen konnten zwei Duplikat-Suchen starten — dieselbe
+            Stelle wie beim Scanner, zweites Vorkommen
       - [x] Geprüft und stehen gelassen: Zwei **lokale** Optimierungen
             derselben Datei bleiben ungeschützt (siehe Bericht)
 
@@ -554,6 +556,22 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 94 (Loop AF, derselbe Fehler ein zweites Mal)** — Nachdem der
+  Scanner sein `_claim()` hatte, war die Frage naheliegend: Wo steht dasselbe
+  Muster noch? Die Duplikat-Suche: Route prüft `is_running`, Thread setzt es
+  bedingungslos. Hier ist die Folge unangenehmer, weil beide Läufe in
+  denselben Fortschritt und dieselbe Ergebnisliste schreiben — der Balken
+  springt zwischen zwei Zählungen, und wer zuletzt fertig wird, überschreibt
+  die Funde des anderen. Für den Nutzer sieht das aus, als hätte die Suche
+  etwas übersehen. `try_begin()` setzt jetzt auch den Anfangszustand im selben
+  Schritt; ein abgewiesener zweiter Aufruf ändert nichts, sonst spränge der
+  Balken des laufenden auf null. Gelernt: Nach einem behobenen Fund ist „wo
+  noch?" die billigste Frage der Nacht — sie hat diesmal zwei Zeilen Code
+  gekostet und einen echten Fehler gefunden. Ein Test hält beide Stellen in
+  derselben Form, damit die nächste Person nicht nur eine davon findet.
+  Nächstes: gleichzeitige Anmeldungen und der Ähnlichkeits-Cache, dann AF
+  schließen.
 
 - **Iteration 93 (Loop AF, die halbe Seite)** — `generate_html_report()`
   schrieb mit `open(report_file, "w")` direkt in die Datei, die der Server
