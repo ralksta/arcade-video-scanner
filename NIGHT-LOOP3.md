@@ -321,7 +321,9 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 - [ ] **Loop Q — Auslieferung: Streaming und Proxys** (läuft)
       - [x] Verkürzt gelieferte Streams liessen den Client hängen —
             erreichbar, wenn der Optimierer die Datei währenddessen ersetzt
-      - [ ] Offen: Proxy-Entscheidung LAN/Tailscale, Zwischenspeicher-Köpfe
+      - [x] Kein Validator: Bereiche aus zwei verschiedenen Fassungen konnten
+            in einer Wiedergabe landen — jetzt `ETag` und `If-Range`
+      - [ ] Offen: Proxy-Entscheidung selbst prüfen
       Jede Wiedergabe läuft hier durch. Range-Requests, Teilinhalte, Springen
       im Video, und die Entscheidung LAN → Original / Tailscale → Proxy. Reine
       Protokoll-Logik, ohne Mediendateien prüfbar.
@@ -335,6 +337,20 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 56 (Loop Q, Validator)** — Die Auslieferung schickte weder `ETag`
+  noch wertete sie `If-Range` aus. Für einen gewöhnlichen Dateiserver wäre das
+  lässlich; hier verbergen sich unter derselben Adresse zwei verschiedene
+  Dateien — der Optimierer ersetzt Originale an Ort und Stelle, und bei
+  eingeschaltetem Proxy-Streaming entscheidet die *Netzwerkadresse des Clients*
+  zwischen Original und Proxy. Wer beim Springen einen Bereich nachforderte,
+  bekam Bytes aus der Datei, die jetzt dort liegt, ohne merken zu können, dass
+  es eine andere ist. Anders als der verkürzte Stream aus Iteration 55 fällt
+  das nicht als Hänger auf, sondern als Bildfehler mitten im Video. Gelernt:
+  Zwei Funde in Folge aus derselben Wurzel — die Adresse identifiziert hier
+  keine feste Datei, und das Protokoll hat für genau diesen Fall einen
+  Mechanismus, der schlicht nicht benutzt wurde. Nächstes: die
+  Proxy-Entscheidung selbst.
 
 - **Iteration 55 (Loop Q, verkürzte Streams)** — Die Range-Behandlung ist gut
   gebaut und gut getestet; die Kommentare warnen ausdrücklich davor, eine
