@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 125 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2192** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 129 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2227** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -189,6 +189,7 @@ damit es nicht wieder aus dem Blick gerät.
 | Tag- und Ordnernamen in interpolierten `onclick`-Handlern | Fünf Stellen. Der Breadcrumb-Handler war sogar abgesichert — aber nur gegen Apostrophe, während das Attribut von Anführungszeichen begrenzt wird. |
 | Dieselbe Sache noch einmal im **Wiedergabe-Dialog** | `cinema.js` baute beide Tag-Listen aus interpolierten `onclick`-Attributen — die sechste Stelle, übersehen, weil sie als einzige Datei `escapeHtml()` gar nicht benutzt. Hier genügt schon der harmlose Fall: Ein Tag namens „Ralfs Auswahl" macht den Knopf funktionsunfähig. Maskieren allein hätte übrigens nicht gereicht — der Browser dekodiert Entitäten im Attribut, *bevor* der Inhalt als JavaScript gelesen wird. Jetzt Knoten statt Zeichenketten, wie in `tag_manager.js`. |
 | **`/stream` lieferte Dateien ohne Anmeldung aus** | Geprüft wurde nur `is_path_allowed()` — ob der Pfad in einem Scan-Ziel liegt. Keine Sitzungsprüfung, weder GET noch HEAD. Wer die Adresse kannte, bekam die Datei: ohne Konto, an der Vault-Markierung vorbei. Die Metadaten waren geschützt, die Oberfläche, die Benutzerdaten — die Dateien selbst nicht, und die sind der Zweck des Programms. Am echten Handler belegt: vorher 200 samt Inhalt, jetzt 401. Beide Clients bringen ihre Kennung schon mit (Browser: Cookie, TV: `&token=`), die Wiedergabe bleibt heil. **Warum es vierzehn Zyklen überlebt hat:** Der Rundum-Test über alle Routen sucht nach `self.path == "/api/…"`, `/stream` wird per `startswith()` erkannt — der Wächter hatte eine Formlücke und meldete deshalb Ruhe. Der neue Test deckt beide Formen ab. |
+| **Sperrliste und Sitzungsliste wuchsen unbegrenzt** | Bei jedem gescheiterten Anmeldeversuch entstand ein Eintrag, dessen Schlüssel aus der Anfrage kommt (`X-Forwarded-For` und der eingetippte Benutzername). Weg ging er nur bei einer erfolgreichen Anmeldung mit **demselben** Schlüssel — für erfundene Werte nie. Jeder, der den Anmeldeport erreicht, konnte damit den Arbeitsspeicher unbegrenzt wachsen lassen: ohne Konto, mit gewöhnlichen Anfragen. Dabei war nichts daran je dafür gedacht, länger als 900 Sekunden zu leben. Beim Deckeln fliegen nicht gesperrte Einträge zuerst — eine laufende Sperre hinauszudrängen wäre genau das Loch, das die Sperre schließen soll. |
 | Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump | `FOLDERS_DATA` enthielt die Ordner *aller* Nutzer, mit vollem Pfad im `title`-Attribut. |
 
 **Ursache hinter zwei dieser Funde:** Der Server hat kein globales Auth-Gate —
@@ -308,6 +309,40 @@ ist. Ich habe sie dort **nicht** angefasst, weil ich den Client hier nicht bauen
 kann (`tv_client/node_modules` fehlt) und ein falsch benanntes Ereignis am
 Enact-`VideoPlayer` den Player kaputtmachen würde, ohne dass es mir auffällt.
 Das gehört an ein Gerät, an dem man es sieht.
+
+---
+
+## Zeit: was „Datum" eigentlich hieß (Loop AE)
+
+Zwei Angaben je Eintrag: `imported_at` (wann der erste Scan die Datei gesehen
+hat) und `mtime` (wann die Datei zuletzt geschrieben wurde). Drei Stellen —
+Datumsfilter, Sammlungen und deren Python-Port — rechneten „`imported_at`,
+ersatzweise `mtime`". Die vierte, die **Sortierung**, rechnete allein mit
+`mtime`. In der Oberfläche hieß beides „Datum".
+
+Praktisch heißt das: Beim Optimieren wird die Datei neu geschrieben. Ein Film
+von 2019 stand danach unter „Sortieren: Datum" ganz oben — nicht weil er neu
+ist, sondern weil er angefasst wurde. Mit dem Fernarbeiter betrifft das über
+Nacht schnell die halbe Bibliothek.
+
+Ich habe das zuerst vereinheitlicht und **mich dann selbst korrigiert**: Beim
+ersten Scan bekommen alle Dateien ihr `imported_at` binnen Minuten. An deiner
+Bibliothek nachgesehen — 8788 Einträge auf zehn Import-Tage, aber 2858 allein
+am 07.08. Für die hätte die Vereinheitlichung „nach Datum" durch „nach
+Scan-Reihenfolge" ersetzt. Es sind zwei berechtigte Fragen, also stehen jetzt
+beide im Auswahlfeld: **„Sort: date added"** und **„Sort: file date"**.
+Gespeicherte Ansichten sind nicht betroffen, der Wert `date` blieb unverändert.
+
+Zwei Dinge in diesem Bereich habe ich geprüft und **nicht** angefasst:
+
+- `imported_at=0` im `image_inspector` ist kein Fehler — der Wert wird im
+  gemeinsamen Block des Scanners gestempelt, den Bilder und Videos
+  gleichermaßen durchlaufen.
+- `cleanup_old_jobs()` in `sqlite_store.py` wird **nirgends aufgerufen**. Es
+  gibt die Funktion, es gibt Tests dafür, und der Verlauf der Warteschlange
+  wächst trotzdem für immer. Bei dir sind es 18 Zeilen, also kein Druck. Ich
+  habe sie nicht verdrahtet, weil das Löschen deines Job-Verlaufs nach 30 Tagen
+  deine Entscheidung ist — anschalten wäre eine Zeile in `main.py`.
 
 ---
 
