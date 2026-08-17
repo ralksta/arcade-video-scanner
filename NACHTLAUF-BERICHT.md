@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 122 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2174** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 125 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2192** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -298,7 +298,16 @@ beiden löschen, oder eine umbenennen. Ich habe nichts angefasst.
 |---|---|
 | **Umbenennen war Datenverlust** | Favoriten, Vault-Marke und Tags hängen am Pfad. Wer eine Datei umbenennt oder in einen anderen Ordner schiebt, erzeugt aus Sicht der Bibliothek „alte weg, neue da" — der Aufräumschritt löschte die alte Zeile mitsamt allem, was daran hing. Ordnung in einer Mediathek *besteht* aus Umbenennen und Verschieben: Der Verlust trifft genau den, der aufräumt. Erkannt wird der Umzug jetzt an Größe, Änderungszeit und Laufzeit, und nur bei eindeutigen Paaren. Das Aufnahmedatum zieht mit, sonst stünde jede umbenannte Datei in „zuletzt hinzugefügt" ganz oben. |
 | Ein nicht eingehängtes Laufwerk stand nur im Protokoll | Der Scanner erkennt den Fall und verhält sich richtig (kein Aufräumen). Gesagt hat er es nur der Konsole — wer den Server als Dienst betreibt, sieht eine vollständige Bibliothek, in der jedes Video einen Fehler wirft, und sucht bei Codecs und Rechten. Die Einstellungen zeigen fehlende Scan-Ziele jetzt an. Nur die eigenen; scheitert die Prüfung selbst (hängender Mount), wird geschwiegen statt falsch gewarnt. |
+| **Optimieren verlor Favoriten, Vault und Tags** | Derselbe Grund, an einer Stelle, die man täglich benutzt: Aus `film.mkv` wird `film.mp4`. Die Zeile in `media` wird sorgfältig übertragen, der Nutzerzustand in `users.db` hängt am Pfad und blieb liegen. Dieselbe Datei, derselbe Name, ohne alles, was du daran gemacht hast — und eine weggelegte Datei war danach wieder sichtbar. Zwei Stellen betroffen (Fernarbeiter-Upload und „optimierte Fassung behalten"), der Prüfmodus durch Zufall nicht. |
+| **TV-Client: gesperrtes `localStorage` machte den Fernseher schwarz** | Sechs ungeschützte Zugriffe, zwei davon im Rumpf der App-Komponente. Auf webOS kann der Speicher gesperrt sein — der Client **weiß** das, in `serverConfig.js` steht seit jeher ein try/catch mit genau dieser Begründung. Eine Ausnahme dort heißt kein halb aufgebauter Bildschirm, sondern gar keiner, und auf einem Fernseher gibt es keine Konsole zum Nachsehen. Derselbe Fund wie im Browser-Client, den beide Clients getrennt voneinander hatten. |
 | Der Wiedergabe-Dialog schwieg bei einem Fehler | Kein error-Handler an `<video>` und `<img>`: schwarzes Bild, sonst nichts. Jetzt eine Meldung, deren Grund nachgeschlagen wird — ein HEAD trennt „Datei weg" von „Server sagt nein" von „Browser kann den Codec nicht". |
+
+**Offen gelassen in diesem Bereich:** Der TV-Client zeigt bei einer nicht
+abspielbaren Datei nichts an — dieselbe Lücke, die im Browser jetzt geschlossen
+ist. Ich habe sie dort **nicht** angefasst, weil ich den Client hier nicht bauen
+kann (`tv_client/node_modules` fehlt) und ein falsch benanntes Ereignis am
+Enact-`VideoPlayer` den Player kaputtmachen würde, ohne dass es mir auffällt.
+Das gehört an ein Gerät, an dem man es sieht.
 
 ---
 

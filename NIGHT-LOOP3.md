@@ -491,7 +491,7 @@ Zwei Themenfelder, die in vierzehn Zyklen nie an der Reihe waren — beide
 betreffen den Kern des Werkzeugs: ein Inventar über Dateien, die es selbst
 nicht kontrolliert.
 
-- [ ] **Loop AD — Wenn Dateien draußen verschwinden, umziehen oder umbenannt werden** (läuft)
+- [x] **Loop AD — Wenn Dateien draußen verschwinden, umziehen oder umbenannt werden**
       Das Inventar steht in SQLite, die Wahrheit auf der Platte. Zwischen
       beiden liegt alles, was der Nutzer außerhalb der App tut: verschieben,
       umbenennen, Platte abhängen, Netzlaufwerk nicht gemountet. Was macht
@@ -507,7 +507,7 @@ nicht kontrolliert.
       - [x] Optimieren verlor Favoriten, Vault und Tags — `film.mkv` wird
             `film.mp4`, und der Nutzerzustand hängt am Pfad
 
-- [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum**
+- [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum** (läuft)
       Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
       Zeitzone steht es, und was passiert beim Rescan?
 
