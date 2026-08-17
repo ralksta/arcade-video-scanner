@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import sqlite3
+import threading
 from typing import List, Optional
 
 from arcade_scanner.config import config
@@ -23,6 +24,23 @@ class UserStore:
         # lesbar" nicht zu unterscheiden — und der Scanner leitet aus dem
         # ersten Fall ab, dass er ersatzweise das ganze Home durchsucht.
         self.last_read_ok = True
+
+        # Lesen-Ändern-Schreiben muss am Stück laufen.
+        #
+        # Der übliche Ablauf im Server ist `get_user()` → Feld ändern →
+        # `add_user()`, und `add_user()` schreibt den **gesamten**
+        # Nutzerdatensatz als ein JSON-Feld zurück. Der Server ist ein
+        # ThreadingTCPServer: Zwei gleichzeitige Anfragen desselben Kontos —
+        # ein Favorit auf dem Fernseher, ein Tag im Browser — lesen beide den
+        # alten Stand, und der zweite Schreibvorgang überschreibt die Änderung
+        # des ersten.
+        #
+        # Nachgemessen mit 60 gleichzeitigen Favoriten auf einem Testkonto:
+        # **4 kamen an, 56 gingen verloren.**
+        #
+        # Die Sperre ist wiedereintrittsfähig, weil `update_user()` innerhalb
+        # ihrer selbst `get_user()` und `add_user()` aufruft.
+        self._write_lock = threading.RLock()
 
         self._init_db()
         self._migrate_from_json_file()
@@ -144,6 +162,26 @@ class UserStore:
         finally:
             if conn:
                 conn.close()
+
+    def update_user(self, username: str, mutate) -> bool:
+        """Liest den Nutzer, lässt ihn ändern und schreibt ihn zurück — am Stück.
+
+        `mutate` bekommt das `User`-Objekt und ändert es an Ort und Stelle; der
+        Rückgabewert wird nicht angesehen. False heisst: Der Nutzer existiert
+        nicht, es wurde nichts geschrieben.
+
+        Der Weg über diese Methode ist der einzige, der gegen gleichzeitige
+        Anfragen hält. Wer stattdessen `get_user()` und `add_user()` einzeln
+        aufruft, liest ausserhalb der Sperre — und verliert bei Gleichzeitigkeit
+        die Änderung des jeweils anderen.
+        """
+        with self._write_lock:
+            user = self.get_user(username)
+            if user is None:
+                return False
+            mutate(user)
+            self.add_user(user)
+            return True
 
     def get_all_users(self) -> List[User]:
         users = []
@@ -441,23 +479,27 @@ class UserStore:
             return 0
 
         removed = 0
-        for user in self.get_all_users():
-            before = removed
+        # Die ganze Schleife unter der Sperre: Sie liest jeden Nutzer, ändert
+        # ihn und schreibt ihn zurück — genau das Muster, das ohne Sperre die
+        # Änderung eines gleichzeitigen Aufrufers verwirft.
+        with self._write_lock:
+            for user in self.get_all_users():
+                before = removed
 
-            keep_fav = [p for p in user.data.favorites if p not in targets]
-            removed += len(user.data.favorites) - len(keep_fav)
-            user.data.favorites = keep_fav
+                keep_fav = [p for p in user.data.favorites if p not in targets]
+                removed += len(user.data.favorites) - len(keep_fav)
+                user.data.favorites = keep_fav
 
-            keep_vault = [p for p in user.data.vaulted if p not in targets]
-            removed += len(user.data.vaulted) - len(keep_vault)
-            user.data.vaulted = keep_vault
+                keep_vault = [p for p in user.data.vaulted if p not in targets]
+                removed += len(user.data.vaulted) - len(keep_vault)
+                user.data.vaulted = keep_vault
 
-            keep_tags = {p: t for p, t in user.data.tags.items() if p not in targets}
-            removed += len(user.data.tags) - len(keep_tags)
-            user.data.tags = keep_tags
+                keep_tags = {p: t for p, t in user.data.tags.items() if p not in targets}
+                removed += len(user.data.tags) - len(keep_tags)
+                user.data.tags = keep_tags
 
-            if removed > before:
-                self.add_user(user)
+                if removed > before:
+                    self.add_user(user)
 
         return removed
 

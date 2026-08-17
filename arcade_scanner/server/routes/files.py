@@ -591,15 +591,20 @@ def _handle_hide(handler) -> None:
 
     if path:
         abs_path = os.path.abspath(path)
-        u = user_db.get_user(user_name)
-        if u:
+
+        # Über update_user() statt get_user()/add_user() einzeln: Der Server
+        # bedient jede Anfrage in einem eigenen Thread, und add_user() schreibt
+        # den gesamten Nutzerdatensatz zurück. Zwei gleichzeitige Anfragen
+        # desselben Kontos lasen sonst beide den alten Stand, und die zweite
+        # verwarf die Änderung der ersten.
+        def toggle(u):
             if state:
                 if abs_path not in u.data.vaulted:
                     u.data.vaulted.append(abs_path)
-            else:
-                if abs_path in u.data.vaulted:
-                    u.data.vaulted.remove(abs_path)
-            user_db.add_user(u)
+            elif abs_path in u.data.vaulted:
+                u.data.vaulted.remove(abs_path)
+
+        if user_db.update_user(user_name, toggle):
             print(f"Updated vault state for {user_name}: {os.path.basename(abs_path)} -> hidden={state}")
 
     handler.send_response(204)
@@ -616,21 +621,21 @@ def _handle_batch_hide(handler) -> None:
     paths_list = paths_str.split("&state=")[0].split(",")
     state = "state=false" not in handler.path
 
-    u = user_db.get_user(user_name)
-    if u:
-        updated_count = 0
+    counted = {"n": 0}
+
+    def toggle_all(u):
         for p in paths_list:
             abs_p = os.path.abspath(p)
             if state:
                 if abs_p not in u.data.vaulted:
                     u.data.vaulted.append(abs_p)
-                    updated_count += 1
-            else:
-                if abs_p in u.data.vaulted:
-                    u.data.vaulted.remove(abs_p)
-                    updated_count += 1
-        user_db.add_user(u)
-        print(f"Batch updated vault state for {user_name} ({updated_count} files) -> hidden={state}")
+                    counted["n"] += 1
+            elif abs_p in u.data.vaulted:
+                u.data.vaulted.remove(abs_p)
+                counted["n"] += 1
+
+    if user_db.update_user(user_name, toggle_all):
+        print(f"Batch updated vault state for {user_name} ({counted['n']} files) -> hidden={state}")
     handler.send_response(204)
     handler.end_headers()
 
@@ -647,15 +652,15 @@ def _handle_favorite(handler) -> None:
 
     if path:
         abs_path = os.path.abspath(path)
-        u = user_db.get_user(user_name)
-        if u:
+
+        def toggle(u):
             if state:
                 if abs_path not in u.data.favorites:
                     u.data.favorites.append(abs_path)
-            else:
-                if abs_path in u.data.favorites:
-                    u.data.favorites.remove(abs_path)
-            user_db.add_user(u)
+            elif abs_path in u.data.favorites:
+                u.data.favorites.remove(abs_path)
+
+        if user_db.update_user(user_name, toggle):
             print(f"Updated favorite state for {user_name}: {os.path.basename(abs_path)} -> favorite={state}")
 
     handler.send_response(204)
@@ -672,22 +677,23 @@ def _handle_batch_favorite(handler) -> None:
     paths = params.get("paths", [""])[0].split(",")
     state = params.get("state", ["true"])[0].lower() == "true"
 
-    u = user_db.get_user(user_name)
-    if u:
-        updated_count = 0
+    counted = {"n": 0}
+
+    def toggle_all(u):
         for p in paths:
-            if p:
-                abs_path = os.path.abspath(p)
-                if state:
-                    if abs_path not in u.data.favorites:
-                        u.data.favorites.append(abs_path)
-                        updated_count += 1
-                else:
-                    if abs_path in u.data.favorites:
-                        u.data.favorites.remove(abs_path)
-                        updated_count += 1
-        user_db.add_user(u)
-        print(f"Batch updated favorite state for {user_name} ({updated_count} files) -> favorite={state}")
+            if not p:
+                continue
+            abs_path = os.path.abspath(p)
+            if state:
+                if abs_path not in u.data.favorites:
+                    u.data.favorites.append(abs_path)
+                    counted["n"] += 1
+            elif abs_path in u.data.favorites:
+                u.data.favorites.remove(abs_path)
+                counted["n"] += 1
+
+    if user_db.update_user(user_name, toggle_all):
+        print(f"Batch updated favorite state for {user_name} ({counted['n']} files) -> favorite={state}")
     handler.send_response(204)
     handler.end_headers()
 

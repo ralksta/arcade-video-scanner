@@ -393,7 +393,11 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       Abweichungen fallen nicht auf, weil niemand beide Clients nebeneinander
       hält. Über node ausführbar.
 
-- [ ] **Loop W — Nebenläufigkeit im Server**
+- [ ] **Loop W — Nebenläufigkeit im Server** (läuft)
+      - [x] Gleichzeitige Anfragen desselben Kontos verwarfen einander:
+            60 gesetzt, **4 angekommen**
+      - [x] Geteilte SQLite-Verbindung geprüft: alle 67 Zugriffe sind gedeckt
+      - [ ] Offen: Tags, Einstellungen, Auto-Tag-Regeln auf `update_user()`
       Eine geteilte SQLite-Verbindung hinter einem wiedereintrittsfähigen
       Lock, dazu ein ThreadingTCPServer. Der letzte grosse Bereich, in dem ein
       Fehler nicht falsch aussieht, sondern selten.
@@ -407,6 +411,25 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 68 (Loop W, verlorene Änderungen)** — Die geteilte
+  SQLite-Verbindung habe ich per AST durchgezählt: 67 Zugriffe, 27 davon ohne
+  Sperre — und alle 27 erklärbar (Verbindungsaufbau, Methoden mit `_locked` im
+  Namen, Startmigration). Das doppelte Prüfen in `_ensure_connection()` ist
+  sauber gebaut. Der Fund lag im **anderen** Store: `user_store` öffnet je
+  Aufruf eine eigene Verbindung, hatte aber gar keine Sperre — und der übliche
+  Ablauf im Server ist `get_user()` → ändern → `add_user()`, wobei `add_user()`
+  den *gesamten* Datensatz als ein JSON-Feld zurückschreibt. Bei einem
+  ThreadingTCPServer heisst das: Wer zuletzt schreibt, gewinnt alles.
+  Nachgemessen mit 60 gleichzeitigen Favoriten: **4 kamen an, 56 gingen
+  verloren.** Gelernt: Ich hatte den ganzen Loop auf die geteilte Verbindung
+  ausgerichtet, weil dort die Kommentare stehen — die Gefahr lag dort, wo
+  niemand einen Kommentar hinterlassen hatte. `update_user()` hält jetzt eine
+  wiedereintrittsfähige Sperre über Lesen, Ändern und Schreiben; danach 60 von
+  60. Umgestellt sind die vier Wege mit dem meisten Verkehr (Favorit und Vault,
+  einzeln und als Stapel); Tags, Einstellungen und Auto-Tag-Regeln stehen noch
+  aus und sind als offene Liste in einem Test festgehalten. Nächstes: diese
+  vier Wege umstellen.
 
 - **Iteration 67 (Loop V, Sortierung — Loop V abgeschlossen)** — Die
   Standard-Sortierung des TV-Clients heisst „newest" und war
