@@ -251,7 +251,8 @@ jetzt systematisch.
             Dateisystemen (macOS) → im Bericht
       - [x] Abgesicherter Modus: Tag-Vergleich einseitig case-sensitiv,
             Eintrag ohne Pfad legte den ganzen Filter lahm
-      - [ ] Offen: Scan-Ziele, `default_exclusions`, Fehlerfall beim Laden
+      - [x] Unlesbare Benutzerdatenbank löste einen Scan des ganzen Homes aus
+            — ohne die Ausschlüsse, die aus derselben Quelle kommen
       Ausschlüsse sind bei diesem Produkt eine Datenschutz-Funktion
       (`exclude_paths`, `sensitive_dirs`). Ein Fehler dort heißt: Verzeichnisse
       landen in der Bibliothek, die der Nutzer ausdrücklich ausgenommen hat.
@@ -266,6 +267,20 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 43 (Loop M, Fehlerfall)** — Der schwerste Fund des Loops, und er
+  steckte nicht in einer Funktion, sondern zwischen zweien. `active_scan_targets`
+  und `active_exclude_paths` lesen dieselbe Quelle, und die verschluckt ihre
+  Fehler und liefert eine leere Liste. Für beide Aufrufer sah „Datenbank nicht
+  lesbar" damit aus wie „nichts eingerichtet" — der eine schloss daraus, das
+  ganze Home zu scannen, der andere, dass es keine Ausschlüsse gibt. Zusammen:
+  vollständiger Home-Scan ohne genau die Verzeichnisse, die ausgenommen sein
+  sollten. Gelernt: Ein verschluckter Fehler ist nicht dort gefährlich, wo er
+  passiert, sondern dort, wo jemand aus dem Ersatzwert eine Absicht ableitet.
+  Zwei harmlose Rückfälle ergeben zusammen einen gefährlichen. `get_all_users()`
+  merkt sich jetzt, ob es lesen konnte; der Home-Rückfall (gewollt beim ersten
+  Start) greift nur noch bei einer wirklich leeren Datenbank. Nächstes: Loop M
+  abschließen, dann Zyklus 7 planen.
 
 - **Iteration 42 (Loop M, abgesicherter Modus)** — `sensitive_dirs` hatte ich
   zunächst für ungenutzt gehalten — die Python-Suche fand keinen Leser. Der

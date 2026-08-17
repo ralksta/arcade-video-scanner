@@ -282,16 +282,35 @@ class ConfigManager:
         # 2. Add User Targets
         # We need to import user_db here to avoid circular init issues at top level if possible
         # Or better, verify if user_db is ready.
+        readable = True
         try:
             from arcade_scanner.database.user_store import user_db
             for user in user_db.get_all_users():
                 for t in user.data.scan_targets:
                     if t:
                         targets.add(t)
+            readable = getattr(user_db, "last_read_ok", True)
         except ImportError:
-            pass # Startup case
+            readable = False  # Startup case
 
+        # Der Rückfall auf das Home-Verzeichnis ist für den ersten Start
+        # gedacht: noch kein Ziel eingerichtet, also einmal alles anbieten.
+        #
+        # Er darf aber nicht greifen, wenn die Benutzerdatenbank gar nicht
+        # gelesen werden konnte. Dann sind nämlich *gleichzeitig* die
+        # Ausschlüsse der Nutzer weg (active_exclude_paths liest dieselbe
+        # Quelle) — der Scanner würde das ganze Home durchsuchen, und
+        # ausgerechnet ohne die Verzeichnisse, die ausgenommen sein sollten.
+        # Für eine Datenschutz-Funktion ist gar nicht scannen das mildere
+        # Ergebnis als alles scannen.
         if not targets:
+            if not readable:
+                print(
+                    "❌ Could not read the user database — skipping the scan "
+                    "instead of falling back to the home directory, because "
+                    "the configured exclusions are unavailable too."
+                )
+                return []
             targets.add(HOME_DIR)
 
         return list(targets)

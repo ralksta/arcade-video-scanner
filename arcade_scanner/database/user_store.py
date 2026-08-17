@@ -18,6 +18,12 @@ class UserStore:
         self.db_path = os.path.join(config.hidden_data_dir, "users.db")
         self.json_path = os.path.join(config.hidden_data_dir, "users.json")
 
+        # Sagt dem Aufrufer, ob der letzte get_all_users() die Datenbank
+        # wirklich lesen konnte. Ohne das ist "keine Benutzer" von "nicht
+        # lesbar" nicht zu unterscheiden — und der Scanner leitet aus dem
+        # ersten Fall ab, dass er ersatzweise das ganze Home durchsucht.
+        self.last_read_ok = True
+
         self._init_db()
         self._migrate_from_json_file()
 
@@ -142,6 +148,7 @@ class UserStore:
     def get_all_users(self) -> List[User]:
         users = []
         conn = None
+        self.last_read_ok = True
         try:
             conn = self._get_conn()
             cursor = conn.execute("SELECT * FROM users")
@@ -163,6 +170,7 @@ class UserStore:
                     print(f"⚠️ Failed to load user: {e}")
         except Exception as e:
             print(f"⚠️ Error getting all users: {e}")
+            self.last_read_ok = False
         finally:
             if conn:
                 conn.close()
