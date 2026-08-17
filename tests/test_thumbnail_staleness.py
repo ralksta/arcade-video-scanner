@@ -151,7 +151,7 @@ def test_a_vanished_video_without_a_thumbnail_still_asks_for_one(processor, tmp_
 
 # --- Der Name ---
 
-def test_the_name_is_derived_from_the_path(processor, tmp_path):
+def test_the_name_is_derived_from_the_path(processor):
     """
     Festgehalten, weil daraus alles Übrige folgt: Zwei verschiedene Dateien
     unter demselben Pfad teilen sich einen Namen. Genau deshalb braucht es die
@@ -161,12 +161,59 @@ def test_the_name_is_derived_from_the_path(processor, tmp_path):
 
     video_processor, _ = processor
     path = "/media/film.mp4"
-    expected = "thumb_" + hashlib.md5(path.encode("utf-8", "surrogateescape")).hexdigest() + ".jpg"
+    expected = "thumb_" + hashlib.md5(
+        path.encode("utf-8", "surrogateescape")).hexdigest() + ".jpg"
 
-    import inspect
-    source = inspect.getsource(video_processor.create_thumbnail)
-    assert 'f"thumb_{file_hash}.jpg"' in source
-    assert hashlib.md5(path.encode("utf-8", "surrogateescape")).hexdigest() in expected
+    assert video_processor.thumbnail_name_for(path) == expected
+
+
+def test_the_name_survives_a_broken_windows_path(processor):
+    """
+    `surrogateescape` ist kein Beiwerk: Pfade aus Windows können Zeichen
+    enthalten, die kein gültiges UTF-8 ergeben. Ohne die Angabe wirft schon
+    die Namensbildung.
+    """
+    video_processor, _ = processor
+    kaputt = "/media/film\udcff.mp4"
+
+    assert video_processor.thumbnail_name_for(kaputt).startswith("thumb_")
+
+
+def test_the_thumbnail_of_a_removed_entry_is_deleted(processor, tmp_path):
+    """
+    Verwaiste Vorschaubilder wurden nie entfernt. In dieser Installation lagen
+    dadurch 1141 Stück ohne Eintrag im Verzeichnis — 17,3 MB.
+    """
+    video_processor, thumbs = processor
+    path = "/media/weg.mp4"
+    (thumbs / video_processor.thumbnail_name_for(path)).write_bytes(b"jpeg")
+
+    assert video_processor.remove_thumbnail_for(path) is True
+    assert not (thumbs / video_processor.thumbnail_name_for(path)).exists()
+
+
+def test_removing_a_thumbnail_that_is_not_there_is_harmless(processor):
+    video_processor, _ = processor
+
+    assert video_processor.remove_thumbnail_for("/media/nie_dagewesen.mp4") is False
+
+
+def test_the_scanner_cleans_up_only_where_it_already_prunes():
+    """
+    Bewusst an genau der Stelle, die schon abgesichert ist: Der Cleanup läuft
+    nur nach einem vollständigen Scan mit erreichbaren Zielen. Der
+    Nutzerzustand wird dort weiterhin **nicht** angefasst — ein Vorschaubild
+    ist neu berechenbar, ein Tag nicht.
+    """
+    from pathlib import Path
+
+    source = (
+        Path(__file__).parent.parent / "arcade_scanner" / "scanner" / "manager.py"
+    ).read_text(encoding="utf-8")
+    block = source.split("elif found_paths:", 1)[1].split("save_last_scan_time", 1)[0]
+
+    assert "remove_thumbnail_for(orphan)" in block
+    assert "purge_paths_from_user_data" not in block
 
 
 def test_two_paths_yield_two_names(processor):

@@ -353,12 +353,13 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
 ## Zyklus 10
 
-- [ ] **Loop T — Vorschaubilder** (läuft)
+- [x] **Loop T — Vorschaubilder**
       - [x] Ein geändertes Video behielt sein altes Vorschaubild für immer
       - [x] Der Traversal-Schutz verglich ohne Verzeichnisgrenze — derselbe
             Fehler wie in `is_path_allowed`
       - [ ] **Für Ralf:** 1141 verwaiste Vorschaubilder, 17,3 MB → im Bericht
-      - [ ] Offen: Aufräumen beim Entfernen verwaister Einträge
+      - [x] Verwaiste Vorschaubilder werden beim Entfernen verwaister
+            Einträge mit gelöscht
       Jede Karte im Raster zeigt eines, und sie sind das einzige, was auf der
       Platte mitwächst, ohne dass jemand hinsieht. Fragen: Werden sie
       erneuert, wenn sich die Datei ändert? Werden sie aufgeräumt, wenn die
@@ -379,6 +380,19 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 63 (Loop T, Aufräumen — Loop T abgeschlossen)** — Verwaiste
+  Vorschaubilder werden jetzt dort entfernt, wo der Scanner ohnehin verwaiste
+  Einträge entfernt: hinter denselben Schutzbedingungen (vollständiger Scan,
+  erreichbare Ziele). Der Unterschied zum Nutzerzustand, den ich in Iteration 51
+  bewusst **nicht** an den Scan gehängt habe, ist der Preis eines Irrtums: Ein
+  Vorschaubild ist jederzeit neu berechenbar, ein Tag nicht. Dieselbe Stelle,
+  zwei verschiedene Antworten, und beide stehen begründet im Code. Die
+  Namensbildung liegt dabei nicht mehr inline in `create_thumbnail()`, sondern
+  in `thumbnail_name_for()` — wer das Bild zu einem Pfad *finden* will, musste
+  die Rechnung sonst nachbauen, samt `surrogateescape` für Windows-Pfade mit
+  kaputten Zeichen. Ralfs 1141 Altlasten sind davon unberührt; sie stehen im
+  Bericht. Nächstes: Loop U (Filter im Frontend).
 
 - **Iteration 62 (Loop T, Vorschaubilder)** — Der Name ist `md5(pfad)`, also
   hängt er am Pfad und nicht am Inhalt; erneuert wurde nur, wenn die Datei

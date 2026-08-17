@@ -319,14 +319,27 @@ class ScannerManager:
                 print(f"⏸ {len(unavailable_targets)} scan target(s) unavailable — "
                       "skipping orphan cleanup to protect existing entries.")
             elif found_paths:
+                from arcade_scanner.core.video_processor import remove_thumbnail_for
+
                 orphans = existing_paths - found_paths
                 removed_count = 0
+                thumbs_removed = 0
                 for orphan in orphans:
                     db.remove(orphan)
+                    # Das Vorschaubild hängt am Pfad und wurde bisher nie
+                    # entfernt. In dieser Installation lagen dadurch 1141
+                    # Bilder ohne Eintrag im Verzeichnis. Anders als Favoriten
+                    # oder Tags ist es jederzeit neu berechenbar — ein Irrtum
+                    # kostet hier eine ffmpeg-Sekunde, kein Datum. Deshalb
+                    # darf es hier mit, wo der Nutzerzustand bewusst nicht
+                    # angefasst wird.
+                    if remove_thumbnail_for(orphan):
+                        thumbs_removed += 1
                     removed_count += 1
 
                 if removed_count > 0:
-                    print(f"🗑 Removed {removed_count} files (deleted or now excluded).")
+                    print(f"🗑 Removed {removed_count} files (deleted or now excluded), "
+                          f"{thumbs_removed} thumbnails.")
 
             # Save scan timestamp for incremental scanning
             fs_scanner.save_last_scan_time()

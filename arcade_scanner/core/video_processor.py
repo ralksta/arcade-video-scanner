@@ -46,6 +46,35 @@ def get_video_metadata(filepath: str) -> Dict[str, Any]:
         logger.debug("get_video_metadata failed for %s: %s", filepath, e)
     return {}
 
+def thumbnail_name_for(video_path: str) -> str:
+    """Dateiname des Vorschaubilds zu einem Medienpfad.
+
+    Stand bis hierher nur inline in `create_thumbnail()`. Wer das Bild zu einem
+    Pfad *finden* wollte — etwa um es mit dem Eintrag zu entfernen —, hätte die
+    Rechnung nachbauen müssen, samt `surrogateescape`, das Windows-Pfade mit
+    kaputten Zeichen überhaupt erst hashbar macht.
+    """
+    file_hash = hashlib.md5(video_path.encode("utf-8", "surrogateescape")).hexdigest()
+    return f"thumb_{file_hash}.jpg"
+
+
+def remove_thumbnail_for(video_path: str) -> bool:
+    """Entfernt das Vorschaubild eines Pfads. True, wenn eines da war.
+
+    Aufgerufen beim Entfernen verwaister Einträge nach einem vollständigen
+    Scan. Anders als Favoriten oder Tags ist ein Vorschaubild jederzeit neu
+    berechenbar — ein Irrtum kostet hier eine ffmpeg-Sekunde, kein Datum.
+    """
+    thumb_path = os.path.join(config.thumb_dir, thumbnail_name_for(video_path))
+    try:
+        if os.path.exists(thumb_path):
+            os.remove(thumb_path)
+            return True
+    except OSError as e:
+        logger.debug("Could not remove thumbnail for %s: %s", video_path, e)
+    return False
+
+
 def _thumbnail_needs_rebuild(thumb_path: str, video_path: str) -> bool:
     """Fehlt das Vorschaubild, ist es leer — oder zeigt es einen alten Stand?
 
@@ -76,8 +105,7 @@ def _thumbnail_needs_rebuild(thumb_path: str, video_path: str) -> bool:
 
 def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
     # Use surrogateescape to handle Windows-originating surrogate characters in paths
-    file_hash = hashlib.md5(video_path.encode('utf-8', 'surrogateescape')).hexdigest()
-    thumb_name = f"thumb_{file_hash}.jpg"
+    thumb_name = thumbnail_name_for(video_path)
     thumb_path = os.path.join(config.thumb_dir, thumb_name)
 
     if _thumbnail_needs_rebuild(thumb_path, video_path):
