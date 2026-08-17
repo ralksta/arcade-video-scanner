@@ -5,7 +5,7 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: 5 von 9 Punkten entschieden.
+Stand: 6 von 9 Punkten entschieden.
 
 ---
 
@@ -154,3 +154,32 @@ Was bei der Umsetzung zu beachten ist:
   nicht besser als eine Vermutung.
 - `tests/test_version_consistency.py` hält die Lücke derzeit fest; der dortige
   Vermerk muss mit angepasst werden, sobald der Abschnitt existiert.
+
+---
+
+## 6. Unmaskierte Interpolationen — **nur die priorisierten**
+
+87 Stellen setzen Werte per `${...}` in HTML ein, ohne durch `escapeHtml()` zu
+laufen. Ein erheblicher Teil sind Fehlalarme (Zahlen, Konstanten, bereits
+maskierte oder serverseitig erzeugte Werte). Der Renderpfad, über den jede
+Datei läuft, ist bereits abgesichert.
+
+**Entschieden:** Nur die Stellen abarbeiten, an denen ein Wert aus einer
+Eingabe stammen kann — die Priorisierung in `dev-docs/frontend-escaping.md`.
+
+Was bei der Umsetzung zu beachten ist:
+
+- **Kein pauschales `escapeHtml()`.** Wo bereits maskiert wird, führt das zu
+  doppelter Maskierung, und dann steht `&amp;lt;` auf dem Bildschirm. Jede
+  Stelle wird einzeln beurteilt: Kann dieser Wert je aus einer Eingabe
+  stammen?
+- Wo möglich der Weg, der in `tag_manager.js` und (seit dieser Nacht)
+  `cinema.js` schon gegangen wird: Knoten bauen, `textContent` setzen, Handler
+  per `addEventListener`. Maskieren ist eine Antwort auf **einen** Kontext;
+  verschachtelte Kontexte (JS in einem HTML-Attribut) lässt man besser gar
+  nicht erst entstehen — HTML-Maskierung hilft dort nämlich nicht, weil der
+  Browser Entitäten dekodiert, bevor der Inhalt als JavaScript gelesen wird.
+- Die abgearbeiteten Stellen gehören per Test festgeschrieben, sonst wandert
+  der alte Stil beim nächsten Feature zurück.
+- Der ungeprüfte Rest bleibt in `dev-docs/frontend-escaping.md` stehen, damit
+  die Zahl 87 nicht als „alles erledigt" missverstanden wird.
