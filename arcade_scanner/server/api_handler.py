@@ -740,6 +740,23 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             #   /batch_compress?  /hide?  /batch_hide?  /favorite?  /batch_favorite?
             elif self.path.startswith("/stream?"):
                 try:
+                    # Sitzungspflichtig — bis hierher war sie es nicht.
+                    #
+                    # Geprüft wurde nur `is_path_allowed()`, also ob der Pfad
+                    # in einem Scan-Ziel liegt. Wer die Adresse kannte, bekam
+                    # die Datei: ohne Anmeldung, ohne Konto, an der
+                    # Vault-Markierung vorbei. Genau die Dateien, um die es in
+                    # diesem Programm geht, waren damit das einzige, was der
+                    # Login nicht geschützt hat.
+                    #
+                    # Beide Clients bringen ihre Kennung schon mit: Der Browser
+                    # schickt das Cookie am `<video>`-Element mit, der
+                    # TV-Client hängt `&token=` an (siehe `get_current_user`,
+                    # Punkt 3 — genau dafür gibt es den Query-Parameter).
+                    if not self.get_current_user():
+                        self.send_error(401, "Unauthorized")
+                        return
+
                     params = parse_qs(urlparse(self.path).query)
                     file_path = params.get("path", [None])[0]
 
@@ -982,6 +999,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
         try:
             if self.path.startswith("/stream?path="):
+                # Dieselbe Sitzungsprüfung wie in do_GET. Ohne sie beantwortet
+                # HEAD die Frage „gibt es diese Datei und wie groß ist sie?"
+                # für jeden, der den Pfad rät.
+                if not self.get_current_user():
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 # parse_qs instead of split("path="): otherwise any further
                 # query parameter ends up inside the file path.
                 params = parse_qs(urlparse(self.path).query)
