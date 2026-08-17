@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 132 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2242** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 138 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2290** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -360,6 +360,17 @@ Zwei Dinge in diesem Bereich habe ich geprüft und **nicht** angefasst:
   wächst trotzdem für immer. Bei dir sind es 18 Zeilen, also kein Druck. Ich
   habe sie nicht verdrahtet, weil das Löschen deines Job-Verlaufs nach 30 Tagen
   deine Entscheidung ist — anschalten wäre eine Zeile in `main.py`.
+
+---
+
+## Gleichzeitigkeit: zwei Nutzer, ein Server (Loop AF)
+
+| Fund | Auswirkung |
+|---|---|
+| **Der Server konnte dauerhaft stehenbleiben** | Ein Schreibvorgang benachrichtigte seine Beobachter, *während* er die Schreibsperre hielt; der Ähnlichkeits-Cache hielt seine Sperre, *während* er in die Datenbank las. Zwei Threads, entgegengesetzte Reihenfolge — beide warten für immer, und weil die Schreibsperre dabei gehalten bleibt, steht danach jeder weitere Schreibvorgang. Kein langsamer Server, ein toter. Auslöser genügt: jemand öffnet ein Video mit der Ähnlich-Leiste, während der Scanner schreibt. Beide Richtungen begradigt. `store_embedding()` hat es übrigens immer richtig gemacht — die richtige Form stand im selben Modul. |
+| Eine Änderung während einer laufenden Anfrage ging verloren | Der Medien-Cache legte sein Leseergebnis bedingungslos ab, auch wenn inzwischen invalidiert wurde. Für den `/api/videos`-Cache hieß das **für immer** — der hat keine Verfallszeit. Der Fernseher fragt regelmäßig ab, während im Browser gelöscht oder optimiert wird. |
+| Wer die Seite im falschen Moment lud, bekam eine halbe | Der HTML-Dump wurde direkt in die ausgelieferte Datei geschrieben. Erzeugt wird er nach jedem Schreibvorgang — beim Scan-Ende also genau dann, wenn alle Geräte etwas Neues erwarten. Jetzt daneben schreiben und tauschen. |
+| Zwei Anfragen, zwei vollständige Scans | „Nachsehen" und „belegen" standen als zwei Zeilen da, und die Route davor prüft ebenfalls nur. Zweimal geklickt oder Fernseher und Browser kurz nacheinander: doppelte ffprobe-Last, zwei Schreiber auf derselben Datei. Dasselbe noch einmal bei der **Duplikat-Suche**, dort mit hässlicherer Folge — beide Läufe schreiben in denselben Fortschritt und dieselbe Ergebnisliste, wer zuletzt fertig wird, überschreibt die Funde des anderen. |
 
 ---
 
