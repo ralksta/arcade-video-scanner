@@ -5,7 +5,7 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: 4 von 9 Punkten entschieden.
+Stand: 5 von 9 Punkten entschieden.
 
 ---
 
@@ -130,3 +130,27 @@ Was dabei bekannt sein muss:
   in beiden Clients) und die Vault-Anteile der Umzugs- und
   Optimier-Umtragung. Die Tests dazu gehören dann mit entfernt — nicht
   auskommentiert.
+
+---
+
+## 5. Release-Notes zu 7.0.0 — **aus dem Git-Log nachtragen**
+
+`CHANGELOG.md` hat keinen Abschnitt für 7.0.0, obwohl die Version
+veröffentlicht wurde. Erfunden wurde bewusst nichts.
+
+**Entschieden:** Aus den Commits zwischen dem letzten 6.x-Eintrag und 7.0.0
+einen Entwurf rekonstruieren, den Ralf gegenliest und korrigiert.
+
+Was bei der Umsetzung zu beachten ist:
+
+- Der Entwurf ist eine **Rekonstruktion** und muss als solche entstehen: Was
+  sich aus dem Log nicht belegen lässt, kommt nicht hinein. Lieber ein
+  Stichpunkt weniger als einer, der plausibel klingt.
+- Vorlage ist der Stil der bestehenden Abschnitte im `CHANGELOG.md`, nicht
+  eine Commit-Liste. Commits, die nur Umbau ohne sichtbare Wirkung sind,
+  gehören nicht in Release-Notes.
+- Der Entwurf geht **erst an Ralf**, bevor er eingecheckt wird — er war dabei
+  und weiß, was damals die Hauptsache war. Ohne diese Runde ist das Ergebnis
+  nicht besser als eine Vermutung.
+- `tests/test_version_consistency.py` hält die Lücke derzeit fest; der dortige
+  Vermerk muss mit angepasst werden, sobald der Abschnitt existiert.
