@@ -498,6 +498,8 @@ nicht kontrolliert.
       der Scanner daraus — und was macht die Oberfläche?
       - [x] Umzug = Datenverlust: Tags, Favoriten und Vault-Marke hängen am
             Pfad und wurden mit der verwaisten Zeile gelöscht
+      - [x] Ein nicht eingehängtes Laufwerk stand nur im Protokoll — im
+            Browser sah es aus wie eine kaputte Bibliothek
 
 - [ ] **Loop AE — Zeit: Zeitstempel, Zeitzonen, Sortierung nach Datum**
       Ein Inventar sortiert nach „neu". Woher kommt das Datum, in welcher
@@ -512,6 +514,20 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 81 (Loop AD, das abgehängte Laufwerk)** — Der Scanner erkennt
+  den Fall seit Loop M und schützt sich richtig davor: kein Aufräumen, keine
+  gelöschten Einträge. Gesagt hat er es nur dem Protokoll. Wer den Server als
+  Dienst laufen lässt, sieht stattdessen eine vollständige Bibliothek, in der
+  jedes Video einen Fehler wirft — und sucht dann bei Codecs, Streaming und
+  Rechten, während die Antwort ein Pfad ist, den es gerade nicht gibt. Gelernt:
+  Ein Programm, das eine Störung korrekt behandelt, hat sie damit noch nicht
+  *mitgeteilt*; die beiden Dinge sind getrennt zu prüfen. `GET /api/settings`
+  meldet die fehlenden Ziele jetzt mit — ausdrücklich nur die des eigenen
+  Kontos, aus demselben Grund wie bei `FOLDERS_DATA` in Loop AB. Bei einem
+  Fehler beim Nachsehen (hängender Mount) wird geschwiegen statt gewarnt.
+  Nächstes: weiter in Loop AD — was macht die Wiedergabe mit einer Datei, die
+  zwischen Scan und Klick verschwunden ist?
 
 - **Iteration 80 (Loop AD, Umzüge)** — Der Aufräumschritt nach dem Scan war
   schon zweimal Thema (Loop M), und beide Male ging es darum, wann er

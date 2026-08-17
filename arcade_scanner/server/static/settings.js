@@ -58,6 +58,8 @@ async function openSettings() {
         if (verboseScanningCheckbox) verboseScanningCheckbox.checked = data.verbose_scanning === true;
 
 
+        renderUnavailableTargets(data.unavailable_targets || []);
+
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
             `Standard: ${data.default_scan_targets.slice(0, 2).join(', ')}${data.default_scan_targets.length > 2 ? '...' : ''}`;
@@ -631,6 +633,36 @@ function rescanLibrary() {
             if (typeof showToast === 'function') showToast(e.message, 'error');
             restore();
         });
+}
+
+/**
+ * Zeigt an, welche der eigenen Scan-Ziele gerade nicht erreichbar sind.
+ *
+ * Der Scanner weiß das und schreibt es ins Protokoll — dorthin, wo niemand
+ * hinsieht, der den Server als Dienst laufen lässt. Zu sehen war stattdessen
+ * eine vollständige Bibliothek, in der nichts abspielt: Das sieht nach einem
+ * kaputten Programm aus, nicht nach einem nicht eingehängten Laufwerk.
+ *
+ * Die Pfade kommen als Textknoten in die Liste, nicht als Markup — es sind
+ * frei eingegebene Zeichenketten.
+ */
+function renderUnavailableTargets(targets) {
+    const card = document.getElementById('unavailableTargetsCard');
+    const list = document.getElementById('unavailableTargetsList');
+    if (!card || !list) return;
+
+    list.replaceChildren();
+    if (!targets.length) {
+        card.classList.add('hidden');
+        return;
+    }
+
+    targets.forEach(path => {
+        const item = document.createElement('li');
+        item.textContent = path;
+        list.append(item);
+    });
+    card.classList.remove('hidden');
 }
 
 /**

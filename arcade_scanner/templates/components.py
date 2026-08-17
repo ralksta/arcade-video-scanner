@@ -1651,6 +1651,17 @@ SETTINGS_MODAL_COMPONENT = """
                                  <span id="defaultTargetsHint" class="opacity-70 text-xs block mt-0.5"></span>
                              </div>
                         </div>
+
+                        <div class="hidden bg-amber-500/10 rounded-lg p-3 border border-amber-500/20" id="unavailableTargetsCard">
+                            <div class="flex items-start gap-2">
+                                <span class="material-icons text-amber-400 text-sm mt-0.5" aria-hidden="true">warning</span>
+                                <div class="text-[12px] text-body-text">
+                                    <strong>Currently unreachable.</strong>
+                                    Drive not mounted? These paths are skipped — existing entries stay untouched.
+                                    <ul id="unavailableTargetsList" class="mt-1 space-y-0.5 font-mono text-[11px] text-text-muted"></ul>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
                     <section class="space-y-3">

@@ -70,7 +70,40 @@ def handle_get_settings(handler) -> None:
     # Docker detection
     settings_dump["is_docker"] = bool(os.getenv("CONFIG_DIR"))
 
+    # Welche der eigenen Scan-Ziele es gerade nicht gibt.
+    #
+    # Der Scanner weiß das längst und schreibt es ins Protokoll — dorthin, wo
+    # niemand hinsieht, der den Server als Dienst laufen lässt. Der Nutzer
+    # sieht stattdessen eine vollständige Bibliothek, in der nichts abspielt,
+    # und das sieht nach einem kaputten Programm aus statt nach einem nicht
+    # eingehängten Laufwerk.
+    #
+    # Ausdrücklich nur die Ziele **dieses** Kontos: Die Liste geht an den
+    # Browser, und fremde Pfade gehören dort nicht hinein.
+    settings_dump["unavailable_targets"] = _unreachable(
+        settings_dump.get("scan_targets") or [])
+
     send_json(handler, settings_dump)
+
+
+def _unreachable(targets) -> list:
+    """Die Teilmenge der Pfade, die es gerade nicht gibt.
+
+    Fehler beim Nachsehen (fehlende Rechte auf einem Elternverzeichnis, ein
+    hängender Netzwerk-Mount) gelten hier **nicht** als „nicht vorhanden": Eine
+    falsche Warnung über ein in Wahrheit erreichbares Ziel wäre schlimmer als
+    gar keine.
+    """
+    fehlend = []
+    for target in targets:
+        if not target:
+            continue
+        try:
+            if not os.path.exists(os.path.abspath(os.path.expanduser(target))):
+                fehlend.append(target)
+        except OSError:
+            continue
+    return fehlend
 
 
 # ---------------------------------------------------------------------------
