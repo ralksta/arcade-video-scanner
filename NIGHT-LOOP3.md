@@ -535,6 +535,10 @@ nicht kontrolliert.
       - [x] Eine Änderung während einer laufenden Anfrage ging verloren — der
             `/api/videos`-Cache hat keine Verfallszeit, also für immer
       - [x] Zwei Anfragen konnten zwei vollständige Scans starten
+      - [x] Wer die Seite im falschen Moment lud, bekam eine halbe — der
+            HTML-Dump wurde direkt in die ausgelieferte Datei geschrieben
+      - [x] Geprüft und stehen gelassen: Zwei **lokale** Optimierungen
+            derselben Datei bleiben ungeschützt (siehe Bericht)
 
 - [ ] **Loop AG — Die Grenzen: leer, eins, sehr viele**
       Was zeigt die Oberfläche bei null Einträgen, was bei einem, was bei
@@ -550,6 +554,26 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 93 (Loop AF, die halbe Seite)** — `generate_html_report()`
+  schrieb mit `open(report_file, "w")` direkt in die Datei, die der Server
+  unter `/` ausliefert. Das kürzt sie sofort auf null und füllt sie langsam
+  wieder: Wer in diesem Fenster lädt, bekommt eine halbe Seite. Und erzeugt
+  wird sie nach **jedem** Schreibvorgang — beim Scan-Ende systematisch dann,
+  wenn alle Geräte etwas Neues erwarten. Jetzt daneben schreiben und tauschen,
+  wie es `config.save()` und der Duplikat-Erkenner im selben Projekt längst
+  tun (dritter Fall von „die Antwort lag schon im Repo"). Der Entpreller baut
+  außerdem nicht mehr zweimal gleichzeitig.
+  Zwei Dinge nebenbei gelernt: Mein Muster-Test ist zum siebten Mal über
+  meinen eigenen Docstring gestolpert — der AST-Entkommentierer aus Loop AB
+  ist inzwischen Standardwerkzeug. Und mein Nebenläufigkeits-Test war zu
+  streng formuliert: Python vergibt die Nummer eines beendeten Threads wieder,
+  fünf nacheinander laufende Threads können also denselben Namen tragen. Mit
+  einer Schranke prüft er jetzt das, worauf es ankommt — *gleichzeitige*
+  Schreiber. Geprüft und stehen gelassen: zwei lokale Optimierungen derselben
+  Datei; ein Register mit Verfallszeit würde einen berechtigten zweiten
+  Versuch nach einem Abbruch stundenlang blockieren. Steht im Bericht.
+  Nächstes: Loop AF schließen, dann Loop AG (Grenzen).
 
 - **Iteration 92 (Loop AF, zwei Scans auf einmal)** — `run_scan()` begann mit
   `if self.is_scanning: return` und `self.is_scanning = True` als zwei

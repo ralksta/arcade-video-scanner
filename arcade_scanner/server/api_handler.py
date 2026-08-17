@@ -242,6 +242,9 @@ class ReportDebouncer:
         self.delay = delay
         self._timer = None
         self._lock = threading.Lock()
+        # Getrennt von `_lock`: Der Bau dauert, und solange dürfen weitere
+        # `schedule()`-Aufrufe nicht warten müssen.
+        self._generate_lock = threading.Lock()
 
     def schedule(self, port):
         with self._lock:
@@ -252,11 +255,16 @@ class ReportDebouncer:
             self._timer.start()
 
     def _generate(self, port):
-        try:
-            generate_html_report(config.report_file, server_port=port)
-            # print(f"✅ HTML Report regenerated (debounced)")
-        except Exception as e:
-            print(f"⚠️ Report generation failed: {e}")
+        # Zwei Erzeugungen gleichzeitig sind möglich: Der Timer feuert,
+        # während das Scan-Ende dieselbe Funktion direkt aufruft. Der Tausch
+        # in `_write_atomically` macht das ungefährlich, aber doppelt gebaut
+        # muss es deshalb nicht werden.
+        with self._generate_lock:
+            try:
+                generate_html_report(config.report_file, server_port=port)
+                # print(f"✅ HTML Report regenerated (debounced)")
+            except Exception as e:
+                print(f"⚠️ Report generation failed: {e}")
 
 report_debouncer = ReportDebouncer(delay=1.0)
 

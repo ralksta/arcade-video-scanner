@@ -287,5 +287,40 @@ def generate_html_report(report_file, server_port=8000):
         scripts=full_scripts_block,
     )
 
-    with open(report_file, "w", encoding="utf-8") as f:
-        f.write(final_html)
+    _write_atomically(report_file, final_html)
+
+
+def _write_atomically(report_file, final_html) -> None:
+    """Schreibt daneben und tauscht dann um.
+
+    Vorher stand hier ``open(report_file, "w")``. Das kürzt die Datei sofort
+    auf null und füllt sie langsam wieder — und genau diese Datei liefert der
+    Server unter ``/`` aus. Wer währenddessen die Seite lädt, bekommt eine
+    halbe. Erzeugt wird sie nach **jedem** Schreibvorgang (Tags, Optimieren,
+    Einstellungen, Scan-Ende), im Haushalt also regelmäßig genau dann, wenn
+    auch jemand hinsieht.
+
+    Dazu kommt der zweite Fall: Zwei Erzeugungen gleichzeitig — der
+    Entprellungs-Timer und das Scan-Ende — schrieben beide in dieselbe offene
+    Datei. Deshalb trägt die Zwischendatei Prozess- und Thread-Nummer im
+    Namen; danach ist ``os.replace`` unteilbar, und der Verlierer überschreibt
+    höchstens mit demselben Inhalt.
+
+    Das Muster steht schon zweimal im Projekt — ``config.save()`` und
+    ``duplicate_detector`` machen es genauso.
+    """
+    import threading
+
+    tmp_path = f"{report_file}.tmp-{os.getpid()}-{threading.get_ident()}"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(final_html)
+        os.replace(tmp_path, report_file)
+    except Exception:
+        # Die alte Fassung bleibt stehen — eine halbe wäre schlechter als
+        # eine veraltete.
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
