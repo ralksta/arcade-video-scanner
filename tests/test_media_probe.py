@@ -309,7 +309,6 @@ class TestMetadataDegradedInput:
 
     @pytest.mark.parametrize("field,attribute", [
         ("duration", "duration_sec"),
-        ("bit_rate", "bitrate_mbps"),
         ("size", "size_mb"),
     ])
     def test_non_numeric_format_field_zeroes_only_that_field(self, field, attribute):
@@ -318,6 +317,10 @@ class TestMetadataDegradedInput:
         One such field must not cost the whole file: a media inventory that
         silently omits a video is worse than one that shows it with a zeroed
         duration.
+
+        `bit_rate` steht seit dem Rückgriff unten nicht mehr in dieser Liste:
+        Fehlt es, wird es aus Größe und Dauer ausgerechnet, statt auf null zu
+        fallen.
         """
         fmt = {**FORMAT, field: "N/A"}
         entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
@@ -327,6 +330,51 @@ class TestMetadataDegradedInput:
         # The rest of the metadata survives.
         assert entry.codec == "h264"
         assert entry.width == 1920
+
+    def test_a_missing_bitrate_is_computed_from_size_and_duration(self):
+        """Nicht jeder Container meldet eine Gesamtbitrate.
+
+        Bleibt sie null, ist die Datei für den gesamten Optimierungs-Weg
+        unsichtbar: `estimate_heuristic()` steigt bei `source_kbps <= 0` sofort
+        aus, und die HIGH/SOURCE-Einstufung im Scanner greift ebenfalls nicht.
+        Es fehlt dabei nichts sichtbar — die Datei taucht nur nie in einem
+        Vorschlag auf.
+
+        In dieser Bibliothek betrifft das genau eine von 8788 Dateien.
+        """
+        fmt = {**FORMAT, "bit_rate": "N/A", "size": str(60 * 1024 * 1024),
+               "duration": "80.0"}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        # 60 MiB = 62.914.560 Bytes × 8 = 503.316.480 Bit, geteilt durch 80 s
+        # und durch 1.000.000 → 6,29 Mbit/s.
+        #
+        # Ausgeschrieben, weil ich hier zuerst 6,0 erwartet und MiB mit MB
+        # verwechselt habe. Der Unterschied sind 4,9 % — genug, um eine
+        # Einstufung an einer Schwelle kippen zu lassen.
+        assert entry.bitrate_mbps == pytest.approx(6.29, abs=0.01)
+
+    def test_the_reported_bitrate_wins_over_the_computed_one(self):
+        """Der Rückgriff greift nur, wenn nichts gemeldet wurde."""
+        fmt = {**FORMAT, "bit_rate": "3000000", "size": str(60 * 1024 * 1024),
+               "duration": "80.0"}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        assert entry.bitrate_mbps == pytest.approx(3.0, abs=0.01)
+
+    def test_without_a_duration_nothing_is_computed(self):
+        """Sonst teilte die Rechnung durch null."""
+        fmt = {**FORMAT, "bit_rate": "N/A", "duration": "0",
+               "size": str(60 * 1024 * 1024)}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        assert entry.bitrate_mbps == 0.0
+
+    def test_without_a_size_nothing_is_computed(self):
+        fmt = {**FORMAT, "bit_rate": "N/A", "size": "0", "duration": "80.0"}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        assert entry.bitrate_mbps == 0.0
 
     def test_non_numeric_dimensions_zero_only_those_fields(self):
         payload = probe_payload({**VIDEO, "width": "N/A", "height": "N/A"},

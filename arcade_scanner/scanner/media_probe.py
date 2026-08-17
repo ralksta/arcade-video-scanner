@@ -97,6 +97,22 @@ class MediaProbe:
             duration = _as_float(fmt.get("duration", 0))
             bitrate_bps = _as_float(fmt.get("bit_rate", 0))
 
+            # Nicht jeder Container meldet eine Gesamtbitrate. Fehlt sie, lässt
+            # sie sich aus Größe und Dauer ausrechnen — beides steht hier schon.
+            #
+            # Ohne diesen Rückgriff bleibt der Eintrag bei 0 Mbps, und das ist
+            # keine Kleinigkeit: `estimate_heuristic()` steigt bei
+            # `source_kbps <= 0` sofort aus, die Datei taucht also in den
+            # Optimierungs-Vorschlägen nie auf, und die HIGH/SOURCE-Einstufung
+            # im Scanner greift ebenfalls nicht. Sie ist damit für den ganzen
+            # Optimierungs-Weg unsichtbar, ohne dass irgendwo etwas fehlt.
+            #
+            # In dieser Bibliothek betrifft das genau eine von 8788 Dateien
+            # (6,29 Mbps ergibt die Rechnung dort) — sie kostet nichts, und bei
+            # anderen Containern als MP4 tritt der Fall häufiger auf.
+            if bitrate_bps <= 0 and duration > 0 and size_mb > 0:
+                bitrate_bps = (size_mb * 1024 * 1024 * 8) / duration
+
             # Video Details
             width = _as_int(video_stream.get("width", 0))
             height = _as_int(video_stream.get("height", 0))

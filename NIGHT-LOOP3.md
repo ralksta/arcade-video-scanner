@@ -449,7 +449,10 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       wird — und optimieren heisst hier: Datei ersetzen. An 8788 echten
       Einträgen nachrechenbar.
 
-- [ ] **Loop AA — Der Scanner bei kaputten Dateien**
+- [ ] **Loop AA — Der Scanner bei kaputten Dateien** (läuft)
+      - [x] Fehlt die Gesamtbitrate im Container, blieb der Eintrag bei 0 —
+            und war damit für den gesamten Optimierungs-Weg unsichtbar
+      - [ ] Offen: image_inspector, Zeitüberschreitungen
       `media_probe`, `video_inspector`, `image_inspector`. Was landet in der
       Bibliothek, wenn ffprobe nichts liefert, Unsinn liefert oder die Datei
       abgeschnitten ist? Eine Null an der falschen Stelle wandert von dort in
@@ -464,6 +467,21 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 74 (Loop AA, fehlende Bitrate)** — `media_probe` ist sorgfältig
+  gebaut: `_as_float`-Helfer überall, Division geprüft, „N/A" pro Feld
+  abgefangen, und der Kommentar begründet auch warum („a single such field must
+  zero itself, not cost the whole file"). Genau eine Lücke blieb: Meldet der
+  Container gar keine Gesamtbitrate, bleibt der Wert 0 — und das ist keine
+  Kleinigkeit, weil `estimate_heuristic()` bei `source_kbps <= 0` sofort
+  aussteigt und auch die HIGH/SOURCE-Einstufung nicht greift. Die Datei ist
+  damit für den ganzen Optimierungs-Weg unsichtbar, ohne dass irgendwo etwas
+  fehlt. In Ralfs Bibliothek trifft es genau **eine von 8788** — die Rechnung
+  aus Größe und Dauer ergibt dort 6,29 Mbps. Gelernt beim Testschreiben: Ich
+  hatte 6,0 erwartet und MiB mit MB verwechselt; der Unterschied sind 4,9 %,
+  genug um eine Einstufung an einer Schwelle kippen zu lassen. Die Rechnung
+  steht jetzt ausgeschrieben im Test. Nächstes: image_inspector und
+  Zeitüberschreitungen.
 
 - **Iteration 73 (Loop Z, Optimierungs-Vorschläge — Loop Z abgeschlossen)** —
   `/api/candidates` hatte genau dieselben zwei Lücken wie `/api/similar`, Zeile
