@@ -305,9 +305,11 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
 ## Zyklus 8
 
-- [ ] **Loop P — Datensicherung** (läuft)
+- [x] **Loop P — Datensicherung**
       - [x] Beide Knöpfe im Bereich „Backup & Restore" zeigten auf Routen,
             die es nie gab — Export repariert
+      - [x] `settings.json` wurde beim Schreiben zuerst geleert; ein defektes
+            wurde beim Start ersatzlos überschrieben
       - [ ] **Für Ralf:** Wiederherstellung nicht implementiert, und die
             Sicherung enthält nur `settings.json` → im Bericht
       `/api/backup` gibt es, und eine Sicherung ist genau so viel wert wie die
@@ -330,6 +332,22 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 54 (Loop P, Haltbarkeit — Loop P abgeschlossen)** — Wenn schon
+  Datensicherung, dann auch die Frage, ob die Einstellungsdatei einen
+  schlechten Moment übersteht. Zwei Fehler, die zusammen greifen: Geschrieben
+  wurde mit `open(..., "w")`, das die Datei sofort auf null kürzt — und ein
+  nicht lesbares `settings.json` wurde beim nächsten Start durch die
+  Standardwerte **ersetzt**. Ein Stromausfall beim Speichern plus ein Neustart
+  genügten also, um Theme, Schwellen, ffmpeg-Pfade und `proxy_root` still auf
+  Werkseinstellung zu setzen. Und wieder dasselbe Muster wie in den
+  Iterationen 43, 46, 47 und 50: `duplicate_detector.py` schreibt seinen Cache
+  seit jeher über eine Zwischendatei — mit genau dieser Begründung im Kommentar
+  („a crash mid-write would otherwise leave a truncated JSON file"). Für die
+  Datei, die ungleich schwerer zu ersetzen ist, galt sie nicht. Jetzt
+  tmp + fsync + `os.replace`, und ein defektes `settings.json` wird als
+  `.corrupt` beiseitegelegt statt überschrieben. Nächstes: Loop Q
+  (Auslieferung, Range-Requests, Proxy-Entscheidung).
 
 - **Iteration 53 (Loop P, Datensicherung)** — Der Einstellungsbereich
   „Backup & Restore" hat zwei Knöpfe, und beide zeigten auf Routen, die es im

@@ -218,7 +218,19 @@ class ConfigManager:
                         self._save_json_raw(file_data)
 
             except json.JSONDecodeError as e:
-                print(f"⚠️ settings.json is corrupted ({e}) – restoring defaults")
+                # Die kaputte Datei zur Seite legen, statt sie zu überschreiben.
+                # Vorher war sie nach diesem Zweig endgültig weg — und mit ihr
+                # jede Chance, die Einstellungen von Hand zu retten. Oft fehlt
+                # nur eine schliessende Klammer.
+                broken_path = f"{SETTINGS_FILE}.corrupt"
+                try:
+                    os.replace(SETTINGS_FILE, broken_path)
+                    print(f"⚠️ settings.json is corrupted ({e}) – kept a copy at "
+                          f"{broken_path}, restoring defaults")
+                except OSError as move_error:
+                    print(f"⚠️ settings.json is corrupted ({e}) – could not keep a "
+                          f"copy ({move_error}), restoring defaults")
+
                 file_data = dict(DEFAULT_SETTINGS_JSON)
                 self._save_json_raw(file_data)
             except OSError as e:
@@ -231,11 +243,34 @@ class ConfigManager:
         return settings
 
     def _save_json_raw(self, data: Dict[str, Any]):
+        """Schreibt settings.json — erst daneben, dann an die Stelle.
+
+        `open(..., "w")` kürzt die Datei sofort auf null. Bricht der Vorgang
+        danach ab — Stromausfall, volle Platte, abgeschossener Prozess —,
+        bleibt eine leere oder halbe Datei zurück.
+
+        Das wäre für sich schon ärgerlich, wird aber durch den Ladepfad
+        verschärft: Ein nicht lesbares settings.json wird beim nächsten Start
+        durch die Standardwerte **ersetzt**. Aus einem unglücklichen Moment
+        wird so der stille Verlust aller Einstellungen.
+
+        `duplicate_detector.py` macht es zwei Dateien weiter längst richtig,
+        mit derselben Begründung im Kommentar. Hier stand sie nicht.
+        """
+        tmp_path = f"{SETTINGS_FILE}.tmp"
         try:
-            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, SETTINGS_FILE)
         except Exception as e:
             print(f"❌ Error saving settings: {e}")
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except OSError:
+                pass
 
     def save(self, updates: Dict[str, Any]) -> bool:
         """
