@@ -790,7 +790,12 @@ function saveSettingsWithoutReload() {
  * Export current settings as JSON file download
  */
 function exportSettings() {
-    window.location.href = '/api/user/export';
+    // '/api/user/export' gab es nie. Der Knopf wurde zusammen mit der
+    // Beschriftung „Saves as arcade_settings_backup.json" eingebaut — und
+    // genau diesen Dateinamen liefert '/api/backup', die einzige
+    // Sicherungsroute, die der Server tatsächlich hat. Sie hatte bis hierher
+    // keinen einzigen Aufrufer.
+    window.location.href = '/api/backup';
 }
 
 /**

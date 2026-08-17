@@ -303,6 +303,24 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       Favoriten des unterlegenen Eintrags? Perceptual Hashing ist reine Logik,
       also ohne Medien prüfbar.
 
+## Zyklus 8
+
+- [ ] **Loop P — Datensicherung** (läuft)
+      - [x] Beide Knöpfe im Bereich „Backup & Restore" zeigten auf Routen,
+            die es nie gab — Export repariert
+      - [ ] **Für Ralf:** Wiederherstellung nicht implementiert, und die
+            Sicherung enthält nur `settings.json` → im Bericht
+      `/api/backup` gibt es, und eine Sicherung ist genau so viel wert wie die
+      Wiederherstellung, die noch niemand versucht hat. Fragen: Was liegt
+      drin? Sind die Konten dabei (`users.db`) oder nur die Medien? Lässt sich
+      daraus überhaupt ein lauffähiger Zustand herstellen? Eine Sicherung, die
+      nur fast vollständig ist, merkt man am schlechtesten Tag.
+
+- [ ] **Loop Q — Auslieferung: Streaming und Proxys**
+      Jede Wiedergabe läuft hier durch. Range-Requests, Teilinhalte, Springen
+      im Video, und die Entscheidung LAN → Original / Tailscale → Proxy. Reine
+      Protokoll-Logik, ohne Mediendateien prüfbar.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
@@ -312,6 +330,21 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 53 (Loop P, Datensicherung)** — Der Einstellungsbereich
+  „Backup & Restore" hat zwei Knöpfe, und beide zeigten auf Routen, die es im
+  Server nie gab (`/api/user/export`, `/api/user/import`) — eingeführt in einem
+  reinen Frontend-Commit, die Gegenstücke wurden nie geschrieben. Gleichzeitig
+  existiert `/api/backup`, funktioniert, und hatte keinen einzigen Aufrufer.
+  Die Beschriftung im Dialog nennt sogar den Dateinamen, den genau diese Route
+  setzt — der Export war eine falsch verdrahtete Leitung, kein fehlendes
+  Stück. Repariert. Der Import bleibt offen: Eine Route, die eine hochgeladene
+  Datei über die Einstellungen schreibt, ist löschend, und ihre Bedeutung ist
+  eine Entscheidung. Steht als dokumentierte Ausnahme in der Prüfliste, nach
+  dem Muster von `DYNAMIC_IDS`. Gelernt (zum dritten Mal heute Nacht): Meine
+  eigenen Erklärkommentare nennen das kaputte Ziel beim Namen und stehen damit
+  vor dem richtigen — Muster-Tests gehören grundsätzlich auf entkommentierten
+  Text. Nächstes: Was in der Sicherung fehlt, in den Bericht.
 
 - **Iteration 52 (Loop O, Empfehlung — Loop O abgeschlossen)** — Die
   Re-Encode-Erkennung lässt den Codec-Bonus bewusst weg, weil der moderne
