@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from arcade_scanner.core.optimization_advisor import EncodeHistory, build_candidates
+from arcade_scanner.core.user_scope import visible_path_filter
 from arcade_scanner.server.response_helpers import send_json
 
 VALID_CODECS = {"hevc", "av1"}
@@ -39,11 +40,26 @@ def handle_get(handler) -> bool:
 
     try:
         db, user_db = _get_deps()
-        exclude = set(db.get_active_queue_paths())
+
+        # Ohne den Nutzerdatensatz ist weder bekannt, was im Vault liegt, noch
+        # welche Verzeichnisse dem Konto gehören. Aus dieser Liste heraus wird
+        # eingereiht, und Einreihen heisst, dass die Datei ersetzt wird — hier
+        # in die offene Richtung zu versagen wäre die falsche Wahl.
         u = user_db.get_user(user_name)
-        if u and u.data.vaulted:
-            exclude.update(os.path.abspath(p) for p in u.data.vaulted)
-        payload = build_candidates(db.get_all(), codec, _history, exclude, limit)
+        if u is None:
+            handler.send_error(503, "User data unavailable")
+            return True
+
+        exclude = set(db.get_active_queue_paths())
+        exclude.update(os.path.abspath(p) for p in u.data.vaulted)
+
+        # Vorschläge nur aus den eigenen Scan-Zielen. Vorher kam die Liste aus
+        # dem gesamten Bestand — mit Pfad, Grösse und Vorschaubild fremder
+        # Dateien, und mit der Möglichkeit, sie einzureihen.
+        may_see = visible_path_filter(u)
+        entries = [e for e in db.get_all() if may_see(os.path.abspath(e.file_path))]
+
+        payload = build_candidates(entries, codec, _history, exclude, limit)
         send_json(handler, payload)
     except Exception as e:
         print(f"❌ Error building candidates: {e}")

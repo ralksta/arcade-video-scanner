@@ -436,12 +436,15 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 
 ## Zyklus 13
 
-- [ ] **Loop Z — Bitraten-Bewertung und Optimierungs-Empfehlung** (läuft)
+- [x] **Loop Z — Bitraten-Bewertung und Optimierungs-Empfehlung**
       - [x] Nicht lesbare Dateien verschwanden lautlos aus der Wahrnehmung —
             jetzt Zählung mit Beispielen am Ende des Scans
       - [x] „CORRUPT" kommt im Code nirgends mehr vor; die Tiefenprüfung wurde
             für Scan-Geschwindigkeit entfernt → im Bericht
-      - [ ] Offen: die Schwellenwerte selbst und der optimization_advisor
+      - [x] `/api/candidates` schlug Dateien **anderer Konten** vor — aus
+            dieser Liste heraus wird eingereiht und ersetzt
+      - [x] Die Frage „welche Pfade darf dieses Konto sehen" steht jetzt in
+            `core/user_scope.py` statt an jeder Stelle einzeln
       `Status` (OK/HIGH/SOURCE) entscheidet, was zum Optimieren vorgeschlagen
       wird — und optimieren heisst hier: Datei ersetzen. An 8788 echten
       Einträgen nachrechenbar.
@@ -461,6 +464,23 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 73 (Loop Z, Optimierungs-Vorschläge — Loop Z abgeschlossen)** —
+  `/api/candidates` hatte genau dieselben zwei Lücken wie `/api/similar`, Zeile
+  für Zeile: `if u and u.data.vaulted` als Fail-Open, und Vorschläge aus dem
+  gesamten Bestand statt aus den eigenen Zielen. Der Unterschied liegt in der
+  Folge — bei der Ähnlichkeitssuche ist es eine Preisgabe, hier wird aus der
+  Liste heraus **eingereiht**, und Einreihen heisst, dass die Datei ersetzt
+  wird. Ein Zweitkonto konnte also die Neukodierung fremder Dateien anstossen.
+  Weil ich dieselbe Regel damit zum dritten Mal geschrieben hätte, steht sie
+  jetzt in `core/user_scope.py` — abgeleitet aus `/api/videos`, nicht neu
+  erfunden. Gelernt: Dass zwei Routen denselben Fehler in derselben
+  Formulierung haben, ist kein Zufall, sondern ein Hinweis, dass die Frage nie
+  an einer Stelle beantwortet wurde. Zwei eigene Testfehler unterwegs: Der
+  Antwortschlüssel heisst `results`, und meine Attrappen lieferten für
+  `optimized_at` etwas Wahres — damit übersprang `build_candidates()` jeden
+  Eintrag, und es sah aus wie ein Filterfehler. Nächstes: Loop AA (Scanner bei
+  kaputten Dateien).
 
 - **Iteration 72 (Loop Z, unlesbare Dateien)** — Eine Iteration, in der ich
   mich fast selbst hereingelegt hätte. Die Statusverteilung zeigt 13 Einträge

@@ -6,7 +6,7 @@ from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
 from arcade_scanner.core.similarity import decode_vector, top_k
-from arcade_scanner.security import path_is_within
+from arcade_scanner.core.user_scope import visible_path_filter
 from arcade_scanner.server.response_helpers import send_json
 
 
@@ -119,18 +119,11 @@ def handle_get(handler) -> bool:
 
         # Der Index ist installationsweit, die Bibliotheken sind es nicht.
         # Ohne diese Einschränkung liefert die Suche Pfade aus den Zielen
-        # *anderer* Konten zurück — vollständig, mit Verzeichnisnamen. Der
-        # Duplikat-Scan und /api/videos filtern an derselben Stelle längst.
-        #
-        # Dieselbe Regel wie in /api/videos, damit nicht zwei Antworten auf
-        # dieselbe Frage im Haus sind: Wer keine Ziele eingerichtet hat, sieht
-        # als Admin alles und sonst nichts.
-        targets = [os.path.abspath(t) for t in (u.data.scan_targets or []) if t]
-        if not targets:
-            candidates = list(vectors.items()) if getattr(u, "is_admin", False) else []
-        else:
-            candidates = [(p, v) for p, v in vectors.items()
-                          if any(path_is_within(p, t) for t in targets)]
+        # *anderer* Konten zurück, vollständig und mit Verzeichnisnamen.
+        # Die Regel steht in core/user_scope.py, damit sie nicht an jeder
+        # Stelle neu beantwortet wird.
+        may_see = visible_path_filter(u)
+        candidates = [(p, v) for p, v in vectors.items() if may_see(p)]
 
         results = top_k(query_vector, candidates, k=limit, exclude=exclude)
         send_json(handler, {"status": "ok",

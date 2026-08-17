@@ -169,39 +169,53 @@ def test_a_normal_user_without_targets_sees_nothing():
 def test_the_rule_matches_the_one_in_the_video_route():
     """
     Der Beleg, dass es dieselbe Regel ist und nicht zufällig dasselbe
-    Ergebnis. Ändert sich eine der beiden, wird das hier sichtbar.
+    Ergebnis. Die Regel steht seit dem Umbau in `core/user_scope.py`; hier wird
+    geprüft, dass die Vorlage in `/api/videos` unverändert dieselbe ist.
     """
     from pathlib import Path
 
     api = (
         Path(__file__).parent.parent / "arcade_scanner" / "server" / "api_handler.py"
     ).read_text(encoding="utf-8")
+    scope = (
+        Path(__file__).parent.parent / "arcade_scanner" / "core" / "user_scope.py"
+    ).read_text(encoding="utf-8")
 
     assert "if not user_targets and u.is_admin:" in api
-    assert 'getattr(u, "is_admin", False)' in (
-        Path(__file__).parent.parent / "arcade_scanner" / "server" / "routes" / "similar.py"
-    ).read_text(encoding="utf-8")
+    assert 'getattr(user, "is_admin", False)' in scope
 
 
 # --- Die gemeinsame Grenzprüfung ---
 
-def test_the_shared_boundary_helper_is_used_everywhere():
+def test_no_route_compares_paths_without_a_directory_boundary():
     """
-    Die Rechnung „liegt Pfad in Verzeichnis" stand an vier Stellen einzeln da,
-    dreimal ohne Verzeichnisgrenze. Jetzt an einer.
+    Die Rechnung „liegt Pfad in Verzeichnis" stand an fünf Stellen einzeln da,
+    viermal ohne Grenze. Jetzt in `security.path_is_within()`, und die
+    Nutzer-Frage darüber in `core/user_scope.py`.
     """
     from pathlib import Path
 
     base = Path(__file__).parent.parent / "arcade_scanner"
-    for rel in ("server/api_handler.py", "server/routes/similar.py"):
+    for rel in ("server/api_handler.py", "server/routes/similar.py",
+                "server/routes/candidates.py", "core/maintenance.py",
+                "core/user_scope.py"):
         source = (base / rel).read_text(encoding="utf-8")
         code = "\n".join(
             ln for ln in source.splitlines() if not ln.lstrip().startswith("#")
         )
-        assert "path_is_within(" in code, f"{rel} prüft wieder selbst"
         assert ".startswith(t)" not in code, (
             f"{rel} vergleicht wieder ohne Verzeichnisgrenze"
         )
+
+
+def test_the_user_scope_rule_lives_in_one_place():
+    """Beide Routen fragen denselben Helfer, statt die Regel nachzubauen."""
+    from pathlib import Path
+
+    base = Path(__file__).parent.parent / "arcade_scanner" / "server" / "routes"
+    for rel in ("similar.py", "candidates.py"):
+        code = (base / rel).read_text(encoding="utf-8")
+        assert "visible_path_filter(" in code, f"{rel} baut die Regel selbst nach"
 
 
 @pytest.mark.parametrize("candidate,directory,expected", [
