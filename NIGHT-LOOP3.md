@@ -244,7 +244,12 @@ jetzt systematisch.
       irgendwo landete, gilt dann für immer. Weiter: Passwort-Hashing,
       Abmeldung, Sitzungen über Neustarts.
 
-- [ ] **Loop M — Der Scanner: was wird tatsächlich gescannt?**
+- [ ] **Loop M — Der Scanner: was wird tatsächlich gescannt?** (läuft)
+      - [x] Drei Wege, über Symlinks in einen ausgeschlossenen Baum zu gelangen
+      - [x] Relative Ausschlüsse verpufften still — sagt es jetzt
+      - [ ] **Für Ralf:** Groß/Kleinschreibung auf case-insensitiven
+            Dateisystemen (macOS) → im Bericht
+      - [ ] Offen: `sensitive_dirs`, Scan-Ziele, `default_exclusions`
       Ausschlüsse sind bei diesem Produkt eine Datenschutz-Funktion
       (`exclude_paths`, `sensitive_dirs`). Ein Fehler dort heißt: Verzeichnisse
       landen in der Bibliothek, die der Nutzer ausdrücklich ausgenommen hat.
@@ -259,6 +264,21 @@ jetzt systematisch.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 41 (Loop M, Ausschlüsse und Symlinks)** — Statt die Logik zu
+  lesen, habe ich zuerst einen echten Verzeichnisbaum gebaut und sechs
+  Schreibweisen durchgemessen. Vier waren in Ordnung, zwei nicht. Der Fund:
+  `os.walk` folgt Symlinks nicht — daraus hatte ich (und offenbar der Code)
+  geschlossen, dass Symlinks kein Thema sind. Das **Ziel** wird aber betreten,
+  auch wenn es ein Symlink ist, und die entstehenden Pfade tragen dessen Namen.
+  Ein Ausschluss auf das echte Verzeichnis passt darauf nie. Drei Varianten
+  davon waren umgehbar. Gelernt: Eine Eigenschaft, die für den Rumpf gilt, gilt
+  nicht automatisch für den Einstiegspunkt. Die Ausschlüsse werden jetzt einmal
+  je Ziel übersetzt — ein `realpath` pro Ausschluss statt eines pro besuchtem
+  Ordner, und die abgelegten Pfade bleiben unverändert (sie umzuschreiben würde
+  Favoriten und Tags entwerten). Zweiter Fund: ein relativer Ausschluss wird
+  gegen das Arbeitsverzeichnis des *Servers* aufgelöst, schließt nichts aus und
+  meldet nichts. Nächstes: `sensitive_dirs` und die Scan-Ziele.
 
 - **Iteration 40 (Loop L, Nutzerverwaltung — Loop L abgeschlossen)** — Das
   Skript, mit dem alle Konten dieser Installation angelegt wurden, war gar

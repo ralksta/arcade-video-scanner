@@ -4,7 +4,7 @@ import json
 import os
 import threading
 import time
-from typing import AsyncIterator, List, Set, Tuple
+from typing import AsyncIterator, List, Optional, Set, Tuple
 
 from ..config import config
 
@@ -31,7 +31,21 @@ class AsyncFileSystem:
         # Resolve excluded paths to absolute for robust matching
         self.exclude_abs: Set[str] = set()
         for p in config.active_exclude_paths:
-            resolved = os.path.abspath(os.path.expanduser(p))
+            expanded = os.path.expanduser(p)
+            resolved = os.path.abspath(expanded)
+
+            # Ein relativer Ausschluss wird gegen das Arbeitsverzeichnis des
+            # Servers aufgelöst — nicht gegen das Scan-Ziel. „privat" schließt
+            # damit nichts aus und schlägt trotzdem nicht fehl. Für eine
+            # Datenschutz-Funktion ist ein stiller Nichtausschluss das
+            # schlechteste Ergebnis, also wird es wenigstens gesagt.
+            if not os.path.isabs(expanded):
+                print(
+                    f"⚠️ Exclusion '{p}' is not an absolute path. It was "
+                    f"resolved to '{resolved}' relative to the server's working "
+                    "directory and probably excludes nothing."
+                )
+
             self.exclude_abs.add(resolved)
 
         # Load last scan time
@@ -73,6 +87,11 @@ class AsyncFileSystem:
                 print(f"⚠️ Warning: Scan target not found: {abs_target}")
                 continue
 
+            excludes = self._exclusions_for_target(abs_target)
+            if excludes is None:
+                print(f"🔒 Skipping excluded scan target: {target}")
+                continue
+
             # Bounded queue: limits RAM usage to ~500 paths at a time.
             # The walker thread blocks on put() when full → natural backpressure.
             queue: asyncio.Queue = asyncio.Queue(maxsize=500)
@@ -84,7 +103,7 @@ class AsyncFileSystem:
             # dies — one lost worker per abandoned scan.
             cancel = threading.Event()
             walker = asyncio.create_task(
-                self._walker_worker(abs_target, queue, cancel)
+                self._walker_worker(abs_target, queue, cancel, excludes)
             )
 
             try:
@@ -101,8 +120,47 @@ class AsyncFileSystem:
         if self._skipped_dirs > 0:
             print(f"\n⚡ Skipped {self._skipped_dirs} unchanged directories (incremental scan)")
 
+    def _exclusions_for_target(self, abs_target: str) -> Optional[Set[str]]:
+        """Ausschlüsse in der Schreibweise dieses Ziels. None = Ziel ganz überspringen.
+
+        Hintergrund: ``os.walk`` folgt Symlinks nicht, Unterverzeichnisse sind
+        also sicher. Das **Ziel selbst** wird aber betreten, egal ob es ein
+        Symlink ist — und die Pfade, die dabei entstehen, tragen den Namen des
+        Symlinks. Ein Ausschluss auf das echte Verzeichnis passt darauf nie.
+
+        Gemessen am Beispiel: Ziel ``…/alias/p`` (Symlink auf ``…/privat``),
+        Ausschluss ``…/privat`` — beide Dateien unter ``privat`` landeten in der
+        Bibliothek. Für eine Datenschutz-Funktion ist das die falsche Richtung
+        des Fehlers.
+
+        Deshalb werden die Ausschlüsse einmal je Ziel übersetzt, statt bei jedem
+        Verzeichnis aufzulösen: ein ``realpath`` pro Ausschluss statt eines pro
+        besuchtem Ordner. Die abgelegten Pfade bleiben dabei unverändert — sie
+        umzuschreiben würde bestehende Einträge, Favoriten und Tags entwerten.
+        """
+        real_target = os.path.realpath(abs_target)
+        if real_target == abs_target and not any(
+            os.path.realpath(ex) != ex for ex in self.exclude_abs
+        ):
+            return self.exclude_abs
+
+        translated = set(self.exclude_abs)
+        for ex in self.exclude_abs:
+            real_ex = os.path.realpath(ex)
+
+            # Das Ziel liegt selbst im ausgeschlossenen Baum.
+            if real_target == real_ex or real_target.startswith(real_ex + os.sep):
+                return None
+
+            # Der Ausschluss liegt im Ziel — unter dem Namen, den der Walk sieht.
+            if real_ex.startswith(real_target + os.sep):
+                translated.add(abs_target + real_ex[len(real_target):])
+
+        return translated
+
     async def _walker_worker(self, root_dir: str, queue: asyncio.Queue,
-                             cancel: threading.Event) -> None:
+                             cancel: threading.Event,
+                             excludes: Optional[Set[str]] = None) -> None:
         """
         Worker that runs in a thread.
         Uses a bounded queue to prevent memory explosion with 50K+ files.
@@ -112,6 +170,7 @@ class AsyncFileSystem:
         while waiting on the queue so an abandoned scan gives its thread back.
         """
         loop = asyncio.get_event_loop()
+        exclude_abs = self.exclude_abs if excludes is None else excludes
 
         def put_blocking(payload) -> bool:
             """Hand one item to the queue. Returns False if the scan was abandoned."""
@@ -135,14 +194,14 @@ class AsyncFileSystem:
 
                     # 1. Skip root if it matches any exclusion (O(n_excludes))
                     if any(abs_root == ex or abs_root.startswith(ex + os.sep)
-                           for ex in self.exclude_abs):
+                           for ex in exclude_abs):
                         dirs.clear()  # Don't descend into excluded subtrees
                         continue
 
                     # 2. Prune excluded subdirs in-place
                     dirs[:] = [
                         d for d in dirs
-                        if os.path.abspath(os.path.join(root, d)) not in self.exclude_abs
+                        if os.path.abspath(os.path.join(root, d)) not in exclude_abs
                     ]
 
                     # 3. Incremental scan: skip dirs unchanged since last scan
@@ -173,11 +232,6 @@ class AsyncFileSystem:
         # queue may be full, so this put would block forever.
         if not cancel.is_set():
             await queue.put(None)
-
-    def _is_excluded(self, parent: str, dirname: str) -> bool:
-        """Check if a subdirectory should be pruned (O(1) set lookup)."""
-        full = os.path.abspath(os.path.join(parent, dirname))
-        return full in self.exclude_abs
 
     def _is_video(self, filename: str) -> bool:
         # Skip macOS resource fork files (e.g., ._video.mp4)
