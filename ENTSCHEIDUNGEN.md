@@ -5,7 +5,8 @@ Aufgenommen am 17.08.2026. **Nichts davon ist umgesetzt** — diese Datei hält
 nur fest, was gelten soll, damit die Umsetzung später nicht wieder von vorn
 diskutiert werden muss.
 
-Stand: alle 9 Punkte entschieden (17.08.2026).
+Stand: alle 9 Punkte entschieden (17.08.2026), dazu Punkt 10 aus dem
+Rauchtest nach dem Neustart.
 
 ---
 
@@ -333,3 +334,74 @@ Keine Entscheidung mehr offen. Vor einer Umsetzung sinnvoll zu klären:
    sollte für sich stehen, nicht mit anderem vermischt.
 3. **Punkt 7b** (Wiederherstellung) ist die einzige löschende Neuentwicklung
    auf dieser Liste und gehört ans Ende, wenn der Rest stabil ist.
+
+---
+
+## 10. Ruckeln bei hohen Bitraten im LAN
+
+Beim Rauchtest nach dem Neustart aufgefallen, nicht Teil des Nachtlaufs.
+
+**Befund:** 4K-Kameraaufnahmen mit 50–60 Bildern/s in HEVC (54–96 Mbps) ruckeln
+im WLAN — auf dem Fernseher wie auf dem MacBook. Nicht die Platte
+(`/media_ralf` liest mit 543 MB/s) und nicht der Server (Container bei 0,01 %
+CPU). Gegenprobe an derselben Datei: Der Proxy (1080p60, 3,5 Mbps, 139 MB)
+läuft flüssig, das Original (4K60, 96 Mbps, 3,7 GB) nicht.
+
+Ursache ist eine bewusste Auslegung: `resolve_stream_path()` liefert im LAN
+**immer** das Original, die kleinere Fassung greift nur bei entfernten
+Clients. Wer früher über Tailscale schaute, bekam deshalb den Proxy — und es
+lief.
+
+Der Server *kann* das schon (`?proxy=1` erzwingt ihn), aber **keine
+Oberfläche bietet es an** — weder Browser noch Fernseher. Die Funktion war da
+und unerreichbar.
+
+### 10a. Verhalten im LAN — **automatisch ab einer Schwelle**
+
+**Entschieden:** Über einer einstellbaren Bitrate liefert der Server auch im
+LAN den Proxy, sofern einer existiert.
+
+Zu beachten:
+
+- Die Schwelle gehört in die Einstellungen, nicht in den Code. Als
+  Ausgangswert bietet sich etwas zwischen 20 und 30 Mbps an — darunter liegen
+  8585 der 8788 Videos, die Automatik greift also nur bei den echten
+  Brocken.
+- `resolve_stream_path()` ist die einzige Stelle, die entscheidet; die
+  Erweiterung gehört dorthin und nicht in die Route.
+- `?proxy=0` muss weiterhin das Original erzwingen können — sonst gibt es
+  keinen Weg mehr zur vollen Auflösung, wenn man sie will.
+- Existiert kein Proxy, bleibt es beim Original (heutiges Verhalten). Der
+  Fall ist häufig, siehe 10b.
+- `X-Arcade-Variant` meldet bereits, was ausgeliefert wurde — beim Prüfen der
+  Automatik ist das der schnellste Weg zur Antwort.
+
+### 10b. Fehlende Proxies — **nur die schwersten (ab 50 Mbps)**
+
+**Entschieden:** Proxies für die 143 Videos über 50 Mbps erzeugen. Die
+mittleren Fälle (20–50 Mbps, weitere 60 Dateien) bleiben vorerst offen.
+
+Zu beachten:
+
+- Werkzeug ist `scripts/generate_proxies.py`. Es kodiert auf einer Maschine
+  mit NVIDIA-GPU (`--remote`), liest Originale nur, schreibt ausschließlich
+  unter `--proxy-root`, und ist wiederholbar (vorhandene Proxies werden
+  übersprungen).
+- Der Scanner läuft in Docker, die Datenbank kennt also Container-Pfade —
+  pro Mount ist ein `--mount /media_ralf=/host/pfad` nötig. Ohne das findet
+  das Skript die Originale nicht.
+- Erst `--dry-run` mit `--limit`, dann der große Lauf.
+- Vorhanden sind bislang 61 Proxies, alle unter `media_ralf`. Für
+  `/media_nas` (NFS von 192.168.2.188) gibt es keine — dort kommt zur
+  Bitrate noch die Netzstrecke dazu.
+
+### Offen geblieben, keine Entscheidung nötig
+
+Auf dem Fernseher bleibt die Liste **leer, nachdem die Sitzung abgelaufen ist
+und man sich neu angemeldet hat**. Der Ladevorgang in `MainPanel.js` hängt an
+einem `useEffect` mit `[onAuthFailed]` und läuft nur beim Einhängen;
+`handleLoginSuccess` schaltet lediglich das Panel um. Ein Neustart der App
+behebt es. Das ist ein bestehender Fehler, nicht aus dem Nachtlauf — er
+tritt nach jedem Server-Neustart auf, weil Sitzungen nur im Arbeitsspeicher
+liegen. Die Reparatur ist klein und sollte mit dem TV-Build aus Phase 1
+mitfahren.
