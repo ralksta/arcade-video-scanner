@@ -289,7 +289,8 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
             — `/media` erlaubte `/media_nas` und `/media_ralf`
       - [ ] **Für Ralf:** die übrigen fünf `is_path_allowed`-Aufrufe sind
             weiterhin installationsweit → im Bericht
-      - [ ] Offen: Gruppenbildung, `recommended_keep`, Re-Encode-Erkennung
+      - [x] Bild-Rückfallweg erklärte „ähnlich groß" zu „exaktes Duplikat"
+      - [ ] Offen: `recommended_keep` und Nutzerzustand, Re-Encode-Erkennung
       Der zweite Bereich mit einer löschenden Aktion. Was gilt als Duplikat,
       wie oft irrt sich das, und was passiert beim Zusammenführen mit Tags und
       Favoriten des unterlegenen Eintrags? Perceptual Hashing ist reine Logik,
@@ -304,6 +305,19 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 50 (Loop O, Bild-Duplikate)** — Der Video-Zweig filtert mit der
+  Signatur nur vor und vergleicht danach die Bytes; der Kommentar sagt es
+  wörtlich: „Verify with content sampling to avoid false positives". Der
+  Bild-Rückfallweg hatte denselben Aufbau, aber nicht den zweiten Schritt — er
+  erklärte alles mit gleicher Auflösung und auf 10 KB gleicher Dateigröße zum
+  `match_type="exact"` mit Konfidenz 0,95, in einer Oberfläche mit Löschknopf.
+  Für eine Fotosammlung ist das kein Grenzfall, sondern der Normalfall.
+  Gelernt: Zwei Zweige mit gleichem Aufbau lesen sich wie zwei Zweige mit
+  gleicher Sorgfalt. `_verify_by_content_sample()` war medienneutral und stand
+  direkt daneben — bei Bildern unter 1 MB liest sie die Datei sogar ganz.
+  Nächstes: `recommended_keep` und was beim Löschen mit Favoriten und Tags
+  passiert.
 
 - **Iteration 49 (Loop O, Löschumfang)** — Der Duplikat-Scan reicht die
   Scan-Ziele des angemeldeten Nutzers durch, die beiden **löschenden** Routen

@@ -871,7 +871,24 @@ class DuplicateDetector:
         return self._find_image_duplicates_by_exact(images), 0
 
     def _find_image_duplicates_by_exact(self, images: List) -> List[DuplicateGroup]:
-        """Find duplicate images by exact size + resolution match."""
+        """Find duplicate images by size + resolution, dann inhaltlich geprüft.
+
+        Die Signatur allein reicht nicht. `round(size_mb, 2)` fasst alles
+        zusammen, was innerhalb von rund 10 KB gleich groß ist — zwei
+        verschiedene Aufnahmen derselben Kamera mit derselben Auflösung landen
+        mühelos im selben Fach. Die Gruppe hiess trotzdem ``"exact"`` und kam
+        mit Konfidenz 0,95 in eine Oberfläche, die das Löschen anbietet.
+
+        Der Video-Zweig hat diese Lehre längst gezogen — er filtert mit der
+        Signatur nur vor und prüft danach die Bytes („Verify with content
+        sampling to avoid false positives", Zeile 515). Hier fehlte derselbe
+        Schritt, obwohl `_verify_by_content_sample()` medienneutral ist: Bei
+        Bildern unter 1 MB liest sie die Datei ganz, der Vergleich ist dann
+        exakt.
+
+        Dieser Zweig läuft nur, wenn `imagehash` nicht verfügbar ist — also
+        selten, aber ausgerechnet dann, wenn schon etwas nicht stimmt.
+        """
         signature_map: Dict[str, List] = defaultdict(list)
 
         for img in images:
@@ -888,8 +905,11 @@ class DuplicateDetector:
         groups = []
         for signature, files in signature_map.items():
             if len(files) > 1:
-                group = self._create_image_group(files, match_type="exact")
-                groups.append(group)
+                for verified_files in self._verify_by_content_sample(files):
+                    if len(verified_files) > 1:
+                        groups.append(
+                            self._create_image_group(verified_files, match_type="exact")
+                        )
 
         return groups
 
