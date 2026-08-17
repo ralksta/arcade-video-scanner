@@ -356,44 +356,73 @@ Der Server *kann* das schon (`?proxy=1` erzwingt ihn), aber **keine
 Oberfläche bietet es an** — weder Browser noch Fernseher. Die Funktion war da
 und unerreichbar.
 
-### 10a. Verhalten im LAN — **automatisch ab einer Schwelle**
+### 10a. Verhalten im LAN — **Schalter statt Automatik** (revidiert)
 
-**Entschieden:** Über einer einstellbaren Bitrate liefert der Server auch im
-LAN den Proxy, sofern einer existiert.
+**Erste Entscheidung war „automatisch ab einer Schwelle".** Sie wurde
+getroffen, bevor gemessen war — und die Messung hat sie widerlegt. Hier steht
+beides, weil die Begründung wichtiger ist als das Ergebnis.
+
+**Gemessen am 17.08.2026** (500-MB-Download vom Server über HTTP):
+
+    2,4 GHz, Arbeitszimmer      51 Mbit/s
+    5 GHz, neben dem Router    615 Mbit/s
+    5 GHz, Wohnzimmer-Couch    232 Mbit/s
+    Fernseher auf 5 GHz        171 Mbit/s
+
+Der Server hängt am Gigabit-Kabel, die Platte liest mit 543 MB/s, der
+Container langweilt sich bei 0,01 % CPU. Die einzige Engstelle war das
+Funkband: Der Fernseher hing im 2,4-GHz-Netz, der Mac zeitweise auch.
+
+**Ursache behoben ohne Code:** 2,4 und 5 GHz haben jetzt getrennte Netznamen
+(`WLAN-449130` und `WLAN-4491305G`), Fernseher und Mac fest auf 5 GHz.
+Gegenprobe: `firstcut.mp4` (4K60, 96 Mbps) läuft auf dem Fernseher durch.
+
+**Entschieden:** Keine Automatik. Sie würde zu Hause die kleinere Fassung
+ausliefern und damit Qualität wegnehmen, um ein Problem zu lösen, das es nach
+der Bandtrennung nicht mehr gibt. Stattdessen ein **sichtbarer Schalter**
+„kleinere Fassung" im Player — er hilft genau dann, wenn ein Gerät doch einmal
+auf schlechtem Funk hängt, und nimmt sonst nichts weg.
 
 Zu beachten:
 
-- Die Schwelle gehört in die Einstellungen, nicht in den Code. Als
-  Ausgangswert bietet sich etwas zwischen 20 und 30 Mbps an — darunter liegen
-  8585 der 8788 Videos, die Automatik greift also nur bei den echten
-  Brocken.
-- `resolve_stream_path()` ist die einzige Stelle, die entscheidet; die
-  Erweiterung gehört dorthin und nicht in die Route.
-- `?proxy=0` muss weiterhin das Original erzwingen können — sonst gibt es
-  keinen Weg mehr zur vollen Auflösung, wenn man sie will.
-- Existiert kein Proxy, bleibt es beim Original (heutiges Verhalten). Der
-  Fall ist häufig, siehe 10b.
-- `X-Arcade-Variant` meldet bereits, was ausgeliefert wurde — beim Prüfen der
-  Automatik ist das der schnellste Weg zur Antwort.
+- Der Schalter setzt `?proxy=1` bzw. `?proxy=0` — beides kann der Server
+  bereits, es fehlte nur die Bedienung. Neu ist keine Serverlogik.
+- Sichtbar machen, dass gerade die kleinere Fassung läuft. `X-Arcade-Variant`
+  meldet es schon; der Player sollte es anzeigen, sonst wundert man sich
+  später über weiche Bilder.
+- Auch im TV-Client, wo er am ehesten gebraucht wird — mit dem Build aus
+  Phase 1.
+- **Falls es doch einmal automatisch werden soll:** Der richtige Auslöser ist
+  die tatsächliche Bandbreite des Geräts, nicht „LAN oder nicht". Derselbe Mac
+  war an einem Vormittag beides.
 
-### 10b. Fehlende Proxies — **nur die schwersten (ab 50 Mbps)**
+### 10b. Fehlende Proxies — **für unterwegs, nicht fürs Wohnzimmer**
 
-**Entschieden:** Proxies für die 143 Videos über 50 Mbps erzeugen. Die
-mittleren Fälle (20–50 Mbps, weitere 60 Dateien) bleiben vorerst offen.
+**Entschieden:** Proxies für die 143 Videos über 50 Mbps erzeugen — aber mit
+der richtigen Begründung: für den **Fernzugriff über Tailscale**, wofür die
+Funktion ursprünglich gebaut wurde. Zu Hause werden sie nach den Messungen
+oben nicht gebraucht.
 
 Zu beachten:
 
 - Werkzeug ist `scripts/generate_proxies.py`. Es kodiert auf einer Maschine
   mit NVIDIA-GPU (`--remote`), liest Originale nur, schreibt ausschließlich
-  unter `--proxy-root`, und ist wiederholbar (vorhandene Proxies werden
-  übersprungen).
-- Der Scanner läuft in Docker, die Datenbank kennt also Container-Pfade —
-  pro Mount ist ein `--mount /media_ralf=/host/pfad` nötig. Ohne das findet
-  das Skript die Originale nicht.
-- Erst `--dry-run` mit `--limit`, dann der große Lauf.
-- Vorhanden sind bislang 61 Proxies, alle unter `media_ralf`. Für
-  `/media_nas` (NFS von 192.168.2.188) gibt es keine — dort kommt zur
-  Bitrate noch die Netzstrecke dazu.
+  unter `--proxy-root`, und ist wiederholbar (vorhandene werden übersprungen).
+- Der Scanner läuft in Docker, die Datenbank kennt also Container-Pfade — pro
+  Mount ein `--mount /media_ralf=/host/pfad`. Ohne das findet das Skript die
+  Originale nicht. Erst `--dry-run` mit `--limit`.
+- **Die Qualitätseinstellungen gehören angehoben.** Der eigentliche Regler ist
+  `-cq`, nicht `-b:v`: Mit `cq 28` kam der 6-Mbps-Proxy als 3,5-Mbps-Datei
+  heraus, weil der Encoder die Qualitätsstufe erreicht hatte und aufhörte.
+  Für 4K60-Material mit glänzenden Oberflächen ist das zu grob — und NVENC
+  liegt bei gleicher Bitrate ohnehin 20–30 % hinter einer CPU-Kodierung.
+
+  Vorschlag: **1440p (`--height 2560`), `-cq 22`, `-b:v 18M -maxrate 28M`,
+  `-preset p6`**, dazu 10 Bit auch für 8-Bit-Quellen (gegen Streifen in
+  Verläufen). Platzbedarf für die 143 Dateien: rund 152 GB bei 704 GB frei.
+  Die heutigen 61 Proxies wären damit neu zu erzeugen.
+- Für den reinen Tailscale-Zweck kann auch weniger reichen — dort begrenzt die
+  Internetleitung. Wer knapp bleiben will: 1080p, `cq 23`, 10 Mbps, ~85 GB.
 
 ### Offen geblieben, keine Entscheidung nötig
 
