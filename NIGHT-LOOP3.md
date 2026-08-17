@@ -460,6 +460,23 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       abgeschnitten ist? Eine Null an der falschen Stelle wandert von dort in
       jede Bewertung weiter.
 
+## Zyklus 14
+
+- [ ] **Loop AB — Der Report-Dump** (läuft)
+      - [x] Geprüft: `ALL_VIDEOS` ist leer, nur ein Pfad wird eingebettet —
+            die Mehrbenutzer-Trennung hält
+      - [x] Die Kopfzeile bekam Anzahl und Größe der **gesamten** Bibliothek
+            übergeben und benutzte beides nicht — eine Einladung
+      - [ ] Offen: wann der Report angestoßen wird
+      `index.html` wird auf die Platte geschrieben und von allen Konten
+      geteilt. In Loop A war schon einmal Thema, dass dort nichts
+      Nutzerspezifisches hineingehört. Jetzt die Erzeugung selbst: Was steht
+      wirklich drin, und wann wird sie angestossen?
+
+- [ ] **Loop AC — Die verbliebenen Frontend-Dateien**
+      `cinema.js`, `store.js`, `collections.js`. Der Rest des Browser-Clients,
+      den noch kein Loop angefasst hat.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
@@ -469,6 +486,22 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 76 (Loop AB, Report-Dump)** — Zuerst nachgesehen statt vermutet:
+  In der erzeugten `index.html` ist `ALL_VIDEOS` tatsächlich leer, und von 23
+  eingebetteten Einstellungen ist genau eine ein Pfad (`proxy_root`). Die
+  Trennung hält. Der Fund liegt eine Ebene daneben: `render_header()` bekam
+  `count` und `size_gb` übergeben — die Zahlen der **gesamten** Bibliothek, für
+  eine Datei, die einmal erzeugt und an jedes Konto ausgeliefert wird — und
+  benutzte beides nicht; die Kopfzeile rendert `...` und wird zur Laufzeit
+  gefüllt. Ich war beim Lesen selbst kurz davor, daraus ein Leck zu schliessen.
+  Genau das ist die Gefahr: Wer die Platzhalter „repariert", indem er die
+  vorhandenen Argumente einsetzt, baut das Leck. Argumente und die dafür
+  gerechnete Gesamtsumme sind jetzt weg, und ein Test hält die Eigenschaft
+  fest. Zum sechsten Mal heute Nacht ist dabei mein eigener Erklärkommentar
+  über eine eigene Prüfung gestolpert — der Test dort arbeitet jetzt über den
+  AST, wo Kommentare gar nicht erst vorkommen. Nächstes: wann der Report
+  angestoßen wird.
 
 - **Iteration 75 (Loop AA, Bild-Inspektor — Loop AA abgeschlossen)** — Der
   Inspektor fasst bis zu 100 Dateien in einen `sips`-Aufruf. Das ist gut für

@@ -100,8 +100,11 @@ def asset_url(filename: str) -> str:
 
 
 def generate_html_report(results, report_file, server_port=8000):
-    total_mb = sum(r["Size_MB"] for r in results)
-
+    # Hier stand `total_mb = sum(r["Size_MB"] for r in results)` — ein
+    # vollständiger Durchlauf über die Bibliothek, dessen Ergebnis nur an
+    # `render_header()` ging, das es nie benutzt hat. Zweiter Fund dieser Art
+    # in dieser Datei (siehe die Anmerkung zu `clean_results` weiter unten).
+    #
     # Keine Ordner-Aggregation mehr im Dump: Diese Datei wird EINMAL erzeugt und
     # an jeden Nutzer ausgeliefert. Die Aggregation enthielt die Ordnerpfade der
     # gesamten Bibliothek — also auch die Verzeichnisse anderer Nutzer, obwohl
@@ -127,12 +130,7 @@ def generate_html_report(results, report_file, server_port=8000):
     active_theme = CURRENT_THEME
 
     # 1. Prepare Header (Themed)
-    header_html = render_header(
-        active_theme,
-        hostname=socket.gethostname().upper(),
-        count=len(results),
-        size_gb=f"{total_mb/1024:.1f}"
-    )
+    header_html = render_header(active_theme, hostname=socket.gethostname().upper())
 
     # 2. Prepare Cinema Modal (Conditional Optimize Button)
     opt_btn_html = ""
