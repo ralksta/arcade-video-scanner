@@ -517,6 +517,8 @@ nicht kontrolliert.
             stempelt es im gemeinsamen Block
       - [x] Sperrliste und Sitzungsliste wuchsen unbegrenzt — jeder
             Fehlversuch legte einen Eintrag an, der nie verschwand
+      - [x] Was **während** eines Scans passiert, fiel dauerhaft durchs
+            Raster — der Zeitstempel wurde am Ende genommen
 
 ## Abschluss vor dem Morgen
 
@@ -527,6 +529,20 @@ nicht kontrolliert.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 89 (Loop AE, das Fenster während des Scans)** — Der Scanner
+  überspringt Verzeichnisse, deren mtime älter ist als der letzte Durchlauf.
+  Gemerkt hat er sich dafür den Zeitpunkt am **Ende**. Bei 8788 Dateien liegen
+  zwischen Anfang und Ende Minuten, und was in dieser Zeit passiert, ist
+  danach nicht bloß einmal verpasst, sondern für immer: Der Ordner-mtime von
+  02:10 ist kleiner als der gemerkte Stand 02:30, also gilt der Ordner beim
+  nächsten Mal als unverändert. Genau die Lage entsteht im Betrieb von selbst
+  — der Fernarbeiter lädt optimierte Fassungen zurück, während der nächtliche
+  Scan läuft. Gemerkt wird jetzt der Beginn: Das führt höchstens dazu, dass
+  einmal zu viel nachgesehen wird. Gelernt: Bei einem Fenster zwischen zwei
+  Zeitpunkten ist immer zu fragen, in welche Richtung der Fehler ausschlägt —
+  zu viel prüfen kostet Zeit, zu wenig kostet Richtigkeit, und nur eines davon
+  merkt man nicht. Nächstes: Loop AE schließen, Zyklus 16 planen.
 
 - **Iteration 88 (Loop AE, Ablaufdaten, die niemand vollstreckt)** — Das
   Themenfeld heißt „Zeit", und der eigentliche Fund war keine Zeitzone, sondern

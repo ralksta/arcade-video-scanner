@@ -21,6 +21,8 @@ class AsyncFileSystem:
     def __init__(self):
         self.allow_images = False # Toggled by ScannerManager based on user settings
         self._last_scan_time = 0.0
+        # Wann der laufende Durchlauf *begonnen* hat. Siehe save_last_scan_time().
+        self._scan_started_at = 0.0
         self._scan_time_file = None  # Set lazily when config is available
         self._skipped_dirs = 0
 
@@ -78,12 +80,32 @@ class AsyncFileSystem:
             self._last_scan_time = 0.0
 
     def save_last_scan_time(self):
-        """Save the current time as last scan timestamp."""
+        """Merkt sich, wann der Durchlauf **begonnen** hat.
+
+        Hier stand `time.time()` — also der Zeitpunkt des Endes. Bei einer
+        großen Bibliothek liegen dazwischen Minuten, und was in dieser Zeit
+        passiert, fällt sonst dauerhaft durchs Raster:
+
+            02:00   Scan beginnt
+            02:00   /media wird durchlaufen
+            02:10   eine Datei in /media wird ersetzt → Ordner-mtime 02:10
+            02:30   Scan endet, merkt sich 02:30
+
+        Beim nächsten Durchlauf gilt `02:10 < 02:30`, der Ordner zählt als
+        unverändert und wird übersprungen. Die Änderung ist damit nicht bloß
+        einmal verpasst, sondern für immer — bis in demselben Ordner zufällig
+        etwas anderes passiert.
+
+        Der Beginn ist die sichere Wahl: Er lässt beim nächsten Mal höchstens
+        noch einmal nachsehen, wo sich nichts geändert hat. Zu viel zu prüfen
+        kostet Zeit, zu wenig kostet Richtigkeit.
+        """
         try:
             if self._scan_time_file:
                 os.makedirs(os.path.dirname(self._scan_time_file), exist_ok=True)
+                stand = self._scan_started_at or time.time()
                 with open(self._scan_time_file, 'w') as f:
-                    json.dump({'last_scan_time': time.time()}, f)
+                    json.dump({'last_scan_time': stand}, f)
         except Exception as e:
             print(f"⚠️ Could not save scan time: {e}")
 
@@ -94,6 +116,10 @@ class AsyncFileSystem:
         """
         # Reload settings fresh (picks up any changes to exclusions/min_size)
         self._load_settings()
+
+        # Vor dem ersten Verzeichnis merken, nicht am Ende: siehe
+        # save_last_scan_time().
+        self._scan_started_at = time.time()
 
         for target in targets:
             abs_target = os.path.abspath(os.path.expanduser(target))
