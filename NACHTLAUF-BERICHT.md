@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 111 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 2078** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 114 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 2080** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -197,6 +197,17 @@ Verzeichnis `privat` nicht aus. Auf Linux ist genau das richtig, deshalb hilft
 kein pauschales Kleinschreiben. Dasselbe gilt für `~/Privat` im Feld
 „sensitive Verzeichnisse" des abgesicherten Modus — im Browser ist nicht
 bekannt, wofür `~` steht.
+
+### Der Report-Dump
+
+| Fund | Auswirkung |
+|---|---|
+| **Der Hintergrund-Rescan scheiterte jedes Mal** | `routes/files.py` rief `model_dump()` auf Elementen von `media_cache.get()` — und der Cache liefert bereits fertige Dicts. Das warf jedes Mal einen `AttributeError`, das umgebende `except` machte daraus „❌ Rescan failed", **nachdem der Scan längst durch war**. Die zwei Zeilen danach wurden nie erreicht: Der Medien-Cache blieb stehen, der Report wurde nicht neu erzeugt, „✅ Rescan complete." nie gedruckt. Wenn dir der Rescan über die Oberfläche je „failed" gemeldet hat, obwohl er offensichtlich lief — das war es. |
+| Fünf Aufrufer beschafften **8788 Pydantic-Umwandlungen** für nichts | `generate_html_report()` las den Parameter seit Längerem nicht mehr. Er ist jetzt weg, und damit auch die Arbeit an allen fünf Stellen. |
+
+Nebenbei ist die Mehrbenutzer-Trennung dadurch **strukturell** geworden: nicht
+mehr „die übergebenen Einträge werden nicht eingebettet", sondern „es gibt
+keine Einträge zu übergeben".
 
 ---
 
