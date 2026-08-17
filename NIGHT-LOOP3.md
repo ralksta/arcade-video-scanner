@@ -361,6 +361,21 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
 
+- **Iteration 61 (Absicherung der Test-Suite)** — Die mtime-Prüfung nach der
+  vorigen Iteration schlug an: `users.db` war angefasst worden. Verursacher war
+  mein eigener Test — `apply_configuration()` holt sich `user_db` **innerhalb**
+  ihres Rumpfes aus dem Modul, und diese Instanz zeigt seit dem Import auf das
+  echte Datenverzeichnis. Ein Patch von `config.HIDDEN_DATA_DIR` erreicht sie
+  nicht. Daten nachgeprüft: unversehrt (Admin weiterhin 9 Favoriten, 1
+  Vault-Marke, 93 Tags, 6 Tag-Definitionen, Ziele `/media` und `/media_nas`) —
+  es war ein identisches Neuschreiben derselben Zeile. Gelernt: Ein Patch wirkt
+  dort, wo nachgeschlagen wird, nicht dort, wo importiert wurde; und genau
+  deshalb ist die mtime-Prüfung nach jeder Iteration kein Ritual. In
+  `conftest.py` steht jetzt eine autouse-Sperre, die Schreibzugriffe auf das
+  gemeinsame `user_db`-Singleton sofort scheitern lässt — sie hat den einen
+  Übeltäter beim ersten Lauf gefunden. Suite danach dreimal durchlaufen,
+  `arcade_data` unverändert. Nächstes: Zyklus 10 planen.
+
 - **Iteration 60 (Loop S, Speichern — Loop S abgeschlossen)** — `apply_configuration`
   hatte die Lese-mischen-Schreiben-Logik ein zweites Mal, mit eigenem
   `json.dump` und damit ohne die Zwischendatei aus Iteration 54. Beim Umbauen

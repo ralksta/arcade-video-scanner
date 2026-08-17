@@ -277,8 +277,13 @@ def test_the_wizard_settings_survive_a_failed_write(data_dir):
     cfg = ConfigManager()
     before = (data_dir / "settings.json").read_text(encoding="utf-8")
 
+    # `apply_configuration()` holt sich `user_db` selbst aus dem Modul — ein
+    # gepatchtes `config` erreicht diese Instanz nicht. Ohne den Ersatz hier
+    # schreibt der Test in die echte users.db; die autouse-Sperre in
+    # conftest.py lässt das auffliegen, aber ersetzen muss ihn der Test.
     with patch("json.dump", side_effect=OSError("Kein Speicherplatz")), \
          patch("arcade_scanner.config.config", cfg), \
+         patch("arcade_scanner.database.user_store.user_db", MagicMock()), \
          patch.object(onboarding, "print_error") as complained:
         onboarding.apply_configuration({
             "min_size_mb": 500, "bitrate_threshold_kbps": 15000,

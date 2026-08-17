@@ -36,6 +36,37 @@ def _no_background_report_generation(monkeypatch):
     yield calls
 
 
+@pytest.fixture(autouse=True)
+def _no_writes_to_the_real_user_store(monkeypatch):
+    """Lässt Schreibzugriffe auf die echte ``users.db`` sofort auffliegen.
+
+    ``arcade_scanner.database.user_store.user_db`` ist eine Modul-Instanz, die
+    beim Import auf das echte Datenverzeichnis zeigt. Wer sie in einem Test
+    benutzt — auch mittelbar, weil eine geprüfte Funktion sie *innerhalb* ihres
+    Rumpfes importiert —, schreibt in die Konten des Entwicklers, ohne dass ein
+    Patch von ``config.HIDDEN_DATA_DIR`` daran etwas ändert.
+
+    Genau das ist beim Testen von ``onboarding.apply_configuration()`` passiert:
+    Die Funktion holt sich ``user_db`` selbst und schrieb die Admin-Zeile neu.
+    Die Daten haben nichts abbekommen — es war ein identisches Neuschreiben —,
+    aber gemerkt hat es nur die mtime-Prüfung danach.
+
+    Tests, die einen echten ``UserStore`` brauchen, bauen sich einen eigenen mit
+    gepatchtem ``config``; diese Sperre betrifft nur das gemeinsame Singleton.
+    """
+    from arcade_scanner.database import user_store
+
+    def refuse(*_args, **_kwargs):
+        raise AssertionError(
+            "Ein Test schreibt in die echte users.db. Wahrscheinlich benutzt der "
+            "geprüfte Code das Modul-Singleton `user_store.user_db` — dann muss "
+            "der Test es ersetzen, statt nur `config` zu patchen."
+        )
+
+    for method in ("add_user", "create_default_admin", "purge_paths_from_user_data"):
+        monkeypatch.setattr(user_store.user_db, method, refuse)
+
+
 @pytest.fixture
 def tmp_db(tmp_path) -> Path:
     """Return a path for a temporary SQLite database (isolated per test)."""
