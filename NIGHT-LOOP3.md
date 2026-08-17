@@ -422,7 +422,14 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       **null Zeilen**. Wird der Index je gebaut? Eine Funktion, die ich selbst
       ausgeliefert habe und die vielleicht nichts tut, gehört zuerst geprüft.
 
-- [ ] **Loop Y — Die Wartungsfunktionen**
+- [x] **Loop Y — Die Wartungsfunktionen**
+      - [x] Jede Wartung brach im Docker-Betrieb still ab
+      - [x] Die Zielliste führte dasselbe Verzeichnis zweimal — in beiden
+            Funktionen; „previews" gibt es im Code gar nicht
+      - [x] `is_safe_to_delete()` verglich ohne Verzeichnisgrenze (fünfte
+            Fundstelle derselben Rechnung)
+      - [ ] **Für Ralf:** `process_video()` in video_processor.py hat keinen
+            einzigen Aufrufer → im Bericht
       `core/maintenance.py` löscht: `purge_media`, `purge_broken_media`,
       `purge_thumbnails`. Alles hinter Kommandozeilen-Schaltern, alles ohne
       Netz. Der letzte löschende Bereich, den ich noch nicht angesehen habe.
@@ -436,6 +443,26 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 71 (Loop Y, Wartungsfunktionen — Loop Y abgeschlossen)** — Drei
+  Funde in 91 Zeilen, die vorher keinen Test hatten und Dateien löschen. Der
+  folgenreichste: Die Sicherheitsprüfung fragte, ob der **Name** des
+  Datenverzeichnisses „arcade_data" enthält. In Docker heisst es `/config` —
+  also brach dort jede Wartung still ab, `--rebuild` und `--cleanup` taten
+  nichts, ohne dass es so aussah. Ich habe die Prüfung ersetzt durch die, die
+  gemeint war: kein Wurzel-, kein Home-Verzeichnis. Das ist eine Änderung an
+  einer Sicherheitsprüfung auf einem Löschpfad, und ich schreibe sie deshalb
+  ausdrücklich in den Bericht — die eigentliche Begrenzung leistet ohnehin
+  `is_safe_to_delete()`. Zweitens stand in beiden Funktionen dasselbe
+  Verzeichnis zweimal in der Zielliste; der Docstring versprach „thumbnail and
+  preview directories", und ein Vorschau-Verzeichnis gibt es im Code nirgends.
+  Drittens verglich `is_safe_to_delete()` ohne Verzeichnisgrenze — die fünfte
+  Fundstelle derselben Rechnung heute Nacht, jetzt alle auf
+  `security.path_is_within()`. Gelernt: Eine Sicherheitsprüfung, die den
+  *Namen* eines Pfads liest statt seiner Lage, prüft eine Verabredung und keine
+  Eigenschaft — und Verabredungen gelten nur, bis jemand in Docker startet.
+  Nebenbei: `process_video()` hat keinen Aufrufer. Nicht gelöscht, in den
+  Bericht.
 
 - **Iteration 70 (Loop X, Ähnlichkeitssuche — Loop X abgeschlossen)** — Ich
   hatte den Loop begonnen mit dem Verdacht, die Funktion sei tot: null Zeilen

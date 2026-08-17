@@ -14,10 +14,10 @@ from arcade_scanner.templates.dashboard_template import generate_html_report
 
 def run_scanner(args_list=None):
     parser = argparse.ArgumentParser(description=f"Arcade Media Scanner {__version__}")
-    parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
+    parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and regenerate them.")
     parser.add_argument("--rebuild-thumbs", action="store_true", help="Delete only thumbnails and regenerate them.")
 
-    parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
+    parser.add_argument("--cleanup", action="store_true", help="Remove thumbnails whose generation failed (0 bytes).")
     parser.add_argument("--ssl", action="store_true", help="Enable HTTPS mode with self-signed certificate.")
     parser.add_argument("--skip-setup", action="store_true", help="Skip the first-run setup wizard.")
     args, _ = parser.parse_known_args(args_list)
