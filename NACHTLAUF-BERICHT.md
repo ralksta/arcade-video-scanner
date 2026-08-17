@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 66 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 1733** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 70 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 1768** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -190,12 +190,19 @@ sind das die teuersten Fehler dieser Nacht.
 | Fund | Auswirkung |
 |---|---|
 | Die fertige Umwandlung konnte eine **fremde Datei überschreiben** | Der Optimierer schreibt immer `.mp4`. Aus `film.mkv` wird `film.mp4` — liegt daneben schon eine, ist sie danach ersatzlos weg. `os.replace` und `os.rename` schweigen dazu. Zweiter Weg: zwei Quellen mit gleichem Stamm (`film.mkv`, `film.avi`) in derselben Warteschlange — die zweite Umwandlung überschreibt die erste, und beide Originale sind dann schon gelöscht. **In deiner Bibliothek gibt es zwei solche Paare** (siehe unten). Beide Ersetzungspfade brechen jetzt ab. |
+| Lokale Umwandlung **ignorierte laufende Warteschlangen-Jobs** | `/compress` und `/batch_compress` starten den Optimierer direkt und fragten nicht, ob ein Mac gerade an derselben Datei arbeitet — genau der Zustand, den die Warteschlange mit ihrem Compare-and-Swap verhindert. `candidates.py` benutzt die nötige Information längst; nur die beiden Stellen, die einen Encoder starten, fragten nicht. |
+| Unbekannte Job-Zustände erzeugten **unerreichbare Zeilen** | `/api/queue/complete` übernahm den Status ungeprüft. Ein `"encoded"` statt `"done"` liegt weder in der aktiven noch in der endgültigen Menge: nie aufgeräumt, nie abgeschlossen. |
 | Verwaiste Jobs blockierten ihre Datei **dauerhaft** | Aufgeräumt wurde nur, wenn ein Arbeiter nach Arbeit fragt — also nie, wenn der Arbeiter gerade weg ist. Nach einem Neustart mitten im Encode blieb der Job auf „läuft", und die Datei liess sich nie wieder einreihen. |
 
 ### Die zwei betroffenen Dateipaare bei dir
 
     pantyhose13219                     .mkv  +  .mp4
     April_2026_Shiny_in_Polen_POV      .mov  +  .mp4
+
+**Ebenfalls offen:** Zwei *lokale* Umwandlungen derselben Datei bleiben
+möglich. `batch_controller.py` und `video_optimizer.py` sprechen gar nicht mit
+der Warteschlange, tauchen dort also nicht auf. Das zu schließen hieße, lokale
+Läufe einzutragen — eine Entwurfsänderung.
 
 Hättest du die `.mkv` bzw. die `.mov` optimiert, wäre die daneben liegende
 `.mp4` überschrieben worden — ohne Meldung. Jetzt bricht der Job mit einer
