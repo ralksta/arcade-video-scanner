@@ -17,6 +17,10 @@ const SORT_OPTIONS = [
 	{key: 'size_asc', label: '📦 Kleinste'}
 ];
 
+// Datum eines Eintrags, in Sekunden. Gleiche Quelle wie im Browser-Client,
+// der für seine 'date'-Sortierung `b.mtime - a.mtime` rechnet.
+const mtimeOf = (v) => v.mtime || 0;
+
 const sortVideos = (list, sortKey) => {
 	const sorted = [...list];
 	switch (sortKey) {
@@ -30,7 +34,15 @@ const sortVideos = (list, sortKey) => {
 			return sorted.sort((a, b) => (a.Size_MB || 0) - (b.Size_MB || 0));
 		case 'newest':
 		default:
-			return sorted.reverse();
+			// Hier stand `sorted.reverse()`. Das dreht die Reihenfolge um, in
+			// der /api/videos liefert — und das ist `SELECT * FROM media` ohne
+			// ORDER BY, also die Einfügereihenfolge des ersten Scans. Mit dem
+			// Alter der Dateien hat sie nichts zu tun.
+			//
+			// An der echten Bibliothek nachgemessen: Unter „newest" standen
+			// Aufnahmen vom Oktober 2025, während die tatsächlich neuesten vom
+			// August 2026 waren — null Überschneidung in den ersten zehn.
+			return sorted.sort((a, b) => mtimeOf(b) - mtimeOf(a));
 	}
 };
 
@@ -266,8 +278,16 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		filterAndSort(allVideos.filter(v => v.favorite && !v.hidden)),
 	[allVideos, filterAndSort]);
 
+	// „Zuletzt hinzugefügt": ebenfalls nach Datum, nicht nach den letzten 48
+	// Zeilen der Datenbank. `slice(-48)` nahm das Ende der Einfügereihenfolge —
+	// dieselbe Verwechslung wie beim „newest"-Sortierschlüssel oben.
 	const recent = useMemo(() =>
-		filterAndSort([...allVideos].filter(v => !v.hidden).slice(-48)),
+		filterAndSort(
+			[...allVideos]
+				.filter(v => !v.hidden)
+				.sort((a, b) => mtimeOf(b) - mtimeOf(a))
+				.slice(0, 48)
+		),
 	[allVideos, filterAndSort]);
 
 	const images = useMemo(() =>

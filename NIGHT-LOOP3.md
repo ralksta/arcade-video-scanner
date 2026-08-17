@@ -377,11 +377,16 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
 ## Zyklus 11
 
-- [ ] **Loop V — Der TV-Client** (läuft)
+- [x] **Loop V — Der TV-Client**
       - [x] Derselbe Vault-Fehler wie im Browser-Client — auf dem Fernseher
       - [x] `node --check` prüft ESM-Dateien gar nicht; der Syntaxtest sichert
             sich jetzt selbst ab
-      - [ ] Offen: Login-Pfad und Sortierung des TV-Clients
+      - [x] Standard-Sortierung „newest" sortierte nicht nach Datum, sondern
+            drehte die Datenbankreihenfolge um — null Überschneidung mit den
+            tatsächlich neuesten zehn
+      - [x] Login-Pfad und Sammlungs-Matcher geprüft: in Ordnung
+      - [ ] **Für Ralf:** Server-Adresse im Login-Bildschirm — bewusst nicht
+            gebaut, ohne `node_modules` nicht prüfbar
       Einer von drei Clients, und der einzige, den Ralf laut Commit-Historie
       tatsächlich pflegt. Schon einmal fiel dort auf, dass Smart Collections
       nach dem falschen Feld filterten (`v.status` statt `v.Status`) — solche
@@ -402,6 +407,25 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 67 (Loop V, Sortierung — Loop V abgeschlossen)** — Die
+  Standard-Sortierung des TV-Clients heisst „newest" und war
+  `sorted.reverse()`. Umgedreht wird damit die Reihenfolge von `/api/videos`,
+  und die ist `SELECT * FROM media` ohne `ORDER BY` — also die
+  Einfügereihenfolge des ersten Scans. An der echten Bibliothek gemessen:
+  Unter „newest" standen Aufnahmen vom Oktober 2025, die tatsächlich neuesten
+  sind vom August 2026, **null Überschneidung in den ersten zehn**. Und weil es
+  die Vorgabe ist, war genau das beim Einschalten zu sehen. Derselbe Denkfehler
+  in „Zuletzt hinzugefügt": `slice(-48)` nahm die letzten 48 Datenbankzeilen.
+  Gelernt: `reverse()` sieht aus wie eine Sortierung und ist keine — es
+  sortiert nach nichts, es dreht nur um, was ohnehin schon dastand. Der
+  Browser-Client rechnete an derselben Stelle immer `b.mtime - a.mtime`.
+  Login-Pfad und Sammlungs-Matcher habe ich mitgeprüft: Anmeldedaten sind
+  gitignored und werden per prebuild als Dummy erzeugt, der Matcher schliesst
+  Vault-Videos bereits aus. Die Server-Adresse im Login-Bildschirm bleibt
+  offen — ohne `node_modules` liesse sich die Oberfläche hier weder bauen noch
+  linten, und ungeprüfte JSX-Zeilen wären dasselbe Scheinergebnis wie beim
+  iOS-Client. Nächstes: Loop W (Nebenläufigkeit).
 
 - **Iteration 66 (Loop V, TV-Client)** — Die erste Frage an den zweiten Client
   war die, die ich gerade beim ersten beantwortet hatte — und die Antwort war
