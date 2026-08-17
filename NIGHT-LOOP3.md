@@ -475,11 +475,13 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
       Nutzerspezifisches hineingehört. Jetzt die Erzeugung selbst: Was steht
       wirklich drin, und wann wird sie angestossen?
 
-- [ ] **Loop AC — Die verbliebenen Frontend-Dateien** (läuft)
+- [x] **Loop AC — Die verbliebenen Frontend-Dateien**
       - [x] `localStorage` wurde ungeschützt beim Laden gelesen — in der
             **ersten** Datei der Seite; ein gesperrter Speicher hätte gar keine
             Oberfläche ergeben
-      - [ ] Offen: cinema.js
+      - [x] Tag-Namen standen in `cinema.js` in interpolierten
+            `onclick`-Attributen — ein Apostroph genügte, um den Knopf
+            funktionsunfähig zu machen
       `cinema.js`, `store.js`, `collections.js`. Der Rest des Browser-Clients,
       den noch kein Loop angefasst hat.
 
@@ -492,6 +494,22 @@ begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 79 (Loop AC, Tag-Namen im Cinema — Loop AC abgeschlossen)** — Ein
+  früherer Lauf hat dieses Muster an fünf Stellen behoben; `cinema.js` blieb
+  übrig, obwohl neun andere Dateien `escapeHtml()` benutzen und diese hier gar
+  nicht. Tag-Namen und -Farben standen in interpolierten `onclick`-Attributen.
+  Der harmlose Fall genügt schon: Ein Tag namens „Ralfs Auswahl" beendet die
+  JavaScript-Zeichenkette im Attribut, und der Knopf tut nichts mehr.
+  Der lehrreiche Teil war die naheliegende Lösung, die **nicht** funktioniert
+  hätte: `escapeHtml()` darüberziehen. Der Browser dekodiert Entitäten im
+  Attributwert, *bevor* der Inhalt als JavaScript gelesen wird — aus `&#39;`
+  würde wieder ein Apostroph, und der Knopf bliebe kaputt. Der richtige Weg
+  stand längst in `tag_manager.js`: Knoten bauen, `textContent` setzen, Handler
+  per `addEventListener`. Dann gibt es gar keinen Attributstring, in den etwas
+  hineingeraten könnte. Gelernt: Maskieren ist kein Universalmittel, sondern
+  eine Antwort auf **einen** Kontext; verschachtelte Kontexte (JS in HTML) lässt
+  man besser gar nicht erst entstehen. Nächstes: Zyklus 15 planen.
 
 - **Iteration 78 (Loop AC, gesperrter Speicher)** — `localStorage` wirft in
   manchen Browsern schon beim **Lesen** (blockierte Cookies, privater Modus).

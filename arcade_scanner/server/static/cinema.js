@@ -655,22 +655,45 @@ function updateCinemaTags() {
     // Update assigned tags display
     const assignedContainer = document.getElementById('cinemaAssignedTags');
     if (assignedContainer) {
-        if (videoTags.length === 0) {
-            assignedContainer.innerHTML = '';
-        } else {
-            assignedContainer.innerHTML = videoTags.map(tagName => {
+        // Knoten statt String. Der Tag-Name ist frei eingegeben und stand hier
+        // in einem interpolierten `onclick` — ein Apostroph („Ralfs Auswahl")
+        // machte den Knopf schon funktionsunfähig, und alles darüber hinaus
+        // wäre eingeschleuster Code gewesen.
+        //
+        // HTML-Maskierung allein genügt an dieser Stelle **nicht**: Der Browser
+        // dekodiert Entitäten im Attributwert, bevor der Inhalt als JavaScript
+        // gelesen wird — aus `&#39;` würde wieder ein Apostroph. Deshalb der
+        // Weg über addEventListener, wie in tag_manager.js.
+        assignedContainer.replaceChildren();
+        if (videoTags.length > 0) {
+            videoTags.forEach(tagName => {
                 const tagData = availableTags.find(t => t.name === tagName);
                 const color = tagData?.color || '#888';
-                return `
-                 <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-ink/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none">
-                     <span class="w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]" style="background-color: ${color}; --color: ${color}"></span>
-                     <span class="text-xs text-white font-semibold tracking-wide drop-shadow-md">${tagName}</span>
-                     <button onclick="event.stopPropagation(); toggleCinemaTag('${tagName}')" class="ml-1 text-white/40 hover:text-red-400 hover:bg-ink/10 rounded-full p-0.5 transition-colors" title="Remove Tag">
-                         <span class="material-icons text-[14px] font-bold" aria-hidden="true">close</span>
-                     </button>
-                 </div>
-                 `;
-            }).join('');
+
+                const chip = document.createElement('div');
+                chip.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-ink/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none';
+
+                const dot = document.createElement('span');
+                dot.className = 'w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]';
+                dot.style.backgroundColor = color;
+                dot.style.setProperty('--color', color);
+
+                const label = document.createElement('span');
+                label.className = 'text-xs text-white font-semibold tracking-wide drop-shadow-md';
+                label.textContent = tagName;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'ml-1 text-white/40 hover:text-red-400 hover:bg-ink/10 rounded-full p-0.5 transition-colors';
+                removeBtn.title = 'Remove Tag';
+                removeBtn.innerHTML = '<span class="material-icons text-[14px] font-bold" aria-hidden="true">close</span>';
+                removeBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    toggleCinemaTag(tagName);
+                });
+
+                chip.append(dot, label, removeBtn);
+                assignedContainer.append(chip);
+            });
         }
     }
 
@@ -679,14 +702,22 @@ function updateCinemaTags() {
         return;
     }
 
-    container.innerHTML = availableTags.map(tag => `
-        <button class="cinema-tag-chip ${videoTags.includes(tag.name) ? 'active' : ''}"
-                onclick="toggleCinemaTag('${tag.name}')"
-                style="--tag-color: ${tag.color}">
-            <span class="tag-dot" style="background-color: ${tag.color}"></span>
-            ${tag.name}
-        </button>
-    `).join('');
+    // Gleiche Begründung wie oben: Name und Farbe kommen aus der Eingabe des
+    // Nutzers und gehören nicht in einen Attributstring.
+    container.replaceChildren();
+    availableTags.forEach(tag => {
+        const button = document.createElement('button');
+        button.className = 'cinema-tag-chip' + (videoTags.includes(tag.name) ? ' active' : '');
+        button.style.setProperty('--tag-color', tag.color || '');
+        button.addEventListener('click', () => toggleCinemaTag(tag.name));
+
+        const dot = document.createElement('span');
+        dot.className = 'tag-dot';
+        dot.style.backgroundColor = tag.color || '';
+
+        button.append(dot, document.createTextNode(tag.name));
+        container.append(button);
+    });
 }
 
 /**
