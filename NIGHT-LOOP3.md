@@ -260,6 +260,25 @@ jetzt systematisch.
       landen in der Bibliothek, die der Nutzer ausdrücklich ausgenommen hat.
       Reine Logik, ohne Medien prüfbar.
 
+## Zyklus 7
+
+Gewählt nach demselben Maßstab wie bisher: Wo richtet ein Fehler echten
+Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
+
+- [ ] **Loop N — Die Warteschlange** (läuft)
+      In Ralfs Datenbank stehen 18 Jobs. Die Warteschlange ist der einzige
+      Teil des Produkts, der *Dateien ersetzt* — ein Zustandsfehler heißt hier
+      nicht „Anzeige falsch", sondern im schlimmsten Fall eine halb
+      geschriebene Datei an der Stelle des Originals. Fragen: Was passiert bei
+      einem Neustart mitten im Encode? Kann ein Job zweimal laufen (Server +
+      `mac_worker.py`)? Bleiben Jobs für immer auf „running" stehen?
+
+- [ ] **Loop O — Duplikaterkennung**
+      Der zweite Bereich mit einer löschenden Aktion. Was gilt als Duplikat,
+      wie oft irrt sich das, und was passiert beim Zusammenführen mit Tags und
+      Favoriten des unterlegenen Eintrags? Perceptual Hashing ist reine Logik,
+      also ohne Medien prüfbar.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für

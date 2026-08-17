@@ -1,7 +1,7 @@
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
-Branch `feat/nightly-loops`, 57 Commits, nichts gepusht, nichts gemerged.
-Tests: **880 → 1656** (grün). Ruff: **8 vorbestehende Fehler → 0**.
+Branch `feat/nightly-loops`, 63 Commits, nichts gepusht, nichts gemerged.
+Tests: **880 → 1710** (grün). Ruff: **8 vorbestehende Fehler → 0**.
 `arcade_data/` nach jeder Iteration nachweislich unverändert.
 
 ---
@@ -114,12 +114,42 @@ Zwei kleinere Punkte im selben Bereich, ebenfalls deine Entscheidung:
 | Brute-Force-Sperre per Header aushebelbar | `/api/login` nahm die Kennung aus `X-Forwarded-For` — vom Client gesetzt. Mit wechselndem Wert: fünf Versuche je Fantasie-IP, beliebig viele. Jetzt zählt zusätzlich der Benutzername mit. |
 | Benutzernamen waren über die **Antwortzeit** erratbar | `verify_password()` rechnete bei unbekanntem Namen gar nicht: 62,39 ms gegen 0,28 ms, Faktor 220 — über Netzwerk trivial zu unterscheiden. Seit die Sperre (Zeile darüber) am Benutzernamen hängt, wird aus so einer Namensliste eine Liste gezielt sperrbarer Konten. Jetzt 62,28 gegen 62,54 ms. |
 | `manage_users.py` nahm **leere Passwörter** an | Zweimal Enter an der Abfrage genügte — die Eingaben waren gleich, eine Leerprüfung gab es nicht. Das Konto stand danach ohne Passwort in der Datenbank. Dasselbe Skript war außerdem gar nicht ausführbar: Die Shebang-Zeile zeigte auf einen absoluten Pfad einer fremden Maschine. |
+| **Alle mitgelieferten Standard-Ausschlüsse waren wirkungslos** | `@eaDir`, `#recycle`, `Temporary Items`, `Network Trash Folder`, `$RECYCLE.BIN`, `AppData/Local/Temp` sind Verzeichnis*namen*, liefen aber durch `os.path.abspath()` und wurden zu Pfaden im Arbeitsverzeichnis des Servers. An einem Baum mit genau diesen Ordnern nachgemessen: kein einziger griff. Auf einem Synology-NAS hält `@eaDir` zu jeder Datei eine Miniatur — bei eingeschalteten Bildern verdoppelt das die Bibliothek. |
+| Ausgeschlossene Verzeichnisse über **Symlinks** erreichbar | `os.walk` folgt Symlinks nicht — das Ziel selbst wird aber betreten, und die Pfade tragen dann den Namen des Symlinks. Drei Varianten waren umgehbar. |
+| Unlesbare Benutzerdatenbank ⇒ **Scan des ganzen Homes ohne Ausschlüsse** | Ziele und Ausschlüsse kommen aus derselben Quelle, die ihre Fehler verschluckt. „Nicht lesbar" sah aus wie „nichts eingerichtet": der eine Aufrufer fiel auf das Home-Verzeichnis zurück, dem anderen fehlten zeitgleich alle Ausschlüsse. |
+| Abgesicherter Modus griff bei **eigenen** Tags nicht | Der Tag des Videos wurde kleingeschrieben, die eingestellte Liste nicht. Wer „NSFW" eintippte, bekam nie einen Treffer — unentdeckt, weil die Voreinstellungen klein geschrieben sind. Zweitens brach ein Eintrag ohne Pfad den ganzen Filter, womit der Modus *alles* zeigte. |
 | Tag- und Ordnernamen in interpolierten `onclick`-Handlern | Fünf Stellen. Der Breadcrumb-Handler war sogar abgesichert — aber nur gegen Apostrophe, während das Attribut von Anführungszeichen begrenzt wird. |
 | Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump | `FOLDERS_DATA` enthielt die Ordner *aller* Nutzer, mit vollem Pfad im `title`-Attribut. |
 
 **Ursache hinter zwei dieser Funde:** Der Server hat kein globales Auth-Gate —
 jede Route prüft in ihrem eigenen Zweig, eine kann es also vergessen. Ein Test
 geht jetzt per AST alle GET- und POST-Routen durch.
+
+### Was sich an den Ausschlüssen in der Bedeutung geändert hat
+
+Damit die Voreinstellungen überhaupt greifen können, versteht der Scanner jetzt
+drei Schreibweisen statt einer:
+
+    /home/ralf/privat     absoluter Pfad — genau dieser Baum
+    @eaDir                nackter Name   — jeder Ordner, der so heißt
+    AppData/Local/Temp    Teilpfad       — jeder Ordner, der so endet
+
+Das gilt auch für **selbst eingetragene** Ausschlüsse: `Downloads` schließt
+jetzt jeden so benannten Ordner aus statt gar nichts. Mehr auszuschließen ist
+hier die sichere Richtung, aber es ist eine Bedeutungsänderung — falls du die
+strenge Lesart willst (nur absolute Pfade zählen, alles andere wird abgelehnt),
+ist das eine Zeile.
+
+Deine Einstellungen habe ich nachgesehen: keine eigenen Ausschlüsse eingetragen,
+und keiner der 8788 Einträge liegt unter einem der betroffenen Ordner. Bei dir
+wirkt die Korrektur also nur vorbeugend.
+
+**Nicht behoben, weil Entscheidung:** Auf case-insensitiven Dateisystemen
+(macOS-Standard, und es gibt einen Mac-Worker) schließt `Privat` das
+Verzeichnis `privat` nicht aus. Auf Linux ist genau das richtig, deshalb hilft
+kein pauschales Kleinschreiben. Dasselbe gilt für `~/Privat` im Feld
+„sensitive Verzeichnisse" des abgesicherten Modus — im Browser ist nicht
+bekannt, wofür `~` steht.
 
 ---
 
