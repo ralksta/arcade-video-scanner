@@ -331,7 +331,7 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 
 ## Zyklus 9
 
-- [ ] **Loop R — Auto-Tagging** (läuft)
+- [x] **Loop R — Auto-Tagging**
       - [x] Eigener Fehler aus Iteration 51 gefunden und behoben: Tags wurden
             beim Löschen aufgeräumt, die Auto-Tag-Buchführung nicht
       - [x] Eine Regel mit leeren oder vertippten Kriterien vertaggte die
