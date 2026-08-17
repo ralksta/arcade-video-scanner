@@ -406,6 +406,27 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
       Lock, dazu ein ThreadingTCPServer. Der letzte grosse Bereich, in dem ein
       Fehler nicht falsch aussieht, sondern selten.
 
+## Zyklus 12
+
+Die dokumentierten Altlasten sind abgearbeitet: Der xfail zu `/api/settings`
+war echt und ist behoben; die verbliebenen (iOS-DeoVR-Routen) sind eine
+begründete Entscheidung, kein Versäumnis. Also zwei neue Themenfelder.
+
+- [x] **Loop X — Die Ähnlichkeitssuche**
+      - [x] Ergebnisse enthielten Pfade aus den Zielen **anderer** Konten
+      - [x] Fiel der Nutzerdatensatz aus, entfiel die Vault-Filterung
+      - [x] Die Grenzprüfung „Pfad liegt in Verzeichnis" stand an vier Stellen
+            einzeln, dreimal ohne Verzeichnisgrenze — jetzt an einer
+      In Loop D habe ich die „Ähnliche Medien"-Leiste gebaut, weil das Backend
+      schon da war. Die Tabellen `frame_embeddings` und `embedding_meta` haben
+      **null Zeilen**. Wird der Index je gebaut? Eine Funktion, die ich selbst
+      ausgeliefert habe und die vielleicht nichts tut, gehört zuerst geprüft.
+
+- [ ] **Loop Y — Die Wartungsfunktionen**
+      `core/maintenance.py` löscht: `purge_media`, `purge_broken_media`,
+      `purge_thumbnails`. Alles hinter Kommandozeilen-Schaltern, alles ohne
+      Netz. Der letzte löschende Bereich, den ich noch nicht angesehen habe.
+
 ## Abschluss vor dem Morgen
 
 - [x] Übergabebericht geschrieben: `NACHTLAUF-BERICHT.md` — sechs Punkte für
@@ -415,6 +436,24 @@ Schaden an, und lässt er sich ohne Hardware und ohne Ralfs Daten prüfen?
 ## Journal
 
 <!-- Jede Iteration hängt hier eine Zeile an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 70 (Loop X, Ähnlichkeitssuche — Loop X abgeschlossen)** — Ich
+  hatte den Loop begonnen mit dem Verdacht, die Funktion sei tot: null Zeilen
+  in beiden Embedding-Tabellen. Sie ist es nicht — der Index wird von
+  `scripts/media_indexer.py` gebaut, das bewusst eigenständig ist und
+  `torch`/`open_clip` nur verzögert lädt; das Extra `[indexer]` gibt es, das
+  Skript läuft auch ohne ML-Stack, und `/api/similar/status` sagt genau
+  deshalb, wie viel indexiert ist. Alles wie entworfen.
+  Die Funde lagen woanders: Die Treffer kamen aus dem **gesamten** Index, also
+  auch aus den Scan-Zielen anderer Konten — mit vollem Pfad in der Antwort.
+  Und `if u and u.data.vaulted` hiess: Fällt der Nutzerdatensatz aus, wird
+  nichts ausgeschlossen, und Vault-Pfade stehen im Klartext in der Antwort.
+  Dritter Fund beim Beheben: Die Rechnung „liegt Pfad in Verzeichnis" steht an
+  vier Stellen im Projekt, **dreimal** ohne Verzeichnisgrenze — `/media` schloss
+  also `/media_nas` und `/media_ralf` mit ein. Jetzt eine gemeinsame
+  `path_is_within()`. Gelernt: Ein Verdacht, der sich nicht bestätigt, ist kein
+  verlorener Loop — ich war nur deshalb an dieser Datei, weil ich etwas anderes
+  vermutet hatte. Nächstes: Loop Y (Wartungsfunktionen).
 
 - **Iteration 69 (Loop W, die übrigen Wege — Loop W abgeschlossen)** — Tags,
   Einstellungen und Auto-Tag-Regeln laufen jetzt ebenfalls über `update_user()`.

@@ -25,6 +25,7 @@ from arcade_scanner.database import db, user_db
 from arcade_scanner.security import (
     SecurityError,
     is_path_allowed,
+    path_is_within,
     session_manager,
     validate_filename,
 )
@@ -285,7 +286,8 @@ def background_duplicate_scan(
         if user_scan_targets:
             all_videos = [
                 v for v in all_videos
-                if any(os.path.abspath(v.file_path).startswith(t) for t in user_scan_targets)
+                if any(path_is_within(os.path.abspath(v.file_path), t)
+                       for t in user_scan_targets)
             ]
             print(f"🔍 After user filter: {len(all_videos)} files match scan targets")
 
@@ -859,7 +861,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     match_count = 0
                     for entry in all_entries:
                         v_path = os.path.abspath(entry["FilePath"])
-                        is_match = any(v_path.startswith(t) for t in user_targets)
+                        is_match = any(path_is_within(v_path, t) for t in user_targets)
                         # Always show items in Review mode, regardless of scan targets
                         if entry["Status"] == "REVIEW" or is_match:
                              filtered_videos.append(entry)
@@ -868,7 +870,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     if not filtered_videos and all_entries:
                          sample = os.path.abspath(all_entries[0]["FilePath"])
-                         print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(sample.startswith(t) for t in user_targets)})")
+                         print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(path_is_within(sample, t) for t in user_targets)})")
                     else:
                          print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
 
