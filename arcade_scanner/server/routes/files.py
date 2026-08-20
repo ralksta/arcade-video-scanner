@@ -276,6 +276,13 @@ def _handle_compress(handler) -> None:
             handler.send_error(400, "Invalid video mode")
             return
 
+        if not os.path.exists(config.optimizer_path):
+            print(f"❌ videocrunch not found at {config.optimizer_path} — "
+                  f"set VIDEOCRUNCH_PATH or clone videocrunch next to this repo")
+            handler.send_response(503)
+            handler.end_headers()
+            return
+
         current_port = handler.server.server_address[1]
         print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Q: {q_val} | Trim: {ss}-{to}")
 

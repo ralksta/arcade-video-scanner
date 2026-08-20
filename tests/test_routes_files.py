@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from arcade_scanner.config import config
 from arcade_scanner.models.video_entry import VideoEntry
 from arcade_scanner.server.routes import files
 
@@ -374,3 +375,42 @@ class TestScanControl:
         assert handled is True
         assert handler.error == 401
         manager.stop.assert_not_called()
+
+
+class TestCompress:
+    """/compress launches videocrunch as a subprocess; it must not do so silently
+    when videocrunch isn't checked out (see /batch_compress's equivalent guard)."""
+
+    def test_missing_videocrunch_returns_503_without_spawning(self):
+        handler = FakeHandler("/compress?path=/media/a.mp4")
+
+        def exists_side_effect(path):
+            return path != config.optimizer_path
+
+        with patch("arcade_scanner.server.routes.files.sanitize_path",
+                   return_value="/media/a.mp4"), \
+             patch("arcade_scanner.server.routes.files.os.path.exists",
+                   side_effect=exists_side_effect), \
+             patch("arcade_scanner.server.routes.files.subprocess.run") as run, \
+             patch("arcade_scanner.server.routes.files.subprocess.Popen") as popen:
+            handled = files.handle_get(handler)
+
+        assert handled is True
+        assert handler.status == 503
+        run.assert_not_called()
+        popen.assert_not_called()
+
+    def test_starts_encode_when_videocrunch_present(self):
+        handler = FakeHandler("/compress?path=/media/a.mp4")
+
+        with patch("arcade_scanner.server.routes.files.sanitize_path",
+                   return_value="/media/a.mp4"), \
+             patch("arcade_scanner.server.routes.files.os.path.exists",
+                   return_value=True), \
+             patch("arcade_scanner.server.routes.files.IS_WIN", False), \
+             patch("arcade_scanner.server.routes.files.subprocess.run") as run:
+            handled = files.handle_get(handler)
+
+        assert handled is True
+        assert handler.status == 204
+        run.assert_called_once()
