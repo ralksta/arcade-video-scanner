@@ -693,7 +693,10 @@ def test_detect_h264_encoder_returns_a_usable_pair():
 
 def test_detect_hevc_optimizer_encoder_names_a_known_profile():
     key = detect_hevc_optimizer_encoder()
-    assert key in {"nvenc", "videotoolbox", "qsv", "libx265",
+    # 'vaapi' is reachable on Linux (encoders.py:118) and is a real
+    # ENCODER_PROFILES key — leaving it out makes this test pass on macOS
+    # and fail on a VAAPI box.
+    assert key in {"nvenc", "videotoolbox", "qsv", "vaapi", "libx265",
                    "av1_nvenc", "av1_software"}
 
 
@@ -779,7 +782,7 @@ new_imports = '''# --- Sibling modules -----------------------------------------
 # All of these live next to this file, so there is no availability dance: the
 # flags exist only because the engine used to be embedded in a larger project
 # where these modules could be absent.
-from bitrate import analyze_bitrate, analyze_packet_hotspots
+from bitrate import analyze_bitrate
 from encoders import detect_hevc_optimizer_encoder
 from savings import estimate_savings_pct
 from crunch_utils import (
@@ -806,7 +809,12 @@ print("import blocks replaced")
 PYEOF
 ```
 
-If `analyze_packet_hotspots` is imported elsewhere in the file via a different path, `grep -n "analyze_packet_hotspots" videocrunch.py` will show it — it must resolve to the `bitrate` import above.
+Note: `analyze_packet_hotspots` is **not** imported — it is defined locally at `video_optimizer.py:647` and travels inside the engine file. Importing it from `bitrate` would raise `ImportError` at startup, because `bitrate_analyzer.py` only exports `analyze_bitrate`. Verify after the edit:
+
+```bash
+grep -n "def analyze_packet_hotspots\|analyze_packet_hotspots" /Users/ralfo/git/videocrunch/videocrunch.py
+```
+Expected: one `def` line and its call sites, no import line.
 
 - [ ] **Step 3: Move the log directory**
 
@@ -1362,6 +1370,15 @@ git add crunch.sh install_macos_quick_action.sh README.md
 git commit -m "feat: Wizard, Quick-Action-Installer und README
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+**STOP — do not publish autonomously.** Creating a public GitHub repo and
+pushing to it is an outward-facing, hard-to-retract act: the code becomes
+world-readable and may be indexed within minutes. The implementer commits
+locally and stops here. Publishing is the human's call:
+
+```bash
+# Only after explicit go-ahead:
 gh repo create videocrunch --public --source=. --remote=origin \
     --description "Fast parallel video optimizer (HEVC/AV1) with SSIM verification — CLI and macOS Finder Quick Action"
 git push -u origin main

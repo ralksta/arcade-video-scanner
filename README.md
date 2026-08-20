@@ -122,30 +122,37 @@ This release adds **AV1 Encoding Support** (powered by FFmpeg 8.1) and a **Smart
 
 ## ⚡ Video Optimizer
 
-The tool includes a specialized cross-platform video optimizer (`scripts/video_optimizer.py`).
+The encoder itself lives in a separate, standalone repository, videocrunch
+([https://github.com/ralksta/videocrunch](https://github.com/ralksta/videocrunch), cloned as a sibling checkout, `../videocrunch`). Arcade
+invokes it as a subprocess and reads its
+encode history to sharpen its own savings estimates; if videocrunch isn't
+checked out, the Optimize panel's encode routes fail with a readable error
+instead of crashing.
 
 - **Cross-Platform Hardware Acceleration**:
   - **NVIDIA NVENC**: Windows/Linux (RTX 40-series optimized)
   - **Apple VideoToolbox**: macOS (Apple Silicon and Intel)
   - **Intel/AMD VAAPI**: Linux (Native hardware support)
   - **Software Fallback**: CPU encoding if no hardware is found.
-- **AV1 Encoding Support** *(Experimental, FFmpeg 8.1+)*: Requires Apple M3/M4 or NVIDIA RTX 40xx. Falls back to HEVC automatically.
+- **AV1 Encoding Support** *(Experimental, FFmpeg 8.1+)*: Hardware AV1 on NVIDIA RTX 40xx, software (SVT-AV1) fallback elsewhere.
 - **Intelligent Transcoding**: Binary search finds optimal quality in O(log n) passes. Savings are checked *before* SSIM — passes with < 10% savings are skipped immediately.
-- **Sample-Clip Pre-Search** *(V2.5)*: Quality is probed on a ~24s sample clip first, narrowing the full-encode search to 1-2 passes. Past encodes seed the starting quality per encoder/resolution/bitrate class.
-- **Safe by Default** *(V2.5)*: HDR/10-bit sources get main10 color passthrough (or are skipped, never mistagged); every output must pass a full decode-verify before it replaces the original.
+- **Sample-Clip Pre-Search**: Quality is probed on a short sample clip first, narrowing the full-encode search to 1-2 passes. Past encodes seed the starting quality per encoder/resolution/bitrate class.
+- **Safe by Default**: HDR/10-bit sources get main10 color passthrough (or are skipped, never mistagged); every output must pass a full decode-verify before it replaces the original.
 - **Batch Processing**: Select multiple videos in the dashboard to queue them up.
 
 ### Codec Selection
 
 ```bash
-# Default: HEVC (H.265) — best compatibility
-.venv/bin/python3 scripts/video_optimizer.py /path/to/video.mp4 --codec hevc
+cd ../videocrunch
 
-# AV1 — better compression, requires M3/M4 or RTX 40xx
-.venv/bin/python3 scripts/video_optimizer.py /path/to/video.mp4 --codec av1
+# Default: HEVC (H.265) — best compatibility
+.venv/bin/python3 videocrunch.py /path/to/video.mp4 --codec hevc
+
+# AV1 — better compression on supported hardware, software fallback otherwise
+.venv/bin/python3 videocrunch.py /path/to/video.mp4 --codec av1
 ```
 
-📖 **[Full technical reference including SSIM, binary search, staging strategy →](dev-docs/video-optimizer.md)**
+📖 **[Full technical reference including SSIM, binary search, staging strategy →](https://github.com/ralksta/videocrunch/blob/main/docs/technical-reference.md)**
 
 ---
 

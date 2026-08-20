@@ -254,8 +254,21 @@ function triggerBatchCompress() {
         } else {
             // Local mode: use batch_compress endpoint
             // Use ||| as separator to avoid issues with commas in filenames
-            fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')));
-            alert(`Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
+            // The alert lives inside .then on purpose: fetch() resolves on an
+            // HTTP 503 ("videocrunch not installed", see routes/files.py) just
+            // like on the 204 success, and firing it on the next line would
+            // report success before — and regardless of — the result.
+            fetch(`/batch_compress?paths=` + encodeURIComponent(paths.join('|||')))
+                .then(response => {
+                    if (response.status === 503) {
+                        throw new Error('videocrunch is not installed on the server.');
+                    }
+                    if (!response.ok) {
+                        throw new Error(`Server returned ${response.status}.`);
+                    }
+                    alert(`Batch Optimierung gestartet!\n\n${processable.length} file(s) will be processed.\n${skipped.length} file(s) skipped (under ${BATCH_MIN_SIZE_MB}MB).`);
+                })
+                .catch(err => alert(`Batch Optimierung fehlgeschlagen!\n\n${err.message || err}`));
         }
         clearSelection();
     }

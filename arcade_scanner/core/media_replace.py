@@ -1,10 +1,10 @@
 """Server-side integrity check + atomic replace for uploaded encodes.
 
 Deliberate twin of ``verify_output_integrity`` / ``promote_staging`` in
-``scripts/video_optimizer.py`` (~line 385). That script is standalone: it runs
-on a remote Mac without this package installed, so it cannot import from here,
-and importing *it* from the server would need a sys.path hack. Keep both in
-sync when the verification rules change.
+videocrunch's ``videocrunch.py``. That engine is standalone and lives in its
+own repo: it runs on a remote Mac without this package installed, so it
+cannot import from here, and importing *it* from the server would need a
+sys.path hack. Keep both in sync when the verification rules change.
 """
 
 import logging

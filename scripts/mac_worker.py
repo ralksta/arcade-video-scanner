@@ -15,7 +15,13 @@ whenever a request comes back 401 (e.g. after a server restart).
 Requirements:
     - macOS with VideoToolbox (Apple Silicon or Intel with T2)
     - ffmpeg installed (brew install ffmpeg)
-    - video_optimizer.py in the same directory (imported for process_file)
+    - the videocrunch repo checked out next to this one (imported for process_file);
+      see VIDEOCRUNCH_PATH / ARCADE_OPTIMIZER_PATH below
+
+This worker deliberately does not import the arcade_scanner package: it runs
+standalone on a remote Mac that may not have this repo's dependencies (e.g.
+pydantic) installed, and importing arcade_scanner.config would create the
+server's arcade_data/ directory tree on a machine that never uses it.
 """
 
 import argparse
@@ -31,11 +37,31 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# Add parent directory to path so we can import video_optimizer
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR))
 
-from optimizer_utils import battery_from_pmset, is_within_schedule, parse_schedule  # noqa: E402
+# videocrunch lives in its own repo now. Find it via the same env vars
+# arcade_scanner.config.optimizer_path uses — the shared authority between
+# this worker and the server is the environment variables, not the config
+# object, since this worker must not import the arcade_scanner package (see
+# module docstring). Keep this resolution logic in sync with config.py's
+# optimizer_path property if that ever changes.
+_VC_DEFAULT_PATH = str(SCRIPT_DIR.parent.parent / "videocrunch" / "videocrunch.py")
+_VC_ENGINE_PATH = os.getenv("ARCADE_OPTIMIZER_PATH") or os.getenv("VIDEOCRUNCH_PATH", _VC_DEFAULT_PATH)
+_VC_DIR = str(Path(_VC_ENGINE_PATH).parent)
+if _VC_DIR not in sys.path:
+    sys.path.insert(0, _VC_DIR)
+
+try:
+    from crunch_utils import battery_from_pmset, is_within_schedule, parse_schedule  # noqa: E402
+    _VC_IMPORT_ERROR = None
+except ImportError as exc:   # videocrunch is not checked out on this machine
+    # Deliberately not fatal at import time: the module stays importable for
+    # tests and tooling. main() refuses to start instead (see _require_videocrunch),
+    # which is where a human is watching. Without videocrunch there is nothing
+    # to encode, so degrading --schedule/--pause-on-battery and then failing
+    # every single job would be the worse trade.
+    _VC_IMPORT_ERROR = exc
+    battery_from_pmset = is_within_schedule = parse_schedule = None  # type: ignore[assignment]
 
 # Color codes
 G = "\033[92m"
@@ -46,6 +72,22 @@ NC = "\033[0m"
 B = "\033[1m"
 
 _shutdown = False
+
+
+def _require_videocrunch() -> None:
+    """Abort with a readable message when videocrunch is not importable.
+
+    Same wording as the engine-import handler in _run_job, but this one runs
+    before any job is claimed — otherwise the process dies on the module-level
+    `crunch_utils` import with a bare ModuleNotFoundError traceback.
+    """
+    if _VC_IMPORT_ERROR is None:
+        return
+    print(f"{R}✗ videocrunch not found at {_VC_DIR}{NC}")
+    print(f"  ({_VC_IMPORT_ERROR})")
+    print(f"{Y}  Clone videocrunch next to this repo, or point VIDEOCRUNCH_PATH")
+    print(f"  at its videocrunch.py.{NC}")
+    sys.exit(1)
 
 
 def is_on_battery() -> bool:
@@ -380,7 +422,7 @@ def _run_job(client, job, job_id, filename, stem, job_dir, reporter):
         return
 
     try:
-        from video_optimizer import ENCODER_PROFILES, detect_encoder, process_file
+        from videocrunch import ENCODER_PROFILES, detect_encoder, process_file
 
         encoder_key = detect_encoder()
         if not encoder_key or encoder_key not in ENCODER_PROFILES:
@@ -428,8 +470,8 @@ def _run_job(client, job, job_id, filename, stem, job_dir, reporter):
         print(f"  {G}✓ Encoded: {opt_size/(1024*1024):.1f} MB (saved {saved/(1024*1024):.1f} MB){NC}")
 
     except ImportError:
-        print(f"  {R}✗ video_optimizer.py not found in {SCRIPT_DIR}{NC}")
-        client.update_status(job_id, "failed", message="video_optimizer.py not found")
+        print(f"  {R}✗ videocrunch not found at {_VC_DIR}{NC}")
+        client.update_status(job_id, "failed", message="videocrunch not found")
         return
     except Exception as e:
         print(f"  {R}✗ Encoding error: {e}{NC}")
@@ -508,6 +550,8 @@ Environment Variables:
                        help="Pause polling while the machine runs on battery power (macOS)")
 
     args = parser.parse_args()
+
+    _require_videocrunch()
 
     schedule_window = None
     if args.schedule:

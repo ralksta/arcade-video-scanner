@@ -44,6 +44,12 @@ verify_*.py
 *.sh
 *.zip
 !run.sh
+# Finder-Wrapper: keine lokalen Pfade mehr drin, sie loesen den
+# videocrunch-Pfad zur Laufzeit ueber VIDEOCRUNCH_PATH auf. Ungetrackt
+# gingen ihre Reparaturen bei jedem frischen Checkout verloren.
+!scripts/optimize-from-finder.sh
+!scripts/scan-folder-from-finder.sh
+!scripts/install-finder-action.sh
 
 # Generated HTML report (user-specific)
 video_dashboard.html

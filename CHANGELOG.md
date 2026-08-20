@@ -28,7 +28,29 @@ All notable changes to this project will be documented in this file.
   than from source footage) and `scripts/generate_proxies.py` (creates the proxies
   on a remote NVENC machine, reading originals only).
 
+### Changed
+- **Encoder ausgelagert nach [videocrunch](https://github.com/ralksta/videocrunch)**
+  (eigenes Repo, als Geschwister-Checkout `../videocrunch` geklont).
+  Encode-Engine, Ordner-Rangliste, Batch-Runner, Encoder-Erkennung und
+  Bitratenanalyse sind ein eigenständiges Werkzeug geworden — nutzbar ohne
+  Arcade, mit eigener Finder-Schnellaktion. Arcade ruft es als Prozess auf
+  (`VIDEOCRUNCH_PATH`, Standard: Geschwister-Checkout `../videocrunch/`) und
+  liest weiterhin dessen `encode_history.jsonl`, um seine Schätzungen mit echten
+  Messwerten zu verbessern. Die Spar-Heuristik liegt bewusst in beiden Repos und
+  wird durch `tests/fixtures/savings_parity.json` auf identisches Verhalten
+  festgenagelt — inklusive `bitrate_class`, `resolution_class` und
+  `MIN_LISTED_SAVED_PCT`. Fehlt videocrunch, melden die Encode-Routen 503 statt
+  zu verrecken, das Dashboard zeigt das als Fehler an, und `mac_worker.py`
+  bricht mit einer lesbaren Meldung ab statt mit einem Traceback. Der
+  Aufruf-Vertrag (Flags, `_opt.mp4`-Suffix, Rückruf
+  `GET /api/mark_optimized?path=`) ist in beiden Repos durch Tests festgehalten.
+
 ### Fixed
+- **Fehlgeschlagene Optimierung meldete im Browser Erfolg.** `fetch()` lehnt bei
+  einem HTTP-Fehlerstatus nicht ab, also zeigten Einzel- und Batch-Optimierung
+  „Optimization started!“ auch dann, wenn der Server mit 503 (videocrunch
+  nicht installiert) geantwortet hatte und gar nichts lief. Beide Aufrufstellen
+  prüfen jetzt den Status und melden den 503 als eigene Fehlermeldung.
 - **Video-Optimizer: Binärsuche lief in die falsche Richtung**. In
   `quality_values` bedeutet ein höherer Index bei *jedem* Encoder mehr Kompression
   (VideoToolbox `75..45`, NVENC/x265 `24..44`). Drei Zweige der Suche haben das

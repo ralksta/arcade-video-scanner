@@ -276,6 +276,13 @@ def _handle_compress(handler) -> None:
             handler.send_error(400, "Invalid video mode")
             return
 
+        if not os.path.exists(config.optimizer_path):
+            print(f"❌ videocrunch not found at {config.optimizer_path} — "
+                  f"set VIDEOCRUNCH_PATH or clone videocrunch next to this repo")
+            handler.send_response(503)
+            handler.end_headers()
+            return
+
         current_port = handler.server.server_address[1]
         print(f"⚡ Optimize: {file_path} | Video: {video_mode} | Audio: {audio_mode} | Q: {q_val} | Trim: {ss}-{to}")
 
@@ -629,10 +636,14 @@ def _handle_batch_compress(handler) -> None:
             handler.end_headers()
             return
 
-        batch_controller_path = os.path.join(
-            os.path.dirname(config.optimizer_path),
-            "batch_controller.py"
-        )
+        batch_controller_path = config.batch_path
+        if not os.path.exists(batch_controller_path):
+            print(f"❌ videocrunch not found at {batch_controller_path} — "
+                  f"set VIDEOCRUNCH_BATCH_PATH or clone videocrunch next to this repo")
+            handler.send_response(503)
+            handler.end_headers()
+            return
+
         files_arg = ",".join(validated_paths)
         cmd_parts = [
             sys.executable,
