@@ -8,6 +8,7 @@ codec efficiency; overridden by real results from encode_history.jsonl
 from __future__ import annotations
 
 import json
+import os
 import statistics
 import threading
 from dataclasses import dataclass
@@ -41,7 +42,29 @@ CODEC_EFFICIENCY: dict = {
     ("vp9",  "h264"):  1.10,
 }
 
-DEFAULT_HISTORY_PATH = Path.home() / ".arcade-scanner" / "logs" / "encode_history.jsonl"
+_VIDEOCRUNCH_HISTORY = Path.home() / ".videocrunch" / "logs" / "encode_history.jsonl"
+_LEGACY_HISTORY = Path.home() / ".arcade-scanner" / "logs" / "encode_history.jsonl"
+
+
+def default_history_path() -> Path:
+    """Where to read encode history from.
+
+    videocrunch writes to ~/.videocrunch/logs. Installs that ran the optimizer
+    while it still lived in this repo have real measured encodes under
+    ~/.arcade-scanner/logs — those keep working until videocrunch has written
+    its first record, at which point the new location takes over.
+    """
+    override = os.getenv("VIDEOCRUNCH_HISTORY_PATH")
+    if override:
+        return Path(override)
+    if _VIDEOCRUNCH_HISTORY.exists():
+        return _VIDEOCRUNCH_HISTORY
+    if _LEGACY_HISTORY.exists():
+        return _LEGACY_HISTORY
+    return _VIDEOCRUNCH_HISTORY
+
+
+DEFAULT_HISTORY_PATH = default_history_path()
 
 # --- bucket helpers -------------------------------------------------------
 # Deliberately duplicated from videocrunch's crunch_utils.py — that repo owns
@@ -194,8 +217,8 @@ class EncodeHistory:
     since the instance is shared across server threads.
     """
 
-    def __init__(self, path: Path = DEFAULT_HISTORY_PATH) -> None:
-        self.path = path
+    def __init__(self, path: Optional[Path] = None) -> None:
+        self.path = path if path is not None else default_history_path()
         self._mtime: float = -1.0
         # bucket (resolution_class, bitrate_class) -> [(lowered codec str, saved_pct), ...]
         self._index: dict[tuple[str, str], list[tuple[str, float]]] = {}
