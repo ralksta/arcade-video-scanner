@@ -1,0 +1,194 @@
+[
+  {
+    "source_kbps": 45000,
+    "height": 2160,
+    "fps": 30,
+    "source_codec": "h264",
+    "target_codec": "hevc",
+    "expected": [
+      73.333333333,
+      true
+    ]
+  },
+  {
+    "source_kbps": 45000,
+    "height": 2160,
+    "fps": 30,
+    "source_codec": "h264",
+    "target_codec": "av1",
+    "expected": [
+      77.333333333,
+      true
+    ]
+  },
+  {
+    "source_kbps": 3500,
+    "height": 1080,
+    "fps": 30,
+    "source_codec": "h264",
+    "target_codec": "hevc",
+    "expected": [
+      35.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 6200,
+    "height": 1080,
+    "fps": 25,
+    "source_codec": "h264",
+    "target_codec": "hevc",
+    "expected": [
+      46.23655914,
+      true
+    ]
+  },
+  {
+    "source_kbps": 1500,
+    "height": 720,
+    "fps": 25,
+    "source_codec": "h264",
+    "target_codec": "hevc",
+    "expected": [
+      35.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 500,
+    "height": 360,
+    "fps": 30,
+    "source_codec": "h264",
+    "target_codec": "hevc",
+    "expected": [
+      35.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 683,
+    "height": 720,
+    "fps": 25,
+    "source_codec": "hevc",
+    "target_codec": "hevc",
+    "expected": [
+      4.9176,
+      true
+    ]
+  },
+  {
+    "source_kbps": 20000,
+    "height": 1080,
+    "fps": 30,
+    "source_codec": "hevc",
+    "target_codec": "hevc",
+    "expected": [
+      15.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 288000,
+    "height": 2160,
+    "fps": 25,
+    "source_codec": "hevc",
+    "target_codec": "hevc",
+    "expected": [
+      15.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 4000,
+    "height": 1080,
+    "fps": 30,
+    "source_codec": "h265",
+    "target_codec": "hevc",
+    "expected": [
+      15.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 4000,
+    "height": 1080,
+    "fps": 30,
+    "source_codec": "hevc",
+    "target_codec": "av1",
+    "expected": [
+      20.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 4000,
+    "height": 1080,
+    "fps": 30,
+    "source_codec": "av1",
+    "target_codec": "hevc",
+    "expected": [
+      0.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 5000,
+    "height": 1080,
+    "fps": 30,
+    "source_codec": "prores",
+    "target_codec": "hevc",
+    "expected": [
+      35.0,
+      false
+    ]
+  },
+  {
+    "source_kbps": 5000,
+    "height": 1080,
+    "fps": 60,
+    "source_codec": "hevc",
+    "target_codec": "hevc",
+    "expected": [
+      9.375,
+      true
+    ]
+  },
+  {
+    "source_kbps": 5000,
+    "height": 1080,
+    "fps": 0,
+    "source_codec": "hevc",
+    "target_codec": "hevc",
+    "expected": [
+      15.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 500000,
+    "height": 2160,
+    "fps": 30,
+    "source_codec": "mpeg2video",
+    "target_codec": "hevc",
+    "expected": [
+      85.0,
+      true
+    ]
+  },
+  {
+    "source_kbps": 0,
+    "height": 1080,
+    "fps": 30,
+    "source_codec": "h264",
+    "target_codec": "hevc",
+    "expected": null
+  },
+  {
+    "source_kbps": 5000,
+    "height": 0,
+    "fps": 30,
+    "source_codec": "h264",
+    "target_codec": "hevc",
+    "expected": null
+  }
+]
