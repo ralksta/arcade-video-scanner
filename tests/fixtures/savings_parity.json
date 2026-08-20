@@ -1,194 +1,276 @@
-[
-  {
-    "source_kbps": 45000,
-    "height": 2160,
-    "fps": 30,
-    "source_codec": "h264",
-    "target_codec": "hevc",
-    "expected": [
-      73.333333333,
-      true
+{
+  "_comment": "Shared parity fixture. An identical copy lives in the companion repo that keeps its own implementation of this math. Do NOT regenerate to make a failure go away \u2014 a failure means the two implementations diverged.",
+  "estimate_savings_pct": [
+    {
+      "source_kbps": 45000,
+      "height": 2160,
+      "fps": 30,
+      "source_codec": "h264",
+      "target_codec": "hevc",
+      "expected": [
+        73.333333333,
+        true
+      ]
+    },
+    {
+      "source_kbps": 45000,
+      "height": 2160,
+      "fps": 30,
+      "source_codec": "h264",
+      "target_codec": "av1",
+      "expected": [
+        77.333333333,
+        true
+      ]
+    },
+    {
+      "source_kbps": 3500,
+      "height": 1080,
+      "fps": 30,
+      "source_codec": "h264",
+      "target_codec": "hevc",
+      "expected": [
+        35.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 6200,
+      "height": 1080,
+      "fps": 25,
+      "source_codec": "h264",
+      "target_codec": "hevc",
+      "expected": [
+        46.23655914,
+        true
+      ]
+    },
+    {
+      "source_kbps": 1500,
+      "height": 720,
+      "fps": 25,
+      "source_codec": "h264",
+      "target_codec": "hevc",
+      "expected": [
+        35.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 500,
+      "height": 360,
+      "fps": 30,
+      "source_codec": "h264",
+      "target_codec": "hevc",
+      "expected": [
+        35.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 683,
+      "height": 720,
+      "fps": 25,
+      "source_codec": "hevc",
+      "target_codec": "hevc",
+      "expected": [
+        4.9176,
+        true
+      ]
+    },
+    {
+      "source_kbps": 20000,
+      "height": 1080,
+      "fps": 30,
+      "source_codec": "hevc",
+      "target_codec": "hevc",
+      "expected": [
+        15.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 288000,
+      "height": 2160,
+      "fps": 25,
+      "source_codec": "hevc",
+      "target_codec": "hevc",
+      "expected": [
+        15.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 4000,
+      "height": 1080,
+      "fps": 30,
+      "source_codec": "h265",
+      "target_codec": "hevc",
+      "expected": [
+        15.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 4000,
+      "height": 1080,
+      "fps": 30,
+      "source_codec": "hevc",
+      "target_codec": "av1",
+      "expected": [
+        20.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 4000,
+      "height": 1080,
+      "fps": 30,
+      "source_codec": "av1",
+      "target_codec": "hevc",
+      "expected": [
+        0.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 5000,
+      "height": 1080,
+      "fps": 30,
+      "source_codec": "prores",
+      "target_codec": "hevc",
+      "expected": [
+        35.0,
+        false
+      ]
+    },
+    {
+      "source_kbps": 5000,
+      "height": 1080,
+      "fps": 60,
+      "source_codec": "hevc",
+      "target_codec": "hevc",
+      "expected": [
+        9.375,
+        true
+      ]
+    },
+    {
+      "source_kbps": 5000,
+      "height": 1080,
+      "fps": 0,
+      "source_codec": "hevc",
+      "target_codec": "hevc",
+      "expected": [
+        15.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 500000,
+      "height": 2160,
+      "fps": 30,
+      "source_codec": "mpeg2video",
+      "target_codec": "hevc",
+      "expected": [
+        85.0,
+        true
+      ]
+    },
+    {
+      "source_kbps": 0,
+      "height": 1080,
+      "fps": 30,
+      "source_codec": "h264",
+      "target_codec": "hevc",
+      "expected": null
+    },
+    {
+      "source_kbps": 5000,
+      "height": 0,
+      "fps": 30,
+      "source_codec": "h264",
+      "target_codec": "hevc",
+      "expected": null
+    }
+  ],
+  "bitrate_class": [
+    [
+      0,
+      "low"
+    ],
+    [
+      2499,
+      "low"
+    ],
+    [
+      2500,
+      "med"
+    ],
+    [
+      7999,
+      "med"
+    ],
+    [
+      8000,
+      "high"
+    ],
+    [
+      19999,
+      "high"
+    ],
+    [
+      20000,
+      "ultra"
+    ],
+    [
+      1000000,
+      "ultra"
     ]
-  },
-  {
-    "source_kbps": 45000,
-    "height": 2160,
-    "fps": 30,
-    "source_codec": "h264",
-    "target_codec": "av1",
-    "expected": [
-      77.333333333,
-      true
+  ],
+  "resolution_class": [
+    [
+      0,
+      "sd"
+    ],
+    [
+      576,
+      "sd"
+    ],
+    [
+      577,
+      "720"
+    ],
+    [
+      800,
+      "720"
+    ],
+    [
+      801,
+      "1080"
+    ],
+    [
+      1200,
+      "1080"
+    ],
+    [
+      1201,
+      "1440"
+    ],
+    [
+      1600,
+      "1440"
+    ],
+    [
+      1601,
+      "2160"
+    ],
+    [
+      4320,
+      "2160"
     ]
-  },
-  {
-    "source_kbps": 3500,
-    "height": 1080,
-    "fps": 30,
-    "source_codec": "h264",
-    "target_codec": "hevc",
-    "expected": [
-      35.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 6200,
-    "height": 1080,
-    "fps": 25,
-    "source_codec": "h264",
-    "target_codec": "hevc",
-    "expected": [
-      46.23655914,
-      true
-    ]
-  },
-  {
-    "source_kbps": 1500,
-    "height": 720,
-    "fps": 25,
-    "source_codec": "h264",
-    "target_codec": "hevc",
-    "expected": [
-      35.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 500,
-    "height": 360,
-    "fps": 30,
-    "source_codec": "h264",
-    "target_codec": "hevc",
-    "expected": [
-      35.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 683,
-    "height": 720,
-    "fps": 25,
-    "source_codec": "hevc",
-    "target_codec": "hevc",
-    "expected": [
-      4.9176,
-      true
-    ]
-  },
-  {
-    "source_kbps": 20000,
-    "height": 1080,
-    "fps": 30,
-    "source_codec": "hevc",
-    "target_codec": "hevc",
-    "expected": [
-      15.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 288000,
-    "height": 2160,
-    "fps": 25,
-    "source_codec": "hevc",
-    "target_codec": "hevc",
-    "expected": [
-      15.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 4000,
-    "height": 1080,
-    "fps": 30,
-    "source_codec": "h265",
-    "target_codec": "hevc",
-    "expected": [
-      15.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 4000,
-    "height": 1080,
-    "fps": 30,
-    "source_codec": "hevc",
-    "target_codec": "av1",
-    "expected": [
-      20.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 4000,
-    "height": 1080,
-    "fps": 30,
-    "source_codec": "av1",
-    "target_codec": "hevc",
-    "expected": [
-      0.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 5000,
-    "height": 1080,
-    "fps": 30,
-    "source_codec": "prores",
-    "target_codec": "hevc",
-    "expected": [
-      35.0,
-      false
-    ]
-  },
-  {
-    "source_kbps": 5000,
-    "height": 1080,
-    "fps": 60,
-    "source_codec": "hevc",
-    "target_codec": "hevc",
-    "expected": [
-      9.375,
-      true
-    ]
-  },
-  {
-    "source_kbps": 5000,
-    "height": 1080,
-    "fps": 0,
-    "source_codec": "hevc",
-    "target_codec": "hevc",
-    "expected": [
-      15.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 500000,
-    "height": 2160,
-    "fps": 30,
-    "source_codec": "mpeg2video",
-    "target_codec": "hevc",
-    "expected": [
-      85.0,
-      true
-    ]
-  },
-  {
-    "source_kbps": 0,
-    "height": 1080,
-    "fps": 30,
-    "source_codec": "h264",
-    "target_codec": "hevc",
-    "expected": null
-  },
-  {
-    "source_kbps": 5000,
-    "height": 0,
-    "fps": 30,
-    "source_codec": "h264",
-    "target_codec": "hevc",
-    "expected": null
+  ],
+  "constants": {
+    "MIN_LISTED_SAVED_PCT": 10.0
   }
-]
+}

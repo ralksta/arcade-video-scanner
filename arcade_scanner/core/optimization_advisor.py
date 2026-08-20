@@ -70,10 +70,10 @@ def default_history_path() -> Path:
     return _VIDEOCRUNCH_HISTORY
 
 # --- bucket helpers -------------------------------------------------------
-# Deliberately duplicated from videocrunch's crunch_utils.py — that repo owns
-# the encoder and needs these standalone; boundary values are pinned by
-# tests/test_optimization_advisor.py::test_bitrate_class_boundaries /
-# test_resolution_class_boundaries.
+# Deliberately duplicated from videocrunch's savings.py — that repo owns the
+# encoder and needs these standalone. Cross-repo parity is pinned by the shared
+# tests/fixtures/savings_parity.json (identical copy in videocrunch), which
+# carries the boundary values for both helpers plus MIN_LISTED_SAVED_PCT.
 
 
 def bitrate_class(kbps: float) -> str:
@@ -318,6 +318,8 @@ class EncodeHistory:
 
 # --- build_candidates -------------------------------------------------------
 
+# Also lives in videocrunch's scan.py; pinned to that copy by
+# tests/fixtures/savings_parity.json ("constants").
 MIN_LISTED_SAVED_PCT = 10.0
 
 

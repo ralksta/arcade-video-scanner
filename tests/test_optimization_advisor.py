@@ -14,10 +14,10 @@ def _entry(**kw) -> VideoEntry:
 
 
 # bitrate_class/resolution_class are deliberately duplicated in videocrunch's
-# crunch_utils.py (see the comment on optimization_advisor.py); videocrunch no
+# savings.py (see the comment on optimization_advisor.py); videocrunch no
 # longer lives in this repo, so parity can't be pinned via a live import here.
-# Pin the boundary values instead — a change to either side's constants should
-# fail one of these two.
+# These two pin this repo's boundaries; cross-repo parity is pinned by the
+# shared fixture in tests/test_savings_parity.py.
 def test_bitrate_class_boundaries():
     expected = {0: "low", 1000: "low", 2499: "low", 2500: "med", 7999: "med",
                 8000: "high", 19999: "high", 20000: "ultra", 50000: "ultra"}
