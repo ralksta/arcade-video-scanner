@@ -21,10 +21,13 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # Add parent path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from arcade_scanner.core.video_processor import (  # noqa: E402
-    get_best_encoder,
-    get_optimal_workers,
+# Both live in hw_encode_detect; video_processor used to re-export them, but
+# that line was dropped as an "unused import" in cf62272 and this script has
+# been failing at startup ever since.
+from arcade_scanner.core.hw_encode_detect import (  # noqa: E402
+    get_best_h264_encoder as get_best_encoder,
 )
+from arcade_scanner.core.hw_encode_detect import get_optimal_workers  # noqa: E402
 
 # --- COLORS ---
 G = '\033[0;32m'
@@ -110,6 +113,26 @@ def display_loop(start_time, max_workers):
         time.sleep(0.5)
 
 
+def terminal_verdict(line: str) -> tuple:
+    """Classify one optimizer output line as the run's final verdict.
+
+    Returns ("success"|"failed", reason) or (None, None) for everything else.
+
+    The optimizer prints exactly ONE `>>> SUCCESS` / `>>> FAILED:` per file.
+    Everything else is per-pass chatter: "Quality too low for this level."
+    rejects a single rung of the quality ladder, and "Aborting pass..." abandons
+    one encode attempt — a run that recovers on another rung is still a success.
+    Treating those as terminal reported finished encodes as failures.
+    """
+    if '>>> SUCCESS' in line:
+        return ("success", None)
+    if '>>> FAILED' in line:
+        match = re.search(r'>>> FAILED:\s*(.*)', line)
+        reason = match.group(1).strip() if match else ""
+        return ("failed", reason or "Encoding failed")
+    return (None, None)
+
+
 def run_optimizer(args_tuple):
     """Worker function - captures output and updates shared state. Returns detailed results for logging."""
     file_path, port, audio_mode, worker_id = args_tuple
@@ -162,6 +185,7 @@ def run_optimizer(args_tuple):
 
         for line in process.stdout:
             line = line.strip()
+            verdict, verdict_reason = terminal_verdict(line)
 
             # Parse progress: look for percentage
             if '%' in line and 'Saved' not in line:
@@ -191,7 +215,7 @@ def run_optimizer(args_tuple):
                     last_saved_pct = float(match.group(1))
 
             # Parse bytes saved from SUCCESS line: ">>> SUCCESS! 1.23 GB saved"
-            if 'SUCCESS' in line:
+            if verdict == 'success':
                 success = True
                 # Try to parse saved bytes: "1.23 GB saved" or "456.7 MB saved"
                 match = re.search(r'([\d.]+)\s*(GB|MB|KB)\s*saved', line)
@@ -205,10 +229,10 @@ def run_optimizer(args_tuple):
                     else:
                         last_saved_bytes = int(val * 1024)
 
-            # Detect explicit failures
-            if 'Quality too low' in line or 'Aborting' in line:
+            # Detect explicit failures (terminal verdict only — see terminal_verdict)
+            if verdict == 'failed':
                 failed = True
-                failure_reason = 'Quality too low (SSIM check failed)'
+                failure_reason = verdict_reason
 
             # Handle skipped files
             if 'Skipping' in line:

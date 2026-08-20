@@ -38,6 +38,17 @@ All notable changes to this project will be documented in this file.
   mit 53,2 % Ersparnis und SSIM 0.9444 wurde deshalb gelöscht und die Datei als
   gescheitert gemeldet. Aufbewahrt wird jetzt ab `SSIM_MIN`; beim Ranking gehen
   Ergebnisse über `SSIM_ACCEPTABLE` weiterhin vor.
+- **`batch_controller.py` startete nicht mehr**. Commit `cf62272` („style: ruff
+  safe fixes, unused imports") entfernte die Re-Export-Zeile aus
+  `core/video_processor.py`, an der das Skript hing — seitdem brach es beim Start
+  mit `ImportError: cannot import name 'get_best_encoder'` ab. Der Import zeigt
+  jetzt direkt auf `core/hw_encode_detect.py`.
+- **`batch_controller.py` meldete gelungene Encodes als Fehlschlag**. Der
+  Ausgabe-Parser wertete `Quality too low` und `Aborting` als Endergebnis — beides
+  druckt der Optimizer aber pro *abgelehnter Stufe* der Qualitätsleiter. Ein Lauf,
+  der auf einer anderen Stufe zum Ziel kam, wurde trotz fertiger `_opt.mp4` als
+  FAILED gezählt. Nur noch `>>> SUCCESS` / `>>> FAILED:` gelten als Verdikt
+  (neu: `terminal_verdict()`).
 - **Ordner-Browser: echte Hierarchie statt flacher Liste**. `getSubfoldersAt(null)`
   hielt jeden Pfad für eine oberste Ebene, zu dem es keinen *anderen Ordner mit
   Dateien* als Präfix gab. Da Mount-Verzeichnisse wie `/media_ralf` selbst keine
