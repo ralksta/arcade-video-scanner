@@ -123,7 +123,7 @@ This release adds **AV1 Encoding Support** (powered by FFmpeg 8.1) and a **Smart
 ## ⚡ Video Optimizer
 
 The encoder itself lives in a separate, standalone repository, videocrunch
-(not yet published — cloned as a sibling checkout, `../videocrunch`). Arcade
+([https://github.com/ralksta/videocrunch](https://github.com/ralksta/videocrunch), cloned as a sibling checkout, `../videocrunch`). Arcade
 invokes it as a subprocess and reads its
 encode history to sharpen its own savings estimates; if videocrunch isn't
 checked out, the Optimize panel's encode routes fail with a readable error
@@ -152,7 +152,7 @@ cd ../videocrunch
 .venv/bin/python3 videocrunch.py /path/to/video.mp4 --codec av1
 ```
 
-📖 **[Full technical reference including SSIM, binary search, staging strategy →](../videocrunch/docs/technical-reference.md)** (in the sibling checkout)
+📖 **[Full technical reference including SSIM, binary search, staging strategy →](https://github.com/ralksta/videocrunch/blob/main/docs/technical-reference.md)**
 
 ---
 

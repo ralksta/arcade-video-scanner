@@ -1,7 +1,7 @@
 # Remote Worker (`scripts/mac_worker.py`)
 
 `mac_worker.py` stayed in Arcade after the encoder split (into videocrunch, a
-separate repo not yet published, cloned as a sibling checkout `../videocrunch`)
+separate repo at https://github.com/ralksta/videocrunch, cloned as a sibling checkout `../videocrunch`)
 because it speaks Arcade's HTTP encoding-queue API, not the encoder itself.
 It loads the actual encoding engine from a videocrunch checkout via
 `VIDEOCRUNCH_PATH` (or the legacy `ARCADE_OPTIMIZER_PATH`) — see

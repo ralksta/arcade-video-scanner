@@ -29,8 +29,8 @@ All notable changes to this project will be documented in this file.
   on a remote NVENC machine, reading originals only).
 
 ### Changed
-- **Encoder ausgelagert nach videocrunch** (eigenes Repo, noch nicht
-  veröffentlicht; als Geschwister-Checkout `../videocrunch` geklont).
+- **Encoder ausgelagert nach [videocrunch](https://github.com/ralksta/videocrunch)**
+  (eigenes Repo, als Geschwister-Checkout `../videocrunch` geklont).
   Encode-Engine, Ordner-Rangliste, Batch-Runner, Encoder-Erkennung und
   Bitratenanalyse sind ein eigenständiges Werkzeug geworden — nutzbar ohne
   Arcade, mit eigener Finder-Schnellaktion. Arcade ruft es als Prozess auf
