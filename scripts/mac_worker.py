@@ -16,7 +16,12 @@ Requirements:
     - macOS with VideoToolbox (Apple Silicon or Intel with T2)
     - ffmpeg installed (brew install ffmpeg)
     - the videocrunch repo checked out next to this one (imported for process_file);
-      see arcade_scanner.config.optimizer_path
+      see VIDEOCRUNCH_PATH / ARCADE_OPTIMIZER_PATH below
+
+This worker deliberately does not import the arcade_scanner package: it runs
+standalone on a remote Mac that may not have this repo's dependencies (e.g.
+pydantic) installed, and importing arcade_scanner.config would create the
+server's arcade_data/ directory tree on a machine that never uses it.
 """
 
 import argparse
@@ -32,14 +37,17 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# Add parent (repo root) directory to path so we can import arcade_scanner.config
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-# videocrunch lives in its own repo now; find it the same way the server does.
-from arcade_scanner.config import config as _arcade_config  # noqa: E402
-
-_VC_DIR = str(Path(_arcade_config.optimizer_path).parent)
+# videocrunch lives in its own repo now. Find it via the same env vars
+# arcade_scanner.config.optimizer_path uses — the shared authority between
+# this worker and the server is the environment variables, not the config
+# object, since this worker must not import the arcade_scanner package (see
+# module docstring). Keep this resolution logic in sync with config.py's
+# optimizer_path property if that ever changes.
+_VC_DEFAULT_PATH = str(SCRIPT_DIR.parent.parent / "videocrunch" / "videocrunch.py")
+_VC_ENGINE_PATH = os.getenv("ARCADE_OPTIMIZER_PATH") or os.getenv("VIDEOCRUNCH_PATH", _VC_DEFAULT_PATH)
+_VC_DIR = str(Path(_VC_ENGINE_PATH).parent)
 if _VC_DIR not in sys.path:
     sys.path.insert(0, _VC_DIR)
 
