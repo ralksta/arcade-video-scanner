@@ -272,12 +272,21 @@ function triggerOptimization() {
     if (to)   params.set('to', to);
     if (qVal) params.set('q',  qVal);
 
+    // fetch() only rejects on a network error — an HTTP 503 ("videocrunch not
+    // installed", see routes/files.py) resolves like a success. Without the
+    // response.ok check the user gets "Optimization started!" while nothing runs.
     fetch(`/compress?${params.toString()}`)
-        .then(() => {
+        .then(response => {
+            if (response.status === 503) {
+                throw new Error('videocrunch not installed on the server');
+            }
+            if (!response.ok) {
+                throw new Error(`server returned ${response.status}`);
+            }
             closeOptimize();
             showToast('Optimization started! 🚀', 'success');
         })
-        .catch(err => showToast(`Optimization failed: ${err}`, 'error'));
+        .catch(err => showToast(`Optimization failed: ${err.message || err}`, 'error'));
 }
 
 // --- REMOTE ENCODING QUEUE ---
