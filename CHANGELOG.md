@@ -28,6 +28,18 @@ All notable changes to this project will be documented in this file.
   than from source footage) and `scripts/generate_proxies.py` (creates the proxies
   on a remote NVENC machine, reading originals only).
 
+### Changed
+- **Encoder ausgelagert nach [videocrunch](https://github.com/ralksta/videocrunch)**.
+  Encode-Engine, Ordner-Rangliste, Batch-Runner, Encoder-Erkennung und
+  Bitratenanalyse sind ein eigenständiges Werkzeug geworden — nutzbar ohne
+  Arcade, mit eigener Finder-Schnellaktion. Arcade ruft es als Prozess auf
+  (`VIDEOCRUNCH_PATH`, Standard: Geschwister-Checkout `../videocrunch/`) und
+  liest weiterhin dessen `encode_history.jsonl`, um seine Schätzungen mit echten
+  Messwerten zu verbessern. Die Spar-Heuristik liegt bewusst in beiden Repos und
+  wird durch `tests/fixtures/savings_parity.json` auf identisches Verhalten
+  festgenagelt. Fehlt videocrunch, melden die Encode-Routen 503 statt zu
+  verrecken.
+
 ### Fixed
 - **Video-Optimizer: Binärsuche lief in die falsche Richtung**. In
   `quality_values` bedeutet ein höherer Index bei *jedem* Encoder mehr Kompression

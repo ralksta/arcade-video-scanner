@@ -27,8 +27,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # Lint (line-length 100, E501 ignored)
 .venv/bin/ruff check .
 
-# Video optimizer (standalone script)
-.venv/bin/python3 scripts/video_optimizer.py /path/to/video.mp4 --codec hevc|av1
+# Video optimizer: lives in the videocrunch repo, cloned as a sibling checkout
+# (../videocrunch by default; override with VIDEOCRUNCH_PATH). Not in this repo.
 
 # User management
 .venv/bin/python3 scripts/manage_users.py list|add <name> [--admin]|passwd <name>
@@ -59,7 +59,7 @@ When you add/rename an element ID or a JS global, update both sides or these tes
 
 **Scanner pipeline.** `arcade_scanner/scanner/` — `manager.py` orchestrates, `file_system.py` walks directories with exclusions, `media_probe.py` shells out to ffprobe, `video_inspector.py`/`image_inspector.py` build entries. Startup order in `main.py` matters: cached DB loads and the server starts *first* so the dashboard is usable immediately; scanning runs after.
 
-**Optimizer.** `scripts/video_optimizer.py` is deliberately standalone (imports `arcade_scanner/core/` modules via sys.path manipulation, degrades gracefully if unavailable). It does binary-search quality passes with SSIM verification (skipped when savings < 10%), hardware encoder detection (`core/hw_encode_detect.py`), and HEVC→AV1 with automatic fallback. `scripts/batch_controller.py` runs parallel encodes; `scripts/mac_worker.py` is a remote worker that polls the server's encoding queue. Full technical reference: `dev-docs/video-optimizer.md`.
+**Optimizer.** Encoding happens in [videocrunch](https://github.com/ralksta/videocrunch), a separate repo. Arcade invokes it as a subprocess (`config.optimizer_path`/`config.batch_path`, resolved via `VIDEOCRUNCH_PATH`) and reads its `encode_history.jsonl` to sharpen its own savings estimates; `arcade_scanner/core/optimization_advisor.py` still does candidate ranking here. `scripts/mac_worker.py` stayed in Arcade — it polls this repo's encoding queue over HTTP and loads the videocrunch engine via the same path resolution. See `dev-docs/video-optimizer.md` and `dev-docs/mac-worker.md`.
 
 **Clients.** Three native clients talk to the same HTTP API: `ios_client/` (SwiftUI), `tv_client/` (webOS, Enact/Limestone + React — `prebuild.js` generates a dummy `src/views/credentials.json` before builds), `webos_client/` (thin packaged web app). When changing API responses or filter semantics, check whether the TV/iOS clients need the same change (see recent commits aligning TV client filtering with the browser client).
 
@@ -69,3 +69,4 @@ When you add/rename an element ID or a JS global, update both sides or these tes
 - Comments in the codebase are mixed German/English; either is fine.
 - Update `CHANGELOG.md` for user-facing changes; `ROADMAP.md` tracks planned features.
 - Version numbers drift across files (pyproject.toml, README, banner strings in main.py) — don't trust any single one as authoritative.
+- Encoder work happens in `../videocrunch`, not here — this repo no longer contains the encoding engine, hardware-encoder detection, bitrate analysis, or the batch/folder-scan CLI tools.
