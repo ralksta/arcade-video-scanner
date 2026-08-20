@@ -51,7 +51,17 @@ _VC_DIR = str(Path(_VC_ENGINE_PATH).parent)
 if _VC_DIR not in sys.path:
     sys.path.insert(0, _VC_DIR)
 
-from crunch_utils import battery_from_pmset, is_within_schedule, parse_schedule  # noqa: E402
+try:
+    from crunch_utils import battery_from_pmset, is_within_schedule, parse_schedule  # noqa: E402
+    _VC_IMPORT_ERROR = None
+except ImportError as exc:   # videocrunch is not checked out on this machine
+    # Deliberately not fatal at import time: the module stays importable for
+    # tests and tooling. main() refuses to start instead (see _require_videocrunch),
+    # which is where a human is watching. Without videocrunch there is nothing
+    # to encode, so degrading --schedule/--pause-on-battery and then failing
+    # every single job would be the worse trade.
+    _VC_IMPORT_ERROR = exc
+    battery_from_pmset = is_within_schedule = parse_schedule = None  # type: ignore[assignment]
 
 # Color codes
 G = "\033[92m"
@@ -62,6 +72,22 @@ NC = "\033[0m"
 B = "\033[1m"
 
 _shutdown = False
+
+
+def _require_videocrunch() -> None:
+    """Abort with a readable message when videocrunch is not importable.
+
+    Same wording as the engine-import handler in _run_job, but this one runs
+    before any job is claimed — otherwise the process dies on the module-level
+    `crunch_utils` import with a bare ModuleNotFoundError traceback.
+    """
+    if _VC_IMPORT_ERROR is None:
+        return
+    print(f"{R}✗ videocrunch not found at {_VC_DIR}{NC}")
+    print(f"  ({_VC_IMPORT_ERROR})")
+    print(f"{Y}  Clone videocrunch next to this repo, or point VIDEOCRUNCH_PATH")
+    print(f"  at its videocrunch.py.{NC}")
+    sys.exit(1)
 
 
 def is_on_battery() -> bool:
@@ -524,6 +550,8 @@ Environment Variables:
                        help="Pause polling while the machine runs on battery power (macOS)")
 
     args = parser.parse_args()
+
+    _require_videocrunch()
 
     schedule_window = None
     if args.schedule:
