@@ -116,8 +116,10 @@ variables with sensible defaults:
   `ARCADE_OPTIMIZER_PATH` (`config.py:325`), which defaults to a path inside the
   Arcade repo that will no longer exist.
 - `VIDEOCRUNCH_BATCH_PATH` — path to `batch.py`. Today `routes/files.py:632`
-  assembles the `batch_controller.py` path inline with no override at all; after
-  the split that hard-coded assumption has to go.
+  derives it as `dirname(config.optimizer_path) + "/batch_controller.py"`: the
+  directory follows the optimizer path, but the filename is hard-coded. Renaming
+  the file to `batch.py` therefore breaks it silently, which is exactly the kind
+  of coupling the split should remove.
 
 Both default to a sibling checkout (`../videocrunch/`), which is the layout a
 user cloning both repos ends up with anyway.
