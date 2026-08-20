@@ -322,7 +322,25 @@ class ConfigManager:
 
     @property
     def optimizer_path(self) -> str:
-        return os.getenv("ARCADE_OPTIMIZER_PATH", os.path.join(PROJECT_ROOT, "scripts", "video_optimizer.py"))
+        """Path to videocrunch.py — the encoder lives in its own repo.
+
+        Defaults to a sibling checkout, which is what cloning both repos next to
+        each other produces. ARCADE_OPTIMIZER_PATH is still honoured so existing
+        installs keep working.
+        """
+        legacy = os.getenv("ARCADE_OPTIMIZER_PATH")
+        if legacy:
+            return legacy
+        default = os.path.join(os.path.dirname(PROJECT_ROOT), "videocrunch", "videocrunch.py")
+        return os.getenv("VIDEOCRUNCH_PATH", default)
+
+    @property
+    def batch_path(self) -> str:
+        """Path to videocrunch's batch.py. Follows optimizer_path unless overridden."""
+        return os.getenv(
+            "VIDEOCRUNCH_BATCH_PATH",
+            os.path.join(os.path.dirname(self.optimizer_path), "batch.py"),
+        )
 
     @property
     def optimizer_available(self) -> bool:

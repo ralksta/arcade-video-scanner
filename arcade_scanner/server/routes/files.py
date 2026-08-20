@@ -629,10 +629,14 @@ def _handle_batch_compress(handler) -> None:
             handler.end_headers()
             return
 
-        batch_controller_path = os.path.join(
-            os.path.dirname(config.optimizer_path),
-            "batch_controller.py"
-        )
+        batch_controller_path = config.batch_path
+        if not os.path.exists(batch_controller_path):
+            print(f"❌ videocrunch not found at {batch_controller_path} — "
+                  f"set VIDEOCRUNCH_BATCH_PATH or clone videocrunch next to this repo")
+            handler.send_response(503)
+            handler.end_headers()
+            return
+
         files_arg = ",".join(validated_paths)
         cmd_parts = [
             sys.executable,
