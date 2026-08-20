@@ -248,3 +248,36 @@ def select_top_windows(bucket_bytes: dict[int, int], duration: float, n: int = 3
         else:
             starts.add(max(0.0, min(lo_t + region_len / 2, max_start)))
     return sorted(starts)[:n]
+
+
+# ---------------------------------------------------------------------------
+# Rate control
+# ---------------------------------------------------------------------------
+
+# A pass may peak at this multiple of its own average target before the
+# encoder is reined in. 2x leaves room for I-frames and hotspots while
+# keeping the pass anywhere near the size it is aiming for.
+PASS_MAXRATE_FACTOR = 2.0
+
+
+def clamp_maxrate_to_pass(maxrate_kbps: float | None, bufsize_kbps: float | None,
+                          target_bitrate_kbps: float | None,
+                          factor: float = PASS_MAXRATE_FACTOR) -> tuple:
+    """Tighten a file-wide peak cap down to what THIS pass is aiming for.
+
+    The file-wide maxrate comes from analysing the source, so it sits far above
+    the individual quality-ladder targets. Left alone, the encoder is free to
+    spend several times a pass's target bitrate in busy scenes and overshoot the
+    size goal — which makes the ladder rungs nearly indistinguishable.
+
+    Returns (maxrate, bufsize); passes the originals straight through when
+    there is no per-pass target to clamp against.
+    """
+    if not target_bitrate_kbps or target_bitrate_kbps <= 0:
+        return maxrate_kbps, bufsize_kbps
+    cap = target_bitrate_kbps * factor
+    if maxrate_kbps and maxrate_kbps > 0:
+        cap = min(maxrate_kbps, cap)
+    if maxrate_kbps and cap >= maxrate_kbps:
+        return maxrate_kbps, bufsize_kbps  # file-wide cap already tighter
+    return cap, cap * 2.0

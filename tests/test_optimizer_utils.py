@@ -19,6 +19,7 @@ from optimizer_utils import (  # noqa: E402
     battery_from_pmset,
     bitrate_class,
     build_audio_filter_chain,
+    clamp_maxrate_to_pass,
     is_hdr_or_10bit,
     is_within_schedule,
     narrow_quality_window,
@@ -267,3 +268,31 @@ class TestBattery:
 
     def test_garbage_defaults_to_false(self):
         assert battery_from_pmset("") is False
+
+
+class TestClampMaxrateToPass:
+    """The peak cap has to follow the ladder rung, not the source file."""
+
+    def test_caps_to_twice_the_pass_target(self):
+        # Real case: file-wide cap 2346k while the pass aims at 632k — the
+        # encoder was free to spend 3.7x its target and overshot the size goal.
+        maxrate, bufsize = clamp_maxrate_to_pass(2346.0, 4692.0, 632.0)
+        assert maxrate == 1264.0
+        assert bufsize == 2528.0
+
+    def test_keeps_file_wide_cap_when_already_tighter(self):
+        # A high pass target must never RAISE the source-derived ceiling.
+        assert clamp_maxrate_to_pass(1000.0, 2000.0, 900.0) == (1000.0, 2000.0)
+
+    def test_passthrough_without_pass_target(self):
+        assert clamp_maxrate_to_pass(2346.0, 4692.0, None) == (2346.0, 4692.0)
+        assert clamp_maxrate_to_pass(2346.0, 4692.0, 0) == (2346.0, 4692.0)
+
+    def test_gives_a_cap_even_without_source_analysis(self):
+        assert clamp_maxrate_to_pass(None, None, 500.0) == (1000.0, 2000.0)
+
+    def test_ladder_rungs_get_distinct_caps(self):
+        # The whole point: different targets must yield different ceilings.
+        caps = [clamp_maxrate_to_pass(2346.0, 4692.0, t)[0] for t in (749, 632, 514, 397)]
+        assert len(set(caps)) == 4
+        assert caps == sorted(caps, reverse=True)

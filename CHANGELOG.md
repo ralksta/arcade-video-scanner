@@ -19,6 +19,25 @@ All notable changes to this project will be documented in this file.
   on a remote NVENC machine, reading originals only).
 
 ### Fixed
+- **Video-Optimizer: Binärsuche lief in die falsche Richtung**. In
+  `quality_values` bedeutet ein höherer Index bei *jedem* Encoder mehr Kompression
+  (VideoToolbox `75..45`, NVENC/x265 `24..44`). Drei Zweige der Suche haben das
+  invertiert: bei zu geringer Ersparnis und bei zu großer Ausgabedatei schob die
+  Suche Richtung *bessere* Qualität, also zu noch größeren Dateien. Konkret: ein
+  Pass mit Q=65 sparte 5,7 %, woraufhin Q=75 getestet wurde — der kann
+  rechnerisch niemals weniger Platz brauchen. Der lineare Pfad (`--q`) hatte es
+  von Anfang an richtig (`quality += step`). Zusätzlich unterscheidet die Suche
+  jetzt, *warum* ein Pass die Ziele verfehlt: ist das Sparziel erreicht und nur
+  die Qualität zu niedrig, geht es Richtung bessere Qualität statt Richtung mehr
+  Kompression — vorher wurde ein Ergebnis mit 53 % Ersparnis mit noch stärkerer
+  Kompression „nachgebessert", bis es an SSIM scheiterte.
+- **Video-Optimizer: brauchbare Ergebnisse landeten im Papierkorb**. Aufgehoben
+  wurde ein Encode erst ab `SSIM_ACCEPTABLE` (0.945), abgelehnt aber erst
+  unterhalb von `SSIM_MIN` (0.940). Alles dazwischen war eine tote Zone: nicht
+  schlecht genug zum Ablehnen, nicht gut genug zum Behalten. Ein fertiger Encode
+  mit 53,2 % Ersparnis und SSIM 0.9444 wurde deshalb gelöscht und die Datei als
+  gescheitert gemeldet. Aufbewahrt wird jetzt ab `SSIM_MIN`; beim Ranking gehen
+  Ergebnisse über `SSIM_ACCEPTABLE` weiterhin vor.
 - **Ordner-Browser: echte Hierarchie statt flacher Liste**. `getSubfoldersAt(null)`
   hielt jeden Pfad für eine oberste Ebene, zu dem es keinen *anderen Ordner mit
   Dateien* als Präfix gab. Da Mount-Verzeichnisse wie `/media_ralf` selbst keine
@@ -52,6 +71,32 @@ All notable changes to this project will be documented in this file.
   parameter ended up inside the filename. Now uses `parse_qs` like `do_GET`.
 
 ### Changed
+- **Video-Optimizer: weniger Leerlauf pro Datei**. Vier Änderungen, die
+  aussichtslose Encodes vermeiden statt sie langsam zu beweisen:
+  (1) *Pre-Flight-Gate* — vor dem ersten Encode fragt der Optimizer dieselbe
+  Heuristik, die das Dashboard für seine Kandidatenliste nutzt
+  (`optimization_advisor.estimate_savings_pct()`, neu als Skalar-Variante von
+  `estimate_heuristic()`). Prognostizierte Ersparnis unter der Hälfte von
+  `MIN_SAVINGS` heißt: gar nicht erst anfangen. Eine bereits schlanke
+  HEVC-Datei (683 kbps bei 720p) kostete vorher zwei Volldurchläufe und rund
+  zehn Minuten für ein garantiertes „failed". `--force` hebt das Gate auf;
+  `mac_worker.py` setzt es fest, weil dort ein Mensch den Job eingereiht hat.
+  Die Heuristik rechnet für Same-Codec-Encodes außerdem die Schlankheit der
+  Quelle relativ zur Auflösungsreferenz ein, statt pauschal 15 % zu versprechen
+  (gemessen: 4,9 % prognostiziert, 5,7 % tatsächlich).
+  (2) *Maxrate pro Pass* — der aus der Quelle abgeleitete Spitzendeckel galt für
+  alle Passes gleich (2346k) und lag weit über deren Zielbitraten (632–749k),
+  so dass der Encoder in Hotspots das Vier­fache seines Ziels ausgeben durfte.
+  `clamp_maxrate_to_pass()` bindet den Deckel ans jeweilige Pass-Ziel; derselbe
+  Pass sparte damit 10,5 % statt 5,7 %.
+  (3) *Bitratenleiter aus `MIN_SAVINGS` abgeleitet* — die oberste Sprosse zielte
+  auf 85 % der Quellbitrate und konnte ein 20-%-Sparziel selbst bei perfektem
+  Treffer nicht erreichen. `BR_TOP` folgt jetzt aus `MIN_SAVINGS`.
+  (4) *Ehrlichere Pre-Search* — der Probe-Clip stammt aus den Bitraten-Hotspots,
+  weshalb sein eigenes Schrumpfverhältnis als Größenprognose unbrauchbar ist
+  (Probe meldete ×0.53, die volle Datei lieferte ×1.08). Geprüft wird jetzt, ob
+  der Encoder sein Ziel auf dem schwersten Material hält; die Größenprognose
+  folgt aus dem Ziel selbst.
 - **Mobile-Navigation**: Neuer Eintrag **Ordner** in der Bottom-Nav, der direkt in
   den Ordner-Browser springt — der war auf dem Handy bisher gar nicht erreichbar
   (die View-Toggles sind `hidden md:flex`, nur per Deep-Link zugänglich). Dafür ist

@@ -37,6 +37,17 @@ except ImportError:
     BITRATE_ANALYZER_AVAILABLE = False
     HW_DETECT_AVAILABLE = False
 
+# Savings advisor — same heuristic the dashboard's candidate list uses.
+# Imported as a package (it has relative imports), so this needs the repo root.
+try:
+    _repo_root = str(Path(__file__).resolve().parent.parent)
+    if _repo_root not in sys.path:
+        sys.path.append(_repo_root)
+    from arcade_scanner.core.optimization_advisor import estimate_savings_pct
+    ADVISOR_AVAILABLE = True
+except ImportError:
+    ADVISOR_AVAILABLE = False
+
 # Pure helper logic (history seeding, HDR detection, scheduling, ...)
 # Lives in a sibling module so it stays unit-testable without ffmpeg.
 try:
@@ -47,6 +58,7 @@ try:
         append_encode_history,
         apply_hdr_adjustments,
         build_audio_filter_chain,
+        clamp_maxrate_to_pass,
         is_hdr_or_10bit,
         narrow_quality_window,
         nearest_quality_index,
@@ -57,6 +69,9 @@ try:
     OPTIMIZER_UTILS_AVAILABLE = True
 except ImportError:
     OPTIMIZER_UTILS_AVAILABLE = False
+
+    def clamp_maxrate_to_pass(maxrate_kbps, bufsize_kbps, target_bitrate_kbps):
+        return maxrate_kbps, bufsize_kbps
 
 # Logs directory
 LOG_DIR = Path.home() / ".arcade-scanner" / "logs"
@@ -72,12 +87,22 @@ DEFAULT_MIN_SIZE_MB = 0  # No minimum file size – process all files
 # --- PRE-SEARCH (sample-clip quality probing) ---
 PRESEARCH_MIN_DURATION = 120.0  # Files shorter than this search directly (samples too coarse)
 PRESEARCH_SEGMENT_SEC = 8.0     # Length of each stream-copied probe segment
+# The probe clip is cut from the bitrate HOTSPOTS, so it is the hardest material
+# in the file. Holding the pass target there (within this tolerance) means the
+# quieter rest of the file will come in under it.
+PROBE_TARGET_TOLERANCE = 1.25
 
 # --- SSIM / SAVINGS THRESHOLDS ---
 SSIM_MIN = 0.940           # Hard lower bound – reject anything below this
 SSIM_ACCEPTABLE = 0.945    # Acceptable quality for fallback results
 EXCELLENT_SAVINGS_PCT = 50.0  # Savings % considered excellent (early-exit in binary search)
 EARLY_ABORT_RATIO = 0.95   # Abort encode early if output reaches this fraction of source size
+
+# --- PRE-FLIGHT GATE ---
+# Predicted savings below this % => don't encode at all. Deliberately well
+# under MIN_SAVINGS: the heuristic is rough, so only hopeless files are cut,
+# borderline ones still get a real encode to prove themselves.
+PREFLIGHT_SKIP_PCT = MIN_SAVINGS * 0.5
 
 # Quality ranges differ per encoder
 # NVENC: CQ 0-51 (lower = better quality)
@@ -875,13 +900,24 @@ def extract_probe_clip(input_path, sample_starts, segment_sec, work_dir):
 
 
 def estimate_optimal_q(input_path, profile, quality_values, bitrate_values,
-                       sample_starts, audio_mode, work_dir, scale_height=None):
+                       sample_starts, audio_mode, work_dir, scale_height=None,
+                       source_avg_kbps=None, maxrate_kbps=None, bufsize_kbps=None):
     """Binary-search Q on a short probe clip instead of the full file.
 
     Full-file binary search encodes the whole video per pass; probing on a
     ~24s clip finds the right neighborhood in seconds. Returns the most-
-    compressed Q whose probe encode passes SSIM_MIN while actually shrinking,
-    or None (probe failure / nothing passed) — caller runs the normal search.
+    compressed Q whose probe encode passes SSIM_MIN while holding its target
+    bitrate, or None (probe failure / nothing passed) — caller runs the
+    normal search.
+
+    NOTE on the size verdict: the probe is cut from bitrate hotspots (right for
+    SSIM — artifacts show up there first), which makes its own shrink ratio
+    useless as a file-size prediction. Hotspots compress dramatically while the
+    already-lean average sections do not, so `probe_out / probe_source` reads
+    far too optimistic (measured: probe said x0.53, the full file delivered
+    x1.08). What the probe CAN answer is whether the encoder holds the pass
+    target on the hardest material; the file-size prediction then follows from
+    the target itself.
     """
     probe = extract_probe_clip(input_path, sample_starts, PRESEARCH_SEGMENT_SEC, work_dir)
     if probe is None:
@@ -902,10 +938,16 @@ def estimate_optimal_q(input_path, profile, quality_values, bitrate_values,
             mid = (low + high) // 2
             q = quality_values[mid]
             out = Path(work_dir) / f"_probe_q{q}.mp4"
+            target = bitrate_values[mid] if mid < len(bitrate_values) else None
+            # Same rate control as the real pass, or the probe measures a
+            # different encode than the one it is predicting.
+            probe_maxrate, probe_bufsize = clamp_maxrate_to_pass(
+                maxrate_kbps, bufsize_kbps, target)
             cmd = build_ffmpeg_command(
                 probe, out, profile, q, copy_audio=True, audio_mode=audio_mode,
                 video_mode='compress',
-                target_bitrate_kbps=bitrate_values[mid] if mid < len(bitrate_values) else None,
+                maxrate_kbps=probe_maxrate, bufsize_kbps=probe_bufsize,
+                target_bitrate_kbps=target,
                 color_args=profile.get('color_args'),
                 scale_height=scale_height,
             )
@@ -915,13 +957,28 @@ def estimate_optimal_q(input_path, profile, quality_values, bitrate_values,
             ref_size = probe_ref_size(out) if scale_height else None
             ssim = get_multi_ssim(probe, out, probe_ssim_starts, probe_ssim_starts, SAMPLE_DURATION,
                                   ref_size=ref_size)
+            out_kbps = (out.stat().st_size * 8) / (probe_dur * 1000) if probe_dur > 0 else 0.0
             ratio = out.stat().st_size / probe_size if probe_size else 1.0
-            print(f" {Y}   probe Q={q}: SSIM {ssim:.4f}, size ×{ratio:.2f}{NC}")
+            if target and target > 0:
+                # Did the encoder hold its target on the hardest material?
+                size_ok = out_kbps <= target * PROBE_TARGET_TOLERANCE
+                if source_avg_kbps and source_avg_kbps > 0:
+                    predicted_saved = (1.0 - target / source_avg_kbps) * 100.0
+                    size_note = (f"{out_kbps:.0f}k vs target {target:.0f}k "
+                                 f"(=> ~{predicted_saved:.0f}% on the full file)")
+                else:
+                    size_note = f"{out_kbps:.0f}k vs target {target:.0f}k"
+            else:
+                # No bitrate ladder (no usable source average): fall back to the
+                # raw shrink ratio, biased though it is.
+                size_ok = ratio < 1.0
+                size_note = f"size \u00d7{ratio:.2f}"
+            print(f" {Y}   probe Q={q}: SSIM {ssim:.4f}, {size_note}{NC}")
             try:
                 out.unlink()
             except OSError:
                 pass
-            if ssim >= SSIM_MIN and ratio < 1.0:
+            if ssim >= SSIM_MIN and size_ok:
                 best_q = q          # passes -> try more compression
                 low = mid + 1
             else:
@@ -941,7 +998,7 @@ def estimate_optimal_q(input_path, profile, quality_values, bitrate_values,
             except OSError:
                 pass
 
-def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress', q_override=None, presearch=True, scale_height=None, progress_callback=None):
+def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None, audio_mode='enhanced', ss=None, to=None, video_mode='compress', q_override=None, presearch=True, scale_height=None, force=False, progress_callback=None):
     """Process a single video file. Returns (success, bytes_saved).
 
     `progress_callback(done_seconds, total_seconds, label)` is called while
@@ -1011,6 +1068,33 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     effective_height = scale_height or info['height']
     last_encode_result['height'] = effective_height
     last_encode_result['source_kbps'] = (size_before * 8) / (info['duration'] * 1000)
+
+    # --- PRE-FLIGHT GATE ---
+    # Ask the savings heuristic BEFORE burning encode time. A file that is
+    # already lean for its resolution (e.g. 683 kbps HEVC at 720p) cannot reach
+    # MIN_SAVINGS no matter which quality level we try — the binary search would
+    # just prove that the slow way, one full encode per pass.
+    # Skipped when the user overrode quality, asked for a downscale (changes the
+    # math entirely), is trimming, or passed --force.
+    if (ADVISOR_AVAILABLE and video_mode == 'compress' and not is_trim
+            and not scale_height and q_override is None and not force):
+        _pf = estimate_savings_pct(
+            last_encode_result['source_kbps'], info['height'] or 0,
+            float(info.get('fps') or 0.0), info.get('codec') or '',
+            profile.get('_target_codec', 'hevc'))
+        if _pf is not None and _pf[0] < PREFLIGHT_SKIP_PCT:
+            predicted, known = _pf
+            reason = (f"predicted savings {predicted:.1f}% < {PREFLIGHT_SKIP_PCT:.0f}% "
+                      f"({info.get('codec')} @ {last_encode_result['source_kbps']:.0f}kbps, "
+                      f"{info['height']}p — already efficient)")
+            print(f"{Y}Skipping:{NC} {input_path.name} ({reason})")
+            print(f"{Y}   -> Use --force to encode anyway.{NC}")
+            batch_stats['skipped'] += 1
+            last_encode_result['filename'] = input_path.name
+            last_encode_result['status'] = 'skipped'
+            last_encode_result['reason'] = reason
+            last_encode_result['duration'] = 0
+            return (False, 0)
 
     # --- HDR / 10-BIT SAFETY ---
     # Stamping BT.709 tags onto BT.2020/PQ content washes out colors. Encode
@@ -1144,9 +1228,14 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     # via -q:v alone. We compute a target -b:v for each quality level so the binary
     # search actually changes output file size meaningfully across passes.
     #
-    # Reduction factors per pass position: top quality → 85% of source avg (5% smaller),
-    # bottom quality → 45% of source avg (55% smaller). Linear interpolation in between.
-    # This gives the binary search real leverage over output file size.
+    # Reduction factors per pass position: the top rung aims just inside the
+    # MIN_SAVINGS goal, the bottom rung at 45% of source avg (55% smaller).
+    # Linear interpolation in between. This gives the binary search real
+    # leverage over output file size.
+    #
+    # BR_TOP is DERIVED from MIN_SAVINGS, not a free constant: a pass targeting
+    # 85% of the source bitrate cannot reach a 20% savings goal even if it hits
+    # its target perfectly — that rung is a guaranteed-failure full encode.
     _effective_duration_for_br = trim_duration if is_trim else info['duration']
     _source_avg_kbps = (size_to_compare * 8) / (_effective_duration_for_br * 1000) if _effective_duration_for_br > 0 else None
     bitrate_values: list = []  # Parallel to quality_values; None = use encoder default VBR
@@ -1163,8 +1252,10 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
     if _source_avg_kbps and _source_avg_kbps > 0:
         n = max(1, len(quality_values))
-        # Factor range: from 0.85 (least compression) down to 0.45 (most compression)
-        BR_TOP, BR_BOT = 0.85, 0.45
+        # Factor range: least compression (still inside the savings goal, with a
+        # 2% margin for audio/container overhead) down to 0.45 (most compression)
+        BR_BOT = 0.45
+        BR_TOP = min(0.85, 1.0 - MIN_SAVINGS / 100.0 - 0.02)
         for i, _qv in enumerate(quality_values):
             # i=0 is highest quality (least compression), i=n-1 is lowest quality (most)
             frac = i / max(1, n - 1)  # 0.0 → 1.0
@@ -1310,11 +1401,17 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
     def run_encode_pass(quality_val, out_path=None, target_bitrate_kbps=None):
         """Run a single encode pass and return (success, size_after, ssim, error_reason, overshoot_ratio)."""
         effective_out = out_path or output_path
+        # Per-pass peak cap: the file-wide maxrate (derived from the SOURCE) is
+        # far above the individual pass targets, so the encoder may spend 3x its
+        # target in hotspots and blow past the size goal. Tie the cap to THIS
+        # pass's target so each rung of the ladder actually controls output size.
+        pass_maxrate, pass_bufsize = clamp_maxrate_to_pass(
+            maxrate_kbps, bufsize_kbps, target_bitrate_kbps)
         br_info = f", target={target_bitrate_kbps:.0f}k" if target_bitrate_kbps else ""
-        maxrate_info = f" (maxrate={maxrate_kbps:.0f}k{br_info})" if maxrate_kbps else (f" (target={target_bitrate_kbps:.0f}k)" if target_bitrate_kbps else "")
+        maxrate_info = f" (maxrate={pass_maxrate:.0f}k{br_info})" if pass_maxrate else (f" (target={target_bitrate_kbps:.0f}k)" if target_bitrate_kbps else "")
         print(f"{G}Pass:{NC} Q={quality_val}{maxrate_info}")
 
-        cmd = build_ffmpeg_command(input_path, effective_out, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress', maxrate_kbps=maxrate_kbps, bufsize_kbps=bufsize_kbps, target_bitrate_kbps=target_bitrate_kbps, color_args=profile.get('color_args'), loudnorm_measured=loudnorm_measured, scale_height=scale_height)
+        cmd = build_ffmpeg_command(input_path, effective_out, profile, quality_val, copy_audio, audio_mode, ss, to, video_mode='compress', maxrate_kbps=pass_maxrate, bufsize_kbps=pass_bufsize, target_bitrate_kbps=target_bitrate_kbps, color_args=profile.get('color_args'), loudnorm_measured=loudnorm_measured, scale_height=scale_height)
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
         cur_stats = {"bitrate": "0kb/s", "speed": "0x"}
@@ -1494,7 +1591,9 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 and info['duration'] >= PRESEARCH_MIN_DURATION):
             predicted_q = estimate_optimal_q(
                 input_path, profile, quality_values, bitrate_values,
-                sample_starts, audio_mode, input_path.parent, scale_height=scale_height)
+                sample_starts, audio_mode, input_path.parent, scale_height=scale_height,
+                source_avg_kbps=_source_avg_kbps,
+                maxrate_kbps=maxrate_kbps, bufsize_kbps=bufsize_kbps)
             if predicted_q is not None:
                 idx = nearest_quality_index(quality_values, predicted_q)
                 low, high = narrow_quality_window(len(quality_values), idx, radius=1)
@@ -1548,40 +1647,40 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
                 # overshoot_ratio = projected_final / target
                 # e.g. 2.0 → projected twice as large → need ~2 quality steps, not 1
                 # We clamp to [1, remaining_range] to avoid overshooting the index.
+                # NOTE: index 0 of quality_values is ALWAYS the least-compressing
+                # level (highest quality / highest target bitrate) for every
+                # encoder profile. Too large -> we need MORE compression -> move
+                # the window UP (low = mid + 1), never down.
                 overshoot_ratio = result[4] if len(result) > 4 else 1.0
                 if overshoot_ratio > 1.05 and (high - low) > 1:
                     # Each binary step halves the range; estimate how many halvings needed.
                     import math
                     steps_needed = max(1, int(math.log2(overshoot_ratio) + 0.5))
-                    new_high = mid - steps_needed
-                    if new_high < low:
-                        new_high = low  # Don't go below binary search floor
-                    if new_high < high:
-                        print(f" {Y}   -> Educated jump: skipping {mid - new_high} quality step(s) (overshoot ×{overshoot_ratio:.2f}){NC}")
-                        high = new_high
+                    new_low = mid + steps_needed
+                    if new_low > high:
+                        new_low = high  # Don't go past binary search ceiling
+                    if new_low > low:
+                        print(f" {Y}   -> Educated jump: skipping {new_low - mid} quality step(s) (overshoot ×{overshoot_ratio:.2f}){NC}")
+                        low = new_low
                     else:
-                        high = mid - 1
+                        low = mid + 1
                 else:
-                    high = mid - 1
+                    low = mid + 1
                 continue
 
             if error == 'poor_savings':
-                # Not enough compression achieved – push toward more compression
-                # (same direction as early_abort / too_large would, but opposite of quality failure)
-                if profile['quality_direction'] > 0:
-                    low = mid + 1   # VideoToolbox: lower Q = more compression
-                else:
-                    high = mid - 1  # NVENC: higher CQ = more compression
+                # Not enough compression achieved – push toward more compression.
+                # quality_values is ordered least-compressing -> most-compressing
+                # for BOTH quality directions (VideoToolbox 75..45, NVENC 24..44),
+                # so this is always low = mid + 1, independent of the encoder.
+                low = mid + 1
                 if staging.exists():
                     staging.unlink()
                 continue
 
             if not success:
-                # Unexpected failure – push toward better quality to stay safe
-                if profile['quality_direction'] > 0:
-                    high = mid - 1
-                else:
-                    low = mid + 1
+                # Unexpected failure – push toward better quality (lower index) to stay safe
+                high = mid - 1
                 continue
 
             # Check SSIM threshold
@@ -1600,9 +1699,19 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
             meets_targets = (saved_pct >= MIN_SAVINGS and ssim >= MIN_QUALITY) or \
                            (saved_pct >= EXCELLENT_SAVINGS_PCT and ssim >= SSIM_ACCEPTABLE)
 
-            # Track best acceptable result as backup (retain its staging file)
-            if ssim >= SSIM_ACCEPTABLE and saved_pct > 0:
-                if best_acceptable is None or saved_pct > best_acceptable[4]:
+            # Track best acceptable result as backup (retain its staging file).
+            # Retention uses SSIM_MIN, the documented hard floor — NOT the
+            # stricter SSIM_ACCEPTABLE. Otherwise 0.940..0.945 is a dead zone:
+            # good enough not to be rejected as "quality too low", too low to be
+            # kept as a fallback, so a 53%-savings pass at SSIM 0.9444 was
+            # deleted and the whole file reported as failed.
+            # Ranking still PREFERS results clearing SSIM_ACCEPTABLE; the dead
+            # zone only wins when nothing better exists.
+            if ssim >= SSIM_MIN and saved_pct > 0:
+                _rank = (ssim >= SSIM_ACCEPTABLE, saved_pct)
+                _best_rank = ((best_acceptable[2] >= SSIM_ACCEPTABLE, best_acceptable[4])
+                              if best_acceptable else None)
+                if _best_rank is None or _rank > _best_rank:
                     # Discard old backup staging file
                     if best_acceptable_path and best_acceptable_path != best_candidate_path and best_acceptable_path.exists():
                         best_acceptable_path.unlink()
@@ -1627,6 +1736,14 @@ def process_file(input_path, profile, min_size_mb=0, copy_audio=False, port=None
 
                 # Otherwise try for more compression
                 low = mid + 1
+            elif saved_pct >= MIN_SAVINGS and ssim < MIN_QUALITY:
+                # Savings goal already met — QUALITY is what is missing. More
+                # compression can only lower SSIM further, so move toward
+                # BETTER quality (lower index) instead of grinding downward.
+                print(f" {Y}   -> Savings fine ({saved_pct:.1f}%), quality short "
+                      f"({ssim:.4f} < {MIN_QUALITY}) – trying better quality.{NC}")
+                high = mid - 1
+                # staging already handled under best_acceptable tracking above
             else:
                 # SSIM OK but savings not enough, need more compression
                 low = mid + 1
@@ -1961,6 +2078,8 @@ def main():
     parser.add_argument('--port', type=int, help='Port of the running Arcade Server to notify')
     parser.add_argument('--preset', choices=['fast', 'balanced', 'best'], default='balanced',
                         help='Encoding quality preset: fast (speed), balanced (default), best (quality/size)')
+    parser.add_argument('--force', action='store_true',
+                        help='Encode even when the savings heuristic predicts it is not worth it')
     parser.add_argument('--no-presearch', action='store_true',
                         help='Skip the sample-clip quality pre-search (always run the full binary search)')
     args = parser.parse_args()
@@ -1995,6 +2114,7 @@ def main():
     preset = getattr(args, 'preset', 'balanced')
     profile = apply_encoding_preset(profile, preset)
     profile['_encoder_key'] = encoder_key  # for encode-history bucketing
+    profile['_target_codec'] = 'av1' if 'av1' in encoder_key else 'hevc'  # for the pre-flight gate
     preset_labels = {'fast': '⚡ Fast', 'balanced': '⚖️  Balanced', 'best': '🏆 Best'}
     print(f"{BG}VIDEO OPTIMIZER V2.1{NC} - {G}{profile['name']}{NC} | Preset: {preset_labels.get(preset, preset)}")
     audio_mode_labels = {
@@ -2043,7 +2163,8 @@ def main():
             video_mode=args.video_mode,
             q_override=args.q,
             presearch=not args.no_presearch,
-            scale_height=args.scale_height
+            scale_height=args.scale_height,
+            force=args.force
         )
 
         # Write to encode log (for both batch controller and single-file calls)
