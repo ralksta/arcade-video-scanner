@@ -3,7 +3,7 @@
 Pure logic (no ffmpeg/subprocess): unit-testable, consumed by the
 /api/candidates route. Heuristic baseline from bitrate-per-resolution +
 codec efficiency; overridden by real results from encode_history.jsonl
-(written by scripts/video_optimizer.py) when a bucket has enough samples.
+(written by videocrunch's engine) when a bucket has enough samples.
 """
 from __future__ import annotations
 
@@ -44,9 +44,10 @@ CODEC_EFFICIENCY: dict = {
 DEFAULT_HISTORY_PATH = Path.home() / ".arcade-scanner" / "logs" / "encode_history.jsonl"
 
 # --- bucket helpers -------------------------------------------------------
-# Deliberately duplicated from scripts/optimizer_utils.py (that module stays
-# import-standalone for the optimizer scripts); parity is pinned by
-# tests/test_optimization_advisor.py::test_bucket_helpers_parity_with_optimizer_utils.
+# Deliberately duplicated from videocrunch's crunch_utils.py — that repo owns
+# the encoder and needs these standalone; boundary values are pinned by
+# tests/test_optimization_advisor.py::test_bitrate_class_boundaries /
+# test_resolution_class_boundaries.
 
 
 def bitrate_class(kbps: float) -> str:
@@ -114,7 +115,7 @@ def estimate_savings_pct(source_kbps: float, height: int, fps: float,
     """Estimated saved percentage (0-100) for re-encoding, from scalars.
 
     Same math as `estimate_heuristic`, but without a VideoEntry — so
-    scripts/video_optimizer.py can use it as a pre-flight gate with raw
+    videocrunch's engine can use it as a pre-flight gate with raw
     ffprobe output. Returns (saved_pct, known_codec_pair) or None when the
     inputs are too incomplete to say anything.
     """

@@ -15,7 +15,8 @@ whenever a request comes back 401 (e.g. after a server restart).
 Requirements:
     - macOS with VideoToolbox (Apple Silicon or Intel with T2)
     - ffmpeg installed (brew install ffmpeg)
-    - video_optimizer.py in the same directory (imported for process_file)
+    - the videocrunch repo checked out next to this one (imported for process_file);
+      see arcade_scanner.config.optimizer_path
 """
 
 import argparse
@@ -31,11 +32,18 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# Add parent directory to path so we can import video_optimizer
+# Add parent (repo root) directory to path so we can import arcade_scanner.config
 SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-from optimizer_utils import battery_from_pmset, is_within_schedule, parse_schedule  # noqa: E402
+# videocrunch lives in its own repo now; find it the same way the server does.
+from arcade_scanner.config import config as _arcade_config  # noqa: E402
+
+_VC_DIR = str(Path(_arcade_config.optimizer_path).parent)
+if _VC_DIR not in sys.path:
+    sys.path.insert(0, _VC_DIR)
+
+from crunch_utils import battery_from_pmset, is_within_schedule, parse_schedule  # noqa: E402
 
 # Color codes
 G = "\033[92m"
@@ -380,7 +388,7 @@ def _run_job(client, job, job_id, filename, stem, job_dir, reporter):
         return
 
     try:
-        from video_optimizer import ENCODER_PROFILES, detect_encoder, process_file
+        from videocrunch import ENCODER_PROFILES, detect_encoder, process_file
 
         encoder_key = detect_encoder()
         if not encoder_key or encoder_key not in ENCODER_PROFILES:
@@ -428,8 +436,8 @@ def _run_job(client, job, job_id, filename, stem, job_dir, reporter):
         print(f"  {G}✓ Encoded: {opt_size/(1024*1024):.1f} MB (saved {saved/(1024*1024):.1f} MB){NC}")
 
     except ImportError:
-        print(f"  {R}✗ video_optimizer.py not found in {SCRIPT_DIR}{NC}")
-        client.update_status(job_id, "failed", message="video_optimizer.py not found")
+        print(f"  {R}✗ videocrunch not found at {_VC_DIR}{NC}")
+        client.update_status(job_id, "failed", message="videocrunch not found")
         return
     except Exception as e:
         print(f"  {R}✗ Encoding error: {e}{NC}")

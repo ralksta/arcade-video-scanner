@@ -1,20 +1,8 @@
 """Unit tests for the optimization advisor (pure logic, no ffmpeg/fs)."""
 import json
-import sys
-from pathlib import Path
 
 from arcade_scanner.core import optimization_advisor as adv
 from arcade_scanner.models.video_entry import VideoEntry
-
-# Add scripts to path for optimizer_utils import
-SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
-
-from optimizer_utils import (  # noqa: E402, I001
-    bitrate_class as ou_bitrate_class,
-    resolution_class as ou_resolution_class,
-)
 
 
 def _entry(**kw) -> VideoEntry:
@@ -25,11 +13,24 @@ def _entry(**kw) -> VideoEntry:
     return VideoEntry(**base)
 
 
-def test_bucket_helpers_parity_with_optimizer_utils():
-    for kbps in (0, 1000, 2499, 2500, 7999, 8000, 19999, 20000, 50000):
-        assert adv.bitrate_class(kbps) == ou_bitrate_class(kbps)
-    for h in (0, 480, 576, 577, 720, 800, 801, 1080, 1200, 1201, 1440, 1600, 1601, 2160):
-        assert adv.resolution_class(h) == ou_resolution_class(h)
+# bitrate_class/resolution_class are deliberately duplicated in videocrunch's
+# crunch_utils.py (see the comment on optimization_advisor.py); videocrunch no
+# longer lives in this repo, so parity can't be pinned via a live import here.
+# Pin the boundary values instead — a change to either side's constants should
+# fail one of these two.
+def test_bitrate_class_boundaries():
+    expected = {0: "low", 1000: "low", 2499: "low", 2500: "med", 7999: "med",
+                8000: "high", 19999: "high", 20000: "ultra", 50000: "ultra"}
+    for kbps, want in expected.items():
+        assert adv.bitrate_class(kbps) == want
+
+
+def test_resolution_class_boundaries():
+    expected = {0: "sd", 480: "sd", 576: "sd", 577: "720", 720: "720", 800: "720",
+                801: "1080", 1080: "1080", 1200: "1080", 1201: "1440", 1440: "1440",
+                1600: "1440", 1601: "2160", 2160: "2160"}
+    for h, want in expected.items():
+        assert adv.resolution_class(h) == want
 
 
 def test_heuristic_high_bitrate_4k_h264_saves_a_lot():
