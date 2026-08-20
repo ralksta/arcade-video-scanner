@@ -1,7 +1,5 @@
 """The encoder lives in a separate repo now; Arcade finds it by path."""
 import importlib
-import os
-from pathlib import Path
 
 import pytest
 
@@ -30,6 +28,17 @@ def test_env_overrides_both_paths(fresh_config):
                      VIDEOCRUNCH_BATCH_PATH="/opt/vc/batch.py")
     assert c.optimizer_path == "/opt/vc/videocrunch.py"
     assert c.batch_path == "/opt/vc/batch.py"
+
+
+def test_legacy_env_var_wins_over_the_new_one(fresh_config):
+    # ARCADE_OPTIMIZER_PATH is a binding constraint: existing installs depend on
+    # it continuing to work even after VIDEOCRUNCH_PATH is also set.
+    c = fresh_config(ARCADE_OPTIMIZER_PATH="/legacy/video_optimizer.py",
+                     VIDEOCRUNCH_PATH="/opt/vc/videocrunch.py")
+    assert c.optimizer_path == "/legacy/video_optimizer.py"
+    # batch_path has no legacy env var of its own, so it follows optimizer_path's
+    # (legacy) directory rather than the new VIDEOCRUNCH_PATH.
+    assert c.batch_path == "/legacy/batch.py"
 
 
 def test_batch_path_follows_the_engine_directory_by_default(fresh_config, tmp_path):
