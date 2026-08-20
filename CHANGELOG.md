@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Ordner-Scan mit Optimierungs-Rangliste** (`scripts/scan_folder.py`): zeigt für
+  einen Ordner, welche Videos sich zu encodieren lohnen — sortiert nach erwarteter
+  Ersparnis in MB, ohne dafür etwas zu encodieren. Liest nur ffprobe-Metadaten
+  (14 Dateien in unter einer Sekunde, 150 in ein paar Sekunden) und rankt über
+  `optimization_advisor.build_candidates()`, also mit derselben Logik wie die
+  Kandidatenliste im Dashboard, inklusive Abgleich mit echten früheren Encodes aus
+  `encode_history.jsonl`. Dateien mit vorhandener `_opt.mp4` fallen raus. Aus der
+  Liste markiert man die gewünschten Einträge (`1,3,7-10`, `a`, Enter für keine);
+  sie gehen dann an `batch_controller.py` zum parallelen Encoden. `--no-encode`
+  zeigt nur die Rangliste, `--codec av1` schätzt gegen AV1.
 - **Proxy Streaming**: Every video may have a smaller copy in its own directory
   tree, which is excluded from scans. `/stream` decides per request which file to
   serve — the original on the LAN, the proxy over Tailscale (CGNAT
