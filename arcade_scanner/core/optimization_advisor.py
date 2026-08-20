@@ -15,7 +15,31 @@ from pathlib import Path
 from typing import Optional
 
 from ..models.video_entry import VideoEntry
-from .bitrate_analyzer import CODEC_EFFICIENCY
+
+# Bitrate multiplier for the same perceived quality when going source -> target.
+# Kept here rather than imported: bitrate_analyzer moved to the videocrunch repo
+# with the encoder, and this table is the only part of it Arcade ever used.
+# The identical table lives in videocrunch's savings.py; savings_parity.json
+# pins both.
+CODEC_EFFICIENCY: dict = {
+    ("h264", "hevc"):  0.65,
+    ("h264", "h265"):  0.65,
+    ("h264", "av1"):   0.55,
+    ("hevc", "h264"):  1.40,
+    ("h265", "h264"):  1.40,
+    ("hevc", "av1"):   0.80,
+    ("h265", "av1"):   0.80,
+    ("av1",  "h264"):  1.70,
+    ("av1",  "hevc"):  1.25,
+    ("av1",  "h265"):  1.25,
+    ("mpeg4", "h264"): 0.60,
+    ("mpeg4", "hevc"): 0.45,
+    ("mpeg2video", "h264"): 0.50,
+    ("mpeg2video", "hevc"): 0.35,
+    ("vp8",  "h264"):  0.75,
+    ("vp9",  "hevc"):  0.90,
+    ("vp9",  "h264"):  1.10,
+}
 
 DEFAULT_HISTORY_PATH = Path.home() / ".arcade-scanner" / "logs" / "encode_history.jsonl"
 
