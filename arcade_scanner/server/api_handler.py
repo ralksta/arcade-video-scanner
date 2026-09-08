@@ -432,7 +432,44 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             self._length_header_sent = True
         super().send_header(keyword, value)
 
+    # Kopfzeilen, die auf jede Antwort gehoeren. Bisher gab es keine einzige
+    # davon -- und diese Oberflaeche kann Dateien loeschen und verschieben.
+    #
+    # `X-Frame-Options: DENY` und `frame-ancestors 'none'` sagen dasselbe
+    # zweimal, einmal fuer aeltere Browser: Ohne sie laesst sich die
+    # angemeldete Seite in einen fremden Rahmen legen und der Nutzer auf
+    # Schaltflaechen locken, die er nicht sieht.
+    #
+    # Die CSP ist an dem ausgerichtet, was die Oberflaeche wirklich laedt:
+    # Tailwind vom CDN, Schriften von Google, sonst nichts. `unsafe-inline`
+    # bei den Skripten ist noetig, weil in den Seiten 57 `onclick`-Attribute
+    # stehen; es faellt weg, sobald die durch addEventListener ersetzt sind.
+    # Der Gewinn liegt trotzdem: Kein anderer Rechner kann Skripte
+    # beisteuern, `connect-src 'self'` laesst nichts nach draussen abfliessen,
+    # und `object-src 'none'` schliesst die alten Einbettungswege.
+    _SICHERHEIT = (
+        ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "DENY"),
+        ("Referrer-Policy", "same-origin"),
+        ("Content-Security-Policy", "; ".join((
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "img-src 'self' data: blob:",
+            "media-src 'self' blob:",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+        ))),
+    )
+
     def end_headers(self):
+        for kopf, wert in self._SICHERHEIT:
+            self.send_header(kopf, wert)
+
         origin = self.headers.get("Origin")
         if origin:
             self.send_header("Access-Control-Allow-Origin", origin)
