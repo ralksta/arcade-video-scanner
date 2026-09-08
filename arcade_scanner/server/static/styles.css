@@ -1166,9 +1166,14 @@ html {
     }
 }
 
+/* --action ist --ds-accent, und das ist die Flaechenfarbe der Marke: im
+   dunklen Modus 3,3:1 auf der Karte und noch weniger auf dem 15-%-Grund
+   dieser Marke selbst. --ds-accent-tint ist der Zwilling fuer genau diesen
+   Fall, hell und dunkel getrennt gesetzt: 6,3:1 hier, 5,5:1 im hellen
+   Modus. */
 .badge.ok {
     background: rgb(var(--ds-accent-rgb) / 0.15);
-    color: var(--action);
+    color: var(--ds-accent-tint);
     border: 1px solid rgb(var(--ds-accent-rgb) / 0.3);
 }
 
@@ -1854,8 +1859,10 @@ html {
         transition: color 0.2s;
     }
 
+    /* Der aktive Reiter auf dem Telefon -- derselbe Grund wie bei .badge.ok:
+       der Markenton traegt als Flaeche, nicht als Schrift. */
     .mobile-tab-bar button.active {
-        color: var(--action);
+        color: var(--ds-accent-tint);
     }
 
     .mobile-tab-bar button .material-icons {

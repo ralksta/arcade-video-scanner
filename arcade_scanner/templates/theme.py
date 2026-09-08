@@ -26,8 +26,13 @@ SURFACES = {
     "surface-2": ("#ffffff", "#1a1a24"),
     "border": ("#e2e2e6", "#2a2a35"),
     "text": ("#15151d", "#f2f2f5"),
-    # Dark lag mit #6b6b76 bei 3.4:1 unter AA; #7e7e8a bringt 4.5:1.
-    "text-muted": ("#5c5c66", "#7e7e8a"),
+    # Dark lag mit #6b6b76 bei 3.4:1 unter AA. #7e7e8a wurde daraufhin
+    # gegen --ds-bg (#0b0b10) gerechnet und erreicht dort 4,53:1 -- aber
+    # nur dort. Auf den gehobenen Flaechen wird der Abstand kleiner, und
+    # auf surface-2 (#1a1a24) blieben 4,30:1. Text steht in dieser Farbe
+    # aber gerade auf Karten und in Seitenleisten. #82828e traegt auf
+    # allen sechs Flaechen der Skala, schlechtester Wert 4,55:1.
+    "text-muted": ("#5c5c66", "#82828e"),
     # Fliesstext sitzt zwischen text und text-muted
     "text-body": ("#3a3a44", "#c7c7cf"),
     # Eyebrow/Label-Grau
@@ -39,8 +44,13 @@ SURFACES = {
 }
 
 # Brand. Identisch in Light und Dark — nur EIN Accent.
-# #c4179f liegt bei 5.8:1 auf Weiss und 5.0:1 auf #0b0b10, funktioniert also
-# in beiden Modi als Text- und als Flaechenfarbe.
+#
+# Nachgerechnet: #c4179f liegt bei 5,29:1 auf Weiss und 3,71:1 auf #0b0b10;
+# auf der gehobenen Flaeche #1a1a24 nur noch bei 3,26:1. Als *Flaechen*farbe
+# stimmt das (weisse Schrift darauf: 5,29:1), als *Text*farbe im dunklen Modus
+# nicht. Fuer diesen Fall gibt es --ds-accent-tint, das als Paar angelegt ist
+# und im Dunkeln mit #e879c6 auf 6,3–7,5:1 kommt. Wer Akzent als Schrift
+# braucht, nimmt also accent-tint, nicht accent.
 BRAND = {
     "accent": "#c4179f",
     "accent-hover": "#e34fc0",
