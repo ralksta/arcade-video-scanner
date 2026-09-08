@@ -56,15 +56,6 @@
 }
 
 
-@media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-    }
-}
-
-
 *,
 *::before,
 *::after {
@@ -2899,8 +2890,12 @@ html {
     resize: none;
     transition: border-color .15s ease;
 }
-.ds-textarea:focus {
-    outline: none;
+.ds-textarea:focus-visible {
+    /* Vorher stand hier `outline: none` und als einziges Zeichen ein
+       Rahmen, der die Farbe wechselt. Rein farbig, und damit fuer eine
+       Farbschwaeche unter Umstaenden gar kein Zeichen. */
+    outline: 2px solid var(--ds-accent);
+    outline-offset: 2px;
     border-color: var(--ds-accent);
 }
 .ds-textarea::placeholder { color: var(--ds-text-muted); }
@@ -3009,4 +3004,26 @@ html {
     background: var(--ds-fill);
     font-family: var(--ds-font-mono);
     font-size: 11px;
+}
+
+
+/* ── Fokus: Auffangregel ─────────────────────────────────────────────────
+   In dieser Datei stand acht Mal `outline: none`, meist in der Grundregel
+   eines Feldes -- also nicht nur beim Zeigen, sondern dauerhaft. Ein Teil
+   der Stellen setzte danach einen eigenen Schatten (#searchBar,
+   #codecSelect, .batch-tag-search); der Rest ersetzte den Ring durch nichts
+   oder durch einen blossen Farbwechsel am Rahmen. `.cinema-scrub` -- der
+   Abspielbalken, der sich mit den Pfeiltasten bedienen laesst -- hatte
+   ueberhaupt keine Fokusregel.
+
+   Diese Regel steht bewusst am Dateiende: `:focus-visible` wiegt genauso
+   schwer wie ein Klassenselektor, bei Gleichstand gewinnt die spaetere
+   Regel. Wo eine Stelle sich schon selbst kuemmert, bleibt ihr Aussehen
+   erhalten -- der Ring kommt dann zusaetzlich dazu und stoert nicht.
+
+   --ds-accent traegt in beiden Themen: 3,71:1 auf dem dunklen Grund,
+   5,29:1 auf dem hellen. WCAG 1.4.11 verlangt 3:1. */
+:focus-visible {
+    outline: 2px solid var(--ds-accent);
+    outline-offset: 2px;
 }
