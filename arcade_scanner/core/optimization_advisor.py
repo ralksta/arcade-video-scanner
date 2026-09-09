@@ -85,28 +85,34 @@ def _reference_kbps(height: int, target_codec: str, fps: float) -> float:
     return ref
 
 
-def estimate_heuristic(entry: VideoEntry, target_codec: str) -> Optional[tuple[float, bool]]:
-    """Estimated saved percentage (0-100) for re-encoding `entry`.
+def estimate_savings_pct(source_kbps: float, height: int, fps: float,
+                        source_codec: str, target_codec: str) -> Optional[tuple[float, bool]]:
+    """Estimated saved percentage (0-100) for re-encoding, from scalars.
 
-    Returns (saved_pct, known_codec_pair) or None when the entry lacks the
-    metadata to say anything (no bitrate / no height from ffprobe).
+    Same math as `estimate_heuristic`, but without a VideoEntry — so
+    scripts/video_optimizer.py can use it as a pre-flight gate with raw
+    ffprobe output. Returns (saved_pct, known_codec_pair) or None when the
+    inputs are too incomplete to say anything.
     """
-    source_kbps = (entry.bitrate_mbps or 0.0) * 1000.0
-    height = entry.height or 0
     if source_kbps <= 0 or height <= 0:
         return None
 
-    eff, known, is_same_codec = _codec_efficiency(entry.codec or "", target_codec)
-
-    fps = entry.frame_rate or 0.0
-    ref = _reference_kbps(height, target_codec, fps)
+    eff, known, is_same_codec = _codec_efficiency(source_codec or "", target_codec)
+    ref = _reference_kbps(height, target_codec, fps or 0.0)
 
     # Predicted output: codec factor applied to the source, but never above
     # what a clean target-codec encode needs at this resolution (`ref`).
     # For same-codec re-encoding, minimal gains from re-optimization; don't cap at ref.
     if is_same_codec:
-        # Same-codec: apply efficiency without ref cap (already efficiently encoded)
-        predicted_kbps = source_kbps * eff
+        # Same-codec: apply efficiency without ref cap (already efficiently encoded).
+        # How much is left depends on how fat the source is RELATIVE to a clean
+        # encode at this resolution. A source already far below `ref` has been
+        # squeezed once; a second HEVC pass gets almost nothing (measured: a
+        # 683 kbps 720p HEVC file yielded 5.7%, not the flat 15% `eff` implies).
+        # Scale the gain by source/ref so leanness is priced in.
+        leanness = min(1.0, source_kbps / ref) if ref > 0 else 1.0
+        effective_eff = 1.0 - (1.0 - eff) * leanness
+        predicted_kbps = source_kbps * effective_eff
         predicted_kbps = max(predicted_kbps, source_kbps * (1 - _MAX_SAVED_PCT / 100))
     else:
         # Different-codec: cap at reference rate
@@ -114,6 +120,21 @@ def estimate_heuristic(entry: VideoEntry, target_codec: str) -> Optional[tuple[f
 
     saved_pct = max(0.0, (1.0 - predicted_kbps / source_kbps) * 100.0)
     return min(saved_pct, _MAX_SAVED_PCT), known
+
+
+def estimate_heuristic(entry: VideoEntry, target_codec: str) -> Optional[tuple[float, bool]]:
+    """Estimated saved percentage (0-100) for re-encoding `entry`.
+
+    Returns (saved_pct, known_codec_pair) or None when the entry lacks the
+    metadata to say anything (no bitrate / no height from ffprobe).
+    """
+    return estimate_savings_pct(
+        (entry.bitrate_mbps or 0.0) * 1000.0,
+        entry.height or 0,
+        entry.frame_rate or 0.0,
+        entry.codec or "",
+        target_codec,
+    )
 
 
 @dataclass

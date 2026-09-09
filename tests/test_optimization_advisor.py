@@ -55,6 +55,43 @@ def test_heuristic_same_codec_saves_little():
     assert same[0] < fat[0]
 
 
+def test_heuristic_same_codec_lean_source_saves_almost_nothing():
+    """Regression: a 683 kbps 720p HEVC file really only yielded 5.7%.
+
+    The flat same-codec factor predicted 15% and sent the optimizer into two
+    full encode passes for nothing. Leanness relative to the resolution
+    reference has to be priced in.
+    """
+    lean = adv.estimate_heuristic(
+        _entry(bitrate_mbps=0.683, width=1280, height=720, codec="hevc"), "hevc")
+    assert lean is not None
+    assert lean[0] < 8.0
+
+
+def test_heuristic_same_codec_fat_source_still_worth_it():
+    """The leanness correction must not neuter genuinely bloated HEVC files."""
+    fat = adv.estimate_heuristic(
+        _entry(bitrate_mbps=20.0, width=1920, height=1080, codec="hevc"), "hevc")
+    lean = adv.estimate_heuristic(
+        _entry(bitrate_mbps=0.683, width=1280, height=720, codec="hevc"), "hevc")
+    assert fat is not None and lean is not None
+    assert fat[0] > lean[0]
+    assert fat[0] >= 14.0  # still the full same-codec gain
+
+
+def test_estimate_savings_pct_matches_entry_variant():
+    """The scalar entry point the optimizer uses must agree with the dashboard's."""
+    entry = _entry(bitrate_mbps=6.0, width=1920, height=1080, codec="h264",
+                   frame_rate=25.0)
+    assert adv.estimate_savings_pct(6000.0, 1080, 25.0, "h264", "hevc") == \
+        adv.estimate_heuristic(entry, "hevc")
+
+
+def test_estimate_savings_pct_needs_metadata():
+    assert adv.estimate_savings_pct(0.0, 1080, 30.0, "h264", "hevc") is None
+    assert adv.estimate_savings_pct(5000.0, 0, 30.0, "h264", "hevc") is None
+
+
 def test_heuristic_av1_target_beats_hevc_target():
     h = adv.estimate_heuristic(_entry(), "hevc")
     a = adv.estimate_heuristic(_entry(), "av1")
