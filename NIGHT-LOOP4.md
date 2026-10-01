@@ -39,7 +39,7 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
       - [x] Sehr viele: 100.000 Einträge — kein Fehler, nur lineare Kosten (s. Journal)
       - [x] Endungen (RAW → Frage 3), Namen an der 255-Byte-Grenze (behoben),
             Symlink-Schleifen (`os.walk` folgt nicht — sicher), Apostroph → Phase 3
-- [ ] **Phase 0.1 — iOS-Client zurückziehen** (siehe UMSETZUNGSPLAN.md)
+- [x] **Phase 0.1 — iOS-Client zurückziehen** — `ios_client/` entfernt, letzter Stand `dec7163`
 - [ ] **Phase 3 — Escaping priorisiert** (Vorlage `dev-docs/frontend-escaping.md`)
 - [ ] **Abschluss:** Übergabebericht oben in `NACHTLAUF-BERICHT.md` (neuer Abschnitt
       „Nachtlauf 4"), Fragen an Ralf zuerst
@@ -282,3 +282,18 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   Länge und Links sind durch; der letzte Durchgang brachte nur noch den
   Grenzfall, der hier real nicht auftritt.
   Nächstes: Phase 0.1 — iOS-Client zurückziehen.
+
+- **Iteration 13 (Phase 0.1, iOS-Client zurückgezogen)** — Nach
+  ENTSCHEIDUNGEN.md, Punkt 1. Von den zwei offen gelassenen Varianten die
+  „sauberere": Ordner ersatzlos weg, `dev-docs/ios-client-status.md` trägt
+  oben den Rückzugsvermerk mit `git checkout dec7163 -- ios_client`
+  (`dec7163` = letzter Commit, der `ios_client/` berührte). Angeglichen:
+  CLAUDE.md (jetzt „Two native clients"), README, proxy-streaming.md, zwei
+  Kommentare „Browser, TV, iOS", CHANGELOG (neuer Abschnitt *Removed*).
+  `test_client_endpoint_contract.py`: `KNOWN_BROKEN` ist leer — die beiden
+  DeoVR-Einträge rief nur der iOS-Client auf; damit verschwinden auch die
+  zwei `xfailed` der Suite, ehrlich und nicht weggedrückt. Der Mechanismus
+  bleibt. Stehen gelassen: historische Einträge in CHANGELOG und Berichten,
+  „iOS export (UUID)" in `master_detect.py` (iPhone-Dateinamen, nicht der
+  Client), `plan-path-criterion.md` (ein Plan von damals).
+  Nächstes: Phase 3 — Escaping priorisiert.

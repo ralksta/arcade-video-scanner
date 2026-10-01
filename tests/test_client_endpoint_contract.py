@@ -31,22 +31,16 @@ SERVER_DIR = ROOT / "arcade_scanner" / "server"
 
 CLIENT_SOURCES = {
     "tv_client": list((ROOT / "tv_client" / "src").rglob("*.js")),
-    "ios_client": list((ROOT / "ios_client").glob("*.swift")),
     "webos_client": list((ROOT / "webos_client").rglob("*.js")) if (ROOT / "webos_client").is_dir() else [],
 }
 
 # Endpunkte, die ein Client aufruft, die es aber nicht (mehr) gibt.
 # Jeder Eintrag braucht eine Begründung und einen Weg heraus.
-KNOWN_BROKEN = {
-    "/api/deovr/library": (
-        "Mit 8c6008a serverseitig entfernt, iOS-Client nie migriert — "
-        "siehe dev-docs/ios-client-status.md"
-    ),
-    "/api/deovr/collection": (
-        "Mit 8c6008a serverseitig entfernt, iOS-Client nie migriert — "
-        "siehe dev-docs/ios-client-status.md"
-    ),
-}
+#
+# Leer seit dem Rückzug des iOS-Clients (2026-10-02): Die beiden Einträge
+# (`/api/deovr/library`, `/api/deovr/collection`) rief nur er auf. Der
+# Mechanismus bleibt für den nächsten Bruch, der nicht sofort behebbar ist.
+KNOWN_BROKEN: dict[str, str] = {}
 
 ENDPOINT_RE = re.compile(r"""["'`]([^"'`]*?/api/[a-zA-Z0-9_/]+)""")
 
@@ -165,7 +159,7 @@ def test_no_hardcoded_server_address_in_client_views():
                 if stripped.startswith(("//", "*", "#")):
                     continue
                 # Beispieladressen in Eingabefeld-Platzhaltern sind Text für den
-                # Nutzer, keine Verdrahtung — der iOS-Client fragt die Adresse ab.
+                # Nutzer, keine Verdrahtung.
                 if "e.g." in line or "z. B." in line:
                     continue
                 if HARDCODED_HOST_RE.search(line):

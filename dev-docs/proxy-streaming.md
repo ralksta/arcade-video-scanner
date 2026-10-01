@@ -33,7 +33,7 @@ file to send.
   serving path writes.
 - **No duplicate entries.** The proxy tree is excluded from scans automatically, so
   every video stays a single row in the library.
-- **Invisible to clients.** Browser, TV and iOS clients keep requesting the original
+- **Invisible to clients.** Browser and TV clients keep requesting the original
   path. No client change was needed.
 - **Fail safe.** No proxy, unreadable config, feature off → the original is served,
   exactly as before.

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+- **iOS-Client zurückgezogen** (`ios_client/`). Er funktionierte seit `8c6008a`
+  nicht mehr — die DeoVR-Routen, die er aufrief, gibt es nicht mehr, und er
+  schickte keine Sitzung mit — und ließ sich ohne Mac und Xcode nicht prüfen
+  (ENTSCHEIDUNGEN.md, Punkt 1). Der letzte Stand liegt in der Historie:
+  `git checkout dec7163 -- ios_client`; `dev-docs/ios-client-status.md`
+  beschreibt, was eine Rückholung reparieren müsste.
+
 ### Added
 - **Endpunkt-Vertrag zwischen Server und Clients**: Ein Test liest die
   API-Pfade aus dem Quelltext von TV-, iOS- und webOS-Client und prüft sie

@@ -143,7 +143,7 @@ class _VideosResponseCache:
     gzip liefen bisher bei *jedem* Request neu — bei 8788 Einträgen gemessene
     ~40 ms für ``json.dumps`` und ~54 ms für ``gzip.compress(level=6)`` auf
     einem 4,95-MB-Body. Das ist der teuerste Einzelposten des Endpunkts, und
-    die drei Clients (Browser, TV, iOS) zahlen ihn unabhängig voneinander.
+    die Clients (Browser, TV) zahlen ihn unabhängig voneinander.
 
     Der Body hängt ausschließlich vom Scan-Target-Satz des Nutzers und seinem
     Admin-Flag ab (die Filterung ist reine Pfad-Präfix-Prüfung, sie verändert
