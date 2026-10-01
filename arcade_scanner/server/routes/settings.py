@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 from arcade_scanner.server.response_helpers import send_json
 
@@ -201,6 +202,35 @@ def handle_post_settings(handler) -> None:
 # GET /api/setup/directories
 # ---------------------------------------------------------------------------
 
+# Wurzel, unter der der Einrichtungs-Assistent Ordner vorschlägt (Docker-Mount).
+SETUP_MEDIA_ROOT = "/media"
+
+# Gesamtbudget für das Zählen. Die Antwort lief vorher über die ganze
+# Bibliothek, zweimal: auf dieser Installation 711.512 Dateien, über 30 s, bei
+# jedem Aufruf. Der Assistent braucht eine Größenordnung, keine Inventur.
+SETUP_SCAN_BUDGET_SEC = 3.0
+
+
+def _summarize_directory(path: str, deadline: float) -> tuple[int, int, bool]:
+    """Größe, Dateizahl und ob vollständig gezählt — in **einem** Durchlauf.
+
+    Eine Datei, die sich nicht messen lässt (während des Laufs verschwunden,
+    etwa eine `.part`-Datei des Optimierers), wird übersprungen. Vorher warf
+    sie den ganzen Ordner aus der Liste.
+    """
+    size = count = 0
+    for dirpath, _dirnames, filenames in os.walk(path):
+        if time.monotonic() > deadline:
+            return size, count, False
+        for name in filenames:
+            try:
+                size += os.lstat(os.path.join(dirpath, name)).st_size
+            except OSError:
+                continue
+            count += 1
+    return size, count, True
+
+
 def handle_get_setup_directories(handler) -> None:
     """List available directories under /media for the setup wizard."""
     user_name = handler.get_current_user()
@@ -209,54 +239,46 @@ def handle_get_setup_directories(handler) -> None:
         return
 
     directories = []
-    media_root = "/media"
+    media_root = SETUP_MEDIA_ROOT
+    deadline = time.monotonic() + SETUP_SCAN_BUDGET_SEC
 
     try:
         if os.path.exists(media_root) and os.path.isdir(media_root):
-            # Root /media itself
-            try:
-                total_size = sum(
-                    os.path.getsize(os.path.join(media_root, f))
-                    for f in os.listdir(media_root)
-                    if os.path.isfile(os.path.join(media_root, f))
-                )
-                file_count = sum(
-                    1
-                    for f in os.listdir(media_root)
-                    if os.path.isfile(os.path.join(media_root, f))
-                )
-                directories.append({
-                    "path": media_root,
-                    "size_bytes": total_size,
-                    "file_count": file_count,
-                    "is_root": True,
-                })
-            except PermissionError:
-                pass
+            entries = sorted(os.listdir(media_root))
+
+            # Root /media itself — nur die Dateien direkt darin
+            root_size = root_count = 0
+            for name in entries:
+                full = os.path.join(media_root, name)
+                try:
+                    if os.path.isfile(full):
+                        root_size += os.lstat(full).st_size
+                        root_count += 1
+                except OSError:
+                    continue
+            directories.append({
+                "path": media_root,
+                "size_bytes": root_size,
+                "file_count": root_count,
+                "is_root": True,
+                "complete": True,
+            })
 
             # Immediate sub-directories
-            for item in os.listdir(media_root):
+            for item in entries:
                 item_path = os.path.join(media_root, item)
-                if os.path.isdir(item_path):
-                    try:
-                        total_size = sum(
-                            os.path.getsize(os.path.join(dp, f))
-                            for dp, dn, filenames in os.walk(item_path)
-                            for f in filenames
-                        )
-                        file_count = sum(
-                            len(filenames)
-                            for dp, dn, filenames in os.walk(item_path)
-                        )
-                        directories.append({
-                            "path": item_path,
-                            "name": item,
-                            "size_bytes": total_size,
-                            "file_count": file_count,
-                            "is_root": False,
-                        })
-                    except (PermissionError, OSError):
-                        pass
+                if not os.path.isdir(item_path):
+                    continue
+                size, count, complete = _summarize_directory(item_path, deadline)
+                directories.append({
+                    "path": item_path,
+                    "name": item,
+                    "size_bytes": size,
+                    "file_count": count,
+                    "is_root": False,
+                    # False: Budget erschöpft, die Zahlen sind eine Untergrenze.
+                    "complete": complete,
+                })
     except Exception as e:
         print(f"⚠️ Error scanning /media: {e}")
 

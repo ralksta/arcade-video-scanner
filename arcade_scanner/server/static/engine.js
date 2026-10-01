@@ -1208,7 +1208,7 @@ function loadSetupDirectories() {
                         <div class="flex items-center gap-3">
                             <span class="material-icons text-arcade-cyan" aria-hidden="true">${dir.is_root ? 'folder_open' : 'folder'}</span>
                             <div><div class="text-text-main font-medium">${displayName}</div>
-                            <div class="text-xs text-gray-500">${sizeGB} GB • ${dir.file_count.toLocaleString()} files</div></div>
+                            <div class="text-xs text-gray-500">${dir.complete === false ? '≥ ' : ''}${sizeGB} GB • ${dir.complete === false ? '≥ ' : ''}${dir.file_count.toLocaleString()} files</div></div>
                         </div>
                         <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan" aria-hidden="true">check_circle</span></div>
                     </div>

@@ -165,3 +165,23 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   ruht. **AF geschlossen**: Der Ertrag fällt (zuletzt ein schmales Fenster und
   ein Durchgang nur mit Spekulation), die offenen Stellen sind durchgesehen.
   Nächstes: Loop AG — null Einträge, ein Eintrag.
+
+- **Iteration 8 (Loop AG, leer — und 711.512 Dateien)** — Ein Prüfskript
+  (`/tmp/claude-1000/nl4/probe_routes.py`) startet den echten Server gegen ein
+  Temp-Datenverzeichnis (`CONFIG_DIR`), legt Admin und Nutzer an und fragt 27
+  GET-Routen ab. Bei leerer Bibliothek: kein einziger 500er — die Divisionen
+  waren in Loop D abgesichert. Aber `/api/setup/directories` lief in den
+  30-s-Timeout, unabhängig von der Bibliothek: Es summiert jeden Ordner unter
+  `/media` per `os.walk`, **zweimal** (Größe, dann Zahl), bei jedem Aufruf, für
+  jedes Konto. Gemessen: 711.512 Dateien, 19 s allein fürs Auflisten. Dazu
+  warf ein einziges gescheitertes `getsize` den ganzen Ordner aus der Liste
+  (Datei während des Laufs verschwunden — der Optimierer erzeugt `.part`).
+  Jetzt ein Durchlauf, `lstat` je Datei mit Fehlertoleranz, 3 s Gesamtbudget;
+  danach `complete: false`, und der Assistent zeigt „≥". Gegenprobe: 3 von 4
+  Tests am alten Stand rot. Der Fetch-Wächter (`.catch` binnen 30 Zeilen)
+  schlug an, weil der `.catch` schon vorher genau am Rand stand — Änderung
+  ohne zusätzliche Zeile statt Wächter lockern.
+  Notiert für Phase 3: `toggleSetupDirectory('${dir.path}')` bricht an einem
+  Apostroph im Ordnernamen. Auffällig, noch nicht geprüft: `/api/backup`
+  liefert auch einem Nicht-Admin eine Sicherung.
+  Nächstes: `/api/backup` für Nicht-Admins, dann ein Eintrag, dann sehr viele.
