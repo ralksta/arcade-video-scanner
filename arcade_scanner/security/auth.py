@@ -1,4 +1,5 @@
 import secrets
+import threading
 import time
 from typing import Dict, Optional
 
@@ -14,8 +15,17 @@ _MAX_FAILED_RECORDS = 4096  # Obergrenze für die Sperrliste, siehe _prune()
 class SessionManager:
     """
     In-memory session manager with IP-based brute-force protection.
+
+    Thread-sicher: Der Server ist ein ``ThreadingTCPServer``, jede Anfrage
+    läuft in einem eigenen Thread. Ohne Sperre konnten zwei Threads dieselbe
+    abgelaufene Sitzung löschen (``KeyError`` → 500), und das Aufräumen
+    iterierte über ein Dict, in das ein anderer Thread gerade schrieb
+    (``RuntimeError: dictionary changed size during iteration``).
     """
     def __init__(self):
+        # RLock: create_session() ruft prune_sessions(), begin_attempt() und
+        # record_failure() rufen _prune() — alle unter derselben Sperre.
+        self._lock = threading.RLock()
         self._sessions: Dict[str, dict] = {}   # token -> {username, created_at}
         self.timeout = 86400 * 30              # 30-day session lifetime
         # ip -> {"attempts": [(timestamp), ...], "locked_until": float}
@@ -25,14 +35,55 @@ class SessionManager:
 
     def is_locked_out(self, ip: str) -> bool:
         """Returns True if the IP is currently locked out."""
-        record = self._failed.get(ip)
+        with self._lock:
+            return self._is_locked_out(ip, time.time())
+
+    def _is_locked_out(self, key: str, now: float) -> bool:
+        record = self._failed.get(key)
         if not record:
             return False
-        if record.get("locked_until", 0) > time.time():
+        if record.get("locked_until", 0) > now:
             return True
         # Expunge stale lock
         record.pop("locked_until", None)
         return False
+
+    def begin_attempt(self, *keys: str) -> bool:
+        """Prüft die Sperre und zählt den Versuch — in einem Schritt.
+
+        Die Route prüfte erst ``is_locked_out()``, dann das Passwort, und erst
+        danach zählte ``record_failure()`` den Fehlschlag. Dazwischen liegt
+        PBKDF2 mit 100.000 Runden, und ``hashlib`` gibt dabei die GIL frei.
+        Parallele Anfragen sahen also alle „nicht gesperrt", bevor die erste
+        mitgezählt war: Gemessen kamen 40 von 40 gleichzeitigen Versuchen
+        durch, bei einer Grenze von fünf. Die Sperre galt nur für Angreifer,
+        die höflich nacheinander raten.
+
+        Deshalb wird jetzt **vor** der Prüfung gezählt. Ein erfolgreicher
+        Versuch löscht seinen Zähler danach über ``record_success()`` — für
+        einen Nutzer, der sich nacheinander anmeldet, ändert sich nichts.
+
+        Gibt False zurück, wenn eine der Kennungen gesperrt ist; dann wird
+        nichts gezählt.
+        """
+        with self._lock:
+            now = time.time()
+            if any(self._is_locked_out(key, now) for key in keys):
+                return False
+            for key in keys:
+                self._count_attempt(key, now)
+            return True
+
+    def remaining_attempts(self, *keys: str) -> int:
+        """Wie viele Versuche bleiben, bis die strengste Kennung sperrt."""
+        with self._lock:
+            now = time.time()
+            counts = [
+                len([t for t in self._failed.get(key, {}).get("attempts", ())
+                     if now - t < _WINDOW_SECONDS])
+                for key in keys
+            ]
+            return max(0, _MAX_ATTEMPTS - max(counts, default=0))
 
     def _prune(self, now: float) -> None:
         """Wirft weg, was abgelaufen ist — und deckelt den Rest.
@@ -87,18 +138,18 @@ class SessionManager:
         liegen. Das ist kein Sicherheitsloch (abgelaufen ist abgelaufen), aber
         es wächst mit.
         """
-        now = time.time() if now is None else now
-        alt = [t for t, s in self._sessions.items()
-               if now - s["created_at"] > self.timeout]
-        for token in alt:
-            del self._sessions[token]
-        return len(alt)
+        with self._lock:
+            now = time.time() if now is None else now
+            alt = [t for t, s in self._sessions.items()
+                   if now - s["created_at"] > self.timeout]
+            for token in alt:
+                del self._sessions[token]
+            return len(alt)
 
-    def record_failure(self, ip: str) -> int:
-        """Records a failed login attempt. Returns remaining attempts before lockout."""
-        now = time.time()
+    def _count_attempt(self, key: str, now: float) -> int:
+        """Zählt einen Versuch für ``key``. Nur unter ``self._lock`` aufrufen."""
         self._prune(now)
-        record = self._failed.setdefault(ip, {"attempts": []})
+        record = self._failed.setdefault(key, {"attempts": []})
 
         # Trim attempts outside the sliding window
         record["attempts"] = [t for t in record["attempts"] if now - t < _WINDOW_SECONDS]
@@ -107,43 +158,53 @@ class SessionManager:
         count = len(record["attempts"])
         if count >= _MAX_ATTEMPTS:
             record["locked_until"] = now + _LOCKOUT_SECONDS
-            print(f"🔒 Login lockout triggered for IP {ip} after {count} failures")
-        return max(0, _MAX_ATTEMPTS - count)
+            print(f"🔒 Login lockout triggered for {key} after {count} attempts")
+        return count
+
+    def record_failure(self, ip: str) -> int:
+        """Records a failed login attempt. Returns remaining attempts before lockout."""
+        with self._lock:
+            count = self._count_attempt(ip, time.time())
+            return max(0, _MAX_ATTEMPTS - count)
 
     def record_success(self, ip: str) -> None:
         """Clears failure history on successful login."""
-        self._failed.pop(ip, None)
+        with self._lock:
+            self._failed.pop(ip, None)
 
     # ── Session helpers ────────────────────────────────────────────────────────
 
     def create_session(self, username: str) -> str:
         """Creates a new session for the user and returns the token."""
-        # Beim Anlegen aufräumen: Anmeldungen sind selten, und nur hier wächst
-        # die Liste. Abgelaufene Sitzungen verfielen sonst erst, wenn jemand
-        # ihr Token noch einmal vorzeigt — was bei einem vergessenen Gerät nie
-        # passiert.
-        self.prune_sessions()
+        with self._lock:
+            # Beim Anlegen aufräumen: Anmeldungen sind selten, und nur hier
+            # wächst die Liste. Abgelaufene Sitzungen verfielen sonst erst,
+            # wenn jemand ihr Token noch einmal vorzeigt — was bei einem
+            # vergessenen Gerät nie passiert.
+            self.prune_sessions()
 
-        token = secrets.token_hex(32)
-        self._sessions[token] = {
-            "username": username,
-            "created_at": time.time(),
-        }
-        return token
+            token = secrets.token_hex(32)
+            self._sessions[token] = {
+                "username": username,
+                "created_at": time.time(),
+            }
+            return token
 
     def get_username(self, token: str) -> Optional[str]:
         """Returns the username for a valid token, or None."""
-        session = self._sessions.get(token)
-        if not session:
-            return None
-        if time.time() - session["created_at"] > self.timeout:
-            del self._sessions[token]
-            return None
-        return session["username"]
+        with self._lock:
+            session = self._sessions.get(token)
+            if not session:
+                return None
+            if time.time() - session["created_at"] > self.timeout:
+                del self._sessions[token]
+                return None
+            return session["username"]
 
     def revoke_session(self, token: str) -> None:
         """Invalidates a session."""
-        self._sessions.pop(token, None)
+        with self._lock:
+            self._sessions.pop(token, None)
 
 
 # Global instance

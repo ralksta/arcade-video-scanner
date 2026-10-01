@@ -25,7 +25,8 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
 ## Reihenfolge
 
 - [ ] **Loop AF — Gleichzeitigkeit (Rest)**
-      - [ ] Gleichzeitige Anmeldungen (SessionManager, Brute-Force-Sperre, user_store)
+      - [x] Gleichzeitige Anmeldungen: Brute-Force-Sperre ließ parallel **40 von 40**
+            Versuchen durch (Grenze 5); `SessionManager` hatte gar keine Sperre
       - [ ] Ähnlichkeits-Cache unter parallelen Anfragen
       - [ ] „Wo noch?"-Durchgang: dasselbe check-then-act-Muster an weiteren Stellen
 - [ ] **Loop AG — Grenzen: leer, eins, sehr viele**
@@ -42,3 +43,17 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
 ## Journal
 
 <!-- Jede Iteration hängt hier einen Eintrag an: was gemacht, was gelernt, was als Nächstes. -->
+
+- **Iteration 1 (Loop AF, die Sperre für Höfliche)** — `/api/login` prüfte
+  `is_locked_out()`, dann das Passwort, und zählte erst danach mit
+  `record_failure()`. Dazwischen läuft PBKDF2 mit 100.000 Runden, und `hashlib`
+  gibt dabei die GIL frei. 40 gleichzeitige Versuche: **alle 40** geprüft, bei
+  einer Grenze von fünf. Die Sperre hielt also nur Angreifer auf, die brav
+  nacheinander raten. Jetzt zählt `begin_attempt()` atomar *vor* der Prüfung;
+  ein Erfolg löscht den Zähler wie bisher, nacheinander ändert sich nichts.
+  Zweiter Fund an derselben Klasse: Der `SessionManager` hatte überhaupt keine
+  Sperre — zwei Anfragen mit demselben abgelaufenen Token liefen beide in
+  `del` (Gegenprobe: `KeyError` → 500), und `prune_sessions()` iterierte über
+  ein Dict, in das andere Threads schrieben. Nebenbei: Die Sperrmeldung im Log
+  sagte „IP user:alice" — der Kontoschlüssel lief durch denselben Text.
+  Nächstes: Ähnlichkeits-Cache unter parallelen Anfragen.

@@ -1208,13 +1208,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     )
                     account_key = f"user:{username.lower()}" if username else "user:"
 
-                    if session_manager.is_locked_out(client_ip):
-                        print(f"🔒 Blocked login attempt from locked-out IP {client_ip}")
-                        self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
-                        return
-
-                    if session_manager.is_locked_out(account_key):
-                        print(f"🔒 Blocked login attempt for locked-out account '{username}'")
+                    # Prüfen und Zählen in einem Schritt, **vor** dem Passwort:
+                    # Getrennt kamen parallele Anfragen alle an der Prüfung
+                    # vorbei, solange PBKDF2 lief — 40 von 40 statt fünf.
+                    # Siehe SessionManager.begin_attempt().
+                    if not session_manager.begin_attempt(client_ip, account_key):
+                        print(f"🔒 Blocked login attempt for '{username}' from {client_ip}")
                         self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
                         return
 
@@ -1254,10 +1253,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.end_headers()
                         self.wfile.write(json.dumps({"success": True, "token": token}).encode())
                     else:
-                        remaining = min(
-                            session_manager.record_failure(client_ip),
-                            session_manager.record_failure(account_key),
-                        )
+                        # Schon in begin_attempt() gezählt — hier nur ablesen.
+                        remaining = session_manager.remaining_attempts(client_ip, account_key)
                         print(f"❌ Login failed for '{username}' from {client_ip} "
                               f"({remaining} attempts remaining)")
                         self.send_error(401, "Invalid credentials")
