@@ -75,10 +75,10 @@ async function openSettings() {
             const item = document.createElement('label');
             item.className = 'checkbox-item';
             item.innerHTML = `
-                <input type="checkbox" data-path="${exc.path}" ${isEnabled ? 'checked' : ''}>
+                <input type="checkbox" data-path="${escapeHtml(exc.path)}" ${isEnabled ? 'checked' : ''}>
                 <div class="checkbox-item-content">
-                    <div class="checkbox-item-title">${exc.path}</div>
-                    <div class="checkbox-item-description">${exc.desc}</div>
+                    <div class="checkbox-item-title">${escapeHtml(exc.path)}</div>
+                    <div class="checkbox-item-description">${escapeHtml(exc.desc)}</div>
                 </div>
             `;
             container.appendChild(item);

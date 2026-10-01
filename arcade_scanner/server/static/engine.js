@@ -173,7 +173,7 @@ function createComparisonCard(pair) {
                 <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
             ${window.IS_LOCAL_ACCESS ? `
-            <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
+            <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder(${jsArg(orig.FilePath)})">
                 <span class="material-icons text-[12px]" aria-hidden="true">folder_open</span> Reveal
             </button>
             ` : ''}
@@ -184,10 +184,10 @@ function createComparisonCard(pair) {
              <div class="text-2xl font-bold ${isSmaller ? 'text-green-400 drop-shadow-[0_0_8px_rgba(76,217,100,0.4)]' : 'text-red-500'} font-mono tracking-tighter">${diffPct.toFixed(1)}%</div>
              <div class="text-xs text-gray-500 font-mono mb-2">${diffMB.toFixed(1)} MB</div>
              
-             <button class="ds-btn ds-btn-primary w-full mt-1" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')">
+             <button class="ds-btn ds-btn-primary w-full mt-1" onclick="keepOptimized(${jsArg(encodeURIComponent(orig.FilePath))}, ${jsArg(encodeURIComponent(opt.FilePath))})">
                 <span class="material-icons text-[14px]" aria-hidden="true">check</span> KEEP
              </button>
-             <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-text-main border border-ink/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
+             <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-text-main border border-ink/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized(${jsArg(encodeURIComponent(opt.FilePath))})">
                 <span class="material-icons text-[14px]" aria-hidden="true">delete</span> DISCARD
              </button>
         </div>
@@ -212,7 +212,7 @@ function createComparisonCard(pair) {
                 <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
              ${window.IS_LOCAL_ACCESS ? `
-             <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
+             <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder(${jsArg(opt.FilePath)})">
                 <span class="material-icons text-[12px]" aria-hidden="true">folder_open</span> Reveal
             </button>
             ` : ''}
@@ -293,7 +293,7 @@ function _optimizeButton(v) {
         // Der Docker-Pfad reicht den Pfad als JS-String weiter, nicht als URL —
         // hier gibt es kein Encoding-Problem.
         return `
-                 <button class="${cls}" title="Queue for Mac" onclick="event.stopPropagation(); queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\'")}')">
+                 <button class="${cls}" title="Queue for Mac" onclick="event.stopPropagation(); queueForRemoteEncode(${jsArg(v.FilePath)})">
                     <span class="material-icons" aria-hidden="true">cloud_upload</span>
                  </button>`;
     }
@@ -307,7 +307,7 @@ function _optimizeButton(v) {
                  </button>`;
     }
     return `
-                 <button class="${cls}" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${enc}&audio=standard', 'h_frame')">
+                 <button class="${cls}" title="Optimize" onclick="event.stopPropagation(); window.open(${jsArg(`/compress?path=${enc}&audio=standard`)}, 'h_frame')">
                     <span class="material-icons" aria-hidden="true">bolt</span>
                  </button>`;
 }
@@ -364,7 +364,7 @@ function createVideoCard(v) {
              
              <!-- Corner Checkbox -->
              <div class="absolute top-1.5 left-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                <input type="checkbox" class="w-4 h-4 rounded-[4px] border-ink/30 bg-black/50 text-accent focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
+                <input type="checkbox" class="w-4 h-4 rounded-[4px] border-ink/30 bg-black/50 text-accent focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, ${jsArg(v.FilePath)})">
              </div>
 
              <button class="favorite-btn absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-full bg-black/45 flex items-center justify-center transition-all ${v.favorite ? 'text-bitrate active' : 'text-white/70 opacity-0 group-hover:opacity-100'}"
@@ -388,7 +388,7 @@ function createVideoCard(v) {
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
                  ${window.IS_LOCAL_ACCESS ? `
-                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
+                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder(${jsArg(v.FilePath)})">
                     <span class="material-icons" aria-hidden="true">folder_open</span>
                  </button>
                  ` : ''}
@@ -843,9 +843,9 @@ function renderActiveFiltersRow() {
     row.classList.remove('hidden');
     chipsContainer.innerHTML = chips.map(c => `
         <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-[var(--ds-hairline-strong)] text-gray-300 border border-[var(--ds-hairline-strong)] ${c.isNeg ? 'line-through decoration-red-500 decoration-2 text-red-200' : ''}">
-            ${c.type === 'tag' ? `<span class="w-2 h-2 rounded-full" style="background: ${c.color}"></span>` : ''}
-            ${c.label}
-            <button class="hover:text-arcade-pink" onclick="removeActiveFilter('${c.type}', '${c.label}')">×</button>
+            ${c.type === 'tag' ? `<span class="w-2 h-2 rounded-full" style="background: ${escapeHtml(c.color)}"></span>` : ''}
+            ${escapeHtml(c.label)}
+            <button class="hover:text-arcade-pink" onclick="removeActiveFilter(${jsArg(c.type)}, ${jsArg(c.label)})">×</button>
         </span>
     `).join('');
 }
@@ -1203,11 +1203,11 @@ function loadSetupDirectories() {
             listEl.innerHTML = data.directories.map(dir => {
                 const sizeGB = (dir.size_bytes / (1024 * 1024 * 1024)).toFixed(2);
                 const displayName = dir.name || dir.path;
-                return `<div class="setup-dir-card" data-path="${dir.path}" onclick="toggleSetupDirectory('${dir.path}')">
+                return `<div class="setup-dir-card" data-path="${escapeHtml(dir.path)}" onclick="toggleSetupDirectory(${jsArg(dir.path)})">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <span class="material-icons text-arcade-cyan" aria-hidden="true">${dir.is_root ? 'folder_open' : 'folder'}</span>
-                            <div><div class="text-text-main font-medium">${displayName}</div>
+                            <div><div class="text-text-main font-medium">${escapeHtml(displayName)}</div>
                             <div class="text-xs text-gray-500">${dir.complete === false ? '≥ ' : ''}${sizeGB} GB • ${dir.complete === false ? '≥ ' : ''}${dir.file_count.toLocaleString()} files</div></div>
                         </div>
                         <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan" aria-hidden="true">check_circle</span></div>
@@ -1230,7 +1230,7 @@ function loadSetupDirectories() {
 }
 
 function toggleSetupDirectory(path) {
-    const card = document.querySelector(`.setup-dir-card[data-path="${path}"]`);
+    const card = document.querySelector(`.setup-dir-card[data-path="${CSS.escape(path)}"]`);
     if (!card) return;
 
     const isSelected = card.classList.contains('selected');

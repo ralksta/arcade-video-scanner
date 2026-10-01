@@ -40,7 +40,7 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
       - [x] Endungen (RAW → Frage 3), Namen an der 255-Byte-Grenze (behoben),
             Symlink-Schleifen (`os.walk` folgt nicht — sicher), Apostroph → Phase 3
 - [x] **Phase 0.1 — iOS-Client zurückziehen** — `ios_client/` entfernt, letzter Stand `dec7163`
-- [ ] **Phase 3 — Escaping priorisiert** (Vorlage `dev-docs/frontend-escaping.md`)
+- [x] **Phase 3 — Escaping priorisiert** — `jsArg()`, 13 Handler + 10 Textstellen, Vault ausgelassen
 - [ ] **Abschluss:** Übergabebericht oben in `NACHTLAUF-BERICHT.md` (neuer Abschnitt
       „Nachtlauf 4"), Fragen an Ralf zuerst
 
@@ -297,3 +297,25 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   „iOS export (UUID)" in `master_detect.py` (iPhone-Dateinamen, nicht der
   Client), `plan-path-criterion.md` (ein Plan von damals).
   Nächstes: Phase 3 — Escaping priorisiert.
+
+- **Iteration 14 (Phase 3, Escaping nach Herkunft)** — Inventar neu erhoben
+  (60 Interpolationen von Namensfeldern ohne `escapeHtml` auf der Zeile), nach
+  Herkunft sortiert. Der schwerste Rest lag im Hauptraster:
+  `onclick="…('${v.FilePath.replace(/'/g, …)}')"` an fünf Stellen. In Node am
+  alten Ausdruck gemessen: `a" onmouseover="alert(document.cookie)" x=".mp4`
+  erzeugt ein **echtes zweites Attribut** am Button, das beim Überfahren der
+  Karte feuert; `Ordner\` macht den Handler zum SyntaxError (alle Knöpfe der
+  Karte tot). `encodeURIComponent` lässt `'` stehen — Keep/Discard in der
+  Review-Ansicht und der Optimieren-Knopf waren per `x');alert(1);//`
+  injizierbar. Statt Einzelreparaturen ein Helfer, der die Schichten richtig
+  ordnet: `jsArg(v) = escapeHtml(JSON.stringify(String(v)))` — erst JS, dann
+  Attribut; genau die Lücke, die frontend-escaping.md für `escapeHtml` allein
+  beschreibt. Test führt es echt aus: Attribut lesen wie der HTML-Parser,
+  Entitäten auflösen, in Node ausführen, Original zurückbekommen — für `"`,
+  `'`, `\`, Zeilenumbruch und U+2028. Text-Kontexte: Dateinamen in der
+  Befehlspalette, Treemap, Assistent; `showToast()` maskiert jetzt selbst
+  (kein Aufrufer übergibt Markup, mehrere übergeben Dateinamen). Vault-Stellen
+  ausgelassen (Phase 1 löscht sie). **Ohne Browser nicht visuell geprüft** —
+  die Umstellung ändert keine Darstellung, nur die Maskierung, aber das steht
+  so im Bericht.
+  Nächstes: Übergabebericht.

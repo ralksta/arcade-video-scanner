@@ -252,10 +252,10 @@ function renderCollectionTagsList() {
 
     container.innerHTML = availableTags.map(tag => `
         <button class="collection-filter-chip ${collectionCriteria.tags.includes(tag.name) ? 'active' : ''}"
-                onclick="toggleCollectionTag('${tag.name}')"
-                style="border-color: ${collectionCriteria.tags.includes(tag.name) ? tag.color : 'rgb(var(--ds-text-rgb) / 0.12)'}">
-            <span class="tag-dot" style="background-color: ${tag.color}; width: 6px; height: 6px; border-radius: 50%; display: inline-block;"></span>
-            ${tag.name}
+                onclick="toggleCollectionTag(${jsArg(tag.name)})"
+                style="border-color: ${collectionCriteria.tags.includes(tag.name) ? escapeHtml(tag.color) : 'rgb(var(--ds-text-rgb) / 0.12)'}">
+            <span class="tag-dot" style="background-color: ${escapeHtml(tag.color)}; width: 6px; height: 6px; border-radius: 50%; display: inline-block;"></span>
+            ${escapeHtml(tag.name)}
         </button>
     `).join('');
 }
@@ -740,10 +740,10 @@ function renderSmartCollectionTagsList() {
 
         return `
         <button class="${classes}"
-                onclick="toggleSmartTagChip('${tag.name}')"
+                onclick="toggleSmartTagChip(${jsArg(tag.name)})"
                 style="${style}">
-            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${isExcluded ? '#ef4444' : tag.color}"></span>
-            ${displayName}
+            <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${isExcluded ? '#ef4444' : escapeHtml(tag.color)}"></span>
+            ${escapeHtml(displayName)}
         </button>
         `;
     }).join('');
@@ -1011,7 +1011,7 @@ function renderCollections() {
 
         html += `
             <div class="category-group mb-1">
-                <button onclick="toggleCategoryCollapse('${category}')"
+                <button onclick="toggleCategoryCollapse(${jsArg(category)})"
                         class="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-gray-300 transition-colors rounded hover:bg-ink/5">
                     <span class="material-icons text-[14px] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}"
                           id="cat-arrow-${safeKey}" aria-hidden="true">expand_more</span>
@@ -1042,8 +1042,8 @@ function renderCollectionItem(col) {
         <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-ink/5 border border-transparent'}"
                 onclick="applyCollection('${col.id}')"
                 ondblclick="openCollectionModal('${col.id}')">
-            <span class="material-icons text-[18px]" style="color: ${col.color}" aria-hidden="true">${col.icon}</span>
-            <span class="flex-1 text-left truncate">${col.name}</span>
+            <span class="material-icons text-[18px]" style="color: ${escapeHtml(col.color)}" aria-hidden="true">${escapeHtml(col.icon)}</span>
+            <span class="flex-1 text-left truncate">${escapeHtml(col.name)}</span>
 
             <button onclick="event.stopPropagation(); openCollectionModal('${col.id}')"
                     class="${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white transition-opacity"
