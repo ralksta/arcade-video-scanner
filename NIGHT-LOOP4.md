@@ -128,3 +128,19 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   verschiedene Fragen.
   Nächstes: Vorschaubilder (zwei Anfragen erzeugen dasselbe Thumbnail?), dann
   entscheiden, ob AF ausgereizt ist.
+
+- **Iteration 6 (Loop AF, das halbe Vorschaubild)** — Unterbrochen durch einen
+  Ausfall der Auto-Mode-Prüfung (mehrere Runden ohne Urteil, nichts verändert;
+  danach von selbst wieder angelaufen). ffmpeg schrieb das Vorschaubild direkt
+  in die ausgelieferte Datei — dasselbe Muster wie beim HTML-Dump in Nachtlauf
+  3, dort gefunden und hier übersehen. Zwei Wege zum halben Bild: Neuaufbau
+  eines veralteten Bildes (`-y` kürzt sofort) und Lazy-Erzeugung im Request
+  (der zweite sieht „existiert"). Ausgeliefert mit `max-age=604800`: eine
+  Woche im Browser. Die Gegenprobe fand einen dritten Fehler, den ich nicht
+  gesucht hatte: Ein **gescheiterter** Neuaufbau zerstörte das alte, intakte
+  Bild (`b''` statt `OLD`). Jetzt rendert `_render_thumbnail()` in eine
+  versteckte Zwischendatei, `os.replace` erst bei Erfolg. Der Wächter für
+  stumme `except`-Blöcke schlug an — Budget nicht angehoben, der Block
+  protokolliert jetzt.
+  Nächstes: „Wo noch?" für genau dieses Muster — `open(…, "w")` auf Dateien,
+  die gleichzeitig gelesen werden. Liefert der Durchgang nichts, ist AF durch.
