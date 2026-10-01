@@ -70,10 +70,17 @@ def run(handler, deps=None, post=False):
     return handled, deps
 
 
-def test_status_is_public():
-    # Characterization: /api/duplicates/status has NO session check — it only
-    # exposes scan-progress state, but reviewers should know it is public.
+def test_status_requires_session():
+    # Bis Nachtlauf 4 öffentlich (Fortschritt und Meldung des Scans). Der
+    # Browser fragt nur angemeldet — test_anonymous_route_sweep.py.
     h = FakeHandler("/api/duplicates/status", user=None)
+    handled, _ = run(h)
+    assert handled is True
+    assert h.error == 401
+
+
+def test_status_works_with_a_session():
+    h = FakeHandler("/api/duplicates/status")
     handled, _ = run(h)
     assert handled is True
     assert h.body() == {"is_running": False}

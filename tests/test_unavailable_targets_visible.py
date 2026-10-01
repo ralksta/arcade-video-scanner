@@ -152,7 +152,11 @@ def test_an_anonymous_request_learns_no_paths(monkeypatch):
     handler.get_current_user.return_value = None
     settings_route.handle_get_settings(handler)
 
-    assert gesendet["unavailable_targets"] == []
+    # Seit Nachtlauf 4 antwortet die Route anonym gar nicht mehr — strenger
+    # als „eine leere Liste": Es wird überhaupt nichts gesendet.
+    assert gesendet == {}
+    handler.send_error.assert_called_once()
+    assert handler.send_error.call_args[0][0] == 401
 
 
 # --- Die Anzeige ---

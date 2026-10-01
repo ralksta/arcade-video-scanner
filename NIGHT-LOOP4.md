@@ -212,3 +212,27 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   eingeschlossen.
   Nächstes: Den Rundum-Wächter auf die Route-Module ausdehnen — sonst bleibt
   die nächste solche Route genauso unsichtbar.
+
+- **Iteration 10 (Loop AG → der Wächter, der die Route-Module sieht)** — Der
+  statische Rundum-Test las nur `api_handler.py`; Restore stand woanders. Ein
+  zweiter statischer Test hätte dieselbe Schwäche in anderer Form. Deshalb
+  jetzt ein Test, der nach der **Antwort** fragt: `tests/anon_sweep_server.py`
+  startet den echten Handler als eigenen Prozess (`CONFIG_DIR` im Temp, Port
+  0) und ruft jede Route, die per Regex im Server-Code steht, anonym per GET
+  und POST auf. Erlaubt: 401/403/404/405/501, alles andere nur mit
+  Begründung in `OPEN_BY_DESIGN`. Erster Lauf: drei weitere Routen.
+  `GET /api/settings` gab anonym den globalen Dump — gespeicherte Ansichten,
+  `proxy_root`, `review_dir`, ffmpeg-Pfade; der `else`-Zweig stammt aus der
+  v7-Umstellung, kein Client fragt vor der Anmeldung.
+  `GET /api/duplicates/status` war öffentlich (ein Charakterisierungstest
+  sagte es sogar: „reviewers should know it is public"). `POST /api/tags`
+  prüfte den Rumpf vor der Sitzung (400 statt 401, ohne Schreibzugriff).
+  Drei Charakterisierungstests schrieben das offene Verhalten fest — auf 401
+  umgestellt, jeweils strenger als vorher. Gegenprobe für den Wächter selbst:
+  Restore-Prüfung vorübergehend entfernt → `POST 200 /api/restore` gemeldet.
+  Zwei Fehlversuche unterwegs: Startmeldungen auf stdout zerstörten das JSON,
+  und die erste Sabotage ließ die 403-Prüfung stehen und bewies nichts.
+  Nebenbei: `start_server()` bindet den Fallback-Port ohne
+  `allow_reuse_address` — nach einem schnellen Neustart scheitert er an
+  TIME_WAIT. Klein, nicht angefasst.
+  Nächstes: ein Eintrag; dann sehr viele (100.000, synthetisch).

@@ -69,6 +69,11 @@ def _deletable_scope(user_name: str):
 def handle_get(handler) -> bool:
     path = handler.path
     if path == "/api/duplicates/status":
+        # Ohne Sitzungsprüfung: Fortschritt und Meldung des laufenden
+        # Duplikat-Scans gingen an jeden, der den Port erreichte.
+        if not handler.get_current_user():
+            handler.send_error(401, "Unauthorized")
+            return True
         _dup_mgr, _, _, _, _, _, _ = _get_deps()
         send_json(handler, _dup_mgr.get_state())
         return True

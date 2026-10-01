@@ -76,14 +76,15 @@ def run(handler, singletons=None, post=False):
     return handled, singletons
 
 
-def test_get_settings_anonymous_returns_global_dump():
-    # Characterization: GET /api/settings needs NO session — anonymous clients
-    # receive the global config dump (without per-user fields).
+def test_get_settings_rejects_anonymous_callers():
+    # Bis Nachtlauf 4 bekam eine anonyme Anfrage den globalen Dump:
+    # gespeicherte Ansichten, proxy_root, review_dir, ffmpeg-Pfade. Kein Client
+    # fragt vor der Anmeldung (test_anonymous_route_sweep.py).
     h = FakeHandler("/api/settings", user=None)
     handled, _ = run(h)
     assert handled is True
-    assert h.status == 200
-    assert h.body()["bitrate_threshold_kbps"] == 8000
+    assert h.error == 401
+    h.wfile.write.assert_not_called()
 
 
 def test_get_settings_merges_user_fields_for_session():

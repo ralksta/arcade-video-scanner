@@ -41,9 +41,16 @@ def handle_get_settings(handler) -> None:
     """Return merged global + user-specific settings as JSON."""
     config, user_db, _, _ = _get_singletons()
 
+    # Anonym gab es hier die globalen Einstellungen: gespeicherte Ansichten
+    # samt Filtern, proxy_root, review_dir, ffmpeg-Pfade — die
+    # Verzeichnisstruktur des Servers. Kein Client fragt vor der Anmeldung.
+    user_name = handler.get_current_user()
+    if not user_name:
+        handler.send_error(401, "Unauthorized")
+        return
+
     settings_dump = config.settings.model_dump()
 
-    user_name = handler.get_current_user()
     if user_name:
         u = user_db.get_user(user_name)
         if u:
