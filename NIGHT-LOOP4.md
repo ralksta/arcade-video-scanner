@@ -24,12 +24,14 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
 
 ## Reihenfolge
 
-- [ ] **Loop AF — Gleichzeitigkeit (Rest)**
+- [x] **Loop AF — Gleichzeitigkeit (Rest)** — ausgereizt (7 Funde)
       - [x] Gleichzeitige Anmeldungen: Brute-Force-Sperre ließ parallel **40 von 40**
             Versuchen durch (Grenze 5); `SessionManager` hatte gar keine Sperre
       - [x] Ähnlichkeits-Cache: Sperren seit Iteration 95 sauber. Dabei gefunden:
             Vektoren verschiedener Modelle wurden miteinander verglichen
-      - [ ] „Wo noch?"-Durchgang: dasselbe check-then-act-Muster an weiteren Stellen
+      - [x] „Wo noch?": GIF-Ausgabe kollidierte, Upload ignorierte „Abbrechen",
+            settings.json ohne Sperre, Vorschaubild halb ausgeliefert,
+            Scanner-Singleton ohne Sperre
 - [ ] **Loop AG — Grenzen: leer, eins, sehr viele**
       - [ ] Null Einträge / ein Eintrag: Routen, Statistiken, Divisionen, Oberfläche
       - [ ] Sehr viele: 100.000 Einträge (synthetisch, nur in tmp-DB)
@@ -144,3 +146,22 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   protokolliert jetzt.
   Nächstes: „Wo noch?" für genau dieses Muster — `open(…, "w")` auf Dateien,
   die gleichzeitig gelesen werden. Liefert der Durchgang nichts, ist AF durch.
+
+- **Iteration 7 (Loop AF, zwei Durchgänge, Abschluss)** — Erster Durchgang:
+  alle `open(…, "w")`. Übrig waren drei. `cleanup_legacy_settings()` schreibt
+  settings.json an Sperre und Zwischendatei vorbei — aber nur bei der
+  einmaligen Migration einer sehr alten Installation, und **vor** dem
+  Serverstart (`main.py:42` gegen `:51`). Duplikat-Cache und Scan-Zeitstempel
+  sind neu berechenbar und werden nur beim Start gelesen. Alles Spekulation,
+  nichts geändert. Zweiter Durchgang: modulweiter Zustand. Die
+  `hw_encode_detect`-Caches sind idempotent (zwei Threads rechnen dasselbe),
+  harmlos. Aber `get_scanner_manager()` war ein Lazy-Singleton ohne Sperre, und
+  der Server pollt `/api/scan/status`, bevor der Scan-Thread den Manager
+  holt. Zwei gleichzeitige Erstaufrufe → zwei Manager mit je eigenem
+  `_claim()` → der Doppel-Scan-Schutz aus Nachtlauf 3 wirkungslos.
+  Gegenprobe mit langsamem Konstruktor: 8 von 8 Threads bekamen je einen
+  eigenen. Ehrlich eingeordnet: Das echte Fenster ist Mikrosekunden breit.
+  Behoben, weil drei Zeilen eine Zusage absichern, auf der ein früherer Fix
+  ruht. **AF geschlossen**: Der Ertrag fällt (zuletzt ein schmales Fenster und
+  ein Durchgang nur mit Spekulation), die offenen Stellen sind durchgesehen.
+  Nächstes: Loop AG — null Einträge, ein Eintrag.
