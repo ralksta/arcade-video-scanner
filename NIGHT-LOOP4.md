@@ -33,8 +33,10 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
             settings.json ohne Sperre, Vorschaubild halb ausgeliefert,
             Scanner-Singleton ohne Sperre
 - [ ] **Loop AG — Grenzen: leer, eins, sehr viele**
-      - [ ] Null Einträge / ein Eintrag: Routen, Statistiken, Divisionen, Oberfläche
-      - [ ] Sehr viele: 100.000 Einträge (synthetisch, nur in tmp-DB)
+      - [x] Null Einträge / ein Eintrag: 27 Routen × 2 Konten am echten Server, kein
+            500er. Gefunden: `/api/setup/directories` (30 s), `/api/restore` offen,
+            drei weitere anonyme Routen
+      - [x] Sehr viele: 100.000 Einträge — kein Fehler, nur lineare Kosten (s. Journal)
       - [ ] Datei ohne Endung, Pfade an der Längengrenze, Sonderzeichen, Symlink-Schleifen
 - [ ] **Phase 0.1 — iOS-Client zurückziehen** (siehe UMSETZUNGSPLAN.md)
 - [ ] **Phase 3 — Escaping priorisiert** (Vorlage `dev-docs/frontend-escaping.md`)
@@ -236,3 +238,18 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   `allow_reuse_address` — nach einem schnellen Neustart scheitert er an
   TIME_WAIT. Klein, nicht angefasst.
   Nächstes: ein Eintrag; dann sehr viele (100.000, synthetisch).
+
+- **Iteration 11 (Loop AG, eins und hunderttausend)** — Ein Eintrag: 54
+  Abfragen, nichts Auffälliges. 100.000 synthetische Einträge (Temp-DB,
+  `bulk_upsert` in 1,7 s): alle Routen antworten richtig. Gemessen:
+  `/api/videos` 2,2 s kalt / 0,9 s, `/api/candidates` **4 s bei jedem Aufruf**
+  (kein Cache), Prozess-RSS 1 GB. Profil der Vorschläge: 2,3 s `db.get_all()`
+  (100.000 Pydantic-Objekte je Anfrage, am Medien-Cache vorbei) und 2,4 s
+  `build_candidates()`, davon 0,55 s `stat` der Verlaufsdatei **je Eintrag**
+  (`median_saved_pct` → `_reload_if_stale`). Auf die echte Bibliothek
+  (5.461) umgerechnet: rund 0,25 s, die `stat`-Aufrufe ~30 ms. **Bewusst nicht
+  geändert** — bei realer Größe Kosmetik; steht im Bericht, falls die
+  Bibliothek wächst. Probe-Skript stellt jetzt auf Port 0 um (der
+  TIME_WAIT-Fallback aus Iteration 10 hatte einen Lauf abgebrochen).
+  Nächstes: Dateien ohne/mit seltener Endung (`.ts` erkennt der Inspector,
+  `ALLOWED_VIDEO_EXTENSIONS` nicht), lange Pfade, Sonderzeichen, Symlinks.
