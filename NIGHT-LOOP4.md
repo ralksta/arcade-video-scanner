@@ -32,12 +32,13 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
       - [x] „Wo noch?": GIF-Ausgabe kollidierte, Upload ignorierte „Abbrechen",
             settings.json ohne Sperre, Vorschaubild halb ausgeliefert,
             Scanner-Singleton ohne Sperre
-- [ ] **Loop AG — Grenzen: leer, eins, sehr viele**
+- [x] **Loop AG — Grenzen: leer, eins, sehr viele** — ausgereizt (5 Funde, 1 Frage)
       - [x] Null Einträge / ein Eintrag: 27 Routen × 2 Konten am echten Server, kein
             500er. Gefunden: `/api/setup/directories` (30 s), `/api/restore` offen,
             drei weitere anonyme Routen
       - [x] Sehr viele: 100.000 Einträge — kein Fehler, nur lineare Kosten (s. Journal)
-      - [ ] Datei ohne Endung, Pfade an der Längengrenze, Sonderzeichen, Symlink-Schleifen
+      - [x] Endungen (RAW → Frage 3), Namen an der 255-Byte-Grenze (behoben),
+            Symlink-Schleifen (`os.walk` folgt nicht — sicher), Apostroph → Phase 3
 - [ ] **Phase 0.1 — iOS-Client zurückziehen** (siehe UMSETZUNGSPLAN.md)
 - [ ] **Phase 3 — Escaping priorisiert** (Vorlage `dev-docs/frontend-escaping.md`)
 - [ ] **Abschluss:** Übergabebericht oben in `NACHTLAUF-BERICHT.md` (neuer Abschnitt
@@ -64,6 +65,17 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
    alle — aber das ändert, was ein Nicht-Admin in den Einstellungen sieht.
    Dazu klein: `GET /api/backup` liefert settings.json auch an Nicht-Admins.
    (`/api/restore` habe ich heute Nacht geschlossen — dort war es eindeutig.)
+
+3. **RAW-Fotos werden nie gescannt.** CHANGELOG und ROADMAP versprechen seit
+   v6.4.1 „12 RAW formats (CR2, NEF, ARW, DNG, …)". Die Endungen stehen aber
+   nur im `ImageInspector`, nie im Datei-Walker (`file_system.py`), der sie
+   gar nicht erst weiterreicht — die Funktion hat nie gearbeitet. Unter
+   `/media` liegen 810 CR2, 683 RAF, 577 DNG. Nicht eingeschaltet, weil der
+   Inspector RAW über `sips` liest (nur macOS); auf diesem Linux-Server ist
+   unklar, was dabei herauskommt — womöglich 2.070 Einträge ohne Vorschau.
+   Einschalten (und unter Linux prüfen) oder das Versprechen aus CHANGELOG
+   und ROADMAP streichen? Nebenbei: `.3gp`/`.mpg` (3 Videos hier) kennt der
+   Scanner nicht, `config.ALLOWED_VIDEO_EXTENSIONS` benutzt niemand.
 
 ## Journal
 
@@ -253,3 +265,20 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   TIME_WAIT-Fallback aus Iteration 10 hatte einen Lauf abgebrochen).
   Nächstes: Dateien ohne/mit seltener Endung (`.ts` erkennt der Inspector,
   `ALLOWED_VIDEO_EXTENSIONS` nicht), lange Pfade, Sonderzeichen, Symlinks.
+
+- **Iteration 12 (Loop AG, Endungen und die 255-Byte-Grenze — AG
+  geschlossen)** — Endungen unter `/media` gezählt (nur lesend). Drei Listen
+  bestimmen, was als Medium gilt; die von Walker und Inspector stimmen bei
+  Videos überein, `config.ALLOWED_VIDEO_EXTENSIONS` ist tot. Der eigentliche
+  Fund: RAW steht seit v6.4.1 nur im Inspector — nie gescannt, obwohl
+  CHANGELOG und ROADMAP es versprechen (→ Frage 3, nicht eingeschaltet, weil
+  der RAW-Pfad `sips` braucht). Symlink-Schleifen: `os.walk` folgt Links nicht.
+  Längste Video-Dateinamen hier: 208 Bytes; der GIF-Name käme auf 232. Unter
+  der Grenze — aber `.{stem}.job{id}.part` und die Review-Namen hängen bis zu
+  ~20 Bytes an, und eine Datei mit langem Namen ließ sich nie optimieren
+  (Gegenprobe: `[Errno 36] File name too long`, Job „failed" ohne Grund).
+  `_fit_name()` kürzt den Stamm an einer Zeichengrenze, an allen sechs
+  Stellen in `queue.py`. **AG geschlossen**: leer, eins, viele, Endungen,
+  Länge und Links sind durch; der letzte Durchgang brachte nur noch den
+  Grenzfall, der hier real nicht auftritt.
+  Nächstes: Phase 0.1 — iOS-Client zurückziehen.

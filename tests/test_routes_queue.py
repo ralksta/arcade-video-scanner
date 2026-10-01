@@ -10,6 +10,7 @@ Nothing touches the real database, the real media library or the filesystem
 outside tmp_path.
 """
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -648,3 +649,47 @@ def test_a_job_is_applied_by_one_upload_at_a_time():
         queue._release_finalize(7)
     assert queue._claim_finalize(7), "Nach dem Freigeben muss es wieder gehen"
     queue._release_finalize(7)
+
+
+class TestNamesAtTheLengthLimit:
+    """
+    Dateinamen dürfen höchstens 255 **Bytes** lang sein. Zwei Stellen hängen
+    etwas an den Namen des Videos: der GIF-Export (``_720p_15fps_<job>.gif``)
+    und der Upload (``.<stem>.job<id>.part``). Bei einem Video mit langem Namen
+    scheiterte das mit ENAMETOOLONG — beim Upload bei **jedem** Versuch, die
+    Datei ließ sich nie optimieren, und der Job hieß nur „failed".
+    """
+
+    STEM = "ä" * 120 + "x" * 8   # 248 Bytes, 128 Zeichen — Umlaute zählen doppelt
+
+    def test_the_gif_name_fits(self, tmp_path):
+        video = tmp_path / f"{self.STEM}.mp4"
+        video.write_bytes(b"x")
+        out, resp = TestGifOutputIsPerJob()._export(video)
+        name = os.path.basename(out)
+        assert len(name.encode("utf-8")) <= 255, len(name.encode("utf-8"))
+        assert name.endswith(".gif") and resp["job_id"] in name
+        name.encode("utf-8").decode("utf-8")  # an einer Zeichengrenze gekürzt
+
+    def test_the_upload_part_file_fits(self, tmp_path):
+        src = tmp_path / f"{self.STEM}.mp4"
+        src.write_bytes(b"original")
+        jobs = [{"id": 123456, "file_path": str(src), "size_bytes": 8}]
+        handler = FakeHandler("/api/queue/upload?job_id=123456")
+        handler.rfile = FakeRFile(b"opt")
+        handler.headers = {"Content-Length": "3"}
+        fake_db = FakeDB(jobs=jobs)
+        fake_db.get = MagicMock(return_value=None)
+        settings = MagicMock()
+        settings.settings.enable_review_mode = False
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.config", settings), \
+             patch("arcade_scanner.server.routes.queue.verify_media_integrity",
+                   return_value=(True, "ok")), \
+             patch("arcade_scanner.server.routes.queue._media_cache"), \
+             patch("arcade_scanner.server.routes.queue.send_json"):
+            queue.handle_post(handler)
+
+        assert handler.error is None, handler.error
+        assert src.read_bytes() == b"opt"
+        assert db_status(fake_db) == [(123456, "done")]

@@ -218,6 +218,28 @@ def _replace_media_entry(original_path: str, new_path: str, codec: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Dateinamen an der Längengrenze
+# ---------------------------------------------------------------------------
+
+_NAME_MAX_BYTES = 255
+
+
+def _fit_name(prefix: str, stem: str, suffix: str) -> str:
+    """``prefix + stem + suffix``, der Stamm so gekürzt, dass 255 Bytes reichen.
+
+    Mehrere Stellen hängen etwas an den Namen eines Videos — GIF-Export,
+    Upload-Zwischendatei, Review-Ordner. Bei einem langen Namen scheiterte das
+    mit ENAMETOOLONG; beim Upload bei **jedem** Versuch, die Datei ließ sich nie
+    optimieren. Gekürzt wird an einer Zeichengrenze (Umlaute zählen in UTF-8
+    doppelt), ``surrogateescape`` hält kaputt kodierte Pfade aus.
+    """
+    budget = _NAME_MAX_BYTES - len((prefix + suffix).encode("utf-8", "surrogateescape"))
+    while stem and len(stem.encode("utf-8", "surrogateescape")) > budget:
+        stem = stem[:-1]
+    return f"{prefix}{stem}{suffix}"
+
+
+# ---------------------------------------------------------------------------
 # Upload-Abschluss: ein Job wird höchstens einmal eingesetzt
 # ---------------------------------------------------------------------------
 
@@ -582,7 +604,7 @@ def handle_post(handler) -> bool:
             # `ffmpeg -y` kürzte sie mitten im ersten Lauf. Wer zuerst „done"
             # sah, lud ein halbes oder das fremde GIF, auch kontoübergreifend.
             base_name = os.path.splitext(os.path.basename(video_path))[0]
-            output_filename = f"{base_name}_{preset}_{fps}fps_{gif_job_id}.gif"
+            output_filename = _fit_name("", base_name, f"_{preset}_{fps}fps_{gif_job_id}.gif")
             gif_export_dir = os.path.join(tempfile.gettempdir(), "arcade_gif_exports")
             os.makedirs(gif_export_dir, exist_ok=True)
             output_path = os.path.join(gif_export_dir, output_filename)
@@ -710,7 +732,7 @@ def handle_post(handler) -> bool:
                 return True
 
             # Receive next to the original so the later os.replace stays atomic.
-            part_path = os.path.join(orig_dir, f".{orig_stem}.job{job_id}.part")
+            part_path = os.path.join(orig_dir, _fit_name(".", orig_stem, f".job{job_id}.part"))
             received = _receive_upload(handler, part_path, content_len)
             if received != content_len:
                 _unlink_quiet(part_path)
@@ -765,17 +787,17 @@ def handle_post(handler) -> bool:
                 if config.settings.enable_review_mode:
                     # Review Mode: Move both files to a dedicated folder
                     # Smart Storage: Try to use .review folder next to original file to save space on system disk
-                    review_job_dir = os.path.join(orig_dir, ".review", f"job_{job_id}_{orig_stem}")
+                    review_job_dir = os.path.join(orig_dir, ".review", _fit_name(f"job_{job_id}_", orig_stem, ""))
                     try:
                         os.makedirs(review_job_dir, exist_ok=True)
                     except Exception as e:
                         # Fallback to global review directory if media directory is read-only
                         print(f"⚠️ Could not create relative review dir ({e}), falling back to global {config.review_dir}")
-                        review_job_dir = os.path.join(config.review_dir, f"job_{job_id}_{orig_stem}")
+                        review_job_dir = os.path.join(config.review_dir, _fit_name(f"job_{job_id}_", orig_stem, ""))
                         os.makedirs(review_job_dir, exist_ok=True)
 
-                    target_orig_path = os.path.join(review_job_dir, f"{orig_stem}_original{orig_ext}")
-                    opt_path = os.path.join(review_job_dir, f"{orig_stem}_optimized.mp4")
+                    target_orig_path = os.path.join(review_job_dir, _fit_name("", orig_stem, f"_original{orig_ext}"))
+                    opt_path = os.path.join(review_job_dir, _fit_name("", orig_stem, "_optimized.mp4"))
 
                     # 1. Move the verified upload into the review folder
                     import shutil
