@@ -113,3 +113,18 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   denselben Job hochladen können. Der Worker meldet eine 409 als `failed`
   über `/complete` mit Schutz, ein `cancelled` bleibt also stehen.
   Nächstes: Settings-Schreibpfad, dann AF abschließen.
+
+- **Iteration 5 (Loop AF, settings.json)** — `config.save()` las die Datei,
+  änderte das Dict und schrieb es zurück, ohne Sperre, über eine Zwischendatei
+  mit festem Namen `settings.json.tmp`. Gegenprobe mit acht gleichzeitigen
+  Speichervorgängen: **sieben meldeten Fehler** — der erste `os.replace` hatte
+  die gemeinsame Zwischendatei schon weggeschoben. Mit zwei Schreibern, deren
+  Ausgabe ineinanderläuft, meldete einer Fehler; ohne das Pech beim Umbenennen
+  wäre ein Gemisch an die Stelle getreten, und ein unlesbares settings.json
+  ersetzt der nächste Start durch Werkseinstellungen. Jetzt eine Modul-Sperre
+  um Lesen-Ändern-Schreiben und `mkstemp` je Vorgang. Gelernt: Das
+  Durability-Commit aus Nachtlauf 3 hat die Datei gegen *einen* schlechten
+  Moment gesichert, nicht gegen *zwei gleichzeitige* — dieselbe Zeile, zwei
+  verschiedene Fragen.
+  Nächstes: Vorschaubilder (zwei Anfragen erzeugen dasselbe Thumbnail?), dann
+  entscheiden, ob AF ausgereizt ist.

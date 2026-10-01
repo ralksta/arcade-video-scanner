@@ -2,6 +2,8 @@ import json
 import os
 import socket
 import sys
+import tempfile
+import threading
 from typing import Any, Dict, List
 
 from pydantic import Field
@@ -181,6 +183,12 @@ class AppSettings(BaseSettings):
 # CONFIG MANAGER
 # ==============================================================================
 
+# Eine Sperre für alle Schreibzugriffe auf settings.json, nicht je Instanz:
+# Die Datei gibt es einmal, egal wie viele ConfigManager sie anfassen.
+# RLock, weil save() unter der Sperre _save_json_raw() aufruft.
+_SETTINGS_WRITE_LOCK = threading.RLock()
+
+
 class ConfigManager:
     def __init__(self):
         self._ensure_directories()
@@ -257,28 +265,44 @@ class ConfigManager:
         `duplicate_detector.py` macht es zwei Dateien weiter längst richtig,
         mit derselben Begründung im Kommentar. Hier stand sie nicht.
         """
-        tmp_path = f"{SETTINGS_FILE}.tmp"
-        try:
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp_path, SETTINGS_FILE)
-            return True
-        except Exception as e:
-            print(f"❌ Error saving settings: {e}")
+        # Der Name der Zwischendatei war fest (`settings.json.tmp`). Zwei
+        # gleichzeitige Schreiber öffneten dieselbe, ihre Ausgaben liefen
+        # ineinander, und der zweite `os.replace` fand die Datei nicht mehr:
+        # gemessen 7 von 8 gleichzeitigen Speichervorgängen mit Fehler. Jetzt
+        # ein eigener Name je Vorgang und die Sperre um das Ganze.
+        tmp_path = None
+        with _SETTINGS_WRITE_LOCK:
             try:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-            except OSError:
-                pass
-            return False
+                fd, tmp_path = tempfile.mkstemp(
+                    dir=os.path.dirname(SETTINGS_FILE) or ".",
+                    prefix=".settings.", suffix=".tmp")
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_path, SETTINGS_FILE)
+                return True
+            except Exception as e:
+                print(f"❌ Error saving settings: {e}")
+                try:
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except OSError:
+                    pass
+                return False
 
     def save(self, updates: Dict[str, Any]) -> bool:
         """
         Updates current settings with new values and saves to disk.
         Preserves existing keys (like comments).
         """
+        # Lesen, Ändern, Schreiben als ein Schritt. Ohne Sperre lasen zwei
+        # gleichzeitige Aufrufe denselben alten Stand, und wer zuletzt
+        # schrieb, verwarf die Schlüssel des anderen — beide meldeten Erfolg.
+        with _SETTINGS_WRITE_LOCK:
+            return self._save_locked(updates)
+
+    def _save_locked(self, updates: Dict[str, Any]) -> bool:
         try:
             # Reload raw file to preserve comments
             current_raw = {}

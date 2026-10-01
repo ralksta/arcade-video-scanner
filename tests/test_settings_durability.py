@@ -216,3 +216,86 @@ def test_the_settings_route_still_checks_the_return_value():
     ).read_text(encoding="utf-8")
 
     assert source.count("if config.save(") == 2
+
+
+# --- Gleichzeitiges Speichern ---
+
+def test_concurrent_saves_do_not_lose_each_others_keys(cfg, settings_file):
+    """
+    ``save()`` liest die Datei, ändert das Dict und schreibt es zurück — ohne
+    Sperre. Zwei Konten speichern gleichzeitig verschiedene Schlüssel: Beide
+    lesen den alten Stand, wer zuletzt schreibt, verwirft den anderen. In der
+    Oberfläche stand für beide „gespeichert".
+    """
+    import threading
+    import time as _time
+
+    settings_file.write_text("{}", encoding="utf-8")
+    original = cfg._save_json_raw
+
+    def slow_write(data):
+        _time.sleep(0.02)  # alle Threads haben gelesen, bevor einer schreibt
+        return original(data)
+
+    cfg._save_json_raw = slow_write
+    n = 8
+    barrier = threading.Barrier(n)
+    results = []
+
+    def worker(i):
+        barrier.wait()
+        results.append(cfg.save({f"key_{i}": i}))
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert all(results)
+    assert {k: saved.get(k) for k in (f"key_{i}" for i in range(n))} == {
+        f"key_{i}": i for i in range(n)
+    }
+
+
+def test_concurrent_raw_writes_never_leave_a_mixed_file(cfg, settings_file):
+    """
+    Die Zwischendatei hieß immer ``settings.json.tmp``. Zwei Schreiber öffneten
+    dieselbe, ihre Ausgaben liefen ineinander, und ``os.replace`` setzte das
+    Gemisch an die Stelle — oder fand die Datei nicht mehr, weil der andere sie
+    schon verschoben hatte. Ein unlesbares settings.json wird beim nächsten
+    Start beiseitegelegt und durch Standardwerte ersetzt.
+    """
+    import threading
+    import time as _time
+
+    real_dump = json.dump
+
+    def chunked_dump(obj, fp, **kwargs):
+        text = json.dumps(obj, **kwargs)
+        half = len(text) // 2
+        fp.write(text[:half])
+        fp.flush()
+        _time.sleep(0.03)
+        fp.write(text[half:])
+
+    payloads = [{"theme": "dark", "who": "a" * 50}, {"theme": "light", "who": "b" * 80}]
+    barrier = threading.Barrier(len(payloads))
+    results = []
+
+    def worker(data):
+        barrier.wait()
+        results.append(cfg._save_json_raw(data))
+
+    with patch("arcade_scanner.config.json.dump", chunked_dump):
+        threads = [threading.Thread(target=worker, args=(p,)) for p in payloads]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+    assert real_dump is json.dump
+    assert all(results), f"Ein Schreiber meldete Fehler: {results}"
+    assert json.loads(settings_file.read_text(encoding="utf-8")) in payloads
+    assert not list(settings_file.parent.glob("*.tmp")), "Zwischendatei liegen geblieben"
