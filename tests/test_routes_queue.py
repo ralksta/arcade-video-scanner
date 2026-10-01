@@ -560,3 +560,91 @@ class TestGifOutputIsPerJob:
 
         assert resp["job_id"] in resp["output_filename"]
         assert out.endswith(resp["output_filename"])
+
+
+class TestUploadRespectsCancellation:
+    """
+    Der Upload sah den Status des Jobs nie an. Wer in der Oberfläche auf
+    „Abbrechen" klickte, während der Worker hochlud — bei einer großen Datei
+    Minuten —, verlor das Original trotzdem: Der Server ersetzte es nach dem
+    Empfang und setzte den Job von ``cancelled`` zurück auf ``done``.
+    """
+
+    def _upload(self, tmp_path, fake_db):
+        handler = FakeHandler("/api/queue/upload?job_id=1")
+        handler.rfile = FakeRFile(b"opt")
+        handler.headers = {"Content-Length": "3"}
+        fake_db.get = MagicMock(return_value=None)
+        settings = MagicMock()
+        settings.settings.enable_review_mode = False
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.config", settings), \
+             patch("arcade_scanner.server.routes.queue.verify_media_integrity",
+                   return_value=(True, "ok")), \
+             patch("arcade_scanner.server.routes.queue._media_cache"), \
+             patch("arcade_scanner.server.routes.queue.send_json"):
+            queue.handle_post(handler)
+        return handler
+
+    @pytest.mark.parametrize("status", ["cancelled", "done", "failed"])
+    def test_a_finished_job_takes_no_upload(self, tmp_path, status):
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        fake_db = FakeDB(jobs=[{"id": 1, "file_path": str(src), "size_bytes": 8,
+                                "status": status}])
+
+        handler = self._upload(tmp_path, fake_db)
+
+        assert handler.error == 409
+        assert src.read_bytes() == b"original"
+        assert ("done" not in [s for _, s in fake_db.status_updates])
+        assert not list(tmp_path.glob(".*part"))
+
+    def test_a_cancel_during_the_transfer_keeps_the_original(self, tmp_path):
+        """Beim Start noch aktiv, nach dem Empfang abgebrochen."""
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        job = {"id": 1, "file_path": str(src), "size_bytes": 8, "status": "uploading"}
+
+        class CancelledMidway(FakeDB):
+            calls = 0
+
+            def get_job(self, job_id):
+                self.calls += 1
+                return dict(job, status="uploading" if self.calls == 1 else "cancelled")
+
+        fake_db = CancelledMidway(jobs=[job])
+        handler = self._upload(tmp_path, fake_db)
+
+        assert handler.error == 409
+        assert src.read_bytes() == b"original"
+        assert "done" not in [s for _, s in fake_db.status_updates]
+        assert not list(tmp_path.glob(".*part"))
+
+    def test_an_active_job_is_still_accepted(self, tmp_path):
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        fake_db = FakeDB(jobs=[{"id": 1, "file_path": str(src), "size_bytes": 8,
+                                "status": "uploading"}])
+
+        handler = self._upload(tmp_path, fake_db)
+
+        assert handler.error is None
+        assert src.read_bytes() == b"opt"
+        assert db_status(fake_db) == [(1, "done")]
+
+
+def test_a_job_is_applied_by_one_upload_at_a_time():
+    """
+    Nach einem Reclaim hat ein Job zwei Worker. Beide lesen ``uploading``,
+    bevor einer ``done`` setzt — der Status allein trennt sie nicht.
+    """
+    assert queue._claim_finalize(7)
+    try:
+        assert not queue._claim_finalize(7), "Zweiter Upload desselben Jobs kam durch"
+        assert queue._claim_finalize(8), "Ein anderer Job darf nicht warten"
+        queue._release_finalize(8)
+    finally:
+        queue._release_finalize(7)
+    assert queue._claim_finalize(7), "Nach dem Freigeben muss es wieder gehen"
+    queue._release_finalize(7)

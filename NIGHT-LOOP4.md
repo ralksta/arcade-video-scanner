@@ -98,3 +98,18 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   *deinem*". Offen und klein: Fertige GIFs werden nie gelöscht — das
   Temp-Verzeichnis wächst bis zum Neustart (→ Loop AG, „sehr viele").
   Nächstes: weitere check-then-act-Stellen (Queue-Claim, Settings-Schreiben).
+
+- **Iteration 4 (Loop AF, „Abbrechen" während des Uploads)** — Die Queue im
+  Store ist sauber: Abholen per Compare-and-Swap, Einreihen unter der Sperre.
+  Die Lücke lag eine Ebene höher. `/api/queue/upload` las den Job, sah seinen
+  Status aber nie an. Der Worker prüft den Abbruch einmal *vor* dem Upload —
+  der Upload selbst dauert bei einer großen Datei Minuten. Wer in dieser Zeit
+  „Abbrechen" klickte, verlor das Original trotzdem, und der Job sprang von
+  `cancelled` auf `done` zurück (`update_job_status` ohne `guard_active`).
+  Gegenprobe: alle vier Fälle (cancelled/done/failed vorab, Abbruch mitten im
+  Empfang) ersetzten am alten Stand das Original. Jetzt zwei Prüfungen — früh,
+  um keine Gigabytes umsonst zu empfangen, und verbindlich direkt vor dem
+  Ersetzen —, dazu eine Sperre je Job, weil nach einem Reclaim zwei Worker
+  denselben Job hochladen können. Der Worker meldet eine 409 als `failed`
+  über `/complete` mit Schutz, ein `cancelled` bleibt also stehen.
+  Nächstes: Settings-Schreibpfad, dann AF abschließen.
