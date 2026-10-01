@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+- `POST /api/restore` überschrieb ohne Anmeldung die globalen Einstellungen
+  (darunter `ffprobe_path`). Jetzt sind Sitzung und Admin nötig.
+- Parallele Anmeldeversuche umgingen die Brute-Force-Sperre (40 statt 5).
+- `GET /api/settings`, `/api/duplicates/status` und `POST /api/tags`
+  antworteten ohne Anmeldung. Ein neuer Test ruft jede Route anonym am
+  echten Server auf.
+- Dateinamen mit `"` oder `\` brachen aus den Klick-Handlern der Karten aus.
+  Neuer Helfer `jsArg()`.
+
+### Fixed (Nachtlauf 4)
+- Abbrechen während des Uploads ersetzte das Original trotzdem.
+- Gleichzeitiges Speichern der Einstellungen verlor Änderungen.
+- Vorschaubilder konnten halb ausgeliefert und eine Woche gecacht werden.
+- Zwei GIF-Exporte mit gleichem Dateinamen schrieben in dieselbe Datei.
+- „Ähnliche Medien" verglich Vektoren verschiedener Modelle.
+- Videos mit sehr langem Namen ließen sich nicht optimieren.
+- Die Ordnerliste des Einrichtungs-Assistenten brauchte über 30 s.
+
 ### Removed
 - **iOS-Client zurückgezogen** (`ios_client/`). Er funktionierte seit `8c6008a`
   nicht mehr — die DeoVR-Routen, die er aufrief, gibt es nicht mehr, und er

@@ -41,7 +41,7 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
             Symlink-Schleifen (`os.walk` folgt nicht — sicher), Apostroph → Phase 3
 - [x] **Phase 0.1 — iOS-Client zurückziehen** — `ios_client/` entfernt, letzter Stand `dec7163`
 - [x] **Phase 3 — Escaping priorisiert** — `jsArg()`, 13 Handler + 10 Textstellen, Vault ausgelassen
-- [ ] **Abschluss:** Übergabebericht oben in `NACHTLAUF-BERICHT.md` (neuer Abschnitt
+- [x] **Abschluss:** Übergabebericht oben in `NACHTLAUF-BERICHT.md` (neuer Abschnitt
       „Nachtlauf 4"), Fragen an Ralf zuerst
 
 ## Fragen an Ralf
@@ -319,3 +319,5 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   die Umstellung ändert keine Darstellung, nur die Maskierung, aber das steht
   so im Bericht.
   Nächstes: Übergabebericht.
+
+- **Iteration 15 (Abschluss)** — Übergabebericht oben in NACHTLAUF-BERICHT.md, CHANGELOG ergänzt. Schleife beendet.
