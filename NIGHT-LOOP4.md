@@ -27,7 +27,8 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
 - [ ] **Loop AF — Gleichzeitigkeit (Rest)**
       - [x] Gleichzeitige Anmeldungen: Brute-Force-Sperre ließ parallel **40 von 40**
             Versuchen durch (Grenze 5); `SessionManager` hatte gar keine Sperre
-      - [ ] Ähnlichkeits-Cache unter parallelen Anfragen
+      - [x] Ähnlichkeits-Cache: Sperren seit Iteration 95 sauber. Dabei gefunden:
+            Vektoren verschiedener Modelle wurden miteinander verglichen
       - [ ] „Wo noch?"-Durchgang: dasselbe check-then-act-Muster an weiteren Stellen
 - [ ] **Loop AG — Grenzen: leer, eins, sehr viele**
       - [ ] Null Einträge / ein Eintrag: Routen, Statistiken, Divisionen, Oberfläche
@@ -57,3 +58,19 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   ein Dict, in das andere Threads schrieben. Nebenbei: Die Sperrmeldung im Log
   sagte „IP user:alice" — der Kontoschlüssel lief durch denselben Text.
   Nächstes: Ähnlichkeits-Cache unter parallelen Anfragen.
+
+- **Iteration 2 (Loop AF → Ähnlichkeits-Cache, zwei Räume)** — Die Sperren des
+  `SimilarityCache` sind seit dem Verklemmungs-Fix in Ordnung; die Gleichzeitig-
+  keit selbst gab nichts mehr her. Gemessen (synthetisch, 10.000 × 512):
+  Dekodieren beim Fehltreffer 243 ms, kNN 271 ms je Anfrage, beides reines
+  Python unter der GIL. Der Cache verfällt bei *jedem* Medien-Schreibvorgang,
+  nicht nur bei neuen Embeddings — während eines Scans fällt er also praktisch
+  ständig. Bewusst **nicht** geändert: Die echte DB hat 0 Embeddings, der Pfad
+  läuft hier gar nicht, und eine halbe Sekunde ist kein Fehler.
+  Der eigentliche Fund lag beim Lesen: `for path, _model, blob` — das Modell
+  wurde verworfen. `media_indexer.py --model X` indiziert Datei für Datei neu,
+  während des Laufs (oder nach Ctrl-C für immer) liegen zwei Modelle im Index.
+  Gleiche Dimension: plausible Zahlen aus zwei verschiedenen Räumen, der fremde
+  Eintrag landete im Test auf Platz 1. Andere Dimension: `zip` schnitt ab, ein
+  768er bekam Score 1.0. Jetzt nur noch Kandidaten desselben Modells.
+  Nächstes: „Wo noch?" — check-then-act an weiteren Stellen.
