@@ -541,13 +541,19 @@ def handle_post(handler) -> bool:
 
             estimated_size_mb = (width * height * fps * duration * (quality / 100) * 0.3) / (1024 * 1024)
 
+            gif_job_id = str(uuid.uuid4())[:8]
+
+            # Die Job-ID gehört in den Namen. Vorher hing er nur an Basename,
+            # Preset und fps: `VID_0001.mp4` aus zwei Ordnern — oder derselbe
+            # Clip mit anderem Ausschnitt — schrieb in dieselbe Datei, und
+            # `ffmpeg -y` kürzte sie mitten im ersten Lauf. Wer zuerst „done"
+            # sah, lud ein halbes oder das fremde GIF, auch kontoübergreifend.
             base_name = os.path.splitext(os.path.basename(video_path))[0]
-            output_filename = f"{base_name}_{preset}_{fps}fps.gif"
+            output_filename = f"{base_name}_{preset}_{fps}fps_{gif_job_id}.gif"
             gif_export_dir = os.path.join(tempfile.gettempdir(), "arcade_gif_exports")
             os.makedirs(gif_export_dir, exist_ok=True)
             output_path = os.path.join(gif_export_dir, output_filename)
 
-            gif_job_id = str(uuid.uuid4())[:8]
             palette_path = os.path.join(gif_export_dir, f"palette_{gif_job_id}.png")
 
             t = threading.Thread(

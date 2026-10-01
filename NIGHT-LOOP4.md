@@ -41,6 +41,16 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
 
 ## Fragen an Ralf
 
+1. **Dateizugriff über Kontogrenzen.** `/stream`, `HEAD /stream` und
+   `/api/export/gif` prüfen nur `is_path_allowed()` — liegt der Pfad in
+   *irgendeinem* Scan-Ziel (`config.active_scan_targets` = Ziele **aller**
+   Konten). Ein angemeldetes Konto B kann also eine Datei aus den Zielen von A
+   abspielen oder als GIF exportieren, wenn es den Pfad kennt oder rät.
+   `/api/videos`, `/api/similar` und `/api/candidates` filtern dagegen per
+   `core/user_scope.visible_path_filter()`. Soll die Auslieferung dieselbe
+   Regel bekommen? Nicht eigenmächtig geändert: Es betrifft den TV-Client, den
+   Prüfmodus-Sonderfall und Phase 6 (Vorschaubilder) gleich mit.
+
 ## Journal
 
 <!-- Jede Iteration hängt hier einen Eintrag an: was gemacht, was gelernt, was als Nächstes. -->
@@ -74,3 +84,17 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   Eintrag landete im Test auf Platz 1. Andere Dimension: `zip` schnitt ab, ein
   768er bekam Score 1.0. Jetzt nur noch Kandidaten desselben Modells.
   Nächstes: „Wo noch?" — check-then-act an weiteren Stellen.
+
+- **Iteration 3 (Loop AF, „Wo noch?" — zwei GIFs, eine Datei)** — Die fünf
+  Stellen, an denen Threads starten, durchgesehen. Scan und Duplikat-Suche sind
+  seit Nachtlauf 3 mit `_claim()`/`try_begin()` geschützt. Der GIF-Export nicht
+  — aber anders als gedacht: Er braucht keinen Ausschluss, sondern eindeutige
+  Ausgaben. Der Name hing nur an `{basename}_{preset}_{fps}fps.gif`, und
+  `VID_0001.mp4` gibt es in jedem Kamera-Ordner. Zwei Exporte, eine Datei;
+  `ffmpeg -y` kürzt sie beim zweiten Start. Gegenprobe: beide Exporte zielten
+  auf `/tmp/arcade_gif_exports/VID_0001_720p_15fps.gif`. Jetzt trägt der Name
+  die Job-ID. Dabei aufgefallen und als **Frage an Ralf** notiert: `/stream`
+  und der GIF-Export prüfen nur „liegt in irgendeinem Scan-Ziel", nicht „in
+  *deinem*". Offen und klein: Fertige GIFs werden nie gelöscht — das
+  Temp-Verzeichnis wächst bis zum Neustart (→ Loop AG, „sehr viele").
+  Nächstes: weitere check-then-act-Stellen (Queue-Claim, Settings-Schreiben).

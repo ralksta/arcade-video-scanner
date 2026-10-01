@@ -495,3 +495,68 @@ class TestDownloadGif:
         handler = FakeHandler(f"/download_gif?file={name}")
         run_route(handler)
         assert handler.error == 403
+
+
+class TestGifOutputIsPerJob:
+    """
+    Der Ausgabepfad hing nur an Basename, Preset und fps. Zwei Exporte von
+    ``VID_0001.mp4`` aus zwei Ordnern — oder derselbe Clip mit einem anderen
+    Ausschnitt — schrieben in **dieselbe** Datei. ``ffmpeg -y`` kürzt sie beim
+    Start des zweiten Laufs; wer zuerst „done" sah, lud ein halbes oder das
+    fremde GIF herunter. Über Kontogrenzen hinweg: Das Temp-Verzeichnis und
+    ``/download_gif`` kennen keine Besitzer.
+    """
+
+    def _export(self, video_path):
+        handler = FakeHandler("/api/export/gif",
+                              body={"path": str(video_path), "preset": "720p", "fps": 15})
+        entry = MagicMock(width=1920, height=1080, duration_sec=10.0)
+        fake_db = MagicMock()
+        fake_db.get.return_value = entry
+        started = []
+
+        class NoThread:
+            def __init__(self, target, args, daemon):
+                started.append(args)
+
+            def start(self):
+                pass
+
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.sanitize_path", side_effect=lambda p: p), \
+             patch("arcade_scanner.server.routes.queue.threading.Thread", NoThread), \
+             patch("arcade_scanner.server.routes.queue.send_json") as send_json:
+            queue.handle_post(handler)
+
+        assert handler.error is None, handler.error
+        output_path = started[0][1]
+        return output_path, send_json.call_args[0][1]
+
+    def test_two_videos_with_the_same_name_get_different_files(self, tmp_path):
+        for sub in ("a", "b"):
+            (tmp_path / sub).mkdir()
+            (tmp_path / sub / "VID_0001.mp4").write_bytes(b"x")
+
+        out_a, resp_a = self._export(tmp_path / "a" / "VID_0001.mp4")
+        out_b, resp_b = self._export(tmp_path / "b" / "VID_0001.mp4")
+
+        assert out_a != out_b
+        assert resp_a["download_url"] != resp_b["download_url"]
+
+    def test_the_same_video_twice_gets_different_files(self, tmp_path):
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"x")
+
+        out_1, _ = self._export(video)
+        out_2, _ = self._export(video)
+
+        assert out_1 != out_2
+
+    def test_the_file_name_carries_the_job_id(self, tmp_path):
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"x")
+
+        out, resp = self._export(video)
+
+        assert resp["job_id"] in resp["output_filename"]
+        assert out.endswith(resp["output_filename"])
