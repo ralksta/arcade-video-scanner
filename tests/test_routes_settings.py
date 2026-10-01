@@ -136,3 +136,47 @@ def test_post_settings_oversized_body_rejected():
     assert handled is True
     assert h.error == 413
     singletons[0].save.assert_not_called()
+
+
+# --- /api/restore: Sitzung und Admin ---
+#
+# Die Route hatte **gar keine** Prüfung. Am echten Server belegt: eine
+# anonyme Anfrage überschrieb proxy_root und review_dir. Unter den
+# Einstellungen steht auch ffprobe_path — das Programm, das der Scanner
+# ausführt. Derselbe Fehler war für POST /api/settings schon einmal behoben
+# worden (siehe dort); die Nachbar-Route hatte ihn behalten.
+#
+# Admin, nicht nur angemeldet: Restore ersetzt Einstellungen, die alle Konten
+# betreffen (UMSETZUNGSPLAN, Phase 5).
+
+def _restore(user, is_admin=False):
+    handler = FakeHandler("/api/restore", user=user,
+                          body={"proxy_root": "/tmp/angreifer"})
+    config = MagicMock()
+    config.save.return_value = True
+    account = MagicMock()
+    account.is_admin = is_admin
+    user_db = MagicMock()
+    user_db.get_user.return_value = account if user else None
+    with patch.object(settings, "_get_singletons",
+                      return_value=(config, user_db, MagicMock(), 10_000)):
+        settings.handle_post(handler)
+    return handler, config
+
+
+def test_restore_rejects_anonymous_callers():
+    handler, config = _restore(user=None)
+    assert handler.error == 401
+    config.save.assert_not_called()
+
+
+def test_restore_rejects_non_admins():
+    handler, config = _restore(user="kim", is_admin=False)
+    assert handler.error == 403
+    config.save.assert_not_called()
+
+
+def test_restore_works_for_admins():
+    handler, config = _restore(user="boss", is_admin=True)
+    assert handler.error is None
+    config.save.assert_called_once_with({"proxy_root": "/tmp/angreifer"})

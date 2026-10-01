@@ -356,7 +356,22 @@ def handle_post_setup_complete(handler) -> None:
 
 def handle_post_restore(handler) -> None:
     """Restore application settings from a JSON backup sent by the client."""
-    config, _, _, MAX_REQUEST_SIZE = _get_singletons()
+    config, user_db, _, MAX_REQUEST_SIZE = _get_singletons()
+
+    # Die Route hatte gar keine Prüfung: Wer den Port erreichte, überschrieb
+    # ohne Anmeldung die globalen Einstellungen — darunter ffprobe_path, das
+    # Programm, das der Scanner ausführt. POST /api/settings hatte denselben
+    # Fehler und wurde behoben; diese Nachbar-Route behielt ihn.
+    #
+    # Admin, nicht nur angemeldet: Restore ersetzt, was alle Konten betrifft.
+    user_name = handler.get_current_user()
+    if not user_name:
+        handler.send_error(401, "Unauthorized")
+        return
+    account = user_db.get_user(user_name)
+    if account is None or not getattr(account, "is_admin", False):
+        handler.send_error(403, "Restore requires an admin account")
+        return
 
     try:
         content_length = int(handler.headers.get("Content-Length", 0))

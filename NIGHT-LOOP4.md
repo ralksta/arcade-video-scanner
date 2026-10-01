@@ -53,6 +53,16 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
    Regel bekommen? Nicht eigenmächtig geändert: Es betrifft den TV-Client, den
    Prüfmodus-Sonderfall und Phase 6 (Vorschaubilder) gleich mit.
 
+2. **Globale Einstellungen für Nicht-Admins.** `POST /api/settings` lässt jedes
+   angemeldete Konto die *globalen* Schlüssel schreiben — Scan-Schwellen,
+   `proxy_root`, `review_dir` und `ffprobe_path`/`ffmpeg_path`, also welches
+   Programm der Server ausführt. Nur die nutzereigenen Felder werden
+   herausgezogen. Soll ein Nicht-Admin globale Schlüssel überhaupt ändern
+   dürfen? Mein Vorschlag: globale Schlüssel nur für Admins, nutzereigene für
+   alle — aber das ändert, was ein Nicht-Admin in den Einstellungen sieht.
+   Dazu klein: `GET /api/backup` liefert settings.json auch an Nicht-Admins.
+   (`/api/restore` habe ich heute Nacht geschlossen — dort war es eindeutig.)
+
 ## Journal
 
 <!-- Jede Iteration hängt hier einen Eintrag an: was gemacht, was gelernt, was als Nächstes. -->
@@ -185,3 +195,20 @@ Autonomer Nachtlauf, gestartet 2026-10-01. Branch: `feat/nightly-loops-4` (aus `
   Apostroph im Ordnernamen. Auffällig, noch nicht geprüft: `/api/backup`
   liefert auch einem Nicht-Admin eine Sicherung.
   Nächstes: `/api/backup` für Nicht-Admins, dann ein Eintrag, dann sehr viele.
+
+- **Iteration 9 (Loop AG → Restore ohne Anmeldung — schwerster Fund)** — Die
+  Frage war harmlos: Warum bekommt ein Nicht-Admin eine Sicherung? Das
+  Gegenstück, `POST /api/restore`, hatte **überhaupt keine** Prüfung. Am
+  echten Server (Temp-Datenverzeichnis) belegt: eine anonyme Anfrage
+  überschrieb `proxy_root` und `review_dir`; unter den Einstellungen steht
+  auch `ffprobe_path`, das der Scanner ausführt. Der Rundum-Wächter
+  (`test_debug_route_authorization.py`) prüft nur `api_handler.py`, nicht die
+  Route-Module — dieselbe Formlücke wie bei `/stream` in Nachtlauf 3. Und
+  `POST /api/settings` hatte exakt diesen Fehler schon einmal, mit Kommentar;
+  die Nachbar-Route im selben Modul behielt ihn. Jetzt Sitzung **und** Admin
+  (Restore ersetzt, was alle Konten betrifft; so auch Phase 5). Kein Client
+  ruft die Route auf — nichts bricht. Neu als **Frage 2**: Nicht-Admins
+  schreiben über `/api/settings` die globalen Schlüssel, `ffprobe_path`
+  eingeschlossen.
+  Nächstes: Den Rundum-Wächter auf die Route-Module ausdehnen — sonst bleibt
+  die nächste solche Route genauso unsichtbar.
