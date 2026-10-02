@@ -716,8 +716,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
             # 2. THUMBNAILS -> Serve from THUMB_DIR (with security checks + lazy generation)
             elif self.path.startswith("/thumbnails/"):
+                # Sitzungspflichtig seit UMSETZUNGSPLAN Phase 6 (2026-10-02).
+                # Vorher bewusst offen, weil der TV-Client kein Cookie hat;
+                # jetzt hängt er sein Token an (serverConfig.thumbnailUrl), der
+                # Browser schickt das Cookie. Kein LAN-Sonderfall — der hätte
+                # sich per X-Forwarded-For fälschen lassen.
+                if not self.get_current_user():
+                    self.send_error(401, "Unauthorized")
+                    return
                 try:
-                    rel_path = unquote(self.path[12:])  # remove /thumbnails/
+                    # Nur der Pfad, ohne Query: Der TV-Client hängt `?token=`
+                    # an, und `self.path[12:]` nahm das mit in den Dateinamen.
+                    rel_path = unquote(urlparse(self.path).path[12:])  # remove /thumbnails/
 
                     # Security Fix C-4: Prevent path traversal
                     thumb_dir_abs = os.path.abspath(config.thumb_dir)

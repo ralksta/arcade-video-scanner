@@ -184,13 +184,8 @@ def test_the_route_sweep_also_covers_startswith_branches():
 
 # Zweige, die bewusst ohne Sitzung erreichbar sind — mit Begründung.
 ERLAUBT_OHNE_SITZUNG = {
-    # Vorschaubilder. Ihre Namen sind Hashes des Quellpfades, der Inhalt ist
-    # ein verkleinertes Standbild. Eine Sitzungspflicht hier würde die
-    # Vorschaubilder im TV-Client abschalten: `thumbnailUrl()` in
-    # `tv_client/src/serverConfig.js` hängt keinen Token an, und ein Cookie
-    # gibt es dort nicht. Das ist eine Entscheidung für den Betreiber, keine,
-    # die ein Testlauf nebenbei trifft — sie steht im Übergabebericht.
-    "/thumbnails/",
+    # (Bis 2026-10-02 stand hier "/thumbnails/". Entschieden in Phase 6: Die
+    # Vorschaubilder verlangen eine Sitzung, der TV-Client hängt sein Token an.)
     # Stylesheets, Skripte und die Login-Seite selbst. Ohne sie gäbe es keine
     # Anmeldemaske.
     "/static/",
