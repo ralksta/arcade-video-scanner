@@ -1585,7 +1585,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <span class="material-icons text-[18px]" aria-hidden="true">folder_open</span>
                     <span class="hidden md:inline">Scanning</span>
                 </button>
-                <button class="settings-nav-item" data-section="performance">
+                <button class="settings-nav-item" data-section="performance" data-admin-only>
                     <span class="settings-nav-indicator"></span>
                     <span class="material-icons text-[18px]" aria-hidden="true">speed</span>
                     <span class="hidden md:inline">Performance</span>
@@ -1605,7 +1605,7 @@ SETTINGS_MODAL_COMPONENT = """
                     <span class="material-icons text-[18px]" aria-hidden="true">security</span>
                     <span class="hidden md:inline">Privacy</span>
                 </button>
-                <button class="settings-nav-item" data-section="backup">
+                <button class="settings-nav-item" data-section="backup" data-admin-only>
                     <span class="settings-nav-indicator"></span>
                     <span class="material-icons text-[18px]" aria-hidden="true">save</span>
                     <span class="hidden md:inline">Backup &amp; Restore</span>
@@ -1671,7 +1671,7 @@ SETTINGS_MODAL_COMPONENT = """
                         </div>
                     </section>
 
-                    <section class="space-y-3">
+                    <section class="space-y-3" data-admin-only>
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
                                 <span class="material-icons text-lg text-gray-400" aria-hidden="true">block</span>
@@ -1695,7 +1695,7 @@ SETTINGS_MODAL_COMPONENT = """
                         <textarea class="w-full ds-textarea" id="settingsExcludes" placeholder="/Volumes/Backup" rows="2" oninput="markSettingsUnsaved()"></textarea>
                     </section>
 
-                    <section class="space-y-3">
+                    <section class="space-y-3" data-admin-only>
                         <div>
                             <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
                                 <span class="material-icons text-lg text-gray-400" aria-hidden="true">notes</span>
@@ -1916,7 +1916,7 @@ SETTINGS_MODAL_COMPONENT = """
 
 
 
-                        <div class="ds-settings-card flex items-center justify-between gap-4">
+                        <div class="ds-settings-card flex items-center justify-between gap-4" data-admin-only>
                             <div class="flex-1">
                                 <div class="text-text-main font-medium text-sm">Video Optimizer</div>
                                 <div class="text-xs text-gray-500 mt-0.5">Enable video compression features <span class="text-amber-400">(restart required)</span></div>

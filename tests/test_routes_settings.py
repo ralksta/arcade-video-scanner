@@ -7,6 +7,7 @@ one xfail documents a real security gap (see below) without fixing it blind.
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fake_user_store import make_fake_user_db
 
 from arcade_scanner.server.routes import settings
@@ -181,3 +182,61 @@ def test_restore_works_for_admins():
     handler, config = _restore(user="boss", is_admin=True)
     assert handler.error is None
     config.save.assert_called_once_with({"proxy_root": "/tmp/angreifer"})
+
+
+# --- Globale Einstellungen nur für Admins (Entscheidung 2026-10-02) ---
+#
+# POST /api/settings ließ jedes angemeldete Konto die *globalen* Schlüssel
+# schreiben — Scan-Schwellen, proxy_root, review_dir, ffprobe_path/ffmpeg_path,
+# also auch, welches Programm der Server ausführt. Nicht-Admins behalten ihre
+# eigenen Felder; globale werden verworfen und in der Antwort genannt. Ein 403
+# ginge nicht: Der Dialog schickt bei jedem Speichern alles mit.
+
+def _as(is_admin):
+    singletons = _singletons()
+    singletons[1].get_user.return_value.is_admin = is_admin
+    return singletons
+
+
+def test_a_non_admin_cannot_write_global_keys():
+    h = FakeHandler("/api/settings", user="kim", body={
+        "ffprobe_path": "/tmp/boese",
+        "proxy_root": "/tmp/x",
+        "min_size_mb": 1,
+        "scan_targets": ["/media/kim"],
+    })
+    singletons = _as(is_admin=False)
+    run(h, singletons, post=True)
+
+    config, user_db = singletons[0], singletons[1]
+    saved = config.save.call_args[0][0] if config.save.called else {}
+    assert "ffprobe_path" not in saved and "proxy_root" not in saved and "min_size_mb" not in saved
+    assert user_db.get_user.return_value.data.scan_targets == ["/media/kim"], (
+        "Die eigenen Felder müssen trotzdem gespeichert werden"
+    )
+    body = h.body()
+    assert body["success"] is True
+    assert body["ignored"] == ["ffprobe_path", "min_size_mb", "proxy_root"]
+
+
+def test_a_non_admin_may_still_save_views():
+    """Gespeicherte Ansichten legt jeder an; nutzereigen werden sie mit Phase 2."""
+    h = FakeHandler("/api/settings", user="kim", body={"saved_views": [{"name": "Urlaub"}]})
+    singletons = _as(is_admin=False)
+    run(h, singletons, post=True)
+    singletons[0].save.assert_called_once_with({"saved_views": [{"name": "Urlaub"}]})
+
+
+def test_an_admin_writes_global_keys():
+    h = FakeHandler("/api/settings", user="boss", body={"proxy_root": "/srv/p", "min_size_mb": 5})
+    singletons = _as(is_admin=True)
+    run(h, singletons, post=True)
+    singletons[0].save.assert_called_once_with({"proxy_root": "/srv/p", "min_size_mb": 5})
+    assert h.body()["ignored"] == []
+
+
+@pytest.mark.parametrize("is_admin", [True, False])
+def test_get_settings_reports_the_admin_flag(is_admin):
+    h = FakeHandler("/api/settings")
+    run(h, _as(is_admin=is_admin))
+    assert h.body()["is_admin"] is is_admin

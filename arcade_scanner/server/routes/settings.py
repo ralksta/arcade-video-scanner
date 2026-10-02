@@ -75,6 +75,11 @@ def handle_get_settings(handler) -> None:
         settings_dump["exclude_paths"]     = []
         settings_dump["available_tags"]    = []
 
+    # Der Dialog blendet globale Abschnitte für Nicht-Admins aus — der Server
+    # verwirft deren globale Schlüssel ohnehin (handle_post_settings).
+    account = user_db.get_user(user_name)
+    settings_dump["is_admin"] = bool(account is not None and getattr(account, "is_admin", False))
+
     # Docker detection
     settings_dump["is_docker"] = bool(os.getenv("CONFIG_DIR"))
 
@@ -117,6 +122,11 @@ def _unreachable(targets) -> list:
 # ---------------------------------------------------------------------------
 # POST /api/settings
 # ---------------------------------------------------------------------------
+
+# Globale Schlüssel, die jedes Konto schreiben darf. Gespeicherte Ansichten
+# legt jeder an; nutzereigen werden sie mit Phase 2 (UMSETZUNGSPLAN).
+SHARED_KEYS_FOR_EVERYONE = frozenset({"saved_views"})
+
 
 def handle_post_settings(handler) -> None:
     """Save global config and user-specific overrides, then schedule report rebuild."""
@@ -161,6 +171,18 @@ def handle_post_settings(handler) -> None:
         user_sensitive_tags        = new_settings.pop("sensitive_tags", None)
         user_sensitive_collections = new_settings.pop("sensitive_collections", None)
 
+        # Globale Schlüssel nur für Admins. Vorher schrieb jedes angemeldete
+        # Konto Scan-Schwellen, proxy_root, review_dir und ffprobe_path —
+        # also auch, welches Programm der Server ausführt. Ein 403 ginge
+        # nicht: Der Dialog schickt bei jedem Speichern alles mit, die
+        # eigenen Felder eingeschlossen. Also verwerfen und nennen.
+        account = user_db.get_user(user_name)
+        ignored: list = []
+        if not (account is not None and getattr(account, "is_admin", False)):
+            ignored = sorted(k for k in new_settings if k not in SHARED_KEYS_FOR_EVERYONE)
+            for key in ignored:
+                new_settings.pop(key)
+
         if config.save(new_settings):
             if user_name:
                 # Über update_user(): Der Datensatz wird als Ganzes
@@ -196,7 +218,7 @@ def handle_post_settings(handler) -> None:
             handler.send_response(200)
             handler.send_header("Content-Type", "application/json")
             handler.end_headers()
-            handler.wfile.write(json.dumps({"success": True}).encode())
+            handler.wfile.write(json.dumps({"success": True, "ignored": ignored}).encode())
         else:
             handler.send_error(500, "Failed to save settings")
 
