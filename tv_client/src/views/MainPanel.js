@@ -14,6 +14,7 @@ import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
 import homeCss from '../components/Home.module.less';
 import displayName from '../displayName';
+import {matchesCollectionCriteria} from '../collectionMatch';
 
 // Rasterzelle in 4K-Pixeln: 680 breit, 16:9-Bild (382) plus 36 Rand für den
 // Fokus. Ergibt auf Full HD fünf Spalten à 340 px.
@@ -67,80 +68,6 @@ const sortVideos = (list, sortKey) => {
 			// August 2026 waren — null Überschneidung in den ersten zehn.
 			return sorted.sort((a, b) => entryDate(b) - entryDate(a));
 	}
-};
-
-// Muss dieselben Verdikte liefern wie evaluateCollectionMatch() im
-// Browser-Client (arcade_scanner/server/static/collections.js) und wie der
-// Python-Port in arcade_scanner/core/criteria_eval.py. Ein Differenztest
-// (tests/test_tv_collection_parity.py) hält die drei gegeneinander.
-//
-// Bewusst NICHT unterstützt, weil die TV-Oberfläche diese Dimensionen nicht
-// anbietet: media_type, format, resolution, orientation, Größen- und
-// Dauergrenzen. Sammlungen, die darauf beruhen, zeigen auf dem Fernseher mehr
-// Treffer als im Browser — dokumentiert statt still abweichend.
-const matchesCollectionCriteria = (v, criteria) => {
-	if (!criteria) return true;
-	const inc = criteria.include || {};
-	const exc = criteria.exclude || {};
-
-	// Die API liefert das Feld als `Status` mit großem S. Hier stand `v.status`:
-	// immer undefined, womit 'optimized' nie und 'pending' immer traf — auf dem
-	// Fernseher zeigte dieselbe Sammlung also nichts oder alles.
-	const status = v.Status || '';
-	const codec = (v.codec || '').toLowerCase();
-
-	// Status
-	if (inc.status && inc.status.length) {
-		const match = inc.status.some(s => {
-			// Gleiche Sonderregel wie im Browser: '_opt' im Dateinamen.
-			if (s === 'optimized_files') return (v.FilePath || '').includes('_opt');
-			return status === s;
-		});
-		if (!match) return false;
-	}
-	if (exc.status && exc.status.length) {
-		if (exc.status.some(s => status.toLowerCase().includes(s.toLowerCase()) || status === s)) {
-			return false;
-		}
-	}
-
-	// Codec — Teilstring wie im Browser: die API liefert auch Werte wie
-	// "hevc (Main 10)", ein exakter Vergleich verfehlt die.
-	if (inc.codec && inc.codec.length) {
-		if (!inc.codec.some(c => codec.includes(c.toLowerCase()))) return false;
-	}
-	if (exc.codec && exc.codec.length) {
-		if (exc.codec.some(c => codec.includes(c.toLowerCase()))) return false;
-	}
-
-	// Tags
-	if (inc.tags && inc.tags.length) {
-		const videoTags = v.tags || [];
-		if (criteria.tagLogic === 'all') {
-			if (!inc.tags.every(t => videoTags.includes(t))) return false;
-		} else {
-			if (!inc.tags.some(t => videoTags.includes(t))) return false;
-		}
-	}
-	if (exc.tags && exc.tags.length) {
-		const videoTags = v.tags || [];
-		if (exc.tags.some(t => videoTags.includes(t))) return false;
-	}
-
-	// Search
-	if (criteria.search) {
-		const q = criteria.search.toLowerCase();
-		if (!v.FilePath.toLowerCase().includes(q)) return false;
-	}
-
-	// Favorites — der Browser kennt beide Richtungen: true = nur Favoriten,
-	// false = Favoriten ausschließen. Letzteres fehlte hier.
-	const wantOnlyFavorites = criteria.favorites === true || criteria.favorites === 'true';
-	const wantExcludeFavorites = criteria.favorites === false || criteria.favorites === 'false';
-	if (wantOnlyFavorites && !v.favorite) return false;
-	if (wantExcludeFavorites && v.favorite) return false;
-
-	return true;
 };
 
 // Die API liefert Width und Height, kein Feld `resolution` — hier stand
