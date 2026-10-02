@@ -42,6 +42,13 @@ All notable changes to this project will be documented in this file.
   Matcher übersprang Medientyp, Größe, Datum und weitere Kriterien; jetzt
   urteilt er wie der Browser, für jede Fixture geprüft.
 - Leere Reiter (etwa „Bilder“) erklären sich, statt schwarz zu bleiben.
+- Nach einem Video landete man wieder auf Home, die Position war weg, und
+  die ganze Bibliothek wurde neu geladen. Jetzt geht es an derselben Kachel
+  weiter.
+- Bilder öffneten den Videoplayer, der nichts zeigte.
+- Nach einem Neustart des Servers stand der Fernseher vor Kacheln ohne Bilder.
+  Kommt die App aus dem Hintergrund zurück, lädt sie neu und führt bei
+  abgelaufener Sitzung zum Login.
 
 ### Fixed (Nachtlauf 4)
 - Abbrechen während des Uploads ersetzte das Original trotzdem.
@@ -73,13 +80,25 @@ All notable changes to this project will be documented in this file.
   beschreibt, was eine Rückholung reparieren müsste.
 
 ### Added
-- **TV-App im Netflix-Stil.** Home bekommt einen großen Hero und waagerechte
-  Reihen (Weiterschauen, Favoriten, Zufällige Entdeckungen, Zuletzt
-  hinzugefügt). Die Kacheln sind 16:9, tragen einen lesbaren Titel und
-  Metadaten, einen Stern für Favoriten und ein 4K-/HD-Badge, und sie
-  vergrößern sich beim Fokus. Der Hintergrund ist dunkel.
-- TV-App: Collections erscheinen als Reihen nach Kategorie; „Alle anzeigen“
-  öffnet das Raster, die Zurück-Taste führt zurück.
+- **TV-App im Stil von Netflix und HBO.** Eine eigene Kopfleiste mit dem Logo
+  ARCADE im Markenverlauf ersetzt die Reiter. Darunter liegt ein randloses
+  Titelbild, das alle neun Sekunden zum nächsten Eintrag wechselt, mit
+  „Abspielen“ und „Mehr Infos“. Es folgen waagerechte Reihen: Weiterschauen,
+  Favoriten, Neu hinzugefügt, Zufällige Entdeckungen. Die Kacheln sind 16:9,
+  tragen Titel, Metadaten, Stern, 4K/HD und „NEU“ und leuchten beim Fokus in
+  der Markenfarbe. Detailansicht und Login sind im selben Stil gehalten. Beim
+  Laden schimmern Platzhalter, statt dass die Fläche leer bleibt.
+- **Scharfe Titelbilder:** `GET /poster` erzeugt bei Bedarf ein Standbild bis
+  1280×720 für Titelbild, Detailansicht und Player. Bisher wurden dort die
+  Vorschaubilder mit 480×270 hochgezogen. Der Endpunkt verlangt eine Sitzung
+  und zeigt nur eigene Einträge; `--rebuild-thumbs` räumt die Standbilder mit
+  ab.
+- TV-App: Collections erscheinen als große Kacheln in ihrer Farbe und als
+  Reihen nach Kategorie. „Alle anzeigen“ öffnet das Raster, die Zurück-Taste
+  führt zurück. Die Standard-Collections tragen deutsche Namen, leere werden
+  ausgeblendet.
+- TV-App: Bilder öffnen einen Vollbild-Betrachter in voller Auflösung, mit
+  ◀ ▶ blättert man.
 - TV-App: Filterleiste in einer Zeile mit Suche, Sortierung (neu „Längste“)
   und Filtern nach Auflösung, Länge und Tag.
 - TV-App: Detailansicht vor dem Abspielen mit „Favorit“ zum Umschalten.
