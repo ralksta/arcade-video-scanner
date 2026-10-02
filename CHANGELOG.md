@@ -37,6 +37,12 @@ All notable changes to this project will be documented in this file.
 - GIF-Export nur noch aus den eigenen Scan-Ordnern. Vorher genügte es, dass
   die Datei in den Ordnern *irgendeines* Kontos lag. `/stream` folgt mit Phase 6.
 
+### Fixed (TV-App)
+- Collections zeigten auf dem Fernseher immer die ganze Bibliothek. Der
+  Matcher übersprang Medientyp, Größe, Datum und weitere Kriterien; jetzt
+  urteilt er wie der Browser, für jede Fixture geprüft.
+- Leere Reiter (etwa „Bilder“) erklären sich, statt schwarz zu bleiben.
+
 ### Fixed (Nachtlauf 4)
 - Abbrechen während des Uploads ersetzte das Original trotzdem.
 - Gleichzeitiges Speichern der Einstellungen verlor Änderungen.
@@ -67,6 +73,19 @@ All notable changes to this project will be documented in this file.
   beschreibt, was eine Rückholung reparieren müsste.
 
 ### Added
+- **TV-App im Netflix-Stil.** Home bekommt einen großen Hero und waagerechte
+  Reihen (Weiterschauen, Favoriten, Zufällige Entdeckungen, Zuletzt
+  hinzugefügt). Die Kacheln sind 16:9, tragen einen lesbaren Titel und
+  Metadaten, einen Stern für Favoriten und ein 4K-/HD-Badge, und sie
+  vergrößern sich beim Fokus. Der Hintergrund ist dunkel.
+- TV-App: Collections erscheinen als Reihen nach Kategorie; „Alle anzeigen“
+  öffnet das Raster, die Zurück-Taste führt zurück.
+- TV-App: Filterleiste in einer Zeile mit Suche, Sortierung (neu „Längste“)
+  und Filtern nach Auflösung, Länge und Tag.
+- TV-App: Detailansicht vor dem Abspielen mit „Favorit“ zum Umschalten.
+  Favoriten lassen sich damit erstmals auf dem Fernseher setzen.
+- TV-App: „Weiterschauen“ merkt sich die Position und setzt dort fort, auf
+  Wunsch auch „Von vorn“.
 - **Endpunkt-Vertrag zwischen Server und Clients**: Ein Test liest die
   API-Pfade aus dem Quelltext von TV-, iOS- und webOS-Client und prüft sie
   gegen die Routen des Servers. Solche Brüche fallen sonst niemandem auf — die
