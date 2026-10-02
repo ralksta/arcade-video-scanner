@@ -57,6 +57,16 @@ iOS-Client behauptet.
 
 ## Phase 1 — Vault entfernen (Punkt 4)
 
+> **Erledigt am 2026-10-02.** `users.db` vorher gesichert:
+> `backups/users.db.2026-10-02-vor-phase1`. Entschieden bei der Umsetzung:
+> `vaulted` wird per Migration aus users.db **entfernt** (`drop_vault_data()`,
+> einmalig, Favoriten und Tags bleiben). Die Spalte `vaulted` in der
+> Medientabelle bleibt im Schema, beschrieben wird sie mit 0. Die
+> Zwischenfrage ist beantwortet: Phase 6 lief im selben TV-Build mit. Der
+> TV-Client ist gebaut (`tv_client/dist`); geprüft auf dem Gerät ist er
+> **noch nicht**, und ein `.ipk` ließ sich hier nicht packen (`ares-package`
+> fehlt).
+
 Die größte Einzelmaßnahme und deshalb früh: Sie **löscht** Code, den die Phasen
 2, 3 und 5 sonst mitschleppen würden.
 
@@ -222,6 +232,12 @@ löscht.
 ---
 
 ## Phase 6 — Vorschaubilder für Nicht-LAN schließen (Punkt 9)
+
+> **Erledigt am 2026-10-02, anders als geplant.** Der saubere Weg aus der
+> Zwischenfrage: `/thumbnails` verlangt für **alle** eine Sitzung, ohne
+> LAN-Ausnahme. Der TV-Client hängt sein Token an (`serverConfig.thumbnailUrl`),
+> der Browser schickt das Cookie. Dabei behoben: Die Route schnitt den
+> Dateinamen samt Query-String aus, ein `?token=` hätte 400 ergeben.
 
 Klein und unabhängig. Steht nach hinten, weil die Zwischenfrage aus Phase 1 sie
 überflüssig machen kann.
