@@ -62,10 +62,14 @@ iOS-Client behauptet.
 > `vaulted` wird per Migration aus users.db **entfernt** (`drop_vault_data()`,
 > einmalig, Favoriten und Tags bleiben). Die Spalte `vaulted` in der
 > Medientabelle bleibt im Schema, beschrieben wird sie mit 0. Die
-> Zwischenfrage ist beantwortet: Phase 6 lief im selben TV-Build mit. Der
-> TV-Client ist gebaut (`tv_client/dist`); geprüft auf dem Gerät ist er
-> **noch nicht**, und ein `.ipk` ließ sich hier nicht packen (`ares-package`
-> fehlt).
+> Zwischenfrage ist beantwortet: Phase 6 lief im selben TV-Build mit.
+> **Auf dem Gerät geprüft am 2026-10-02** (LG OLED77C4, webOS 10, über
+> `scripts/build_tv_ipk.sh` gebaut und mit `ares-install` aufgespielt).
+> Geprüft über das DevTools-Protokoll: Die Mediathek lädt (5458 Videos), alle
+> 17 Vorschaubilder laden mit Token, der Reiter „Archiv“ fehlt, `/stream`
+> liefert mit Token 206 und ohne Token 401. Die früheren Vault-Dateien von
+> `privat` sind sichtbar; die eine von `admin` gibt es nicht mehr auf der
+> Platte. Die Markierung war verwaist.
 
 Die größte Einzelmaßnahme und deshalb früh: Sie **löscht** Code, den die Phasen
 2, 3 und 5 sonst mitschleppen würden.
