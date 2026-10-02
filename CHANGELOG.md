@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Gespeicherte Ansichten gehören jetzt dem Konto** (ENTSCHEIDUNGEN.md,
+  Punkt 2). Bisher lagen sie in der globalen settings.json, und jedes Konto
+  sah Suchbegriffe und Ordner der anderen. Beim ersten Start gehen vorhandene
+  Ansichten einmalig an den Admin.
+
 ### Security
 - `POST /api/restore` überschrieb ohne Anmeldung die globalen Einstellungen
   (darunter `ffprobe_path`). Jetzt sind Sitzung und Admin nötig.

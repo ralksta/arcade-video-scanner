@@ -103,6 +103,12 @@ Suite grün, TV-Client gebaut und auf dem Gerät geprüft.
 
 ## Phase 2 — Gespeicherte Ansichten pro Nutzer (Punkt 2)
 
+> **Erledigt am 2026-10-02**, vor Phase 1 und damit außerhalb der geplanten
+> Reihenfolge, auf Wunsch. `users.db` wurde vorher gesichert:
+> `backups/users.db.2026-10-02-vor-phase2`. Die Migration übernimmt erst und
+> entfernt danach; ein zweiter Lauf tut nichts. Auf dieser Installation gab es
+> keine globalen Ansichten.
+
 Nach Phase 1, weil beide dieselben Stellen berühren (`models/user.py`,
 `routes/settings.py`).
 
