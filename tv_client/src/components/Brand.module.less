@@ -1,0 +1,20 @@
+@import './tokens.less';
+
+.brand {
+	display: inline-block;
+	font-size: 76px;
+	font-weight: 900;
+	letter-spacing: 10px;
+	line-height: 1;
+	background: @brand-gradient;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	// Leichter Schein, damit das Logo auf hellen Bildern nicht verschwindet.
+	filter: drop-shadow(0 4px 18px rgba(196, 23, 159, 0.45));
+}
+
+.large {
+	font-size: 180px;
+	letter-spacing: 26px;
+}

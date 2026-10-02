@@ -58,4 +58,20 @@ export const thumbnailUrl = (thumb) => {
 	return serverUrl(`/thumbnails/${encodeURIComponent(thumb || '')}${query}`);
 };
 
+/**
+ * URL des großen Standbilds (bis 1280×720) für Titelbild und Detailansicht.
+ *
+ * Die Vorschaubilder sind 480×270 — auf dem halben Fernseher verwaschen. Der
+ * Server erzeugt das Standbild beim ersten Abruf (GET /poster). Token wie bei
+ * thumbnailUrl().
+ *
+ * @param {string} path - FilePath des Eintrags
+ * @returns {string}
+ */
+export const posterUrl = (path) => {
+	const token = getItem('arcade_session_token', '');
+	const auth = token ? `&token=${encodeURIComponent(token)}` : '';
+	return serverUrl(`/poster?path=${encodeURIComponent(path || '')}${auth}`);
+};
+
 export {DEFAULT_SERVER_URL, STORAGE_KEY};

@@ -22,9 +22,13 @@ const SpottableDiv = Spottable('div');
  * @param {Function} onSelect - OK-Taste oder Klick
  * @param {boolean} [favorite] - Stern oben links
  * @param {string} [badge] - z. B. „4K“ oder „HD“, oben rechts
- * @param {number} [progress] - 0…1, roter Balken am unteren Rand (Weiterschauen)
+ * @param {number} [progress] - 0…1, Balken am unteren Rand (Weiterschauen)
+ * @param {boolean} [isNew] - Marke „NEU“ oben links (erst kürzlich hinzugefügt)
  */
-const MediaCard = ({src, title, meta, width, onSelect, favorite, badge, progress, ...rest}) => {
+// `poster` gehört zur Detailansicht, nicht zur Kachel — herausnehmen, damit
+// es nicht als HTML-Attribut am div landet.
+// eslint-disable-next-line no-unused-vars
+const MediaCard = ({src, poster, title, meta, width, onSelect, favorite, badge, progress, isNew, ...rest}) => {
 	// Spotlight setzt den Fokus, scrollt aber nicht zwingend mit. In einer
 	// waagerechten Reihe bliebe die fokussierte Kachel sonst außer Sicht.
 	const handleFocus = useCallback((ev) => {
@@ -38,7 +42,12 @@ const MediaCard = ({src, title, meta, width, onSelect, favorite, badge, progress
 			<div className={css.frame}>
 				{src ? <img className={css.thumb} src={src} alt="" loading="lazy" /> : null}
 				<div className={css.shade} />
-				{favorite ? <div className={css.favorite} aria-label="Favorit">★</div> : null}
+				{favorite || isNew ? (
+					<div className={css.marks}>
+						{isNew ? <span className={css.newMark}>NEU</span> : null}
+						{favorite ? <span className={css.favorite} aria-label="Favorit">★</span> : null}
+					</div>
+				) : null}
 				{badge ? <div className={css.badge}>{badge}</div> : null}
 				<div className={css.text}>
 					<div className={css.title}>{title}</div>
@@ -59,7 +68,9 @@ MediaCard.propTypes = {
 	title: PropTypes.string.isRequired,
 	badge: PropTypes.string,
 	favorite: PropTypes.bool,
+	isNew: PropTypes.bool,
 	meta: PropTypes.string,
+	poster: PropTypes.string,
 	progress: PropTypes.number,
 	src: PropTypes.string,
 	width: PropTypes.number

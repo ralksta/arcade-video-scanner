@@ -1,9 +1,10 @@
 import {useEffect} from 'react';
 import PropTypes from 'prop-types';
-import Button from '@enact/limestone/Button';
 import Spotlight from '@enact/spotlight';
 import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 
+import PillButton from './PillButton';
+import Backdrop from './Backdrop';
 import css from './DetailView.module.less';
 
 // Fokus bleibt in der Ansicht: Ohne Einschränkung sprang er mit den
@@ -25,7 +26,7 @@ const CONTAINER_ID = 'detail-view';
  * Die Zurück-Taste schließt die Ansicht (Capture, damit Panels sie nicht
  * zuerst als „App beenden“ deutet).
  */
-const DetailView = ({src, title, meta, tags, favorite, busy, resumeLabel, onPlay, onPlayFromStart, onToggleFavorite, onClose}) => {
+const DetailView = ({src, poster, title, meta, badge, kicker, playLabel = 'Abspielen', playIcon = 'play', tags, favorite, busy, resumeLabel, onPlay, onPlayFromStart, onToggleFavorite, onClose}) => {
 	useEffect(() => {
 		const timer = setTimeout(() => Spotlight.focus(CONTAINER_ID), 0);
 		const onBack = (ev) => {
@@ -43,11 +44,15 @@ const DetailView = ({src, title, meta, tags, favorite, busy, resumeLabel, onPlay
 
 	return (
 		<Container spotlightId={CONTAINER_ID} className={css.detail}>
-			{src ? <img className={css.image} src={src} alt="" /> : null}
+			<Backdrop className={css.image} poster={poster} fallback={src} />
 			<div className={css.shade} />
 			<div className={css.content}>
+				{kicker ? <div className={css.kicker}>{kicker}</div> : null}
 				<div className={css.title}>{title}</div>
-				{meta ? <div className={css.meta}>{meta}</div> : null}
+				<div className={css.meta}>
+					{badge ? <span className={css.badge}>{badge}</span> : null}
+					{meta}
+				</div>
 				{resumeLabel ? <div className={css.resume}>{resumeLabel}</div> : null}
 				{tags && tags.length ? (
 					<div className={css.tags}>
@@ -55,19 +60,19 @@ const DetailView = ({src, title, meta, tags, favorite, busy, resumeLabel, onPlay
 					</div>
 				) : null}
 				<div className={css.actions}>
-					<Button className="spottable-default" icon="play" onClick={onPlay}>
-						{resumeLabel ? 'Fortsetzen' : 'Abspielen'}
-					</Button>
-					{resumeLabel ? <Button icon="refresh" onClick={onPlayFromStart}>Von vorn</Button> : null}
-					<Button
+					<PillButton variant="primary" className="spottable-default" icon={playIcon} onClick={onPlay}>
+						{resumeLabel ? 'Fortsetzen' : playLabel}
+					</PillButton>
+					{resumeLabel ? <PillButton icon="refresh" onClick={onPlayFromStart}>Von vorn</PillButton> : null}
+					<PillButton
 						icon={favorite ? 'star' : 'starhollow'}
 						selected={favorite}
 						disabled={busy}
 						onClick={onToggleFavorite}
 					>
 						{favorite ? 'Favorit' : 'Zu Favoriten'}
-					</Button>
-					<Button icon="arrowlargeleft" onClick={onClose}>Zurück</Button>
+					</PillButton>
+					<PillButton icon="arrowlargeleft" onClick={onClose}>Zurück</PillButton>
 				</div>
 			</div>
 		</Container>
@@ -79,11 +84,16 @@ DetailView.propTypes = {
 	onPlay: PropTypes.func.isRequired,
 	onPlayFromStart: PropTypes.func,
 	resumeLabel: PropTypes.string,
+	badge: PropTypes.string,
+	kicker: PropTypes.string,
+	playIcon: PropTypes.string,
+	playLabel: PropTypes.string,
 	onToggleFavorite: PropTypes.func.isRequired,
 	title: PropTypes.string.isRequired,
 	busy: PropTypes.bool,
 	favorite: PropTypes.bool,
 	meta: PropTypes.string,
+	poster: PropTypes.string,
 	src: PropTypes.string,
 	tags: PropTypes.arrayOf(PropTypes.string)
 };
