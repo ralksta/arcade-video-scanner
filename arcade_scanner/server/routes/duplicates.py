@@ -17,13 +17,12 @@ def _get_deps():
     return _dup_mgr, db, user_db, MAX_REQUEST_SIZE, background_duplicate_scan, clear_duplicate_cache, is_path_allowed
 
 def _purge_user_state(paths) -> None:
-    """Favoriten, Vault-Marken und Tags gelöschter Dateien mit entfernen.
+    """Favoriten und Tags gelöschter Dateien mit entfernen.
 
     `db.remove()` löscht nur die Zeile in `media`; der Nutzerzustand hängt am
     Pfad und blieb liegen. Entsteht später dieselbe Pfadangabe erneut — beim
     Optimieren wird aus `film.mkv` wieder `film.mp4` —, erbt die neue Datei
-    stillschweigend den alten Zustand. Eine als „vaulted" markierte Datei wäre
-    sofort wieder versteckt, ohne erkennbaren Grund.
+    stillschweigend den alten Zustand, ohne erkennbaren Grund.
     """
     _, db, user_db, _, _, _, _ = _get_deps()
     try:
@@ -34,7 +33,7 @@ def _purge_user_state(paths) -> None:
         # einen Tag.
         forgotten = db.forget_auto_tag_paths(paths)
         if removed or forgotten:
-            print(f"🧹 {removed} verwaiste Favoriten/Tags/Vault-Einträge entfernt, "
+            print(f"🧹 {removed} verwaiste Favoriten/Tags-Einträge entfernt, "
                   f"{forgotten} Auto-Tag-Vermerke vergessen")
     except Exception as e:
         # Die Dateien sind zu diesem Zeitpunkt schon weg — ein Fehler beim

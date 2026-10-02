@@ -45,11 +45,6 @@ function _buildContextMenu() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M9 12h3v2.5a2.5 2.5 0 0 1-5 0v-5a2.5 2.5 0 0 1 5 0"/><line x1="14" y1="8" x2="14" y2="16"/><line x1="17" y1="8" x2="19" y2="8"/><line x1="17" y1="12" x2="19" y2="12"/></svg>
                 Als GIF exportieren
             </button>
-            <div class="border-t border-ink/5 my-1"></div>
-            <button class="ctx-item w-full flex items-center gap-2.5 px-3 py-2 text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer rounded-lg mx-1" style="width:calc(100% - 8px)" id="ctx-vault">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>
-                Vault
-            </button>
         </div>
     `;
     document.body.appendChild(_cmEl);
@@ -78,10 +73,6 @@ function _buildContextMenu() {
     });
     _cmEl.querySelector('#ctx-gif').addEventListener('click', () => {
         if (_cmCurrentVideo) openGifPanel(_cmCurrentVideo);
-        hideCtxMenu();
-    });
-    _cmEl.querySelector('#ctx-vault').addEventListener('click', () => {
-        if (_cmCurrentVideo) toggleHiddenById(_cmCurrentVideo.id || _cmCurrentVideo.FilePath);
         hideCtxMenu();
     });
 
@@ -195,7 +186,6 @@ function _buildCommandPalette() {
 
 const CMD_ACTIONS = [
     { icon: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>', label: 'Alle Favoriten anzeigen', action: () => setWorkspaceMode('favorites'), tags: ['favoriten','stars'] },
-    { icon: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/>', label: 'Vault öffnen', action: () => setWorkspaceMode('vault'), tags: ['vault','archiv'] },
     { icon: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', label: 'Duplikate anzeigen', action: () => setWorkspaceMode('duplicates'), tags: ['duplikat','kopie'] },
     { icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" fill-opacity="0.15"/><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', label: 'Optimizer öffnen', action: () => { if (typeof openOptimizerPanel === 'function') openOptimizerPanel(null); }, tags: ['optimier','compress'] },
     { icon: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>', label: 'Lobby / Alle Videos', action: () => setWorkspaceMode('lobby'), tags: ['lobby','home','alle'] },

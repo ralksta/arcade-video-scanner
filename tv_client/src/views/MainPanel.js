@@ -76,12 +76,6 @@ const matchesCollectionCriteria = (v, criteria) => {
 	const status = v.Status || '';
 	const codec = (v.codec || '').toLowerCase();
 
-	// Vault-Videos gehören in keine Sammlung — gleiche Regel wie im Browser.
-	// Der TV-Client filtert sie zwar beim Laden schon heraus, aber die Regel
-	// gehört in den Matcher: sonst hängt die Korrektheit daran, dass jeder
-	// künftige Aufrufer daran denkt.
-	if (v.hidden) return false;
-
 	// Status
 	if (inc.status && inc.status.length) {
 		const match = inc.status.some(s => {
@@ -171,9 +165,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [selectedCollectionId, setSelectedCollectionId] = useState(null);
 	const [tabIndex, setTabIndex] = useState(0);
 	const [loading, setLoading] = useState(true);
-	// Ohne die Nutzerdaten ist unbekannt, welche Einträge im Vault liegen —
-	// dann wird nichts angezeigt statt alles. Siehe den Kommentar bei
-	// setUserDataFailed unten.
+	// Ohne die Nutzerdaten fehlen Favoriten, Tags und Sammlungen; die
+	// Mediathek wird trotzdem gezeigt (bis Phase 1 verhinderte das der Vault).
 	const [userDataFailed, setUserDataFailed] = useState(false);
 	const [sortKey, setSortKey] = useState('newest');
 	const [filterText, setFilterText] = useState('');
@@ -221,30 +214,23 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 
 		Promise.all([videosPromise, userDataPromise])
 			.then(([videosData, userData]) => {
-				// Mapping von Favoriten, Vault-Status und Tags aus den User-Daten auf die Videos
+				// Mapping von Favoriten und Tags aus den User-Daten auf die Videos
 				if (userData) {
 					const favSet = new Set(userData.favorites || []);
-					const vaultSet = new Set(userData.vaulted || []);
 					const tagMap = userData.tags || {};
 					videosData.forEach(v => {
 						v.favorite = favSet.has(v.FilePath);
-						v.hidden = vaultSet.has(v.FilePath);
 						v.tags = tagMap[v.FilePath] || [];
 					});
 				}
 
 				// `userData` ist null, wenn /api/user/data nicht erreichbar war.
-				// Dann bleibt `v.hidden` auf jedem Eintrag undefined, und jeder
-				// Filter unten prüft `!v.hidden` — undefined ist falsy, also
-				// stünde der gesamte Vault im Raster. Auf einem Fernseher im
-				// Wohnzimmer ist das die denkbar falscheste Richtung.
-				//
-				// Derselbe Fehler steckte im Browser-Client; dort ist er in
-				// filter_engine.js behoben.
+				// Bis Phase 1 blieb das Raster dann leer, weil sonst der Vault
+				// sichtbar gewesen wäre. Den gibt es nicht mehr, und der TV kennt
+				// keinen abgesicherten Modus — also zeigen, nur ohne Favoriten
+				// und Tags, und im Untertitel sagen, warum.
 				if (!userData) {
 					setUserDataFailed(true);
-					setLoading(false);
-					return;
 				}
 
 				setAllVideos(videosData);
@@ -254,7 +240,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				}
 
 				// Zufällige Empfehlungen generieren (nur sichtbare Videos)
-				const videoOnly = videosData.filter(v => (v.media_type || 'video') === 'video' && !v.hidden);
+				const videoOnly = videosData.filter(v => (v.media_type || 'video') === 'video');
 				const shuffled = [...videoOnly].sort(() => 0.5 - Math.random());
 				setRecommendations(shuffled.slice(0, 5));
 
@@ -281,11 +267,11 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	}, [filterText, sortKey]);
 
 	const videos = useMemo(() =>
-		filterAndSort(allVideos.filter(v => (v.media_type || 'video') === 'video' && !v.hidden)),
+		filterAndSort(allVideos.filter(v => (v.media_type || 'video') === 'video')),
 	[allVideos, filterAndSort]);
 
 	const favorites = useMemo(() =>
-		filterAndSort(allVideos.filter(v => v.favorite && !v.hidden)),
+		filterAndSort(allVideos.filter(v => v.favorite)),
 	[allVideos, filterAndSort]);
 
 	// „Zuletzt hinzugefügt": ebenfalls nach Datum, nicht nach den letzten 48
@@ -294,19 +280,15 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const recent = useMemo(() =>
 		filterAndSort(
 			[...allVideos]
-				.filter(v => !v.hidden)
 				.sort((a, b) => entryDate(b) - entryDate(a))
 				.slice(0, 48)
 		),
 	[allVideos, filterAndSort]);
 
 	const images = useMemo(() =>
-		filterAndSort(allVideos.filter(v => v.media_type === 'image' && !v.hidden)),
+		filterAndSort(allVideos.filter(v => v.media_type === 'image')),
 	[allVideos, filterAndSort]);
 
-	const vault = useMemo(() =>
-		filterAndSort(allVideos.filter(v => v.hidden)),
-	[allVideos, filterAndSort]);
 
 	// Aktive Collection ermitteln
 	const selectedCollection = useMemo(() => {
@@ -364,13 +346,14 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		setTabIndex(ev.index);
 	}, []);
 
-	const subtitle = userDataFailed
-		? 'Nutzerdaten nicht abrufbar'
-		: loading
+	const baseSubtitle = loading
 		? 'Lade Mediathek...'
 		: filterText
 			? `${videos.length} Treffer für "${filterText}"`
 			: `${videos.length} Videos`;
+	const subtitle = userDataFailed
+		? `${baseSubtitle} · Nutzerdaten fehlen (Favoriten, Tags)`
+		: baseSubtitle;
 
 	return (
 		<Panel {...props}>
@@ -399,18 +382,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				))}
 			</div>
 
-			{userDataFailed && (
-				<div style={{padding: ri.scale(48) + 'px', textAlign: 'center'}}>
-					<div style={{fontSize: ri.scale(24) + 'px', color: '#ff0090'}}>
-						Deine Nutzerdaten konnten nicht geladen werden.
-					</div>
-					<div style={{fontSize: ri.scale(16) + 'px', color: 'gray', marginTop: ri.scale(12) + 'px'}}>
-						Die Mediathek wird nicht angezeigt, weil sonst auch Einträge aus dem Vault sichtbar wären.
-					</div>
-				</div>
-			)}
 
-			{!loading && !userDataFailed && (
+			{!loading && (
 				<TabLayout index={tabIndex} onSelect={handleTabSelect}>
 					<Tab title="Home" icon="home">
 						<div style={{overflowY: 'auto', height: '100%', padding: `${ri.scale(16)}px ${ri.scale(24)}px`, display: 'flex', flexDirection: 'column', gap: ri.scale(32) + 'px'}}>
@@ -591,17 +564,6 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 								)}
 							</div>
 						</div>
-					</Tab>
-					<Tab title="Archiv" icon="files">
-						<VirtualGridList
-							dataSize={vault.length}
-							itemRenderer={makeRenderer(vault)}
-							itemSize={{
-								minWidth: ri.scale(600),
-								minHeight: ri.scale(450)
-							}}
-							direction="vertical"
-						/>
 					</Tab>
 				</TabLayout>
 			)}

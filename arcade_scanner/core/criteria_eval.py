@@ -140,8 +140,7 @@ def narrows_the_selection(criteria: Optional[dict]) -> bool:
 
 def video_matches(video: dict, criteria: Optional[dict], now: Optional[int] = None) -> bool:
     """Return True when `video` (API-dict shape) matches `criteria`."""
-    # JS: `if (!criteria) return true` — only null/undefined skip evaluation;
-    # an empty {} object is truthy in JS and still filters hidden videos.
+    # JS: `if (!criteria) return true` — only null/undefined skip evaluation.
     if criteria is None:
         return True
     if now is None:
@@ -160,9 +159,6 @@ def video_matches(video: dict, criteria: Optional[dict], now: Optional[int] = No
     fmt = str(video.get("format") or "").lower()
     if not fmt and file_path:
         fmt = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
-
-    if video.get("hidden"):
-        return False
 
     exc = criteria.get("exclude") or {}
     if media_type in (exc.get("media_type") or []):

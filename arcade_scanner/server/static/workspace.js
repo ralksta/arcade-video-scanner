@@ -3,7 +3,7 @@
 // --- WORKSPACE & LAYOUT ---
 
 /**
- * Switch between workspace modes (lobby, vault, favorites, duplicates, optimized)
+ * Switch between workspace modes (lobby, favorites, duplicates, optimized)
  * Updates UI theming, navigation highlights, and triggers appropriate filtering
  *
  * @param {string} mode - Workspace mode to activate
@@ -51,10 +51,6 @@ function setWorkspaceMode(mode, preserveCollection = false) {
             const indicator = modeBtn.querySelector('.nav-indicator');
             if (indicator) indicator.classList.remove('opacity-0');
         }
-
-        // Legacy vault mode class
-        if (mode === 'vault') document.body.classList.add('vault-mode');
-        else document.body.classList.remove('vault-mode');
 
         // Design System: alle Workspaces teilen sich EINEN Accent. Der Indikator
         // wird komplett ueber CSS-Tokens gestylt — kein Inline-Farb-Mapping mehr.
@@ -295,7 +291,7 @@ function setLayout(layout, skipURLUpdate = false) {
 /**
  * Update browser URL to reflect current application state
  * Enables deep linking and browser back/forward navigation
- * Maps workspace modes to paths: /lobby, /favorites, /vault, /duplicates, /review
+ * Maps workspace modes to paths: /lobby, /favorites, /duplicates, /review
  */
 function updateURL() {
     let path = '/';
@@ -314,7 +310,6 @@ function updateURL() {
         // Map workspace mode to path
         if (workspaceMode === 'optimized') path = '/review';
         else if (workspaceMode === 'favorites') path = '/favorites';
-        else if (workspaceMode === 'vault') path = '/vault';
         else if (workspaceMode === 'duplicates') path = '/duplicates';
         else if (workspaceMode === 'candidates') path = '/candidates';
         else if (path.startsWith('/collections/')) { } // Keep existing path for collections
@@ -351,7 +346,7 @@ function updateURL() {
 /**
  * Initialize application state from current URL on page load
  * Parses path and query params to restore workspace, layout, and collection filters
- * Supports deep links to /favorites, /vault, /duplicates, /review, /treeview, /collections/*
+ * Supports deep links to /favorites, /duplicates, /review, /treeview, /collections/*
  */
 function loadFromURL() {
     const path = window.location.pathname;
@@ -363,7 +358,6 @@ function loadFromURL() {
 
     if (path === '/favorites') mode = 'favorites';
     else if (path === '/review') mode = 'optimized';
-    else if (path === '/vault') mode = 'vault';
     else if (path === '/duplicates') mode = 'duplicates';
     else if (path === '/candidates') mode = 'candidates';
     else if (path === '/treeview') {

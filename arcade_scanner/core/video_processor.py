@@ -234,8 +234,6 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[s
                 if entry.get("mtime") == mtime and entry.get("size_mb") == size_mb and "codec" in entry:
                     thumb_path = os.path.join(config.thumb_dir, entry["thumb"])
                     if os.path.exists(thumb_path):
-                        if "hidden" not in entry:
-                            entry["hidden"] = False
                         return entry
 
         meta = get_video_metadata(filepath)
@@ -255,7 +253,6 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[s
         # Preview generation removed
         preview = ""
 
-        is_hidden = cached_entry.get("hidden", False)
         is_favorite = cached_entry.get("favorite", False)
 
         result = {
@@ -268,7 +265,6 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[s
             "mtime": mtime,
             "size_mb": size_mb,
             "codec": codec,
-            "hidden": is_hidden,
             "favorite": is_favorite
         }
         return result

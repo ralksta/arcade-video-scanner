@@ -35,7 +35,7 @@ def visible_path_filter(user: Any) -> Callable[[str], bool]:
 
     `user` ist ein `User`-Objekt oder None. **None ergibt ein Prädikat, das
     nichts durchlässt** — wenn der Datensatz nicht lesbar ist, ist weder
-    bekannt, was im Vault liegt, noch welche Verzeichnisse dem Konto gehören.
+    bekannt, welche Verzeichnisse dem Konto gehören.
     Beides fiele sonst in die offene Richtung aus.
     """
     if user is None:

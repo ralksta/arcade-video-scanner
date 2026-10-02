@@ -134,9 +134,9 @@ def handle_get(handler) -> bool:
             return True
         query_model, query_vector = query_entry
 
-        # Ohne den Nutzerdatensatz ist weder bekannt, was im Vault liegt, noch
-        # welche Verzeichnisse ihm gehören. Dann lieber nichts ausliefern:
-        # Beides fiele sonst in die offene Richtung aus — genau der Fehler, der
+        # Ohne den Nutzerdatensatz ist nicht bekannt, welche Verzeichnisse
+        # ihm gehören. Dann lieber nichts ausliefern: Das fiele sonst in die
+        # offene Richtung aus — genau der Fehler, der
         # in beiden Clients steckte.
         u = user_db.get_user(user_name)
         if u is None:
@@ -144,7 +144,6 @@ def handle_get(handler) -> bool:
             return True
 
         exclude = {query_path}
-        exclude.update(os.path.abspath(p) for p in u.data.vaulted)
 
         # Der Index ist installationsweit, die Bibliotheken sind es nicht.
         # Ohne diese Einschränkung liefert die Suche Pfade aus den Zielen

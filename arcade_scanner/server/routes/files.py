@@ -68,16 +68,6 @@ def handle_get(handler) -> bool:
         _handle_discard_optimized(handler)
         return True
 
-    # /hide?path=...&state=...
-    if path.startswith("/hide?"):
-        _handle_hide(handler)
-        return True
-
-    # /batch_hide?paths=...
-    if path.startswith("/batch_hide?paths="):
-        _handle_batch_hide(handler)
-        return True
-
     # /favorite?path=...&state=...
     if path.startswith("/favorite?"):
         _handle_favorite(handler)
@@ -480,7 +470,7 @@ def _handle_keep_optimized(handler) -> None:
                     db.remove(opt_abs)
                     if orig_abs != str(new_path):
                         db.remove(orig_abs)
-                        # Favoriten, Vault und Tags hängen am Pfad, und aus
+                        # Favoriten und Tags hängen am Pfad, und aus
                         # `film.mkv` wird hier `film.mp4`. Ohne das Umtragen
                         # verliert der Nutzer sie beim Behalten der
                         # optimierten Fassung — bei einer Datei, die für ihn
@@ -587,67 +577,6 @@ def _handle_discard_optimized(handler) -> None:
     except Exception as e:
         print(f"❌ Error in discard_optimized: {e}")
         handler.send_error(500, str(e))
-
-
-def _handle_hide(handler) -> None:
-    user_name = handler.get_current_user()
-    if not user_name:
-        handler.send_error(401)
-        return
-
-    params = parse_qs(urlparse(handler.path).query)
-    path = params.get("path", [None])[0]
-    state = params.get("state", ["true"])[0].lower() == "true"
-
-    if path:
-        abs_path = os.path.abspath(path)
-
-        # Über update_user() statt get_user()/add_user() einzeln: Der Server
-        # bedient jede Anfrage in einem eigenen Thread, und add_user() schreibt
-        # den gesamten Nutzerdatensatz zurück. Zwei gleichzeitige Anfragen
-        # desselben Kontos lasen sonst beide den alten Stand, und die zweite
-        # verwarf die Änderung der ersten.
-        def toggle(u):
-            if state:
-                if abs_path not in u.data.vaulted:
-                    u.data.vaulted.append(abs_path)
-            elif abs_path in u.data.vaulted:
-                u.data.vaulted.remove(abs_path)
-
-        if user_db.update_user(user_name, toggle):
-            print(f"Updated vault state for {user_name}: {os.path.basename(abs_path)} -> hidden={state}")
-
-    handler.send_response(204)
-    handler.end_headers()
-
-
-def _handle_batch_hide(handler) -> None:
-    user_name = handler.get_current_user()
-    if not user_name:
-        handler.send_error(401)
-        return
-
-    paths_str = unquote(handler.path.split("paths=")[1])
-    paths_list = paths_str.split("&state=")[0].split(",")
-    state = "state=false" not in handler.path
-
-    counted = {"n": 0}
-
-    def toggle_all(u):
-        for p in paths_list:
-            abs_p = os.path.abspath(p)
-            if state:
-                if abs_p not in u.data.vaulted:
-                    u.data.vaulted.append(abs_p)
-                    counted["n"] += 1
-            elif abs_p in u.data.vaulted:
-                u.data.vaulted.remove(abs_p)
-                counted["n"] += 1
-
-    if user_db.update_user(user_name, toggle_all):
-        print(f"Batch updated vault state for {user_name} ({counted['n']} files) -> hidden={state}")
-    handler.send_response(204)
-    handler.end_headers()
 
 
 def _handle_favorite(handler) -> None:

@@ -345,11 +345,6 @@ CINEMA_MODAL_COMPONENT = """
             <span class="cinema-rail-label">Tags</span>
         </button>
 
-        <button class="cinema-rail-btn cinema-action-btn" onclick="cinemaVault()" title="Move to Vault [V]">
-            <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">archive</span></span>
-            <span class="cinema-rail-label">Vault</span>
-        </button>
-
         <button class="cinema-rail-btn" onclick="toggleCinemaSimilar()" title="Ähnliche Medien [S]">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">auto_awesome_motion</span></span>
             <span class="cinema-rail-label">Ähnlich</span>
@@ -572,11 +567,6 @@ BATCH_BAR_COMPONENT = """
     <button class="batch-action-btn" onclick="triggerBatchFavorite(true)">
         <span class="material-icons text-[16px]" aria-hidden="true">star</span>
         <span>Favorite</span>
-    </button>
-
-    <button class="batch-action-btn" onclick="triggerBatchHide(true)">
-        <span class="material-icons text-[16px]" aria-hidden="true">archive</span>
-        <span>Vault</span>
     </button>
 
     <button class="batch-action-btn" onclick="openBatchTagModal()">

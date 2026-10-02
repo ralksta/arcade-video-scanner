@@ -670,6 +670,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
             # 1. ROOT / INDEX -> Serve REPORT_FILE
+            # /vault: Den Vault gibt es nicht mehr (Phase 1); alte Lesezeichen landen
+            # in der normalen Bibliothek.
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
             clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
@@ -852,15 +854,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             #   /reveal?         /api/mark_optimized?   /compress?
             #   /api/keep_optimized?  /api/discard_optimized?
             #   /api/rescan      /api/backup
-            #   /batch_compress?  /hide?  /batch_hide?  /favorite?  /batch_favorite?
+            #   /batch_compress?  /favorite?  /batch_favorite?
             elif self.path.startswith("/stream?"):
                 try:
                     # Sitzungspflichtig — bis hierher war sie es nicht.
                     #
                     # Geprüft wurde nur `is_path_allowed()`, also ob der Pfad
                     # in einem Scan-Ziel liegt. Wer die Adresse kannte, bekam
-                    # die Datei: ohne Anmeldung, ohne Konto, an der
-                    # Vault-Markierung vorbei. Genau die Dateien, um die es in
+                    # die Datei: ohne Anmeldung, ohne Konto. Genau die Dateien, um die es in
                     # diesem Programm geht, waren damit das einzige, was der
                     # Login nicht geschützt hat.
                     #

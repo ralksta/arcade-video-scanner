@@ -120,10 +120,8 @@ def test_api_write_runs_the_rollback():
 
 
 OPTIMISTIC_ACTIONS = [
-    ("cards.js", "toggleHidden"),
     ("cards.js", "toggleFavorite"),
     ("cards.js", "triggerBatchFavorite"),
-    ("batch_operations.js", "triggerBatchHide"),
 ]
 
 

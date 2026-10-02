@@ -528,7 +528,6 @@ function evaluateCollectionMatch(video, criteria) {
     const videoTags = video.tags || [];
     const resolution = getVideoResolution(video);
     const orientation = getVideoOrientation(video);
-    const isHidden = video.hidden || false;
     const isFavorite = video.favorite || false;
     const duration = video.Duration_Sec || 0;
     const sizeMB = video.Size_MB || 0;
@@ -541,8 +540,6 @@ function evaluateCollectionMatch(video, criteria) {
         format = video.FilePath.split('.').pop().toLowerCase();
     }
 
-    // Hidden videos are never included
-    if (isHidden) return false;
 
     // --- EXCLUSIONS ---
     const exc = criteria.exclude || {};
@@ -924,9 +921,6 @@ function getCollectionCount(collection) {
         const status = v.Status;
         const codec = v.codec || 'unknown';
         const videoTags = v.tags || [];
-        const isHidden = v.hidden || false;
-
-        if (isHidden) return false;
 
         if (collection.criteria.status && collection.criteria.status !== 'all') {
             if (collection.criteria.status === 'optimized_files') {

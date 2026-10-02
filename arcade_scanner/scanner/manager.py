@@ -15,7 +15,7 @@ from .video_inspector import VideoInspector
 
 
 def _apply_detected_moves(existing_entries, orphans, newcomers) -> dict:
-    """Trägt Favoriten, Vault, Tags und das Aufnahmedatum auf den neuen Pfad um.
+    """Trägt Favoriten, Tags und das Aufnahmedatum auf den neuen Pfad um.
 
     `existing_entries` ist der Stand **vor** dem Scan, `orphans` sind die
     daraus verschwundenen Pfade, `newcomers` die neu hinzugekommenen.
@@ -366,7 +366,6 @@ class ScannerManager:
 
                     if cached_entry:
                         entry.favorite = cached_entry.favorite
-                        entry.vaulted = cached_entry.vaulted
                         entry.tags = cached_entry.tags
                         entry.optimized_at = cached_entry.optimized_at
                         if cached_entry.imported_at and cached_entry.imported_at > 0:
@@ -431,7 +430,7 @@ class ScannerManager:
             # 4. Prune Orphans (files deleted OR now excluded)
             # Only ever on a complete pass. Anything the walk did not reach looks
             # identical to a deleted file from here, and these rows carry user
-            # state — favorites, tags, vault flags — that no rescan can restore.
+            # state — favorites and tags — that no rescan can restore.
             # A stopped scan or an unmounted drive must therefore prune nothing.
             if not scan_targets:
                 # Erreichbar, seit config.active_scan_targets bei unlesbarer

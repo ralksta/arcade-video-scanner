@@ -174,7 +174,6 @@ def render_navigation(theme: BaseTheme) -> str:
     {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "dashboard", "Lobby", active=True)}
     {nav_btn("m-favorites", "setWorkspaceMode('favorites')", "star", "Favoriten")}
     {nav_btn("m-optimized", "setWorkspaceMode('optimized')", "offline_bolt", "Review")}
-    {nav_btn("m-vault", "setWorkspaceMode('vault')", "archive", "Vault")}
     {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplicates")}
     {nav_btn("m-candidates", "setWorkspaceMode('candidates')", "savings", "Kandidaten")}
 

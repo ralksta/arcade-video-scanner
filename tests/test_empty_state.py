@@ -94,7 +94,6 @@ def test_search_and_filters_offer_both_ways_out():
 
 
 @pytest.mark.parametrize("mode,icon", [
-    ("vault", "lock"),
     ("favorites", "star_border"),
     ("optimized", "compress"),
 ])
