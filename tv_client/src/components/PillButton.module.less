@@ -1,0 +1,54 @@
+@import './tokens.less';
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 20px;
+	height: 120px;
+	padding: 0 64px 0 52px;
+	border-radius: 14px;
+	font-size: 48px;
+	font-weight: 700;
+	white-space: nowrap;
+	outline: none;
+	transition: transform 140ms ease-out, box-shadow 140ms ease-out, background 140ms ease-out;
+}
+
+.icon {
+	color: inherit;
+}
+
+.primary {
+	background: #fff;
+	color: #0b0b0f;
+}
+
+.secondary {
+	background: rgba(120, 120, 140, 0.42);
+	color: #fff;
+	backdrop-filter: blur(12px);
+}
+
+.selected {
+	background: @brand-gradient;
+	color: #fff;
+}
+
+.disabled {
+	opacity: 0.5;
+}
+
+.pill:focus {
+	transform: scale(1.06);
+	box-shadow: @focus-ring, @focus-glow;
+}
+
+.secondary:focus {
+	background: rgba(255, 255, 255, 0.92);
+	color: #0b0b0f;
+}
+
+.selected:focus {
+	background: @brand-gradient;
+	color: #fff;
+}

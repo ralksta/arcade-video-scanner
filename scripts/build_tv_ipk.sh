@@ -7,8 +7,8 @@
 # (von Git ignoriert). Aufspielen danach wie gewohnt, z. B. mit ares-install.
 #
 # Die Enact-CLI ist keine Projektabhängigkeit; sie kommt per npx in den
-# npm-Cache, nicht global. ares-package (webOS CLI) muss installiert sein —
-# fehlt es, bleibt der fertige Build in tv_client/dist liegen.
+# npm-Cache, nicht global; ebenso ares-package, falls die webOS-CLI nicht
+# installiert ist.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,12 +22,13 @@ node prebuild.js
 npx --yes -p @enact/cli enact pack -p >/dev/null
 echo "  fertig: tv_client/dist"
 
-if ! command -v ares-package >/dev/null 2>&1; then
-    echo "⚠ ares-package nicht gefunden — .ipk nicht gepackt."
-    echo "  webOS CLI installieren (npm install -g @webos-tools/cli), dann erneut aufrufen."
-    exit 1
+# Global installierte webOS-CLI bevorzugen, sonst über npx (npm-Cache).
+if command -v ares-package >/dev/null 2>&1; then
+    ARES_PACKAGE=(ares-package)
+else
+    ARES_PACKAGE=(npx --yes -p @webos-tools/cli ares-package)
 fi
 
 mkdir -p ipk
-ares-package dist -o ipk
+"${ARES_PACKAGE[@]}" dist -o ipk >/dev/null
 echo "✓ $(ls -t ipk/*.ipk | head -1)"

@@ -1,3 +1,18 @@
+@import '../components/tokens.less';
+
 .app {
-	/* styles can be put here */
+	/* Dunkler Grund wie bei Netflix. Limestone setzt hier gar nichts — der
+	   Fernseher zeigte deshalb Weiß unter einer Schrift, die für Dunkel
+	   gedacht ist. */
+	background: @bg;
+	color: @text;
+	height: 100%;
+}
+
+// Player als Ebene über allem (siehe App.js)
+.player {
+	position: fixed;
+	inset: 0;
+	z-index: 200;
+	background: #000;
 }

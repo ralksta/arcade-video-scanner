@@ -37,6 +37,25 @@ All notable changes to this project will be documented in this file.
 - GIF-Export nur noch aus den eigenen Scan-Ordnern. Vorher genügte es, dass
   die Datei in den Ordnern *irgendeines* Kontos lag. `/stream` folgt mit Phase 6.
 
+### Fixed (TV-App)
+- Collections zeigten auf dem Fernseher immer die ganze Bibliothek. Der
+  Matcher übersprang Medientyp, Größe, Datum und weitere Kriterien; jetzt
+  urteilt er wie der Browser, für jede Fixture geprüft.
+- Leere Reiter (etwa „Bilder“) erklären sich, statt schwarz zu bleiben.
+- Nach einem Video landete man wieder auf Home, die Position war weg, und
+  die ganze Bibliothek wurde neu geladen. Jetzt geht es an derselben Kachel
+  weiter.
+- Bilder öffneten den Videoplayer, der nichts zeigte.
+- **Anmeldungen überleben einen Neustart des Servers.** Sitzungen lebten nur
+  im Speicher: Jedes Update und jeder Docker-Neustart meldete alle Geräte ab,
+  am Fernseher hieß das, Benutzername und Passwort mit der Fernbedienung neu
+  einzutippen. Jetzt stehen sie zusätzlich in `arcade_data/sessions.db`, nur
+  als SHA-256 des Tokens. Wer die Datei liest, kann sich damit nicht anmelden.
+  Die Laufzeit bleibt bei 30 Tagen, Abmelden wirkt auch über einen Neustart.
+- Nach einem Neustart des Servers stand der Fernseher vor Kacheln ohne Bilder.
+  Kommt die App aus dem Hintergrund zurück, lädt sie neu und führt bei
+  abgelaufener Sitzung zum Login.
+
 ### Fixed (Nachtlauf 4)
 - Abbrechen während des Uploads ersetzte das Original trotzdem.
 - Gleichzeitiges Speichern der Einstellungen verlor Änderungen.
@@ -67,6 +86,31 @@ All notable changes to this project will be documented in this file.
   beschreibt, was eine Rückholung reparieren müsste.
 
 ### Added
+- **TV-App im Stil von Netflix und HBO.** Eine eigene Kopfleiste mit dem Logo
+  ARCADE im Markenverlauf ersetzt die Reiter. Darunter liegt ein randloses
+  Titelbild, das alle neun Sekunden zum nächsten Eintrag wechselt, mit
+  „Abspielen“ und „Mehr Infos“. Es folgen waagerechte Reihen: Weiterschauen,
+  Favoriten, Neu hinzugefügt, Zufällige Entdeckungen. Die Kacheln sind 16:9,
+  tragen Titel, Metadaten, Stern, 4K/HD und „NEU“ und leuchten beim Fokus in
+  der Markenfarbe. Detailansicht und Login sind im selben Stil gehalten. Beim
+  Laden schimmern Platzhalter, statt dass die Fläche leer bleibt.
+- **Scharfe Titelbilder:** `GET /poster` erzeugt bei Bedarf ein Standbild bis
+  1280×720 für Titelbild, Detailansicht und Player. Bisher wurden dort die
+  Vorschaubilder mit 480×270 hochgezogen. Der Endpunkt verlangt eine Sitzung
+  und zeigt nur eigene Einträge; `--rebuild-thumbs` räumt die Standbilder mit
+  ab.
+- TV-App: Collections erscheinen als große Kacheln in ihrer Farbe und als
+  Reihen nach Kategorie. „Alle anzeigen“ öffnet das Raster, die Zurück-Taste
+  führt zurück. Die Standard-Collections tragen deutsche Namen, leere werden
+  ausgeblendet.
+- TV-App: Bilder öffnen einen Vollbild-Betrachter in voller Auflösung, mit
+  ◀ ▶ blättert man.
+- TV-App: Filterleiste in einer Zeile mit Suche, Sortierung (neu „Längste“)
+  und Filtern nach Auflösung, Länge und Tag.
+- TV-App: Detailansicht vor dem Abspielen mit „Favorit“ zum Umschalten.
+  Favoriten lassen sich damit erstmals auf dem Fernseher setzen.
+- TV-App: „Weiterschauen“ merkt sich die Position und setzt dort fort, auf
+  Wunsch auch „Von vorn“.
 - **Endpunkt-Vertrag zwischen Server und Clients**: Ein Test liest die
   API-Pfade aus dem Quelltext von TV-, iOS- und webOS-Client und prüft sie
   gegen die Routen des Servers. Solche Brüche fallen sonst niemandem auf — die
