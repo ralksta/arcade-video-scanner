@@ -785,6 +785,50 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(500)
                     return
 
+            # 2b. POSTER -> grosses Standbild für Titelbild/Detailansicht des TV
+            elif self.path.startswith("/poster?"):
+                # Erst die Sitzung, dann die Eingabe (test_anonymous_route_sweep).
+                name = self.get_current_user()
+                if not name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                try:
+                    from arcade_scanner.core.user_scope import visible_path_filter
+                    from arcade_scanner.core.video_processor import create_poster
+
+                    params = parse_qs(urlparse(self.path).query)
+                    file_path = params.get("path", [None])[0]
+                    if not file_path:
+                        self.send_error(400, "Missing path parameter")
+                        return
+                    # Nur Einträge der Bibliothek, und nur die eigenen: Ein
+                    # Standbild zeigt den Inhalt — dieselbe Regel wie /api/videos.
+                    # Ohne den DB-Abgleich startete jeder gültige Pfad ffmpeg.
+                    entry = db.get(file_path)
+                    may_see = visible_path_filter(user_db.get_user(name))
+                    if (entry is None or not is_path_allowed(file_path)
+                            or not may_see(os.path.abspath(file_path))):
+                        self.send_error(404)
+                        return
+
+                    poster = create_poster(file_path, entry.duration_sec or None)
+                    if not poster:
+                        self.send_error(404)
+                        return
+                    fs = os.stat(poster)
+                    if send_not_modified_if_unchanged(self, fs.st_mtime):
+                        return
+                    with open(poster, "rb") as f:
+                        body = f.read()
+                    # Privat: Das Bild gehört zu einem Konto, kein geteilter Cache.
+                    send_bytes(self, body, "image/jpeg",
+                               cache_control="private, max-age=86400",
+                               last_modified=fs.st_mtime)
+                except Exception as e:
+                    print(f"❌ Error serving poster: {e}")
+                    self.send_error(500)
+                return
+
             # 3. STATIC ASSETS -> Catch-all for any path containing /static/
             elif "/static/" in self.path:
                 try:

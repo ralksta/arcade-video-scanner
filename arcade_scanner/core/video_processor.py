@@ -210,6 +210,71 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
             logger.debug("Could not remove thumbnail temp file %s: %s", tmp_path, e)
 
 
+POSTER_PREFIX = "poster_"
+# Gross genug für ein Titelbild auf dem Fernseher, klein genug für ffmpeg in
+# unter einer Sekunde. Die Vorschaubilder (480×270) wirkten dort verwaschen.
+POSTER_MAX_W, POSTER_MAX_H = 1280, 720
+
+
+def poster_name_for(video_path: str) -> str:
+    """Dateiname des grossen Standbilds — derselbe Hash wie beim Vorschaubild."""
+    return POSTER_PREFIX + thumbnail_name_for(video_path)[len("thumb_"):]
+
+
+def create_poster(video_path: str, duration: Optional[float] = None) -> str:
+    """Grosses Standbild (bis 1280×720) für Titelbild und Detailansicht des TV.
+
+    Wird nur auf Anfrage erzeugt (``GET /poster``), nicht beim Scan: Gebraucht
+    wird es für die paar Einträge, die gerade gross zu sehen sind. Liegt neben
+    den Vorschaubildern, mit eigenem Präfix; ``--rebuild-thumbs`` räumt beide
+    ab (maintenance.purge_thumbnails).
+
+    Gibt den absoluten Pfad zurück, oder ``""``, wenn ffmpeg scheiterte.
+    """
+    out_path = os.path.join(config.thumb_dir, poster_name_for(video_path))
+    if not _thumbnail_needs_rebuild(out_path, video_path):
+        return out_path
+
+    vf = (f"scale={POSTER_MAX_W}:{POSTER_MAX_H}:force_original_aspect_ratio=decrease")
+    is_image = os.path.splitext(video_path)[1].lower() in IMAGE_EXTENSIONS
+    if is_image:
+        seek: List[str] = []
+    else:
+        if duration is None:
+            try:
+                probe: List[Union[str, bytes]] = [
+                    "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
+                duration = float(subprocess.check_output(
+                    probe, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
+            except Exception as e:
+                logger.debug("Duration probe failed for %s: %s", video_path, e)
+                duration = 0
+        # Dieselbe Stelle wie beim Vorschaubild: 10 %, höchstens 60 s.
+        seek = ["-ss", str(min(60, int(duration * 0.1)) if duration > 5 else 0)]
+
+    os.makedirs(config.thumb_dir, exist_ok=True)
+    # Wie beim Vorschaubild: daneben schreiben, dann ersetzen — ein paralleler
+    # Request bekommt nie ein halbes JPEG.
+    tmp_path = os.path.join(config.thumb_dir, f".tmp-{uuid.uuid4().hex[:8]}-{os.path.basename(out_path)}")
+    cmd = ["ffmpeg", *seek, "-i", video_path, "-vframes", "1", "-q:v", "3", "-threads", "1",
+           "-vf", vf, tmp_path, "-y", "-loglevel", "error"]
+    try:
+        subprocess.run([os.fsencode(a) for a in cmd], stdout=subprocess.DEVNULL, timeout=60)
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            os.replace(tmp_path, out_path)
+            return out_path
+    except Exception as e:
+        logger.warning("Poster failed for %s: %s", video_path, e)
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+    return ""
+
+
 # --- HARDWARE ENCODER DETECTION ---
 
 def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[str] = None) -> Optional[Dict[str, Any]]:
