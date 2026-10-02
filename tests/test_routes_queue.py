@@ -10,6 +10,7 @@ Nothing touches the real database, the real media library or the filesystem
 outside tmp_path.
 """
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -495,3 +496,200 @@ class TestDownloadGif:
         handler = FakeHandler(f"/download_gif?file={name}")
         run_route(handler)
         assert handler.error == 403
+
+
+class TestGifOutputIsPerJob:
+    """
+    Der Ausgabepfad hing nur an Basename, Preset und fps. Zwei Exporte von
+    ``VID_0001.mp4`` aus zwei Ordnern — oder derselbe Clip mit einem anderen
+    Ausschnitt — schrieben in **dieselbe** Datei. ``ffmpeg -y`` kürzt sie beim
+    Start des zweiten Laufs; wer zuerst „done" sah, lud ein halbes oder das
+    fremde GIF herunter. Über Kontogrenzen hinweg: Das Temp-Verzeichnis und
+    ``/download_gif`` kennen keine Besitzer.
+    """
+
+    def _export(self, video_path):
+        handler = FakeHandler("/api/export/gif",
+                              body={"path": str(video_path), "preset": "720p", "fps": 15})
+        entry = MagicMock(width=1920, height=1080, duration_sec=10.0)
+        fake_db = MagicMock()
+        fake_db.get.return_value = entry
+        started = []
+
+        class NoThread:
+            def __init__(self, target, args, daemon):
+                started.append(args)
+
+            def start(self):
+                pass
+
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.sanitize_path", side_effect=lambda p: p), \
+             patch("arcade_scanner.server.routes.queue.threading.Thread", NoThread), \
+             patch("arcade_scanner.server.routes.queue.send_json") as send_json:
+            queue.handle_post(handler)
+
+        assert handler.error is None, handler.error
+        output_path = started[0][1]
+        return output_path, send_json.call_args[0][1]
+
+    def test_two_videos_with_the_same_name_get_different_files(self, tmp_path):
+        for sub in ("a", "b"):
+            (tmp_path / sub).mkdir()
+            (tmp_path / sub / "VID_0001.mp4").write_bytes(b"x")
+
+        out_a, resp_a = self._export(tmp_path / "a" / "VID_0001.mp4")
+        out_b, resp_b = self._export(tmp_path / "b" / "VID_0001.mp4")
+
+        assert out_a != out_b
+        assert resp_a["download_url"] != resp_b["download_url"]
+
+    def test_the_same_video_twice_gets_different_files(self, tmp_path):
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"x")
+
+        out_1, _ = self._export(video)
+        out_2, _ = self._export(video)
+
+        assert out_1 != out_2
+
+    def test_the_file_name_carries_the_job_id(self, tmp_path):
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"x")
+
+        out, resp = self._export(video)
+
+        assert resp["job_id"] in resp["output_filename"]
+        assert out.endswith(resp["output_filename"])
+
+
+class TestUploadRespectsCancellation:
+    """
+    Der Upload sah den Status des Jobs nie an. Wer in der Oberfläche auf
+    „Abbrechen" klickte, während der Worker hochlud — bei einer großen Datei
+    Minuten —, verlor das Original trotzdem: Der Server ersetzte es nach dem
+    Empfang und setzte den Job von ``cancelled`` zurück auf ``done``.
+    """
+
+    def _upload(self, tmp_path, fake_db):
+        handler = FakeHandler("/api/queue/upload?job_id=1")
+        handler.rfile = FakeRFile(b"opt")
+        handler.headers = {"Content-Length": "3"}
+        fake_db.get = MagicMock(return_value=None)
+        settings = MagicMock()
+        settings.settings.enable_review_mode = False
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.config", settings), \
+             patch("arcade_scanner.server.routes.queue.verify_media_integrity",
+                   return_value=(True, "ok")), \
+             patch("arcade_scanner.server.routes.queue._media_cache"), \
+             patch("arcade_scanner.server.routes.queue.send_json"):
+            queue.handle_post(handler)
+        return handler
+
+    @pytest.mark.parametrize("status", ["cancelled", "done", "failed"])
+    def test_a_finished_job_takes_no_upload(self, tmp_path, status):
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        fake_db = FakeDB(jobs=[{"id": 1, "file_path": str(src), "size_bytes": 8,
+                                "status": status}])
+
+        handler = self._upload(tmp_path, fake_db)
+
+        assert handler.error == 409
+        assert src.read_bytes() == b"original"
+        assert ("done" not in [s for _, s in fake_db.status_updates])
+        assert not list(tmp_path.glob(".*part"))
+
+    def test_a_cancel_during_the_transfer_keeps_the_original(self, tmp_path):
+        """Beim Start noch aktiv, nach dem Empfang abgebrochen."""
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        job = {"id": 1, "file_path": str(src), "size_bytes": 8, "status": "uploading"}
+
+        class CancelledMidway(FakeDB):
+            calls = 0
+
+            def get_job(self, job_id):
+                self.calls += 1
+                return dict(job, status="uploading" if self.calls == 1 else "cancelled")
+
+        fake_db = CancelledMidway(jobs=[job])
+        handler = self._upload(tmp_path, fake_db)
+
+        assert handler.error == 409
+        assert src.read_bytes() == b"original"
+        assert "done" not in [s for _, s in fake_db.status_updates]
+        assert not list(tmp_path.glob(".*part"))
+
+    def test_an_active_job_is_still_accepted(self, tmp_path):
+        src = tmp_path / "a.mp4"
+        src.write_bytes(b"original")
+        fake_db = FakeDB(jobs=[{"id": 1, "file_path": str(src), "size_bytes": 8,
+                                "status": "uploading"}])
+
+        handler = self._upload(tmp_path, fake_db)
+
+        assert handler.error is None
+        assert src.read_bytes() == b"opt"
+        assert db_status(fake_db) == [(1, "done")]
+
+
+def test_a_job_is_applied_by_one_upload_at_a_time():
+    """
+    Nach einem Reclaim hat ein Job zwei Worker. Beide lesen ``uploading``,
+    bevor einer ``done`` setzt — der Status allein trennt sie nicht.
+    """
+    assert queue._claim_finalize(7)
+    try:
+        assert not queue._claim_finalize(7), "Zweiter Upload desselben Jobs kam durch"
+        assert queue._claim_finalize(8), "Ein anderer Job darf nicht warten"
+        queue._release_finalize(8)
+    finally:
+        queue._release_finalize(7)
+    assert queue._claim_finalize(7), "Nach dem Freigeben muss es wieder gehen"
+    queue._release_finalize(7)
+
+
+class TestNamesAtTheLengthLimit:
+    """
+    Dateinamen dürfen höchstens 255 **Bytes** lang sein. Zwei Stellen hängen
+    etwas an den Namen des Videos: der GIF-Export (``_720p_15fps_<job>.gif``)
+    und der Upload (``.<stem>.job<id>.part``). Bei einem Video mit langem Namen
+    scheiterte das mit ENAMETOOLONG — beim Upload bei **jedem** Versuch, die
+    Datei ließ sich nie optimieren, und der Job hieß nur „failed".
+    """
+
+    STEM = "ä" * 120 + "x" * 8   # 248 Bytes, 128 Zeichen — Umlaute zählen doppelt
+
+    def test_the_gif_name_fits(self, tmp_path):
+        video = tmp_path / f"{self.STEM}.mp4"
+        video.write_bytes(b"x")
+        out, resp = TestGifOutputIsPerJob()._export(video)
+        name = os.path.basename(out)
+        assert len(name.encode("utf-8")) <= 255, len(name.encode("utf-8"))
+        assert name.endswith(".gif") and resp["job_id"] in name
+        name.encode("utf-8").decode("utf-8")  # an einer Zeichengrenze gekürzt
+
+    def test_the_upload_part_file_fits(self, tmp_path):
+        src = tmp_path / f"{self.STEM}.mp4"
+        src.write_bytes(b"original")
+        jobs = [{"id": 123456, "file_path": str(src), "size_bytes": 8}]
+        handler = FakeHandler("/api/queue/upload?job_id=123456")
+        handler.rfile = FakeRFile(b"opt")
+        handler.headers = {"Content-Length": "3"}
+        fake_db = FakeDB(jobs=jobs)
+        fake_db.get = MagicMock(return_value=None)
+        settings = MagicMock()
+        settings.settings.enable_review_mode = False
+        with patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.config", settings), \
+             patch("arcade_scanner.server.routes.queue.verify_media_integrity",
+                   return_value=(True, "ok")), \
+             patch("arcade_scanner.server.routes.queue._media_cache"), \
+             patch("arcade_scanner.server.routes.queue.send_json"):
+            queue.handle_post(handler)
+
+        assert handler.error is None, handler.error
+        assert src.read_bytes() == b"opt"
+        assert db_status(fake_db) == [(123456, "done")]

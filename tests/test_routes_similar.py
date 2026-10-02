@@ -203,3 +203,43 @@ def test_status_lists_each_model_once():
 
     assert run(h, db) is True
     assert h.body()["models"] == ["ViT-B-16"]
+
+
+# --- Gemischte Modelle im Index ---
+
+class MixedModelDB(FakeMediaDB):
+    """Wie FakeMediaDB, aber mit Modell je Eintrag: (path, model, values)."""
+
+    def __init__(self, entries):
+        super().__init__()
+        self._vectors = [(p, m, encode_vector(v)) for p, m, v in entries]
+
+
+def test_vectors_of_another_model_are_not_compared():
+    """
+    ``media_indexer.py --model X`` indiziert Datei für Datei neu. Während des
+    Laufs — oder dauerhaft nach einem Abbruch — liegen Vektoren zweier Modelle
+    im Index. Zwei CLIP-Modelle mit gleicher Dimension liefern Zahlen, die
+    plausibel aussehen, aber aus verschiedenen Räumen stammen: Das Skalarprodukt
+    sagt nichts. Hier hätte der fremde Eintrag sogar den Höchstwert.
+    """
+    db = MixedModelDB([
+        ("/lib/query.mp4", "ViT-B-16", [1.0, 0.0]),
+        ("/lib/same_model.mp4", "ViT-B-16", [0.6, 0.4]),
+        ("/lib/other_model.mp4", "ViT-B-32", [1.0, 0.0]),
+    ])
+    h = FakeHandler("/api/similar?path=/lib/query.mp4")
+    assert run(h, db) is True
+    paths = [r["file_path"] for r in h.body()["results"]]
+    assert paths == ["/lib/same_model.mp4"]
+
+
+def test_vectors_of_another_dimension_are_not_truncated():
+    """Ein 768er-Vektor gegen einen 512er: ``zip`` schnitt still ab."""
+    db = MixedModelDB([
+        ("/lib/query.mp4", "ViT-B-32", [1.0, 0.0]),
+        ("/lib/big.mp4", "ViT-L-14", [1.0, 0.0, 0.0]),
+    ])
+    h = FakeHandler("/api/similar?path=/lib/query.mp4")
+    assert run(h, db) is True
+    assert h.body()["results"] == []

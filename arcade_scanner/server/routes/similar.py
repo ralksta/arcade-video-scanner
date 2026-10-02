@@ -16,11 +16,15 @@ def _get_deps() -> tuple[Any, Any]:
 
 
 class SimilarityCache:
-    """Decoded mean vectors, loaded lazily and invalidated on store changes."""
+    """Decoded mean vectors, loaded lazily and invalidated on store changes.
+
+    Je Pfad liegt ``(model, vector)``: Vergleichbar sind nur Vektoren
+    desselben Modells, siehe ``handle_get``.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._vectors: Optional[dict[str, list[float]]] = None
+        self._vectors: Optional[dict[str, tuple[str, list[float]]]] = None
         self._hooked = False
         self._version = 0
 
@@ -29,7 +33,7 @@ class SimilarityCache:
             self._vectors = None
             self._version += 1
 
-    def get(self, media_db: Any) -> dict[str, list[float]]:
+    def get(self, media_db: Any) -> dict[str, tuple[str, list[float]]]:
         """Lädt die Vektoren — **ohne** die eigene Sperre zu halten.
 
         Vorher lief das Lesen innerhalb der Sperre. Das ist die eine Hälfte
@@ -55,8 +59,8 @@ class SimilarityCache:
                 return self._vectors
             version = self._version
 
-        vectors = {path: decode_vector(blob)
-                   for path, _model, blob in media_db.get_mean_vectors()}
+        vectors = {path: (model, decode_vector(blob))
+                   for path, model, blob in media_db.get_mean_vectors()}
 
         with self._lock:
             if version == self._version:
@@ -124,10 +128,11 @@ def handle_get(handler) -> bool:
         if not vectors:
             send_json(handler, {"status": "not_indexed"})
             return True
-        query_vector = vectors.get(query_path)
-        if query_vector is None:
+        query_entry = vectors.get(query_path)
+        if query_entry is None:
             handler.send_error(404, "File not indexed")
             return True
+        query_model, query_vector = query_entry
 
         # Ohne den Nutzerdatensatz ist weder bekannt, was im Vault liegt, noch
         # welche Verzeichnisse ihm gehören. Dann lieber nichts ausliefern:
@@ -147,7 +152,13 @@ def handle_get(handler) -> bool:
         # Die Regel steht in core/user_scope.py, damit sie nicht an jeder
         # Stelle neu beantwortet wird.
         may_see = visible_path_filter(u)
-        candidates = [(p, v) for p, v in vectors.items() if may_see(p)]
+        # Nur Vektoren desselben Modells. `media_indexer.py --model X`
+        # indiziert Datei für Datei neu; währenddessen — oder nach einem
+        # Abbruch dauerhaft — liegen zwei Modelle im Index. Deren
+        # Skalarprodukt sieht plausibel aus, vergleicht aber zwei
+        # verschiedene Räume; bei anderer Dimension schnitt `zip` still ab.
+        candidates = [(p, v) for p, (m, v) in vectors.items()
+                      if m == query_model and may_see(p)]
 
         results = top_k(query_vector, candidates, k=limit, exclude=exclude)
         send_json(handler, {"status": "ok",

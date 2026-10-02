@@ -236,8 +236,8 @@ function _renderCmdResults() {
                     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                 </svg>
                 <div class="flex-1 min-w-0">
-                    <div class="text-gray-200 text-sm font-medium truncate group-hover:text-text-main">${name}</div>
-                    <div class="text-gray-600 text-[11px] truncate">${v.DirectoryPath || ''}</div>
+                    <div class="text-gray-200 text-sm font-medium truncate group-hover:text-text-main">${escapeHtml(name)}</div>
+                    <div class="text-gray-600 text-[11px] truncate">${escapeHtml(v.DirectoryPath || '')}</div>
                 </div>
                 <span class="text-[11px] text-gray-600 shrink-0">${size}</span>
             </button>`;

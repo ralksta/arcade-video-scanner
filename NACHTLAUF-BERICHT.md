@@ -1,3 +1,119 @@
+# Nachtlauf vom 1./2. Oktober 2026 — Übergabe
+
+Branch `feat/nightly-loops-4` (aus `dev`, `aa6cbd0`), 16 Commits, **nichts gepusht,
+nichts gemerged**. Tests: **2353 → 2404** grün, die 2 `xfailed` sind mit dem
+iOS-Client verschwunden. Ruff: sauber. Journal mit allen Messwerten und
+Gegenproben: `NIGHT-LOOP4.md`.
+
+Umfang wie vereinbart: Loop AF zu Ende, Loop AG, Phase 0.1 und Phase 3.
+Nicht angefasst: Phase 0.2, 1, 2, 4–7.
+
+---
+
+## Zuerst lesen: drei Fragen an dich
+
+### 1. Dateien über Kontogrenzen
+`/stream` und der GIF-Export prüfen nur „liegt in *irgendeinem* Scan-Ziel".
+Ein Konto, das den Pfad kennt oder rät, kann Dateien aus den Zielen eines
+anderen abspielen. `/api/videos`, `/api/similar` und `/api/candidates` filtern
+dagegen pro Konto (`core/user_scope.py`). Soll die Auslieferung dieselbe Regel
+bekommen? Das betrifft den TV-Client und Phase 6 mit.
+
+### 2. Globale Einstellungen für Nicht-Admins
+`POST /api/settings` lässt jedes angemeldete Konto die *globalen* Schlüssel
+schreiben, auch `ffprobe_path`/`ffmpeg_path`, also das Programm, das der
+Server ausführt. Mein Vorschlag: globale Schlüssel nur für Admins. Das ändert,
+was Nicht-Admins in den Einstellungen sehen. Klein dazu: `GET /api/backup`
+liefert settings.json auch an Nicht-Admins.
+
+### 3. RAW-Fotos werden nie gescannt
+CHANGELOG und ROADMAP versprechen seit v6.4.1 „12 RAW formats". Die Endungen
+stehen aber nur im `ImageInspector`, nie im Datei-Walker. Das hat also nie
+funktioniert. Unter `/media` liegen 810 CR2, 683 RAF und 577 DNG. Ich habe es
+nicht eingeschaltet, weil der RAW-Pfad `sips` braucht (nur macOS).
+Einschalten und unter Linux prüfen, oder das Versprechen streichen?
+
+### Bitte kurz ansehen
+- **Phase 3 ist ohne Browser umgesetzt.** Geändert hat sich nur die
+  Maskierung, nicht die Darstellung. Ein Blick auf Raster, Befehlspalette,
+  Treemap und Review-Ansicht lohnt trotzdem.
+- **`arcade_data/settings.json` hat den Zeitstempel 2026-10-01 23:16:12.** Das
+  war nach dem Start deines Servers (22:53) und vor meinem ersten Commit
+  (23:18). Mehr als 20 spätere Suite-Läufe haben die Datei nicht verändert.
+  Alle Prüfskripte liefen mit `CONFIG_DIR` im Temp-Verzeichnis. Der Inhalt
+  passt nicht zu meinen Testwerten (`setup_complete` fehlt, `proxy_root` ist
+  `/proxies`). Vermutlich war es der laufende Server; prüf es bitte trotzdem.
+  Alle anderen Dateien in `arcade_data/` sind älter als der Lauf.
+
+---
+
+## Sicherheit: vier Funde, zwei davon ohne Anmeldung ausnutzbar
+
+| Fund | Commit |
+|---|---|
+| **`POST /api/restore` ohne jede Prüfung.** Am echten Server belegt: Eine anonyme Anfrage überschrieb `proxy_root` und `review_dir`. Unter den Einstellungen steht auch `ffprobe_path`. Jetzt sind Sitzung **und** Admin nötig. Kein Client ruft die Route auf. | `414d39f` |
+| **Brute-Force-Sperre parallel umgehbar.** Geprüft, dann PBKDF2, dann gezählt: 40 von 40 gleichzeitigen Versuchen kamen durch, die Grenze liegt bei 5. Jetzt wird vor der Prüfung atomar gezählt. Dazu hatte der `SessionManager` gar keine Sperre (KeyError → 500). | `442edad` |
+| **Drei weitere Routen antworteten anonym.** `GET /api/settings` gab den globalen Dump heraus (Ansichten, Pfade), `/api/duplicates/status` war öffentlich, `POST /api/tags` prüfte erst den Inhalt. **Neuer Wächter:** `test_anonymous_route_sweep.py` startet den echten Server isoliert und ruft jede Route anonym auf. Er hätte Restore gefunden (Gegenprobe gemacht). | `8608e27` |
+| **Dateinamen brachen aus Klick-Handlern aus.** Ein `"` im Namen hängte ein eigenes `onmouseover` an den Button der Karte, ein `\` machte alle Knöpfe tot. `encodeURIComponent` lässt `'` stehen, damit war Keep/Discard injizierbar. Neu: `jsArg()`, das erst für JS und dann für HTML maskiert. | `d2809c9` |
+
+## Korrektheit
+
+- **Abbrechen während des Uploads half nicht** (`68ca09b`): Das Original
+  wurde trotzdem ersetzt, und der Job sprang zurück auf `done`.
+- **Gleichzeitiges Speichern der Einstellungen** (`d8a7500`): 7 von 8
+  Speichervorgängen scheiterten an der gemeinsamen Zwischendatei, sonst
+  gewann der letzte.
+- **Halbe Vorschaubilder** (`6347d77`): ffmpeg schrieb direkt in die
+  ausgelieferte Datei, und der Browser cachte das eine Woche. Ein
+  gescheiterter Neuaufbau zerstörte das alte Bild.
+- **Zwei GIF-Exporte, eine Datei** (`2696192`): `VID_0001.mp4` aus zwei
+  Ordnern.
+- **„Ähnliche Medien" verglich Vektoren verschiedener Modelle** (`bdd8209`):
+  nach `--model X` oder einem abgebrochenen Indexer-Lauf.
+- **Lange Dateinamen** (`2807a3d`): Upload, GIF und Review hängen bis zu
+  ~30 Bytes an den Namen. An der 255-Byte-Grenze ließ sich die Datei nie
+  optimieren.
+- **Zwei Scanner-Manager** (`b181919`): Lazy-Singleton ohne Sperre. Das
+  Zeitfenster ist schmal, der Doppel-Scan-Schutz hängt aber daran.
+
+## Performance
+
+- **Einrichtungs-Assistent** (`a1989ef`): Die Ordnerliste lief über die ganze
+  Bibliothek, und das zweimal: 711.512 Dateien, über 30 s. Jetzt ein
+  Durchlauf mit 3 s Budget, danach wird „≥" angezeigt.
+- **Gemessen, nicht geändert:** Mit 100.000 Einträgen braucht `/api/candidates`
+  4 s pro Aufruf (100.000 Pydantic-Objekte und ein `stat` je Eintrag). Bei
+  5.461 Einträgen sind es rund 0,25 s. Das wird erst relevant, wenn die
+  Bibliothek wächst.
+
+## Umsetzungsplan
+
+- **Phase 0.1 erledigt** (`7d0e4e7`): `ios_client/` ist entfernt, der letzte
+  Stand liegt in `dec7163`. Die Dokumentation ist angeglichen.
+- **Phase 3 erledigt** (`d2809c9`): nach Herkunft priorisiert, die
+  Vault-Stellen sind ausgenommen (Phase 1 löscht sie).
+  `dev-docs/frontend-escaping.md` führt die übrigen Stellen als unbedenklich.
+
+## Klein notiert, nicht angefasst
+
+- `start_server()` bindet den Ausweich-Port ohne `allow_reuse_address`. Nach
+  einem schnellen Neustart scheitert er an TIME_WAIT.
+- `config.ALLOWED_VIDEO_EXTENSIONS` wird nirgends benutzt. `.3gp`/`.mpg`
+  kennt der Scanner nicht (3 Dateien hier).
+- Fertige GIFs im Temp-Verzeichnis werden nie gelöscht.
+
+## Was ich falsch hatte
+
+- Die erste Gegenprobe für den neuen Wächter ließ die 403-Prüfung stehen und
+  bewies deshalb nichts. Das ist aufgefallen und wiederholt.
+- Ein `git add` brach am schon gestagten `ios_client` ab, der Commit enthielt
+  zuerst nur die Löschung. Ich habe ihn lokal korrigiert, daher die neue ID
+  `7d0e4e7`.
+- Mehrere Runden fiel die Auto-Mode-Prüfung aus und gab kein Urteil. Ich habe
+  nichts erzwungen und abgewartet, danach lief es von selbst weiter.
+
+---
+
 # Nachtlauf vom 16./17. August 2026 — Übergabe
 
 Branch `feat/nightly-loops`, 138 Commits, nichts gepusht, nichts gemerged.

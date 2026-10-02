@@ -92,7 +92,8 @@ def query(user, path="/media_ralf/eigenes.mp4", vectors=None):
         sent.update(payload)
 
     with patch.object(similar, "_get_deps", return_value=(media_db, user_db)), \
-         patch.object(similar._cache, "get", return_value=dict(vectors or VECTORS)), \
+         patch.object(similar._cache, "get", return_value={
+             p: ("m", v) for p, v in (vectors or VECTORS).items()}), \
          patch.object(similar, "send_json", capture):
         similar.handle_get(handler)
 

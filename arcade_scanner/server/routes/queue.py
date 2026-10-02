@@ -41,6 +41,7 @@ from arcade_scanner.core.media_replace import (
     verify_media_integrity,
 )
 from arcade_scanner.database import db
+from arcade_scanner.database.sqlite_store import SQLiteStore
 from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 from arcade_scanner.server.api_handler import _media_cache
 from arcade_scanner.server.response_helpers import (
@@ -214,6 +215,60 @@ def _replace_media_entry(original_path: str, new_path: str, codec: str) -> None:
             user_db.remap_paths_in_user_data({original_path: new_path})
         except Exception as e:
             print(f"⚠️ Nutzerzustand nicht übernommen ({e!r}): {original_path}")
+
+
+# ---------------------------------------------------------------------------
+# Dateinamen an der Längengrenze
+# ---------------------------------------------------------------------------
+
+_NAME_MAX_BYTES = 255
+
+
+def _fit_name(prefix: str, stem: str, suffix: str) -> str:
+    """``prefix + stem + suffix``, der Stamm so gekürzt, dass 255 Bytes reichen.
+
+    Mehrere Stellen hängen etwas an den Namen eines Videos — GIF-Export,
+    Upload-Zwischendatei, Review-Ordner. Bei einem langen Namen scheiterte das
+    mit ENAMETOOLONG; beim Upload bei **jedem** Versuch, die Datei ließ sich nie
+    optimieren. Gekürzt wird an einer Zeichengrenze (Umlaute zählen in UTF-8
+    doppelt), ``surrogateescape`` hält kaputt kodierte Pfade aus.
+    """
+    budget = _NAME_MAX_BYTES - len((prefix + suffix).encode("utf-8", "surrogateescape"))
+    while stem and len(stem.encode("utf-8", "surrogateescape")) > budget:
+        stem = stem[:-1]
+    return f"{prefix}{stem}{suffix}"
+
+
+# ---------------------------------------------------------------------------
+# Upload-Abschluss: ein Job wird höchstens einmal eingesetzt
+# ---------------------------------------------------------------------------
+
+_FINALIZE_LOCK = threading.Lock()
+_FINALIZING: set[int] = set()
+
+
+def _claim_finalize(job_id: int) -> bool:
+    """Belegt das Einsetzen eines Uploads. False: Ein anderer Upload ist dran.
+
+    Nach einem Reclaim (Worker meldete sich 15 Minuten nicht) kann ein Job
+    zwei Worker haben, und beide laden hoch. Der Status allein schützt nicht:
+    Beide lesen ihn, bevor einer von beiden ihn auf ``done`` setzt.
+    """
+    with _FINALIZE_LOCK:
+        if job_id in _FINALIZING:
+            return False
+        _FINALIZING.add(job_id)
+        return True
+
+
+def _release_finalize(job_id: int) -> None:
+    with _FINALIZE_LOCK:
+        _FINALIZING.discard(job_id)
+
+
+def _job_is_finished(job: dict | None) -> bool:
+    """Abgebrochen, erledigt oder gescheitert — darf nichts mehr ersetzen."""
+    return job is None or job.get("status") in SQLiteStore.TERMINAL_STATUSES
 
 
 # ---------------------------------------------------------------------------
@@ -541,13 +596,19 @@ def handle_post(handler) -> bool:
 
             estimated_size_mb = (width * height * fps * duration * (quality / 100) * 0.3) / (1024 * 1024)
 
+            gif_job_id = str(uuid.uuid4())[:8]
+
+            # Die Job-ID gehört in den Namen. Vorher hing er nur an Basename,
+            # Preset und fps: `VID_0001.mp4` aus zwei Ordnern — oder derselbe
+            # Clip mit anderem Ausschnitt — schrieb in dieselbe Datei, und
+            # `ffmpeg -y` kürzte sie mitten im ersten Lauf. Wer zuerst „done"
+            # sah, lud ein halbes oder das fremde GIF, auch kontoübergreifend.
             base_name = os.path.splitext(os.path.basename(video_path))[0]
-            output_filename = f"{base_name}_{preset}_{fps}fps.gif"
+            output_filename = _fit_name("", base_name, f"_{preset}_{fps}fps_{gif_job_id}.gif")
             gif_export_dir = os.path.join(tempfile.gettempdir(), "arcade_gif_exports")
             os.makedirs(gif_export_dir, exist_ok=True)
             output_path = os.path.join(gif_export_dir, output_filename)
 
-            gif_job_id = str(uuid.uuid4())[:8]
             palette_path = os.path.join(gif_export_dir, f"palette_{gif_job_id}.png")
 
             t = threading.Thread(
@@ -645,6 +706,12 @@ def handle_post(handler) -> bool:
             if not job:
                 handler.send_error(404, "Job not found")
                 return True
+            # Ein abgebrochener Job darf nichts mehr ersetzen. Früh prüfen,
+            # damit nicht erst Gigabytes empfangen werden — entscheidend ist
+            # aber die zweite Prüfung direkt vor dem Ersetzen, weiter unten.
+            if _job_is_finished(job):
+                handler.send_error(409, f"Job is {job.get('status')}")
+                return True
 
             original_path = job["file_path"]
             orig_stem = Path(original_path).stem
@@ -665,7 +732,7 @@ def handle_post(handler) -> bool:
                 return True
 
             # Receive next to the original so the later os.replace stays atomic.
-            part_path = os.path.join(orig_dir, f".{orig_stem}.job{job_id}.part")
+            part_path = os.path.join(orig_dir, _fit_name(".", orig_stem, f".job{job_id}.part"))
             received = _receive_upload(handler, part_path, content_len)
             if received != content_len:
                 _unlink_quiet(part_path)
@@ -698,104 +765,123 @@ def handle_post(handler) -> bool:
                 send_json(handler, {"success": False, "error": reason})
                 return True
 
-            orig_size = os.path.getsize(original_path) if os.path.exists(original_path) else 0
-
-            if config.settings.enable_review_mode:
-                # Review Mode: Move both files to a dedicated folder
-                # Smart Storage: Try to use .review folder next to original file to save space on system disk
-                review_job_dir = os.path.join(orig_dir, ".review", f"job_{job_id}_{orig_stem}")
-                try:
-                    os.makedirs(review_job_dir, exist_ok=True)
-                except Exception as e:
-                    # Fallback to global review directory if media directory is read-only
-                    print(f"⚠️ Could not create relative review dir ({e}), falling back to global {config.review_dir}")
-                    review_job_dir = os.path.join(config.review_dir, f"job_{job_id}_{orig_stem}")
-                    os.makedirs(review_job_dir, exist_ok=True)
-
-                target_orig_path = os.path.join(review_job_dir, f"{orig_stem}_original{orig_ext}")
-                opt_path = os.path.join(review_job_dir, f"{orig_stem}_optimized.mp4")
-
-                # 1. Move the verified upload into the review folder
-                import shutil
-                shutil.move(part_path, opt_path)
-
-                # 2. Move original file
-                if os.path.exists(original_path):
-                    shutil.move(original_path, target_orig_path)
-
-                    # 3. Update Database for original
-                    # We need to preserve metadata, so we get the old entry, update it, and upsert
-                    orig_entry = db.get(original_path)
-                    if orig_entry:
-                        old_entry_dict = orig_entry.model_dump(by_alias=True)
-                        # Remove old record (since path is PK)
-                        db.remove(original_path)
-
-                        # Update fields
-                        old_entry_dict["FilePath"] = target_orig_path
-                        old_entry_dict["Status"] = "REVIEW"
-                        old_entry_dict["OriginalPath"] = original_path
-
-                        from arcade_scanner.models.video_entry import VideoEntry
-                        db.upsert(VideoEntry(**old_entry_dict))
-
-                        # 4. Create database entry for optimized file
-                        # We use the original entry as a template for metadata
-                        opt_entry_dict = old_entry_dict.copy()
-                        opt_entry_dict["FilePath"] = opt_path
-                        opt_entry_dict["Size_MB"] = os.path.getsize(opt_path) / (1024 * 1024)
-                        opt_entry_dict["Status"] = "REVIEW"
-                        # Reset some props for the optimized version
-                        opt_entry_dict["Bitrate_Mbps"] = 0 # Will be updated by scanner/analyzed later
-
-                        db.upsert(VideoEntry(**opt_entry_dict))
-                else:
-                    print(f"⚠️ Original file not found at {original_path}, skipping move.")
-            else:
-                # Standard Mode: the optimized file takes the original's place.
-                opt_path = str(Path(original_path).with_suffix(".mp4"))
-
-                # Vor dem Ersetzen: Gehört der Zielname schon einer anderen
-                # Datei? Dann lieber den Job scheitern lassen, als sie
-                # kommentarlos zu überschreiben.
-                try:
-                    check_target_collision(Path(original_path), Path(opt_path))
-                except TargetCollision as e:
+            # Zweite Prüfung, jetzt verbindlich: Der Empfang dauert bei einer
+            # großen Datei Minuten. Wer währenddessen „Abbrechen" klickte,
+            # verlor sonst das Original trotzdem, und der Job sprang von
+            # `cancelled` zurück auf `done`.
+            if not _claim_finalize(job_id):
+                _unlink_quiet(part_path)
+                handler.send_error(409, "Another upload for this job is being applied")
+                return True
+            try:
+                current = db.get_job(job_id)
+                if _job_is_finished(current):
                     _unlink_quiet(part_path)
-                    db.update_job_status(job_id, "failed", result_message=str(e))
-                    print(f"❌ Upload for job {job_id} rejected: {e}")
-                    send_json(handler, {"success": False, "error": str(e)})
+                    status = (current or {}).get("status", "gone")
+                    print(f"⏹ Upload for job {job_id} discarded: job is {status}")
+                    handler.send_error(409, f"Job is {status}")
                     return True
 
-                atomic_replace(Path(part_path), Path(opt_path))
-                # A .mkv source becomes .mp4, so the old file survives the replace.
-                if opt_path != original_path:
-                    _unlink_quiet(original_path)
-                _replace_media_entry(original_path, opt_path, job.get("target_codec") or "hevc")
+                orig_size = os.path.getsize(original_path) if os.path.exists(original_path) else 0
 
-            opt_size = os.path.getsize(opt_path)
-            if config.settings.enable_review_mode and os.path.exists(target_orig_path):
-                orig_size = os.path.getsize(target_orig_path)
-            saved = orig_size - opt_size
+                if config.settings.enable_review_mode:
+                    # Review Mode: Move both files to a dedicated folder
+                    # Smart Storage: Try to use .review folder next to original file to save space on system disk
+                    review_job_dir = os.path.join(orig_dir, ".review", _fit_name(f"job_{job_id}_", orig_stem, ""))
+                    try:
+                        os.makedirs(review_job_dir, exist_ok=True)
+                    except Exception as e:
+                        # Fallback to global review directory if media directory is read-only
+                        print(f"⚠️ Could not create relative review dir ({e}), falling back to global {config.review_dir}")
+                        review_job_dir = os.path.join(config.review_dir, _fit_name(f"job_{job_id}_", orig_stem, ""))
+                        os.makedirs(review_job_dir, exist_ok=True)
 
-            db.update_job_status(
-                job_id, "done", saved_bytes=saved,
-                result_message=f"Optimized: {opt_size/(1024*1024):.1f}MB (saved {saved/(1024*1024):.1f}MB)"
-            )
-            print(f"✅ Upload received for job {job_id}: {os.path.basename(opt_path)} ({opt_size/(1024*1024):.1f} MB)")
+                    target_orig_path = os.path.join(review_job_dir, _fit_name("", orig_stem, f"_original{orig_ext}"))
+                    opt_path = os.path.join(review_job_dir, _fit_name("", orig_stem, "_optimized.mp4"))
 
-            # Flush media cache so UI sees new entries (REVIEW status) immediately
-            _media_cache.invalidate()
+                    # 1. Move the verified upload into the review folder
+                    import shutil
+                    shutil.move(part_path, opt_path)
 
-            # Report nach Upload neu generieren
-            try:
-                from arcade_scanner.server.api_handler import report_debouncer
-                current_port = handler.server.server_address[1]
-                report_debouncer.schedule(current_port)
-            except Exception as e:
-                print(f"⚠️ Report scheduling after upload failed: {e}")
+                    # 2. Move original file
+                    if os.path.exists(original_path):
+                        shutil.move(original_path, target_orig_path)
 
-            send_json(handler, {"success": True, "opt_path": opt_path, "saved_bytes": saved})
+                        # 3. Update Database for original
+                        # We need to preserve metadata, so we get the old entry, update it, and upsert
+                        orig_entry = db.get(original_path)
+                        if orig_entry:
+                            old_entry_dict = orig_entry.model_dump(by_alias=True)
+                            # Remove old record (since path is PK)
+                            db.remove(original_path)
+
+                            # Update fields
+                            old_entry_dict["FilePath"] = target_orig_path
+                            old_entry_dict["Status"] = "REVIEW"
+                            old_entry_dict["OriginalPath"] = original_path
+
+                            from arcade_scanner.models.video_entry import VideoEntry
+                            db.upsert(VideoEntry(**old_entry_dict))
+
+                            # 4. Create database entry for optimized file
+                            # We use the original entry as a template for metadata
+                            opt_entry_dict = old_entry_dict.copy()
+                            opt_entry_dict["FilePath"] = opt_path
+                            opt_entry_dict["Size_MB"] = os.path.getsize(opt_path) / (1024 * 1024)
+                            opt_entry_dict["Status"] = "REVIEW"
+                            # Reset some props for the optimized version
+                            opt_entry_dict["Bitrate_Mbps"] = 0 # Will be updated by scanner/analyzed later
+
+                            db.upsert(VideoEntry(**opt_entry_dict))
+                    else:
+                        print(f"⚠️ Original file not found at {original_path}, skipping move.")
+                else:
+                    # Standard Mode: the optimized file takes the original's place.
+                    opt_path = str(Path(original_path).with_suffix(".mp4"))
+
+                    # Vor dem Ersetzen: Gehört der Zielname schon einer anderen
+                    # Datei? Dann lieber den Job scheitern lassen, als sie
+                    # kommentarlos zu überschreiben.
+                    try:
+                        check_target_collision(Path(original_path), Path(opt_path))
+                    except TargetCollision as e:
+                        _unlink_quiet(part_path)
+                        db.update_job_status(job_id, "failed", result_message=str(e))
+                        print(f"❌ Upload for job {job_id} rejected: {e}")
+                        send_json(handler, {"success": False, "error": str(e)})
+                        return True
+
+                    atomic_replace(Path(part_path), Path(opt_path))
+                    # A .mkv source becomes .mp4, so the old file survives the replace.
+                    if opt_path != original_path:
+                        _unlink_quiet(original_path)
+                    _replace_media_entry(original_path, opt_path, job.get("target_codec") or "hevc")
+
+                opt_size = os.path.getsize(opt_path)
+                if config.settings.enable_review_mode and os.path.exists(target_orig_path):
+                    orig_size = os.path.getsize(target_orig_path)
+                saved = orig_size - opt_size
+
+                db.update_job_status(
+                    job_id, "done", saved_bytes=saved,
+                    result_message=f"Optimized: {opt_size/(1024*1024):.1f}MB (saved {saved/(1024*1024):.1f}MB)"
+                )
+                print(f"✅ Upload received for job {job_id}: {os.path.basename(opt_path)} ({opt_size/(1024*1024):.1f} MB)")
+
+                # Flush media cache so UI sees new entries (REVIEW status) immediately
+                _media_cache.invalidate()
+
+                # Report nach Upload neu generieren
+                try:
+                    from arcade_scanner.server.api_handler import report_debouncer
+                    current_port = handler.server.server_address[1]
+                    report_debouncer.schedule(current_port)
+                except Exception as e:
+                    print(f"⚠️ Report scheduling after upload failed: {e}")
+
+                send_json(handler, {"success": True, "opt_path": opt_path, "saved_bytes": saved})
+            finally:
+                _release_finalize(job_id)
 
         except Exception as e:
             print(f"❌ Error in queue/upload: {e}")

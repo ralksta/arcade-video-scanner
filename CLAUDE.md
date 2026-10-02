@@ -67,7 +67,7 @@ When you add/rename an element ID or a JS global, update both sides or these tes
 
 **Optimizer.** `scripts/video_optimizer.py` is deliberately standalone (imports `arcade_scanner/core/` modules via sys.path manipulation, degrades gracefully if unavailable). It does binary-search quality passes with SSIM verification (skipped when savings < 10%), hardware encoder detection (`core/hw_encode_detect.py`), and HEVC→AV1 with automatic fallback. `scripts/batch_controller.py` runs parallel encodes; `scripts/mac_worker.py` is a remote worker that polls the server's encoding queue. Full technical reference: `dev-docs/video-optimizer.md`.
 
-**Clients.** Three native clients talk to the same HTTP API: `ios_client/` (SwiftUI), `tv_client/` (webOS, Enact/Limestone + React — `prebuild.js` generates a dummy `src/views/credentials.json` before builds), `webos_client/` (thin packaged web app). When changing API responses or filter semantics, check whether the TV/iOS clients need the same change (see recent commits aligning TV client filtering with the browser client).
+**Clients.** Two native clients talk to the same HTTP API: `tv_client/` (webOS, Enact/Limestone + React — `prebuild.js` generates a dummy `src/views/credentials.json` before builds) and `webos_client/` (thin packaged web app). When changing API responses or filter semantics, check whether the TV client needs the same change (see recent commits aligning TV client filtering with the browser client). The SwiftUI iOS client was retired on 2026-10-02 (broken since `8c6008a`); `dev-docs/ios-client-status.md` says how to bring it back.
 
 ## Conventions
 

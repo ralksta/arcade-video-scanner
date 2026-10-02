@@ -536,9 +536,21 @@ class ScannerManager:
         self._stop_event.set()
 
 _scanner_instance = None
+_scanner_instance_lock = threading.Lock()
+
+
 def get_scanner_manager() -> ScannerManager:
+    """Der eine Scanner-Manager des Prozesses.
+
+    Mit Sperre: Der Server startet vor dem Scan-Thread, und das Dashboard
+    pollt `/api/scan/status` sofort. Fragten beide zum ersten Mal
+    gleichzeitig, entstanden zwei Manager mit je eigenem `_claim()` — und der
+    Schutz gegen zwei gleichzeitige Scans hängt daran, dass es einen gibt.
+    """
     global _scanner_instance
     if _scanner_instance is None:
-        _scanner_instance = ScannerManager()
+        with _scanner_instance_lock:
+            if _scanner_instance is None:
+                _scanner_instance = ScannerManager()
     return _scanner_instance
 

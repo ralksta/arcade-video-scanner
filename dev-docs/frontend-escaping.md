@@ -63,6 +63,41 @@ Die Zahl der Interpolationen von Namensfeldern ist damit von 87 auf 60
 gefallen. Der Rest betrifft Felder ohne Fremdeinfluss (Zahlen, feste Auswahl,
 bereits geprüfte Werte) — die Angriffsfläche ist abgedeckt.
 
+## Dritte Runde (Nachtlauf 4, 2026-10-02) — UMSETZUNGSPLAN Phase 3
+
+Die verbliebenen Fundstellen nach **Herkunft** durchgesehen, nicht nach Datei.
+
+**Inline-Handler.** Der schwerste Rest stand im Hauptraster, über das jede
+Datei läuft: `onclick="…('${v.FilePath.replace(/'/g, "\\'")}')"` an fünf
+Stellen (Reveal, Auswahl, Queue for Mac, Review-Vergleich). Am alten Ausdruck
+in Node belegt: Ein `"` im Dateinamen beendet das Attribut und hängt ein
+eigenes `onmouseover` an — es feuert beim Überfahren der Karte. Ein `\` am
+Namensende macht den Handler zum SyntaxError. Und `encodeURIComponent`
+(Keep/Discard, Optimieren) lässt `'` stehen: `x');alert(1);//.mp4` war
+JS-Injektion beim Klick.
+
+Neu ist `jsArg(v)` in `utils.js` = `escapeHtml(JSON.stringify(String(v)))`.
+Damit stimmt die Reihenfolge: erst für JavaScript maskieren, dann für das
+Attribut. Das ist die Antwort auf den Befund oben, dass `escapeHtml` allein
+für JS-im-Attribut nicht reicht. Umgestellt sind alle Handler mit
+Fremdherkunft: `engine.js` (9), `collections.js` (3), `duplicates.js` (1).
+`test_inline_handler_escaping.py` verbietet `'${…}'` in Handlern, außer bei
+begründeten Ausnahmen (erzeugte IDs, feste Auswahl).
+
+**Text.** Roh standen noch Dateinamen in der Befehlspalette
+(`context_menu.js`), Ordner- und Dateinamen im Treemap, Ordnernamen im
+Einrichtungs-Assistenten und Sammlungs-, Tag- und Regelnamen. `showToast()`
+maskiert jetzt selbst, denn mehrere Aufrufer übergeben Dateinamen und keiner
+übergibt Markup.
+
+**Als unbedenklich eingestuft:** Werte aus ffprobe (Codec, Profil), die
+Dateiendung in der Cinema-Ansicht (sie muss eine bekannte Medien-Endung sein,
+sonst wird die Datei nicht gescannt), Vorschaubild-URLs (md5-Name vom
+Server), erzeugte IDs, Zahlen, Werte aus fester Auswahl.
+
+**Bewusst ausgelassen:** Vault-eigene Stellen. Phase 1 entfernt den Vault,
+Arbeit daran wäre verloren.
+
 ## Was offen ist
 
 Eine Erhebung über alle statischen JS-Dateien fand **87 Interpolationen** von

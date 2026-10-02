@@ -157,7 +157,7 @@ serves it **only** to clients outside your LAN:
 
 - **Originals are never modified** — the generator reads them, nothing in the serving path writes.
 - **No duplicate entries**: the proxy directory is excluded from scans automatically.
-- **Invisible to clients**: browser, TV and iOS clients keep requesting the original path.
+- **Invisible to clients**: browser and TV clients keep requesting the original path.
 - **Fail safe**: no proxy, feature off, or bad config → the original is served as before.
 
 Clients on `10/8`, `172.16/12`, `192.168/16` and loopback count as local; Tailscale
