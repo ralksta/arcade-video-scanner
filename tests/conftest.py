@@ -89,3 +89,17 @@ def sample_video_entry():
         "favorite": False,
         "tags": [],
     }
+
+
+@pytest.fixture(autouse=True)
+def _no_session_file_for_the_global_manager(monkeypatch):
+    """Die globale ``session_manager``-Instanz schreibt sonst nach
+    ``arcade_data/sessions.db`` — viele Tests legen dort Sitzungen an.
+
+    Im Test bleibt sie im Speicher. Die Sitzungsdatei selbst prüft
+    ``test_sessions_survive_restart.py`` mit eigenen Instanzen.
+    """
+    from arcade_scanner.security.auth import session_manager
+
+    monkeypatch.setattr(session_manager, "_store_path", None)
+    monkeypatch.setattr(session_manager, "_store_conn", None)

@@ -46,6 +46,12 @@ All notable changes to this project will be documented in this file.
   die ganze Bibliothek wurde neu geladen. Jetzt geht es an derselben Kachel
   weiter.
 - Bilder öffneten den Videoplayer, der nichts zeigte.
+- **Anmeldungen überleben einen Neustart des Servers.** Sitzungen lebten nur
+  im Speicher: Jedes Update und jeder Docker-Neustart meldete alle Geräte ab,
+  am Fernseher hieß das, Benutzername und Passwort mit der Fernbedienung neu
+  einzutippen. Jetzt stehen sie zusätzlich in `arcade_data/sessions.db`, nur
+  als SHA-256 des Tokens. Wer die Datei liest, kann sich damit nicht anmelden.
+  Die Laufzeit bleibt bei 30 Tagen, Abmelden wirkt auch über einen Neustart.
 - Nach einem Neustart des Servers stand der Fernseher vor Kacheln ohne Bilder.
   Kommt die App aus dem Hintergrund zurück, lädt sie neu und führt bei
   abgelaufener Sitzung zum Login.
