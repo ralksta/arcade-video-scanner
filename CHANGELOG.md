@@ -5,12 +5,22 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- TV-Client: Fehlen die Nutzerdaten, zeigt er die Mediathek ohne Favoriten und
+  Tags und nennt den Grund im Untertitel. Bisher blieb das Raster leer, damit
+  der Vault nicht sichtbar wurde.
+- Tag-Kürzel: G, I, O und S sind beim Anlegen gesperrt, weil das Cinema sie
+  belegt; bisher ließen sie sich vergeben und griffen nie. V ist frei.
 - **Gespeicherte Ansichten gehören jetzt dem Konto** (ENTSCHEIDUNGEN.md,
   Punkt 2). Bisher lagen sie in der globalen settings.json, und jedes Konto
   sah Suchbegriffe und Ordner der anderen. Beim ersten Start gehen vorhandene
   Ansichten einmalig an den Admin.
 
 ### Security
+- **Vorschaubilder verlangen eine Anmeldung** (Phase 6). `/thumbnails` war
+  bewusst offen, weil der TV-Client kein Cookie hat. Jetzt hängt er sein Token
+  an, und die Route gilt ohne LAN-Ausnahme. Eine Ausnahme hätte an der
+  fälschbaren Client-Adresse gehangen. Der Rundum-Test für anonyme Zugriffe
+  prüft jetzt alle 56 Routen statt nur `/api/…`.
 - `POST /api/restore` überschrieb ohne Anmeldung die globalen Einstellungen
   (darunter `ffprobe_path`). Jetzt sind Sitzung und Admin nötig.
 - Parallele Anmeldeversuche umgingen die Brute-Force-Sperre (40 statt 5).
@@ -37,6 +47,13 @@ All notable changes to this project will be documented in this file.
 - Die Ordnerliste des Einrichtungs-Assistenten brauchte über 30 s.
 
 ### Removed
+- **Vault entfernt** (ENTSCHEIDUNGEN.md, Punkt 4). Weg sind der Reiter, der
+  Knopf auf den Karten, die Taste V im Cinema, der Batch-Knopf, der Eintrag im
+  Kontextmenü, der Reiter „Archiv“ im TV-Client und die Routen `/hide` und
+  `/batch_hide`. Bisher versteckte Dateien sind wieder sichtbar. Beim Start
+  entfernt eine einmalige Migration die Vault-Markierungen aus users.db;
+  Favoriten und Tags bleiben unberührt. Alte Lesezeichen auf `/vault` landen in
+  der Bibliothek. Der abgesicherte Modus ist eine andere Funktion und bleibt.
 - **`webos_client/` entfernt.** Die Hülle leitete auf `/static/tv.html` um,
   das seit `40c546f` (5. Juli) nicht mehr existiert. Damals hatte der
   Enact-Client die Seite ersetzt. Die Hülle lieferte deshalb nur noch eine 404

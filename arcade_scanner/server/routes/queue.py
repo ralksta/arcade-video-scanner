@@ -207,8 +207,7 @@ def _replace_media_entry(original_path: str, new_path: str, codec: str) -> None:
 
     # Der Nutzerzustand hängt nicht an der Zeile in `media`, sondern am Pfad —
     # und aus `film.mkv` wird hier `film.mp4`. Ohne diesen Schritt verliert
-    # jeder, der ein Video optimiert, dessen Favoriten-, Vault- und
-    # Tag-Zuordnung. Still: In der Oberfläche steht danach dieselbe Datei mit
+    # jeder, der ein Video optimiert, dessen Favoriten- und Tag-Zuordnung. Still: In der Oberfläche steht danach dieselbe Datei mit
     # demselben Namen, nur ohne alles, was der Nutzer daran gemacht hat.
     if new_path != original_path:
         try:

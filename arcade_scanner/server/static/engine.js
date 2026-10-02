@@ -325,7 +325,6 @@ function _optimizeButton(v) {
  * @param {string} v.thumb - Thumbnail filename
  * @param {string} [v.media_type] - Type of media ('video' or 'image')
  * @param {boolean} [v.favorite] - Whether item is favorited
- * @param {boolean} [v.hidden] - Whether item is in vault
  * @param {string[]} [v.tags] - Array of tag names
  * @returns {HTMLElement} DOM element for the video card
  */
@@ -395,9 +394,6 @@ function createVideoCard(v) {
                  <button class="w-11 h-11 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] flex items-center justify-center backdrop-blur transition-colors" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
                     <span class="material-icons text-3xl" aria-hidden="true">play_arrow</span>
                  </button>
-                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
-                    <span class="material-icons" aria-hidden="true">${v.hidden ? 'unarchive' : 'archive'}</span>
-                 </button>
                   ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? _optimizeButton(v) : ''}
              </div>
              
@@ -430,9 +426,6 @@ function createVideoCard(v) {
                     <span class="bg-[var(--ds-fill-soft)] text-label px-1.5 py-0.5 rounded-[4px]">${v.Size_MB.toFixed(0)} MB</span>
                     ${v.media_type === 'video' ? `<span style="color:${rateColor}">${v.Bitrate_Mbps.toFixed(1)} Mbps</span>` : ''}
                 </div>
-                <button class="text-text-muted hover:text-text-main transition-colors hide-toggle-btn cursor-pointer" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))" title="${v.hidden ? 'Restore' : 'Move to Vault'}">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${v.hidden ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>' : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'}</svg>
-                </button>
             </div>
 
             
@@ -533,7 +526,7 @@ scrollObserver.observe(sentinel);
 // --- CINEMA MODULE ---
 // Cinema functionality has been extracted to cinema.js
 // Functions available: openCinema, closeCinema, navigateCinema, cinemaFavorite,
-// cinemaVault, cinemaLocate, toggleCinemaInfo, toggleCinemaTagPanel, toggleCinemaTag
+// cinemaLocate, toggleCinemaInfo, toggleCinemaTagPanel, toggleCinemaTag
 
 // --- TREEMAP VISUALIZATION ---
 // UI code moved to treemap.js
@@ -986,7 +979,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (res.ok) {
                 const data = await res.json();
                 const favSet = new Set(data.favorites || []);
-                const vaultSet = new Set(data.vaulted || []);
                 const tagMap = data.tags || {};
 
                 // Hydrate Sensitive Settings (Safe Mode) - Migrated from global config
@@ -1000,11 +992,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (window.ALL_VIDEOS) {
                     window.ALL_VIDEOS.forEach(v => {
                         v.favorite = favSet.has(v.FilePath);
-                        v.hidden = vaultSet.has(v.FilePath);
                         v.tags = tagMap[v.FilePath] || [];
                     });
                 }
-                console.log(`✅ User data loaded: ${favSet.size} favs, ${vaultSet.size} vaulted.`);
+                console.log(`✅ User data loaded: ${favSet.size} favs.`);
                 window.userDataLoaded = true;
                 return true;
             } else {
@@ -1015,8 +1006,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {
             console.error("Error loading user data:", e);
         }
-        // Fehlgeschlagen. Der Filter zeigt daraufhin gar nichts an, statt eine
-        // Bibliothek auszubreiten, deren Vault-Zustand unbekannt ist.
+        // Fehlgeschlagen. Der Filter zeigt daraufhin gar nichts an: Ohne die
+        // Nutzerdaten fehlen die Listen des abgesicherten Modus (sensitive_*),
+        // und der zeigte sonst alles, was er verbergen soll.
         window.userDataLoaded = false;
         return false;
     }

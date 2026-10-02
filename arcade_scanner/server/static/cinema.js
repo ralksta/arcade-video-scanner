@@ -3,7 +3,7 @@
  *
  * Features:
  * - Video playback and image display
- * - Keyboard navigation (←→ for prev/next, F for favorite, V for vault)
+ * - Keyboard navigation (←→ for prev/next, F for favorite)
  * - Tag assignment via shortcuts (A-Z keys mapped to tags)
  * - Info panel with media metadata
  * - Tag picker panel
@@ -449,7 +449,6 @@ function cinemaToggleFullscreen() {
  *   ← / →        – Previous / Next in playlist
  *   Space        – Play / Pause video
  *   F            – Toggle Favorite
- *   V            – Move to Vault
  *   G            – Toggle GIF Export panel
  *   O            – Toggle Optimizer panel
  *   I            – Toggle Info panel
@@ -493,13 +492,6 @@ function cinemaKeyHandler(e) {
             showCinemaToast('Favorite toggled');
         }
 
-    } else if (key === 'v') {
-        e.preventDefault();
-        if (currentCinemaPath) {
-            cinemaVault();
-            showCinemaToast('Moved to Vault');
-        }
-
     } else if (key === 'g') {
         // GIF Export panel toggle
         e.preventDefault();
@@ -532,7 +524,8 @@ function cinemaKeyHandler(e) {
 
     } else {
         // Check custom tag shortcuts (A-Z except reserved)
-        const reservedKeys = ['f', 'v', 'g', 'o', 'i', 's', ' ', 'escape', 'arrowleft', 'arrowright'];
+        // Muss zu tag_manager.js passen — dort wird beim Anlegen geprüft.
+        const reservedKeys = ['f', 'g', 'o', 'i', 's', ' ', 'escape', 'arrowleft', 'arrowright'];
         if (key.length === 1 && /[a-z]/i.test(key) && !reservedKeys.includes(key)) {
             const tags = window.userSettings?.available_tags || [];
             const matchingTag = tags.find(t => t.shortcut && t.shortcut.toLowerCase() === key);
@@ -577,21 +570,6 @@ function cinemaFavorite() {
 }
 
 /**
- * Move current cinema item to vault (hide)
- */
-function cinemaVault() {
-    if (!currentCinemaPath) return;
-
-    apiWrite(`/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`, {}, {
-        action: 'In den Vault verschieben',
-    }).then(response => {
-        if (!response) return;   // Fehler gemeldet — Cinema bleibt offen
-        closeCinema();
-        location.reload();
-    });
-}
-
-/**
  * Reveal current cinema item in system file browser
  */
 function cinemaLocate() {
@@ -602,7 +580,7 @@ function cinemaLocate() {
 // --- UI UPDATE FUNCTIONS ---
 
 /**
- * Update cinema action button states (favorite, vault indicators)
+ * Update cinema action button states (favorite indicator)
  */
 function updateCinemaButtons() {
     if (!currentCinemaVideo) return;
@@ -613,12 +591,6 @@ function updateCinemaButtons() {
         favBtn.title = currentCinemaVideo.favorite ? 'Already a Favorite' : 'Add to Favorites';
         const icon = document.getElementById('cinemaFavIcon');
         if (icon) icon.textContent = currentCinemaVideo.favorite ? 'star' : 'star_border';
-    }
-
-    const vaultBtn = document.querySelector('.cinema-action-btn[onclick="cinemaVault()"]');
-    if (vaultBtn) {
-        vaultBtn.classList.toggle('is-active', !!currentCinemaVideo.hidden);
-        vaultBtn.title = currentCinemaVideo.hidden ? 'Already in Vault' : 'Move to Vault';
     }
 }
 
@@ -880,7 +852,6 @@ window.openCinema         = openCinema;
 window.closeCinema        = closeCinema;
 window.navigateCinema     = navigateCinema;
 window.cinemaFavorite     = cinemaFavorite;
-window.cinemaVault        = cinemaVault;
 window.cinemaLocate       = cinemaLocate;
 window.toggleCinemaInfo   = toggleCinemaInfo;
 window.toggleCinemaTagPanel = toggleCinemaTagPanel;

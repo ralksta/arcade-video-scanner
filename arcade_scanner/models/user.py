@@ -78,7 +78,6 @@ class UserVideoData(BaseModel):
     Separates user preferences from global file metadata.
     """
     favorites: List[str] = Field(default_factory=list, description="List of absolute file paths marked as favorite")
-    vaulted: List[str] = Field(default_factory=list, description="List of absolute file paths marked as hidden/vaulted")
     # tags mapping: path -> list of tags
     tags: Dict[str, List[str]] = Field(default_factory=dict, description="User specific tags per video path")
 

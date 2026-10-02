@@ -41,8 +41,8 @@ def handle_get(handler) -> bool:
     try:
         db, user_db = _get_deps()
 
-        # Ohne den Nutzerdatensatz ist weder bekannt, was im Vault liegt, noch
-        # welche Verzeichnisse dem Konto gehören. Aus dieser Liste heraus wird
+        # Ohne den Nutzerdatensatz ist nicht bekannt, welche Verzeichnisse
+        # dem Konto gehören. Aus dieser Liste heraus wird
         # eingereiht, und Einreihen heisst, dass die Datei ersetzt wird — hier
         # in die offene Richtung zu versagen wäre die falsche Wahl.
         u = user_db.get_user(user_name)
@@ -51,7 +51,6 @@ def handle_get(handler) -> bool:
             return True
 
         exclude = set(db.get_active_queue_paths())
-        exclude.update(os.path.abspath(p) for p in u.data.vaulted)
 
         # Vorschläge nur aus den eigenen Scan-Zielen. Vorher kam die Liste aus
         # dem gesamten Bestand — mit Pfad, Grösse und Vorschaubild fremder

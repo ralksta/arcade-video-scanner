@@ -39,7 +39,6 @@ def run_auto_tag_rules(username: str, *, user_db: Any, media_db: Any,
         return {}
 
     videos = media_db.get_all_dicts()
-    vaulted = set(user.data.vaulted)
     favorites = set(user.data.favorites)
     counts: dict[str, int] = {}
     changed = False
@@ -57,8 +56,7 @@ def run_auto_tag_rules(username: str, *, user_db: Any, media_db: Any,
                 continue
             effective = {**video,
                          "tags": user.data.tags.get(path, []),
-                         "favorite": path in favorites,
-                         "hidden": path in vaulted}
+                         "favorite": path in favorites}
             if not video_matches(effective, rule.get("criteria"), now=now):
                 continue
             current = user.data.tags.setdefault(path, [])

@@ -130,8 +130,6 @@ ROUTES = [
     "/compress?path=/media/a.mp4",
     "/api/keep_optimized?original=/media/a.mp4&optimized=/media/a_opt.mp4",
     "/api/discard_optimized?path=/media/a_opt.mp4",
-    "/hide?path=/media/a.mp4&state=true",
-    "/batch_hide?paths=/media/a.mp4",
     "/favorite?path=/media/a.mp4&state=true",
     "/batch_favorite?paths=/media/a.mp4",
     "/batch_compress?paths=/media/a.mp4",

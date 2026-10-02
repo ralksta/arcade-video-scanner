@@ -670,6 +670,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
             # 1. ROOT / INDEX -> Serve REPORT_FILE
+            # /vault: Den Vault gibt es nicht mehr (Phase 1); alte Lesezeichen landen
+            # in der normalen Bibliothek.
             spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
             clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
@@ -714,8 +716,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
             # 2. THUMBNAILS -> Serve from THUMB_DIR (with security checks + lazy generation)
             elif self.path.startswith("/thumbnails/"):
+                # Sitzungspflichtig seit UMSETZUNGSPLAN Phase 6 (2026-10-02).
+                # Vorher bewusst offen, weil der TV-Client kein Cookie hat;
+                # jetzt hängt er sein Token an (serverConfig.thumbnailUrl), der
+                # Browser schickt das Cookie. Kein LAN-Sonderfall — der hätte
+                # sich per X-Forwarded-For fälschen lassen.
+                if not self.get_current_user():
+                    self.send_error(401, "Unauthorized")
+                    return
                 try:
-                    rel_path = unquote(self.path[12:])  # remove /thumbnails/
+                    # Nur der Pfad, ohne Query: Der TV-Client hängt `?token=`
+                    # an, und `self.path[12:]` nahm das mit in den Dateinamen.
+                    rel_path = unquote(urlparse(self.path).path[12:])  # remove /thumbnails/
 
                     # Security Fix C-4: Prevent path traversal
                     thumb_dir_abs = os.path.abspath(config.thumb_dir)
@@ -852,15 +864,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             #   /reveal?         /api/mark_optimized?   /compress?
             #   /api/keep_optimized?  /api/discard_optimized?
             #   /api/rescan      /api/backup
-            #   /batch_compress?  /hide?  /batch_hide?  /favorite?  /batch_favorite?
+            #   /batch_compress?  /favorite?  /batch_favorite?
             elif self.path.startswith("/stream?"):
                 try:
                     # Sitzungspflichtig — bis hierher war sie es nicht.
                     #
                     # Geprüft wurde nur `is_path_allowed()`, also ob der Pfad
                     # in einem Scan-Ziel liegt. Wer die Adresse kannte, bekam
-                    # die Datei: ohne Anmeldung, ohne Konto, an der
-                    # Vault-Markierung vorbei. Genau die Dateien, um die es in
+                    # die Datei: ohne Anmeldung, ohne Konto. Genau die Dateien, um die es in
                     # diesem Programm geht, waren damit das einzige, was der
                     # Login nicht geschützt hat.
                     #

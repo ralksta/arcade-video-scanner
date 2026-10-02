@@ -282,7 +282,6 @@ class UserStore:
 
         modified = False
         count_fav = 0
-        count_hidden = 0
         count_tags = 0
 
         for entry in video_db.get_all():
@@ -291,18 +290,13 @@ class UserStore:
                 modified = True
                 count_fav += 1
 
-            if entry.vaulted and entry.file_path not in admin.data.vaulted:
-                admin.data.vaulted.append(entry.file_path)
-                modified = True
-                count_hidden += 1
-
             if entry.tags and entry.file_path not in admin.data.tags:
                 admin.data.tags[entry.file_path] = list(entry.tags)
                 modified = True
                 count_tags += 1
 
         if modified:
-            print(f"📦 Migrating legacy data to 'admin': {count_fav} favs, {count_hidden} hidden, {count_tags} tagged videos.")
+            print(f"📦 Migrating legacy data to 'admin': {count_fav} favs, {count_tags} tagged videos.")
             self.add_user(admin) # Save changes
 
         self.migrate_collections()
@@ -310,6 +304,7 @@ class UserStore:
         self.migrate_tags()
         self.migrate_sensitive_settings()
         self.migrate_saved_views()
+        self.drop_vault_data()
         self.cleanup_legacy_settings()
 
     def migrate_tags(self):
@@ -432,6 +427,34 @@ class UserStore:
             print(f"📦 {len(added)} gespeicherte Ansichten an '{admin_name}' übergeben.")
         return len(added)
 
+    def drop_vault_data(self) -> int:
+        """Entfernt die Vault-Markierungen aus allen Konten — UMSETZUNGSPLAN Phase 1.
+
+        Der Vault ist als Funktion entfernt (ENTSCHEIDUNGEN.md, Punkt 4). Das
+        Modell kennt `vaulted` nicht mehr, Pydantic verwirft das Feld beim
+        Laden; ein Neuschreiben des Kontos entfernt es also aus `users.db`.
+        Geschrieben wird nur, wo das Feld noch steht — ein zweiter Lauf findet
+        nichts. Vorher gesichert: backups/users.db.2026-10-02-vor-phase1.
+
+        Gibt die Zahl der bereinigten Konten zurück.
+        """
+        conn = None
+        try:
+            conn = self._get_conn()
+            names = [row["username"] for row in conn.execute("SELECT username, user_data FROM users")
+                     if "vaulted" in json.loads(row["user_data"] or "{}")]
+        except Exception as e:
+            print(f"⚠️ Vault-Daten nicht lesbar, nichts bereinigt: {e}")
+            return 0
+        finally:
+            if conn is not None:
+                conn.close()
+
+        cleaned = sum(1 for name in names if self.update_user(name, lambda _user: None))
+        if cleaned:
+            print(f"🧹 Vault-Markierungen aus {cleaned} Konto/Konten entfernt.")
+        return cleaned
+
     def _migration_admin_name(self):
         """`admin`, sonst das erste Admin-Konto — wohin globale Daten wandern."""
         if self.get_user("admin") is not None:
@@ -516,7 +539,7 @@ class UserStore:
             print(f"⚠️ Error migrating sensitive settings: {e}")
 
     def remap_paths_in_user_data(self, mapping) -> int:
-        """Schreibt Favoriten, Vault und Tags von einem Pfad auf einen anderen um.
+        """Schreibt Favoriten und Tags von einem Pfad auf einen anderen um.
 
         `mapping` ist `{alter Pfad: neuer Pfad}`. Zurückgegeben wird die Zahl
         der umgeschriebenen Einträge.
@@ -524,7 +547,7 @@ class UserStore:
         Gedacht für den Fall, dass eine Datei **umgezogen** ist: Der
         Nutzerzustand hängt hier ausschließlich am Pfad, ein Umbenennen im
         Dateimanager sieht für die Bibliothek deshalb aus wie „alte Datei weg,
-        neue Datei da". Favoriten, Vault-Markierung und Tags blieben dabei auf
+        neue Datei da". Favoriten und Tags blieben dabei auf
         dem alten Pfad liegen — unsichtbar, aber für immer, und die neue Datei
         stand ohne alles da.
 
@@ -551,12 +574,6 @@ class UserStore:
                             user.data.favorites.append(new)
                         changed += 1
 
-                    if old in user.data.vaulted:
-                        user.data.vaulted.remove(old)
-                        if new not in user.data.vaulted:
-                            user.data.vaulted.append(new)
-                        changed += 1
-
                     if old in user.data.tags:
                         alte_tags = user.data.tags.pop(old)
                         vorhanden = user.data.tags.get(new, [])
@@ -571,7 +588,7 @@ class UserStore:
         return changed
 
     def purge_paths_from_user_data(self, paths) -> int:
-        """Entfernt gelöschte Pfade aus Favoriten, Vault und Tags aller Nutzer.
+        """Entfernt gelöschte Pfade aus Favoriten und Tags aller Nutzer.
 
         Zurückgegeben wird die Zahl der entfernten Einträge.
 
@@ -580,14 +597,13 @@ class UserStore:
 
         1. Die Listen wachsen mit jeder gelöschten Datei. In dieser
            Installation stehen bereits 12 Tag-Einträge und drei
-           Favoriten/Vault-Einträge auf Pfaden, die es nicht mehr gibt.
+           Favoriten-Einträge auf Pfaden, die es nicht mehr gibt.
 
         2. Die gefährlichere: Entsteht später **dieselbe Pfadangabe erneut** —
            und beim Optimieren entsteht sie regelmäßig neu, weil aus
            ``film.mkv`` wieder ``film.mp4`` wird —, erbt die neue Datei
-           stillschweigend den alten Zustand. Ein Video, das als „vaulted"
-           galt, ist nach dem Neuanlegen sofort wieder versteckt, ohne dass
-           irgendwo steht, warum.
+           stillschweigend den alten Zustand: Favorit und Tags einer Datei,
+           die es nicht mehr gibt, ohne dass irgendwo steht, warum.
 
         Aufgerufen wird das bei **ausdrücklichen** Löschungen durch den
         Nutzer. Nicht beim Aufräumen verwaister Einträge nach einem Scan: Dort
@@ -609,10 +625,6 @@ class UserStore:
                 keep_fav = [p for p in user.data.favorites if p not in targets]
                 removed += len(user.data.favorites) - len(keep_fav)
                 user.data.favorites = keep_fav
-
-                keep_vault = [p for p in user.data.vaulted if p not in targets]
-                removed += len(user.data.vaulted) - len(keep_vault)
-                user.data.vaulted = keep_vault
 
                 keep_tags = {p: t for p, t in user.data.tags.items() if p not in targets}
                 removed += len(user.data.tags) - len(keep_tags)

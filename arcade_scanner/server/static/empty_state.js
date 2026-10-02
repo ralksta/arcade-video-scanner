@@ -57,12 +57,6 @@ function describeEmptyState() {
 
     // 3. Der Workspace ist einfach noch leer.
     const perWorkspace = {
-        vault: {
-            icon: 'lock',
-            title: 'Der Vault ist leer',
-            hint: 'Versteckte Dateien landen hier. Im Cinema mit V oder über das '
-                + 'Augen-Symbol auf einer Karte verschiebst du etwas hierher.',
-        },
         favorites: {
             icon: 'star_border',
             title: 'Noch keine Favoriten',

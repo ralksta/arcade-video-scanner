@@ -100,6 +100,8 @@ Was bei der Umsetzung zu beachten ist:
 
 ## 4. Bottom-Nav / Vault — **Vault als Funktion entfernen**
 
+> **Umgesetzt am 2026-10-02** (UMSETZUNGSPLAN Phase 1).
+
 Gefragt war, ob Vault zurück in die Bottom-Nav soll (der Grund für seinen
 Rauswurf war weggefallen). Die Antwort geht weiter: Die Funktion soll ganz weg.
 Damit erübrigt sich die Nav-Frage — der Ordner-Browser behält seinen Platz.
@@ -292,6 +294,10 @@ nur `list`, `add`, `passwd`):
 ---
 
 ## 9. Vorschaubilder ohne Anmeldung — **nur für Nicht-LAN schließen**
+
+> **Geändert und umgesetzt am 2026-10-02:** Mit dem TV-Build aus Phase 1 ging
+> der saubere Weg. `/thumbnails` verlangt jetzt überall eine Sitzung, und der
+> TV-Client sendet sein Token mit.
 
 `/thumbnails/` prüft Dateinamen und Pfad, aber keine Sitzung. Eine
 Sitzungspflicht würde die Vorschaubilder im TV-Client abschalten:

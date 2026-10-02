@@ -55,10 +55,9 @@ class FakeMediaDB:
         return getattr(self, "media_count", len(self._vectors))
 
 
-def _user_db(vaulted=()):
+def _user_db():
     user_db = MagicMock()
     u = MagicMock()
-    u.data.vaulted = list(vaulted)
     user_db.get_user.return_value = u
     return user_db
 
@@ -117,18 +116,6 @@ def test_ranked_results_exclude_query_and_respect_limit():
     assert paths == ["/lib/close.mp4", "/lib/mid.mp4"]
     assert "/lib/query.mp4" not in paths
     assert body["results"][0]["score"] >= body["results"][1]["score"]
-
-
-def test_vaulted_results_omitted():
-    db = FakeMediaDB([
-        ("/lib/query.mp4", [1.0, 0.0]),
-        ("/lib/secret.mp4", [1.0, 0.0]),
-        ("/lib/ok.mp4", [0.5, 0.5]),
-    ])
-    h = FakeHandler("/api/similar?path=/lib/query.mp4")
-    assert run(h, db, _user_db(vaulted=["/lib/secret.mp4"])) is True
-    paths = [r["file_path"] for r in h.body()["results"]]
-    assert paths == ["/lib/ok.mp4"]
 
 
 def test_cache_invalidated_via_on_change_hook():

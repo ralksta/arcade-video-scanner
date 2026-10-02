@@ -141,9 +141,9 @@ def test_an_unknown_user_writes_nothing(store):
 
 
 def test_the_mutation_is_applied_and_persisted(store):
-    store.update_user("ralf", lambda u: u.data.vaulted.append("/media/privat.mp4"))
+    store.update_user("ralf", lambda u: u.data.favorites.append("/media/privat.mp4"))
 
-    assert store.get_user("ralf").data.vaulted == ["/media/privat.mp4"]
+    assert store.get_user("ralf").data.favorites == ["/media/privat.mp4"]
 
 
 def test_the_lock_is_reentrant(store):
@@ -175,7 +175,7 @@ def test_purging_holds_the_lock_across_the_whole_loop(store):
 
 # --- Welche Wege schon umgestellt sind ---
 
-def test_the_favourite_and_vault_routes_use_update_user():
+def test_the_favourite_routes_use_update_user():
     from pathlib import Path
 
     source = (
@@ -185,7 +185,8 @@ def test_the_favourite_and_vault_routes_use_update_user():
         ln for ln in source.splitlines() if not ln.lstrip().startswith("#")
     )
 
-    assert code.count("user_db.update_user(") == 4
+    # Vier bis Phase 1; die beiden Vault-Routen sind entfernt.
+    assert code.count("user_db.update_user(") == 2
     assert "user_db.add_user(" not in code, (
         "In files.py wird wieder einzeln geschrieben — das verliert bei "
         "gleichzeitigen Anfragen Änderungen"

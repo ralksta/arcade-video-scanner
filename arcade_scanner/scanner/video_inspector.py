@@ -53,7 +53,6 @@ class VideoInspector(MediaInspector):
             video_metadata=v_meta,
             status=legacy_entry.status,
             favorite=legacy_entry.favorite,
-            hidden=legacy_entry.vaulted,
             tags=legacy_entry.tags,
             thumb=legacy_entry.thumb,
             imported_at=legacy_entry.imported_at,

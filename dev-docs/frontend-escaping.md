@@ -95,7 +95,7 @@ Dateiendung in der Cinema-Ansicht (sie muss eine bekannte Medien-Endung sein,
 sonst wird die Datei nicht gescannt), Vorschaubild-URLs (md5-Name vom
 Server), erzeugte IDs, Zahlen, Werte aus fester Auswahl.
 
-**Bewusst ausgelassen:** Vault-eigene Stellen. Phase 1 entfernt den Vault,
+**Bewusst ausgelassen (inzwischen erledigt):** Vault-eigene Stellen. Phase 1 hat den Vault am 2026-10-02 entfernt,
 Arbeit daran wäre verloren.
 
 ## Was offen ist

@@ -3,49 +3,6 @@
 // --- CARD ACTIONS ---
 
 /**
- * Toggle hidden/vault state for a video card
- * Updates local state, sends to server, and animates card out if no longer visible
- *
- * @param {HTMLElement} card - The video card container element
- */
-function toggleHidden(card) {
-    const path = card.getAttribute('data-path');
-    const video = window.ALL_VIDEOS.find(v => v.FilePath === path);
-    if (!video) return;
-
-    const previous = video.hidden;
-    video.hidden = !video.hidden;
-
-    // Update specific card UI instantly
-    const btn = card.querySelector('.hide-toggle-btn .material-icons');
-    const paintIcon = () => { btn.innerText = video.hidden ? 'visibility' : 'visibility_off'; };
-    paintIcon();
-
-    apiWrite(`/hide?path=` + encodeURIComponent(path) + `&state=${video.hidden}`, {}, {
-        action: video.hidden ? 'In den Vault verschieben' : 'Aus dem Vault holen',
-        rollback: () => {
-            video.hidden = previous;
-            paintIcon();
-            filterAndSort();
-            renderCollections();
-        },
-    });
-
-    // Animate out if no longer matching workspace
-    const shouldHide = (workspaceMode === 'lobby' && video.hidden) || (workspaceMode === 'vault' && !video.hidden);
-    if (shouldHide) {
-        card.style.opacity = '0';
-        card.style.transform = 'scale(0.8)';
-        setTimeout(() => {
-            filterAndSort();
-            renderCollections(); // Update sidebar counts
-        }, 300);
-    } else {
-        renderCollections(); // Update immediately if not animating out
-    }
-}
-
-/**
  * Toggle favorite state for a video card
  * Updates local state, sends to server, and updates star icon
  *

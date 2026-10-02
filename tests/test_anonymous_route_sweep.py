@@ -30,8 +30,7 @@ OPEN_BY_DESIGN = {
     ("GET", "/api/health"): "Gesundheitscheck für Docker/Monitoring",
     ("GET", "/api/health/"): "Gesundheitscheck für Docker/Monitoring",
     ("POST", "/api/logout"): "Abmelden ohne gültige Sitzung ist harmlos",
-    ("GET", "/thumbnails/"): "Vorschaubilder bewusst offen (ENTSCHEIDUNGEN.md, Punkt 9)",
-    ("POST", "/thumbnails/"): "Vorschaubilder bewusst offen (ENTSCHEIDUNGEN.md, Punkt 9)",
+    ("GET", "/collections/"): "SPA-Route: anonym kommt die Anmeldeseite (wie bei /)",
 }
 
 

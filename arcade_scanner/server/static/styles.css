@@ -653,7 +653,7 @@ html {
 
 /* .cinema-actions / .cinema-action-btn: Layout und Optik kommen jetzt aus
    dem Design-System-Block am Dateiende (.cinema-rail-*). Die Klasse
-   .cinema-action-btn bleibt nur noch JS-Hook fuer Favorit/Vault-Zustand. */
+   .cinema-action-btn bleibt nur noch JS-Hook fuer den Favorit-Zustand. */
 
 .cinema-info-btn {
     position: absolute;
@@ -2156,7 +2156,7 @@ html {
     opacity: 1 !important;
 }
 
-/* Hide action buttons (favorite, vault, optimize, play overlay) in selection mode */
+/* Hide action buttons (favorite, optimize, play overlay) in selection mode */
 #videoGrid.selection-mode .video-card-container .favorite-btn,
 #videoGrid.selection-mode .video-card-container .card-media>.hidden.md\:flex {
     display: none !important;
@@ -2791,7 +2791,7 @@ html {
 }
 .cinema-rail-btn.is-primary .cinema-rail-label { color: var(--ds-accent-tint); }
 
-/* Aktiver Zustand (Favorit gesetzt / im Vault) */
+/* Aktiver Zustand (Favorit gesetzt) */
 .cinema-rail-btn.is-active .cinema-rail-icon { color: var(--ds-bitrate); }
 
 /* Transport */

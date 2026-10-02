@@ -33,8 +33,9 @@ config.save({"setup_complete": True})
 source = "".join(open(f, encoding="utf-8").read() for f in
                  glob.glob(os.path.join(root, "arcade_scanner", "server", "**", "*.py"),
                            recursive=True))
-paths = sorted(set(re.findall(
-    r'(?:==|startswith\()\s*"(/(?:api|stream|download|thumbnails|reveal)[^"]*)"', source)))
+# Jede Route, die als Literal im Server-Code steht — nicht nur /api/…:
+# /favorite?, /compress?, /batch_… sahen sonst durch die Lücke.
+paths = sorted(set(re.findall(r'(?:==|startswith\()\s*"(/[a-z_][^"]*)"', source)))
 
 import socketserver  # noqa: E402
 import threading  # noqa: E402

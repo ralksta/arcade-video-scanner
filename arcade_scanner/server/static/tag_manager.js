@@ -524,7 +524,10 @@ function createNewTag() {
     }
 
     // Validate shortcut
-    const reservedKeys = ['F', 'V'];
+    // Dieselben Buchstaben wie die Cinema-Kürzel (cinema.js). Vorher nur F und V:
+    // G, I, O und S ließen sich vergeben, funktionierten im Cinema aber nie.
+    // V ist seit Phase 1 frei (der Vault ist entfernt).
+    const reservedKeys = ['F', 'G', 'I', 'O', 'S'];
     if (shortcut && reservedKeys.includes(shortcut)) {
         showToast(`Kürzel „${shortcut}" ist reserviert — bitte einen anderen Buchstaben wählen`, 'warning');
         return;

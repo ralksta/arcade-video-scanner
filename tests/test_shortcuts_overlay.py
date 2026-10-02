@@ -61,7 +61,7 @@ def _documented_keys(section_title: str) -> set[str]:
 def test_documented_cinema_keys_exist_in_cinema_handler():
     handler = (STATIC_DIR / "cinema.js").read_text(encoding="utf-8")
     handler = handler.split("function cinemaKeyHandler", 1)[1]
-    for key in ("f", "v", "i", "g", "o"):
+    for key in ("f", "i", "g", "o"):
         assert f"key === '{key}'" in handler, f"Cinema-Shortcut '{key}' dokumentiert, aber nicht implementiert"
     assert "ArrowLeft" in handler and "ArrowRight" in handler
 
@@ -101,3 +101,19 @@ def test_cinema_section_documents_all_reserved_keys():
     documented = {k.lower() for k in _documented_keys("Cinema")}
     missing = letters - documented
     assert not missing, f"Reservierte Cinema-Tasten fehlen im Overlay: {sorted(missing)}"
+
+
+def test_tag_shortcut_validation_reserves_the_same_letters_as_cinema():
+    """
+    Die Tag-Verwaltung reservierte nur F und V, das Cinema f, v, g, o, i, s.
+    Ein Tag mit Kürzel G ließ sich also anlegen und griff im Cinema nie. Seit
+    Phase 1 ist V frei (kein Vault mehr); beide Listen müssen gleich sein.
+    """
+    cinema_js = (STATIC_DIR / "cinema.js").read_text(encoding="utf-8")
+    tags_js = (STATIC_DIR / "tag_manager.js").read_text(encoding="utf-8")
+    cinema = {k for k in re.findall(r"'([^']+)'", re.search(
+        r"reservedKeys = \[([^\]]+)\]", cinema_js).group(1)) if len(k) == 1 and k.isalpha()}
+    tags = {k.lower() for k in re.findall(r"'([^']+)'", re.search(
+        r"reservedKeys = \[([^\]]+)\]", tags_js).group(1))}
+    assert cinema == tags
+    assert "v" not in cinema

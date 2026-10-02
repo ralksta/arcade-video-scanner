@@ -13,7 +13,7 @@ NOW = 1_786_000_000  # fixed "now" for date tests
 def _video(**kw) -> dict:
     base = {
         "FilePath": "/lib/clip.mp4", "Size_MB": 500.0, "Status": "OK",
-        "codec": "h264", "tags": [], "hidden": False, "favorite": False,
+        "codec": "h264", "tags": [], "favorite": False,
         "Width": 1920, "Height": 1080, "Duration_Sec": 120.0,
         "media_type": "video", "imported_at": NOW - 3600, "mtime": NOW - 3600,
     }
@@ -85,9 +85,6 @@ class TestVideoMatches:
     def test_empty_criteria_matches(self):
         assert video_matches(_video(), _criteria()) is True
         assert video_matches(_video(), None) is True
-
-    def test_hidden_never_matches(self):
-        assert video_matches(_video(hidden=True), _criteria()) is False
 
     def test_include_media_type(self):
         c = _inc(media_type=["image"])

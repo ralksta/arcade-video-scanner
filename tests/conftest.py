@@ -87,6 +87,5 @@ def sample_video_entry():
         "Duration": 60.0,
         "mtime": 1700000000.0,
         "favorite": False,
-        "vaulted": False,
         "tags": [],
     }
