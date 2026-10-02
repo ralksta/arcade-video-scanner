@@ -171,7 +171,8 @@ def render_navigation(theme: BaseTheme) -> str:
 <nav class="{theme.sidebar_container}">
     <div class="ds-eyebrow !text-[10px] px-2.5 mb-2">Workspace</div>
 
-    {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "dashboard", "Lobby", active=True)}
+    {nav_btn("m-home", "setWorkspaceMode('home')", "home", "Start", active=True)}
+    {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "dashboard", "Lobby")}
     {nav_btn("m-favorites", "setWorkspaceMode('favorites')", "star", "Favoriten")}
     {nav_btn("m-optimized", "setWorkspaceMode('optimized')", "offline_bolt", "Review")}
     {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplicates")}
@@ -198,6 +199,10 @@ def render_navigation(theme: BaseTheme) -> str:
 
 <!-- Mobile Nav -->
 <nav class="md:hidden fixed bottom-0 left-0 right-0 h-[60px] pb-safe-bottom bg-header border-t border-line/60 z-50 flex justify-around items-center px-2">
+    <button onclick="setWorkspaceMode('home')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
+        <span class="material-icons text-[22px]" aria-hidden="true">home</span>
+        <span class="text-[9px] font-medium">Start</span>
+    </button>
     <button onclick="setWorkspaceMode('lobby')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
         <span class="material-icons text-[22px]" aria-hidden="true">dashboard</span>
         <span class="text-[9px] font-medium">Lobby</span>

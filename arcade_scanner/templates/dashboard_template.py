@@ -60,11 +60,13 @@ SCRIPT_MODULES = [
     "folder_browser.js",
     "engine.js",
     "optimizer.js",
+    "watch_progress.js",
     "cinema.js",
     "similar.js",
     "timeline_scrubber.js",
     "gif_export.js",
     "collections.js",
+    "home_view.js",
     "context_menu.js",
     "shortcuts.js",
     "empty_state.js",
@@ -196,6 +198,9 @@ def generate_html_report(report_file, server_port=8000):
 
         <!-- Main Content Container with safe area padding -->
         <main class="flex-1 p-2 md:p-6 pb-[80px] md:pb-6 relative w-full overflow-x-hidden" id="mainContentArea">
+
+            <!-- Startseite (home_view.js): Titelbild + Reihen -->
+            <div id="homeView" class="home-view"></div>
 
             <!-- Video Grid -->
             <div id="videoGrid" class="responsive-grid transition-opacity duration-300 overflow-hidden">

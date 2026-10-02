@@ -22,6 +22,17 @@ function renderUI(reset, scrollToTop = false) {
     // dann stimmen, wenn wir gleich in einen der Early-Returns laufen.
     if (typeof updateEmptyState === 'function') updateEmptyState();
 
+    // Startseite: eigene Darstellung. Eine Suche oder Collection zeigt
+    // Treffer — die gehören in die Bibliothek, nicht in die Reihen.
+    if (workspaceMode === 'home') {
+        if (searchTerm || activeSmartCollectionCriteria) {
+            setWorkspaceMode('lobby', true);
+            return;
+        }
+        if (typeof renderHome === 'function') renderHome();
+        return;
+    }
+
     // If in treemap mode, re-render treemap instead
     if (currentLayout === 'treemap') {
         renderTreemap();
@@ -594,6 +605,12 @@ window.addEventListener('popstate', (event) => {
             folderBrowserState.currentPath = event.state.folderBrowserPath;
             folderBrowserPath = event.state.folderBrowserPath;
         }
+        // Ohne das blieb „Zurück" von der Lobby zur Startseite in der Lobby:
+        // wiederhergestellt wurde nur das Layout.
+        if (event.state.mode && event.state.mode !== workspaceMode) {
+            setWorkspaceMode(event.state.mode);
+            if (event.state.mode === 'home') return;
+        }
         setLayout(currentLayout, true);
     } else {
         loadFromURL();
@@ -1022,6 +1039,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 1b. Load User Data (Hydrate Global Video List)
     await loadUserData();
+
+    // 1c. Wiedergabefortschritt — blockiert nichts; „Weiterschauen" kommt
+    //     nach, sobald der Server geantwortet hat.
+    if (typeof loadWatchProgress === 'function') {
+        loadWatchProgress().then(ok => {
+            if (ok && workspaceMode === 'home' && typeof renderHome === 'function') renderHome();
+        });
+    }
 
     // 2. Initial Render (Sidebar etc)
     initialRender();

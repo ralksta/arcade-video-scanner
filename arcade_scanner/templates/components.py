@@ -2219,10 +2219,10 @@ FILTER_BAR_COMPONENT = """
         <div class="relative">
             <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px] pointer-events-none" aria-hidden="true">sort</span>
             <select id="sortSelect" onchange="setSort(this.value)" class="ds-chip pl-9 pr-4 appearance-none min-w-[140px]">
+                <option value="date">Sort: date added</option>
                 <option value="bitrate">Sort: bitrate</option>
                 <option value="size">Sort: size</option>
                 <option value="runtime">Sort: runtime</option>
-                <option value="date">Sort: date added</option>
                 <option value="file_date">Sort: file date</option>
             </select>
         </div>

@@ -151,6 +151,10 @@ function updateGridScale(value) {
  * @param {boolean} [skipURLUpdate=false] - If true, don't update browser URL
  */
 function setLayout(layout, skipURLUpdate = false) {
+    // Die Startseite hat kein Layout — Raster, Liste, Treemap und Ordner
+    // gehören zur Bibliothek.
+    if (workspaceMode === 'home') setWorkspaceMode('lobby');
+
     currentLayout = layout;
 
     // Treemap und Ordner-Browser rendern nicht über renderUI() — der Leer-Zustand
@@ -296,8 +300,11 @@ function setLayout(layout, skipURLUpdate = false) {
 function updateURL() {
     let path = '/';
 
-    // Special handling for Treemap
-    if (currentLayout === 'treemap') {
+    // Startseite zuerst: Sie hat kein Layout, auch wenn zuletzt die Treemap
+    // offen war.
+    if (workspaceMode === 'home') {
+        path = '/';
+    } else if (currentLayout === 'treemap') {
         path = '/treeview';
         const params = new URLSearchParams();
         const treemapFolder = typeof getTreemapCurrentFolder === 'function' ? getTreemapCurrentFolder() : null;
@@ -352,11 +359,12 @@ function loadFromURL() {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
 
-    // Default
-    let mode = 'lobby';
+    // Default: Startseite. Ein `view`-Parameter gehört zur Bibliothek.
     let layout = params.get('view') || 'grid';
+    let mode = params.get('view') ? 'lobby' : 'home';
 
-    if (path === '/favorites') mode = 'favorites';
+    if (path === '/lobby') mode = 'lobby';
+    else if (path === '/favorites') mode = 'favorites';
     else if (path === '/review') mode = 'optimized';
     else if (path === '/duplicates') mode = 'duplicates';
     else if (path === '/candidates') mode = 'candidates';

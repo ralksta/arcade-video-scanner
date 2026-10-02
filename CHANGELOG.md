@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- Die Bibliothek ist standardmäßig nach „date added“ sortiert (neueste
+  zuerst), nicht mehr nach Bitrate.
 - TV-Client: Fehlen die Nutzerdaten, zeigt er die Mediathek ohne Favoriten und
   Tags und nennt den Grund im Untertitel. Bisher blieb das Raster leer, damit
   der Vault nicht sichtbar wurde.
@@ -86,6 +88,18 @@ All notable changes to this project will be documented in this file.
   beschreibt, was eine Rückholung reparieren müsste.
 
 ### Added
+- **Startseite im Browser.** Nach dem Login öffnet sich jetzt eine Startseite
+  wie in der TV-App statt des Rasters der ganzen Bibliothek: oben ein
+  Titelbild mit „Abspielen“ bzw. „Fortsetzen bei …“, darunter Reihen für
+  Weiterschauen, Neu hinzugefügt, Favoriten, eigene Collections, Zufällige
+  Entdeckungen und Neue Bilder. Die Bibliothek mit allen Filtern bleibt unter
+  „Lobby“. Wer auf der Startseite sucht, landet direkt in den Treffern.
+- **Weiterschauen auf allen Geräten.** Der Wiedergabefortschritt liegt jetzt
+  pro Konto auf dem Server (`/api/progress`). Der Browser-Player setzt dort
+  fort, wo man aufgehört hat, auch wenn das am Fernseher war, und umgekehrt.
+  Pos1 springt an den Anfang. Ab 95 % gilt ein Video als gesehen. Was die
+  TV-App bisher nur lokal gespeichert hatte, lädt sie beim nächsten Start
+  einmal hoch.
 - **TV-App im Stil von Netflix und HBO.** Eine eigene Kopfleiste mit dem Logo
   ARCADE im Markenverlauf ersetzt die Reiter. Darunter liegt ein randloses
   Titelbild, das alle neun Sekunden zum nächsten Eintrag wechselt, mit

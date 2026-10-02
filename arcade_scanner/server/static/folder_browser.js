@@ -95,7 +95,7 @@ function renderFolderSidebar() {
 function resetDashboard() {
     currentFilter = 'all';
     currentCodec = 'all';
-    currentSort = 'bitrate';
+    currentSort = 'date';
     currentFolder = 'all';
     searchTerm = '';
 
@@ -111,7 +111,7 @@ function resetDashboard() {
     }
 
     const sortSelect = document.getElementById('sortSelect');
-    if (sortSelect) sortSelect.value = 'bitrate';
+    if (sortSelect) sortSelect.value = 'date';
 
     // Reset internal state and re-render
     setFilter('all');

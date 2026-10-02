@@ -72,7 +72,9 @@ window.AppState = new Store({
     view: {
         layout: 'grid',
         workspace: 'lobby',
-        sort: 'bitrate'
+        // Neueste zuerst, wie in jeder Mediathek. Vorher 'bitrate' — eine
+        // Wartungsfrage als erster Eindruck der Bibliothek.
+        sort: 'date'
     },
     collection: {
         activeId: null,

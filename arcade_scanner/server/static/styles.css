@@ -3034,3 +3034,258 @@ html {
     outline: 2px solid var(--ds-accent);
     outline-offset: 2px;
 }
+
+/* === STARTSEITE (home_view.js) ===
+   Titelbild + Reihen wie in der TV-App. Auf der Startseite bleibt von der
+   Filterleiste nur die Suche; Raster, Treemap, Liste, Statistik und
+   Leer-Zustand gehören zur Bibliothek. */
+.home-view { display: none; }
+body[data-workspace="home"] .home-view { display: block; }
+body[data-workspace="home"] #videoGrid,
+body[data-workspace="home"] #listViewContainer,
+body[data-workspace="home"] #treemapContainer,
+body[data-workspace="home"] #treemapLegend,
+body[data-workspace="home"] #folderBrowserLegend,
+body[data-workspace="home"] #savedViewsContainer,
+body[data-workspace="home"] #quickStatsRibbon,
+body[data-workspace="home"] #emptyState,
+body[data-workspace="home"] #loadingSentinel,
+body[data-workspace="home"] .workspace-indicator > :not(:first-child) {
+    display: none !important;
+}
+
+.home-hero {
+    position: relative;
+    margin: -8px -8px 8px;
+    min-height: clamp(260px, 52vh, 560px);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    border-radius: 0 0 var(--ds-radius-lg) var(--ds-radius-lg);
+    background: #000;
+}
+@media (min-width: 768px) {
+    .home-hero { margin: -24px -24px 12px; }
+}
+.home-hero-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    animation: home-hero-zoom 18s ease-out both;
+}
+/* Verlauf in die Seitenfarbe: Der Text liegt immer auf Dunklem, und die
+   Unterkante geht nahtlos in die erste Reihe über. */
+.home-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.35) 45%, transparent 75%),
+        linear-gradient(0deg, var(--ds-bg) 0%, transparent 38%);
+}
+.home-hero-body {
+    position: relative;
+    z-index: 1;
+    max-width: 640px;
+    padding: 24px 20px 36px;
+    color: #fff;
+}
+@media (min-width: 768px) {
+    .home-hero-body { padding: 48px 40px 56px; }
+}
+.home-hero-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ds-accent-tint);
+    margin-bottom: 8px;
+}
+.home-hero-title {
+    font-size: clamp(24px, 4.2vw, 48px);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+.home-hero-meta {
+    margin-top: 10px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.78);
+}
+.home-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+}
+.home-hero-play,
+.home-hero-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 42px;
+    padding: 0 20px 0 16px;
+    border-radius: var(--ds-radius-md);
+    font-size: 14px;
+    font-weight: 700;
+    transition: background-color 0.15s ease;
+}
+.home-hero-play { background: #fff; color: #000; }
+.home-hero-play:hover { background: rgba(255, 255, 255, 0.85); }
+.home-hero-secondary {
+    padding: 0 18px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    backdrop-filter: blur(6px);
+}
+.home-hero-secondary:hover { background: rgba(255, 255, 255, 0.28); }
+@keyframes home-hero-zoom {
+    from { transform: scale(1.08); }
+    to { transform: scale(1); }
+}
+
+.home-row {
+    position: relative;
+    margin: 22px 0 6px;
+}
+.home-row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 4px 10px;
+}
+.home-row-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ds-text);
+}
+.home-row-all {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ds-text-muted);
+}
+.home-row-all:hover { color: var(--ds-accent-tint); }
+.home-row-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: clamp(150px, 42vw, 200px);
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 4px;
+    padding: 6px 4px 10px;
+    scrollbar-width: none;
+}
+.home-row-track::-webkit-scrollbar { display: none; }
+@media (min-width: 768px) {
+    .home-row-track { grid-auto-columns: clamp(200px, 19vw, 280px); gap: 14px; }
+}
+.home-row-scroll {
+    display: none;
+    position: absolute;
+    top: 38px;
+    bottom: 34px;
+    width: 40px;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 2;
+}
+.home-row-scroll.is-prev { left: 0; border-radius: 0 var(--ds-radius-md) var(--ds-radius-md) 0; }
+.home-row-scroll.is-next { right: 0; border-radius: var(--ds-radius-md) 0 0 var(--ds-radius-md); }
+@media (hover: hover) and (min-width: 768px) {
+    .home-row.is-scrollable .home-row-scroll { display: flex; }
+    .home-row:hover .home-row-scroll,
+    .home-row-scroll:focus-visible { opacity: 1; }
+}
+
+.home-card {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    text-align: left;
+    scroll-snap-align: start;
+    min-width: 0;
+}
+.home-card-thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--ds-radius-md);
+    overflow: hidden;
+    background: var(--ds-card);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.home-card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.home-card:hover .home-card-thumb,
+.home-card:focus-visible .home-card-thumb {
+    transform: scale(1.04);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+.home-card:focus-visible { outline: none; }
+.home-card:focus-visible .home-card-thumb {
+    outline: 2px solid var(--ds-accent);
+    outline-offset: 2px;
+}
+.home-card-duration {
+    position: absolute;
+    right: 6px;
+    bottom: 8px;
+    padding: 1px 6px;
+    border-radius: var(--ds-radius-xs);
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    font-family: var(--ds-font-mono);
+    font-size: 11px;
+}
+.home-card-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    /* Dunkle Spur: auf hellen Bildern verschwand eine helle. */
+    background: rgba(0, 0, 0, 0.6);
+}
+.home-card-progress span {
+    display: block;
+    height: 100%;
+    background: var(--ds-accent);
+}
+.home-card-title {
+    padding: 0 2px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ds-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.home-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 80px 24px;
+    text-align: center;
+    color: var(--ds-text-muted);
+}
+.home-empty .material-icons { font-size: 44px; opacity: 0.6; }
+.home-empty h2 { font-size: 16px; font-weight: 600; color: var(--ds-text); }
+
+@media (prefers-reduced-motion: reduce) {
+    .home-hero-backdrop { animation: none; }
+    .home-card-thumb { transition: none; }
+}

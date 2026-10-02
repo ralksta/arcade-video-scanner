@@ -3,7 +3,8 @@
  *
  * Features:
  * - Video playback and image display
- * - Keyboard navigation (←→ for prev/next, F for favorite)
+ * - Keyboard navigation (←→ for prev/next, F for favorite, Pos1 for restart)
+ * - Resumes where the account stopped (watch_progress.js, also across devices)
  * - Tag assignment via shortcuts (A-Z keys mapped to tags)
  * - Info panel with media metadata
  * - Tag picker panel
@@ -42,6 +43,10 @@ function openCinema(container) {
     }
 
     if (!path) return;
+
+    // Wird aus dem laufenden Player heraus ein anderes Medium geöffnet (Leiste
+    // „Ähnliche"), gehört die Position noch dem bisherigen.
+    flushCinemaProgress();
 
     const fileName = path.split(/[\\\/]/).pop();
     currentCinemaPath = path;
@@ -97,6 +102,20 @@ function openCinema(container) {
             image.src = '';
         }
         video.classList.remove('hidden');
+
+        // Fortsetzen, wo das Konto aufgehört hat. Erst nach loadedmetadata —
+        // vorher kennt das Element die Dauer nicht und verwirft currentTime.
+        const resumeAt = typeof resumePositionFor === 'function' ? resumePositionFor(path) : 0;
+        if (resumeAt > 0) {
+            video.addEventListener('loadedmetadata', () => {
+                if (currentCinemaPath !== path) return;
+                if (isFinite(video.duration) && resumeAt < video.duration * WATCH_PROGRESS_FINISHED_RATIO) {
+                    video.currentTime = resumeAt;
+                    showCinemaToast(`Fortgesetzt bei ${formatCinemaTime(resumeAt)} · Pos1: von vorn`);
+                }
+            }, {once: true});
+        }
+        _cinemaLastProgressSave = Date.now();
 
         video.src = streamUrl;
         video.load();
@@ -213,6 +232,7 @@ function initCinemaErrorReporting() {
  */
 function closeCinema() {
     window.removeEventListener('keydown', cinemaKeyHandler, true);
+    flushCinemaProgress();
 
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
@@ -241,6 +261,12 @@ function closeCinema() {
 
     currentCinemaPath = null;
     currentCinemaVideo = null;
+
+    // „Weiterschauen" auf der Startseite zeigt sonst den Stand von vorher.
+    if (typeof workspaceMode !== 'undefined' && workspaceMode === 'home'
+            && typeof renderHome === 'function') {
+        renderHome();
+    }
 
     // Close any open panels
     if (typeof closeOptimize === 'function') closeOptimize();
@@ -273,6 +299,7 @@ function navigateCinema(direction) {
 
     const newVideo = sourceList[newIndex];
     if (newVideo) {
+        flushCinemaProgress();
         // Clean up current streams to avoid file handle leak
         const video = document.getElementById('cinemaVideo');
         const image = document.getElementById('cinemaImage');
@@ -299,6 +326,23 @@ function navigateCinema(direction) {
 
 let _cinemaTransportReady = false;
 let _cinemaScrubbing = false;
+let _cinemaLastProgressSave = 0;
+
+/**
+ * Meldet die aktuelle Position des laufenden Videos (watch_progress.js).
+ * Bilder und SOURCE-Dateien (die nicht abgespielt werden) zählen nicht.
+ *
+ * @param {boolean} [beacon=false] - beim Schließen der Seite: per sendBeacon
+ */
+function flushCinemaProgress(beacon = false) {
+    if (!currentCinemaPath || typeof recordWatchProgress !== 'function') return;
+    if (currentCinemaVideo && (currentCinemaVideo.media_type === 'image'
+            || currentCinemaVideo.Status === 'SOURCE')) return;
+    const video = document.getElementById('cinemaVideo');
+    if (!video || !video.currentSrc || !isFinite(video.duration)) return;
+    recordWatchProgress(currentCinemaPath, video.currentTime, video.duration, {beacon});
+    _cinemaLastProgressSave = Date.now();
+}
 
 /**
  * Format seconds as MM:SS (or H:MM:SS past an hour) for the transport readouts
@@ -328,7 +372,14 @@ function initCinemaTransport() {
 
     video.addEventListener('timeupdate', () => {
         if (!_cinemaScrubbing) updateCinemaTransport();
+        // Alle fünf Sekunden sichern — ein abgestürzter Tab soll nicht alles
+        // verlieren.
+        if (Date.now() - _cinemaLastProgressSave > 5000) flushCinemaProgress();
     });
+    video.addEventListener('pause', () => flushCinemaProgress());
+    video.addEventListener('ended', () => flushCinemaProgress());
+    // Tab schließen oder neu laden mitten im Video: fetch würde abgebrochen.
+    window.addEventListener('pagehide', () => flushCinemaProgress(true));
     video.addEventListener('loadedmetadata', updateCinemaTransport);
     video.addEventListener('play', updateCinemaTransport);
     video.addEventListener('pause', updateCinemaTransport);
@@ -474,6 +525,15 @@ function cinemaKeyHandler(e) {
     } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         navigateCinema(1);
+
+    } else if (e.key === 'Home') {
+        // Von vorn — das Gegenstück zum automatischen Fortsetzen
+        const video = document.getElementById('cinemaVideo');
+        if (video && !video.classList.contains('hidden')) {
+            e.preventDefault();
+            video.currentTime = 0;
+            showCinemaToast('Von vorn');
+        }
 
     } else if (e.key === ' ' || e.code === 'Space') {
         // Play / Pause
