@@ -15,6 +15,12 @@ This document outlines planned features and improvements for the Arcade Media Sc
 ### 🟢 Performance & Optimization
 - [x] Database migration from JSON to SQLite for better performance with large libraries
 
+### 🔵 RAW-Fotos wirklich scannen
+- [ ] Seit v6.4.1 versprochen, nie aktiv: Der Datei-Walker reicht keine
+      RAW-Endung weiter. Unter Linux fehlt `sips`; der Weg über die
+      eingebettete JPEG-Vorschau (nur Pillow) ist gemessen und beschrieben in
+      `dev-docs/raw-on-linux.md` (2026-10-02).
+
 ### 🟢 User Experience
 - [x] **Customizable grid layout (card size, columns)** (bereits umgesetzt, hier
       nur nachgetragen) — Slider in der Filter-Bar (`gridScaleSlider`) setzt
@@ -98,7 +104,7 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ### ✅ Version 6.4.1 (2026-01-14)
 - **Image Smart Collections**: Filter images by media type and format (JPG, PNG, RAW, etc.) in smart collections.
-- **RAW Image Support**: Extended scanner to support 12 RAW formats (CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW, RWL).
+- **RAW Image Support**: Extended scanner to support 12 RAW formats (CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW, RWL). *(Nachtrag 2026-10-02: Nur im Inspector eingetragen, nie im Datei-Walker. RAW wurde nie gescannt, siehe oben „RAW-Fotos wirklich scannen“.)*
 - **Image-Specific UI**: Removed irrelevant bitrate display from image tiles, added separate image count in header.
 - **Enhanced Header Stats**: Top info bar now shows video count, image count (when present), and combined total size.
 - **Duplicate Cache Persistence**: Scan results saved to disk, no need to rescan on refresh/restart.
