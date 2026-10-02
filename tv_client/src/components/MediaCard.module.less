@@ -1,0 +1,79 @@
+// MediaCard — Kachel im Netflix-Stil.
+//
+// Maße in 4K-Pixeln: Die Enact-Toolchain rechnet px über die Auflösungs-
+// unabhängigkeit um, auf einem Full-HD-Fernseher halbiert sich alles.
+
+.card {
+	position: relative;
+	flex-shrink: 0;
+	padding: 18px;            // Platz für Vergrößerung und Rahmen beim Fokus
+	box-sizing: border-box;
+	outline: none;
+}
+
+.frame {
+	position: relative;
+	width: 100%;
+	padding-top: 56.25%;      // 16:9
+	border-radius: 12px;
+	overflow: hidden;
+	background: #2a2a2a;
+	transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+	will-change: transform;
+}
+
+.thumb {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+// Verlauf unten, damit der Titel auf jedem Bild lesbar bleibt.
+.shade {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.55) 38%, rgba(0, 0, 0, 0) 65%);
+}
+
+.text {
+	position: absolute;
+	left: 28px;
+	right: 28px;
+	bottom: 22px;
+	color: #fff;
+}
+
+.title {
+	font-size: 44px;
+	line-height: 1.2;
+	font-weight: 600;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	word-break: break-word;
+	text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.meta {
+	margin-top: 8px;
+	font-size: 32px;
+	color: rgba(255, 255, 255, 0.75);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+// Fokus mit der Fernbedienung: größer, heller Rahmen, Schatten.
+.card:focus .frame,
+.card:global(.spottable):focus .frame {
+	transform: scale(1.08);
+	box-shadow: 0 0 0 6px #fff, 0 24px 48px rgba(0, 0, 0, 0.7);
+	z-index: 2;
+}
+
+.card:focus {
+	z-index: 2;
+}

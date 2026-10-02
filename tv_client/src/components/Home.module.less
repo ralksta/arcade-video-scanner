@@ -1,0 +1,111 @@
+// Home im Netflix-Stil: Hero oben, darunter waagerechte Reihen.
+// Maße in 4K-Pixeln (siehe MediaCard.module.less).
+
+.home {
+	height: 100%;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding-bottom: 80px;
+}
+
+// --- Hero ---
+
+.hero {
+	position: relative;
+	height: 860px;
+	margin: 0 48px 24px;
+	border-radius: 20px;
+	overflow: hidden;
+	background: #1c1c1c;
+}
+
+.heroImage {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.heroShade {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(to right, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0) 70%),
+		linear-gradient(to top, rgba(20, 20, 20, 1) 0%, rgba(20, 20, 20, 0) 35%);
+}
+
+.heroText {
+	position: absolute;
+	left: 96px;
+	bottom: 96px;
+	width: 55%;
+	color: #fff;
+}
+
+.heroEyebrow {
+	font-size: 34px;
+	font-weight: 700;
+	letter-spacing: 4px;
+	text-transform: uppercase;
+	color: #e50914;
+	margin-bottom: 16px;
+}
+
+.heroTitle {
+	font-size: 88px;
+	line-height: 1.1;
+	font-weight: 800;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	word-break: break-word;
+	text-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+}
+
+.heroMeta {
+	margin: 20px 0 36px;
+	font-size: 40px;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+// --- Reihen ---
+
+.row {
+	margin-top: 36px;
+}
+
+.rowTitle {
+	margin: 0 0 4px 66px;
+	font-size: 52px;
+	font-weight: 700;
+	color: #e5e5e5;
+}
+
+.rowCount {
+	margin-left: 20px;
+	font-size: 36px;
+	font-weight: 400;
+	color: rgba(255, 255, 255, 0.5);
+}
+
+// Waagerechte Schiene: scrollt mit dem Fokus, Scrollbalken unsichtbar.
+.rail {
+	display: flex;
+	overflow-x: auto;
+	overflow-y: visible;
+	padding: 6px 30px 12px;
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+.empty {
+	margin-left: 66px;
+	font-size: 36px;
+	font-style: italic;
+	color: rgba(255, 255, 255, 0.5);
+}

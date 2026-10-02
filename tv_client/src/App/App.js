@@ -1,6 +1,7 @@
 import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {serverUrl} from '../serverConfig';
 import {getItem} from '../safeStorage';
+import displayName from '../displayName';
 import ThemeDecorator from '@enact/limestone/ThemeDecorator';
 import Panels, {Panel} from '@enact/limestone/Panels';
 import VideoPlayer, {Video} from '@enact/limestone/VideoPlayer';
@@ -74,7 +75,7 @@ const App = (props) => {
 				<Panel>
 					{activeVideo && (
 						<VideoPlayer
-							title={activeVideo._fileName}
+							title={displayName(activeVideo)}
 							onBack={handleClosePlayer}
 							autoCloseTimeout={3000}
 						>

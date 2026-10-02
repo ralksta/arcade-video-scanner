@@ -5,10 +5,19 @@ import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import TabLayout, {Tab} from '@enact/limestone/TabLayout';
 import {VirtualGridList} from '@enact/limestone/VirtualList';
-import ImageItem from '@enact/limestone/ImageItem';
 import Button from '@enact/limestone/Button';
 import {InputField} from '@enact/limestone/Input';
 import ri from '@enact/ui/resolution';
+
+import MediaCard from '../components/MediaCard';
+import MediaRow from '../components/MediaRow';
+import HeroBanner from '../components/HeroBanner';
+import homeCss from '../components/Home.module.less';
+import displayName from '../displayName';
+
+// Rasterzelle in 4K-Pixeln: 680 breit, 16:9-Bild (382) plus 36 Rand für den
+// Fokus. Ergibt auf Full HD fünf Spalten à 340 px.
+const GRID_ITEM = {minWidth: ri.scale(680), minHeight: ri.scale(418)};
 
 const SORT_OPTIONS = [
 	{key: 'newest', label: '🕐 Neueste'},
@@ -242,7 +251,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				// Zufällige Empfehlungen generieren (nur sichtbare Videos)
 				const videoOnly = videosData.filter(v => (v.media_type || 'video') === 'video');
 				const shuffled = [...videoOnly].sort(() => 0.5 - Math.random());
-				setRecommendations(shuffled.slice(0, 5));
+				setRecommendations(shuffled.slice(0, 16));
 
 				setLoading(false);
 			})
@@ -314,33 +323,27 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	}, [smartCollections]);
 
 	// Item Renderer Factory
+	// Titel, Vorschaubild und Metazeile einer Kachel — eine Stelle für Home
+	// und die Raster-Reiter.
+	const cardProps = useCallback((v) => ({
+		src: thumbnailUrl(v.thumb),
+		title: displayName(v),
+		meta: [formatDuration(v.Duration_Sec), resolutionLabel(v), formatSize(v.Size_MB)]
+			.filter(Boolean).join('  ·  ')
+	}), []);
+
+	// eslint-disable-next-line no-unused-vars
 	const makeRenderer = useCallback((list) => ({index, ...itemProps}) => {
 		const v = list[index];
 		if (!v) return null;
-
-		const isImage = v.media_type === 'image';
-		const sizeStr = formatSize(v.Size_MB);
-		const durationStr = formatDuration(v.Duration_Sec);
-		const resStr = resolutionLabel(v);
-
-		const labelText = [
-			sizeStr,
-			durationStr,
-			resStr
-		].filter(Boolean).join(' | ');
-
 		return (
-			<ImageItem
+			<MediaCard
 				{...itemProps}
-				src={thumbnailUrl(v.thumb)}
-				label={labelText}
-				onClick={() => onSelectVideo(v)}
-				wideImage={!isImage}
-			>
-				{v._fileName}
-			</ImageItem>
+				{...cardProps(v)}
+				onSelect={() => onSelectVideo(v)}
+			/>
 		);
-	}, [onSelectVideo]);
+	}, [onSelectVideo, cardProps]);
 
 	const handleTabSelect = useCallback((ev) => {
 		setTabIndex(ev.index);
@@ -362,8 +365,9 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				subtitle={subtitle}
 			/>
 
-			{/* Sortier- und Filterleiste */}
-			<div style={{display: 'flex', alignItems: 'center', gap: ri.scale(16) + 'px', padding: `${ri.scale(8)}px ${ri.scale(24)}px`, flexWrap: 'wrap'}}>
+			{/* Sortier- und Filterleiste — nur in den Raster-Reitern; Home ist
+			    eine kuratierte Ansicht und braucht sie nicht. */}
+			{tabIndex !== 0 && <div style={{display: 'flex', alignItems: 'center', gap: ri.scale(16) + 'px', padding: `${ri.scale(8)}px ${ri.scale(24)}px`, flexWrap: 'wrap'}}>
 				<InputField
 					placeholder="🔍 Suche nach Name..."
 					value={filterText}
@@ -380,97 +384,47 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						{opt.label}
 					</Button>
 				))}
-			</div>
+			</div>}
 
 
 			{!loading && (
 				<TabLayout index={tabIndex} onSelect={handleTabSelect}>
 					<Tab title="Home" icon="home">
-						<div style={{overflowY: 'auto', height: '100%', padding: `${ri.scale(16)}px ${ri.scale(24)}px`, display: 'flex', flexDirection: 'column', gap: ri.scale(32) + 'px'}}>
-							
-							{/* Begrüßung */}
-							<div>
-								<h2 style={{fontSize: ri.scale(28) + 'px', fontWeight: 'bold', color: '#ff0090'}}>Moin Ralf! ⚓</h2>
-								<p style={{color: 'gray', fontSize: ri.scale(16) + 'px'}}>Willkommen auf dem Arcade-Kutter. Hier ist deine heutige Auswahl:</p>
-							</div>
-
-							{/* Reihe 1: Favoriten */}
-							{favorites.length > 0 ? (
-								<div>
-									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#00f5e4', marginBottom: ri.scale(12) + 'px'}}>⭐ Deine Favoriten</h3>
-									<div style={{display: 'flex', gap: ri.scale(16) + 'px', overflowX: 'auto', paddingBottom: ri.scale(8) + 'px'}}>
-										{favorites.slice(0, 6).map(v => (
-											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
-												<ImageItem
-													src={thumbnailUrl(v.thumb)}
-													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
-													onClick={() => onSelectVideo(v)}
-													wideImage
-												>
-													{v._fileName}
-												</ImageItem>
-											</div>
-										))}
-									</div>
-								</div>
-							) : (
-								<div>
-									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#00f5e4', marginBottom: ri.scale(12) + 'px'}}>⭐ Deine Favoriten</h3>
-									<p style={{color: 'gray', fontSize: ri.scale(14) + 'px', fontStyle: 'italic', paddingLeft: ri.scale(8) + 'px'}}>Noch keine Favoriten hinzugefügt. Markiere Videos in der Web-App als Favorit, um sie hier zu sehen!</p>
-								</div>
-							)}
-
-							{/* Reihe 2: Empfehlungen */}
-							{recommendations.length > 0 && (
-								<div>
-									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#f4b342', marginBottom: ri.scale(12) + 'px'}}>🎲 Zufällige Entdeckungen</h3>
-									<div style={{display: 'flex', gap: ri.scale(16) + 'px', overflowX: 'auto', paddingBottom: ri.scale(8) + 'px'}}>
-										{recommendations.map(v => (
-											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
-												<ImageItem
-													src={thumbnailUrl(v.thumb)}
-													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
-													onClick={() => onSelectVideo(v)}
-													wideImage
-												>
-													{v._fileName}
-												</ImageItem>
-											</div>
-										))}
-									</div>
-								</div>
-							)}
-
-							{/* Reihe 3: Letzte Importe */}
-							{recent.length > 0 && (
-								<div>
-									<h3 style={{fontSize: ri.scale(20) + 'px', fontWeight: 'bold', color: '#8b5cf6', marginBottom: ri.scale(12) + 'px'}}>🕐 Letzte Importe</h3>
-									<div style={{display: 'flex', gap: ri.scale(16) + 'px', overflowX: 'auto', paddingBottom: ri.scale(8) + 'px'}}>
-										{recent.slice(0, 6).map(v => (
-											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
-												<ImageItem
-													src={thumbnailUrl(v.thumb)}
-													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
-													onClick={() => onSelectVideo(v)}
-													wideImage
-												>
-													{v._fileName}
-												</ImageItem>
-											</div>
-										))}
-									</div>
-								</div>
-							)}
+						<div className={homeCss.home}>
+							{recommendations[0] ? (
+								<HeroBanner
+									video={recommendations[0]}
+									eyebrow="Zufällige Entdeckung"
+									onPlay={() => onSelectVideo(recommendations[0])}
+									{...cardProps(recommendations[0])}
+								/>
+							) : null}
+							<MediaRow
+								title="Deine Favoriten"
+								items={favorites.slice(0, 30)}
+								cardProps={cardProps}
+								onSelect={onSelectVideo}
+								emptyText="Noch keine Favoriten — markiere Videos in der Web-App mit dem Stern."
+							/>
+							<MediaRow
+								title="Zufällige Entdeckungen"
+								items={recommendations.slice(1)}
+								cardProps={cardProps}
+								onSelect={onSelectVideo}
+							/>
+							<MediaRow
+								title="Zuletzt hinzugefügt"
+								items={recent.slice(0, 30)}
+								cardProps={cardProps}
+								onSelect={onSelectVideo}
+							/>
 						</div>
 					</Tab>
 					<Tab title="Alle Videos" icon="movies">
 						<VirtualGridList
 							dataSize={videos.length}
 							itemRenderer={makeRenderer(videos)}
-							itemSize={{
-								minWidth: ri.scale(600),
-								minHeight: ri.scale(450)
-							}}
+							itemSize={GRID_ITEM}
 							direction="vertical"
 						/>
 					</Tab>
@@ -478,10 +432,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						<VirtualGridList
 							dataSize={favorites.length}
 							itemRenderer={makeRenderer(favorites)}
-							itemSize={{
-								minWidth: ri.scale(600),
-								minHeight: ri.scale(450)
-							}}
+							itemSize={GRID_ITEM}
 							direction="vertical"
 						/>
 					</Tab>
@@ -489,10 +440,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						<VirtualGridList
 							dataSize={recent.length}
 							itemRenderer={makeRenderer(recent)}
-							itemSize={{
-								minWidth: ri.scale(600),
-								minHeight: ri.scale(450)
-							}}
+							itemSize={GRID_ITEM}
 							direction="vertical"
 						/>
 					</Tab>
@@ -500,10 +448,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						<VirtualGridList
 							dataSize={images.length}
 							itemRenderer={makeRenderer(images)}
-							itemSize={{
-								minWidth: ri.scale(500),
-								minHeight: ri.scale(500)
-							}}
+							itemSize={GRID_ITEM}
 							direction="vertical"
 						/>
 					</Tab>
@@ -550,10 +495,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 										<VirtualGridList
 											dataSize={collectionVideos.length}
 											itemRenderer={makeRenderer(collectionVideos)}
-											itemSize={{
-												minWidth: ri.scale(600),
-												minHeight: ri.scale(450)
-											}}
+											itemSize={GRID_ITEM}
 											direction="vertical"
 										/>
 									)
