@@ -13,6 +13,13 @@ All notable changes to this project will be documented in this file.
   echten Server auf.
 - Dateinamen mit `"` oder `\` brachen aus den Klick-Handlern der Karten aus.
   Neuer Helfer `jsArg()`.
+- Globale Einstellungen (Scan-Schwellen, Proxy, Review-Ordner, ffmpeg-Pfade)
+  ändern nur noch Admins. Nicht-Admins speichern weiter ihre eigenen Felder,
+  globale Schlüssel werden verworfen und in der Antwort genannt; der Dialog
+  blendet die Felder für sie aus. Gespeicherte Ansichten bleiben für alle
+  speicherbar (bis Phase 2). Die Sicherung gibt es nur noch für Admins.
+- GIF-Export nur noch aus den eigenen Scan-Ordnern. Vorher genügte es, dass
+  die Datei in den Ordnern *irgendeines* Kontos lag. `/stream` folgt mit Phase 6.
 
 ### Fixed (Nachtlauf 4)
 - Abbrechen während des Uploads ersetzte das Original trotzdem.

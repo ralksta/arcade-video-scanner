@@ -525,6 +525,7 @@ class TestGifOutputIsPerJob:
 
         with patch("arcade_scanner.server.routes.queue.db", fake_db), \
              patch("arcade_scanner.server.routes.queue.sanitize_path", side_effect=lambda p: p), \
+             patch("arcade_scanner.server.routes.queue._user_may_see", return_value=True), \
              patch("arcade_scanner.server.routes.queue.threading.Thread", NoThread), \
              patch("arcade_scanner.server.routes.queue.send_json") as send_json:
             queue.handle_post(handler)
@@ -693,3 +694,80 @@ class TestNamesAtTheLengthLimit:
         assert handler.error is None, handler.error
         assert src.read_bytes() == b"opt"
         assert db_status(fake_db) == [(123456, "done")]
+
+
+class TestGifExportStaysInOwnLibrary:
+    """
+    Der GIF-Export prüfte nur „liegt in *irgendeinem* Scan-Ziel" — den Zielen
+    aller Konten. Ein Konto konnte eine Datei aus der Bibliothek eines anderen
+    exportieren und herunterladen, wenn es den Pfad kannte. Entscheidung
+    2026-10-02: GIF-Export jetzt pro Konto; /stream folgt mit Phase 6.
+    """
+
+    def _export_as(self, user, video_path):
+        handler = FakeHandler("/api/export/gif", user="kim",
+                              body={"path": str(video_path)})
+        user_db = MagicMock()
+        user_db.get_user.return_value = user
+        started = []
+
+        class NoThread:
+            def __init__(self, target, args, daemon):
+                started.append(args)
+
+            def start(self):
+                pass
+
+        fake_db = MagicMock()
+        fake_db.get.return_value = MagicMock(width=1920, height=1080, duration_sec=10.0)
+        with patch("arcade_scanner.server.api_handler.user_db", user_db), \
+             patch("arcade_scanner.server.routes.queue.db", fake_db), \
+             patch("arcade_scanner.server.routes.queue.sanitize_path", side_effect=lambda p: p), \
+             patch("arcade_scanner.server.routes.queue.threading.Thread", NoThread), \
+             patch("arcade_scanner.server.routes.queue.send_json"):
+            queue.handle_post(handler)
+        return handler, started
+
+    @staticmethod
+    def _user(targets, is_admin=False):
+        u = MagicMock()
+        u.is_admin = is_admin
+        u.data.scan_targets = [str(t) for t in targets]
+        return u
+
+    def test_a_file_from_another_library_is_refused(self, tmp_path):
+        mine, theirs = tmp_path / "kim", tmp_path / "ralf"
+        mine.mkdir()
+        theirs.mkdir()
+        video = theirs / "privat.mp4"
+        video.write_bytes(b"x")
+
+        handler, started = self._export_as(self._user([mine]), video)
+
+        assert handler.error == 403
+        assert started == []
+
+    def test_a_missing_foreign_file_answers_the_same(self, tmp_path):
+        """403 auch für Nicht-Existierendes — sonst verrät 404 fremde Dateien."""
+        mine = tmp_path / "kim"
+        mine.mkdir()
+        handler, _ = self._export_as(self._user([mine]), tmp_path / "ralf" / "gibtsnicht.mp4")
+        assert handler.error == 403
+
+    def test_an_own_file_is_exported(self, tmp_path):
+        mine = tmp_path / "kim"
+        mine.mkdir()
+        video = mine / "clip.mp4"
+        video.write_bytes(b"x")
+
+        handler, started = self._export_as(self._user([mine]), video)
+
+        assert handler.error is None
+        assert len(started) == 1
+
+    def test_without_a_user_record_nothing_is_exported(self, tmp_path):
+        video = tmp_path / "clip.mp4"
+        video.write_bytes(b"x")
+        handler, started = self._export_as(None, video)
+        assert handler.error == 403
+        assert started == []

@@ -890,6 +890,14 @@ def _handle_backup(handler) -> None:
     if not user_name:
         handler.send_error(401, "Unauthorized")
         return
+    # Die Sicherung enthält die globalen Einstellungen (Pfade, ffmpeg); die
+    # schreibt seit 2026-10-02 nur noch ein Admin, und Restore ist ohnehin
+    # admin-pflichtig.
+    from arcade_scanner.server.api_handler import user_db
+    account = user_db.get_user(user_name)
+    if account is None or not getattr(account, "is_admin", False):
+        handler.send_error(403, "Backup requires an admin account")
+        return
 
     try:
         print("💾 Backup requested...")

@@ -12,6 +12,12 @@ Nicht angefasst: Phase 0.2, 1, 2, 4–7.
 
 ## Zuerst lesen: drei Fragen an dich
 
+> **Entschieden am 2026-10-02:** (1) Nur der GIF-Export ist auf die eigenen
+> Ordner beschränkt (`fe856b1`), `/stream` folgt mit Phase 6. (2) Globale
+> Einstellungen schreiben nur noch Admins, Backup ebenso (`1677856`).
+> (3) RAW wurde unter Linux gemessen (`dev-docs/raw-on-linux.md`), die
+> Umsetzung ist auf später verschoben.
+
 ### 1. Dateien über Kontogrenzen
 `/stream` und der GIF-Export prüfen nur „liegt in *irgendeinem* Scan-Ziel".
 Ein Konto, das den Pfad kennt oder rät, kann Dateien aus den Zielen eines
