@@ -31,7 +31,6 @@ SERVER_DIR = ROOT / "arcade_scanner" / "server"
 
 CLIENT_SOURCES = {
     "tv_client": list((ROOT / "tv_client" / "src").rglob("*.js")),
-    "webos_client": list((ROOT / "webos_client").rglob("*.js")) if (ROOT / "webos_client").is_dir() else [],
 }
 
 # Endpunkte, die ein Client aufruft, die es aber nicht (mehr) gibt.
