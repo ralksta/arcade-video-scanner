@@ -21,6 +21,18 @@ This document outlines planned features and improvements for the Arcade Media Sc
       eingebettete JPEG-Vorschau (nur Pillow) ist gemessen und beschrieben in
       `dev-docs/raw-on-linux.md` (2026-10-02).
 
+### 🔵 Auto-Tags per lokalem Vision-Modell
+- [ ] Idee, vertagt (2026-10-02): Standbilder jedes Videos von einem lokalen
+      Vision-Modell (GPU-Rechner im LAN) verschlagworten lassen, damit sich
+      die Bibliothek — auch auf dem Fernseher — nach Inhalten filtern lässt.
+      Ergebnisse als eigene Auto-Tags, getrennt von den Nutzer-Tags, nichts
+      verlässt das eigene Netz. Ein Vergleich mehrerer Modelle hat gezeigt:
+      Sichtbares (Kleidung, Ort, Bildausschnitt) erkennen sie brauchbar,
+      konkrete Handlungen kaum — dafür ist der Dateiname die bessere Quelle,
+      am besten beides kombiniert je Begriff. Testskripte und Messwerte
+      liegen privat beim Entwickler, nicht im Repo. Offen: Gegenprobe auf
+      zufälligen Videos, dann Server-Endpunkt, Worker und TV-Anzeige.
+
 ### 🟢 User Experience
 - [x] **Customizable grid layout (card size, columns)** (bereits umgesetzt, hier
       nur nachgetragen) — Slider in der Filter-Bar (`gridScaleSlider`) setzt
