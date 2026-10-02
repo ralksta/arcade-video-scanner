@@ -619,6 +619,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 candidates,
                 duplicates,
                 files,
+                progress,
                 queue,
                 settings,
                 similar,
@@ -637,6 +638,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if candidates.handle_get(self):
                 return
             if similar.handle_get(self):
+                return
+            if progress.handle_get(self):
                 return
             if files.handle_get(self):
                 return
@@ -672,7 +675,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # 1. ROOT / INDEX -> Serve REPORT_FILE
             # /vault: Den Vault gibt es nicht mehr (Phase 1); alte Lesezeichen landen
             # in der normalen Bibliothek.
-            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
+            spa_routes = ["/", "/index.html", "/home", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
             clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
 
@@ -1209,7 +1212,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         self._response_started = False
         try:
-            from .routes import autotag, duplicates, queue, settings, tags
+            from .routes import autotag, duplicates, progress, queue, settings, tags
             if queue.handle_post(self):
                 return
             if settings.handle_post(self):
@@ -1219,6 +1222,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if tags.handle_post(self):
                 return
             if autotag.handle_post(self):
+                return
+            if progress.handle_post(self):
                 return
         except Exception as e:
             print(f"Module route error POST: {e}")

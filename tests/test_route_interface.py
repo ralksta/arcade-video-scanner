@@ -24,6 +24,7 @@ ROUTE_MODULES = [
     "arcade_scanner.server.routes.duplicates",
     "arcade_scanner.server.routes.tags",
     "arcade_scanner.server.routes.files",
+    "arcade_scanner.server.routes.progress",
 ]
 
 

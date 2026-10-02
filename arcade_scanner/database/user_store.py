@@ -5,6 +5,7 @@ import os
 import shutil
 import sqlite3
 import threading
+import time
 from typing import List, Optional
 
 from arcade_scanner.config import config
@@ -68,6 +69,20 @@ class UserStore:
                     is_admin INTEGER DEFAULT 0,
                     created_at INTEGER,
                     user_data TEXT
+                )
+            """)
+            # Wiedergabefortschritt eigene Tabelle statt Feld in `user_data`:
+            # Der Player meldet alle paar Sekunden, und `add_user()` schreibt
+            # bei jeder Änderung den ganzen Nutzerdatensatz neu.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS watch_progress (
+                    username TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    position REAL NOT NULL,
+                    duration REAL NOT NULL,
+                    watched INTEGER NOT NULL DEFAULT 0,
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY (username, path)
                 )
             """)
             conn.commit()
@@ -182,6 +197,149 @@ class UserStore:
             mutate(user)
             self.add_user(user)
             return True
+
+    # ── Wiedergabefortschritt („Weiterschauen") ───────────────────────────────
+    #
+    # Dieselben Schwellen wie vorher im TV-Client (watchProgress.js), damit
+    # beide Clients dasselbe unter „angefangen" und „gesehen" verstehen.
+    PROGRESS_MIN_SECONDS = 20       # darunter lohnt kein Fortsetzen
+    PROGRESS_FINISHED_RATIO = 0.95  # ab hier gilt das Video als gesehen
+
+    @staticmethod
+    def _progress_row(row) -> dict:
+        return {
+            "path": row["path"],
+            "position": row["position"],
+            "duration": row["duration"],
+            "watched": bool(row["watched"]),
+            "updated_at": row["updated_at"],
+        }
+
+    def save_progress(self, username: str, path: str, position: float,
+                      duration: float, now: Optional[float] = None) -> Optional[dict]:
+        """Merkt sich, wo `username` in `path` steht.
+
+        Zurück kommt der gespeicherte Stand, oder None, wenn nichts zu
+        speichern war: unbekannte Dauer, oder weniger als
+        ``PROGRESS_MIN_SECONDS`` gesehen — dann bleibt ein älterer Stand
+        stehen, statt dass kurzes Hineinschauen ihn überschreibt.
+
+        Ab ``PROGRESS_FINISHED_RATIO`` gilt das Video als gesehen: Die Position
+        fällt auf 0 (es gehört nicht mehr in „Weiterschauen"), ``watched``
+        bleibt danach gesetzt, auch wenn man es später noch einmal anfängt.
+        """
+        try:
+            position = float(position)
+            duration = float(duration)
+        except (TypeError, ValueError):
+            return None
+        # NaN fällt durch beide Vergleiche — genau das soll es.
+        if not (duration > 0) or not (position >= 0) or duration == float("inf"):
+            return None
+
+        finished = position / duration >= self.PROGRESS_FINISHED_RATIO
+        if not finished and position < self.PROGRESS_MIN_SECONDS:
+            return None
+
+        now = time.time() if now is None else now
+        stored_position = 0.0 if finished else round(position, 1)
+        conn = None
+        try:
+            conn = self._get_conn()
+            conn.execute("""
+                INSERT INTO watch_progress
+                    (username, path, position, duration, watched, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (username, path) DO UPDATE SET
+                    position = excluded.position,
+                    duration = excluded.duration,
+                    watched = MAX(watch_progress.watched, excluded.watched),
+                    updated_at = excluded.updated_at
+            """, (username, path, stored_position, round(duration, 1),
+                  1 if finished else 0, now))
+            conn.commit()
+            row = conn.execute(
+                "SELECT * FROM watch_progress WHERE username = ? AND path = ?",
+                (username, path)).fetchone()
+            return self._progress_row(row) if row else None
+        except Exception as e:
+            print(f"❌ Error saving progress for {username}: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+
+    def list_progress(self, username: str) -> List[dict]:
+        """Alle Einträge des Kontos, zuletzt geänderter zuerst."""
+        conn = None
+        try:
+            conn = self._get_conn()
+            rows = conn.execute(
+                "SELECT * FROM watch_progress WHERE username = ?"
+                " ORDER BY updated_at DESC", (username,)).fetchall()
+            return [self._progress_row(r) for r in rows]
+        except Exception as e:
+            print(f"⚠️ Error listing progress for {username}: {e}")
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    def clear_progress(self, username: str, path: str) -> None:
+        """Nimmt `path` aus „Weiterschauen" — „gesehen" bleibt erhalten."""
+        conn = None
+        try:
+            conn = self._get_conn()
+            conn.execute(
+                "UPDATE watch_progress SET position = 0, updated_at = ?"
+                " WHERE username = ? AND path = ?", (time.time(), username, path))
+            conn.execute(
+                "DELETE FROM watch_progress WHERE username = ? AND path = ?"
+                " AND watched = 0", (username, path))
+            conn.commit()
+        except Exception as e:
+            print(f"❌ Error clearing progress for {username}: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    def _remap_progress(self, pairs: dict) -> int:
+        """Zieht Fortschritt mit umgezogenen Dateien mit (siehe remap_paths_in_user_data)."""
+        changed = 0
+        conn = None
+        try:
+            conn = self._get_conn()
+            for old, new in pairs.items():
+                # Hat das Konto für den neuen Pfad schon einen Stand, gilt der.
+                conn.execute(
+                    "DELETE FROM watch_progress WHERE path = ? AND username IN"
+                    " (SELECT username FROM watch_progress WHERE path = ?)", (old, new))
+                changed += conn.execute(
+                    "UPDATE watch_progress SET path = ? WHERE path = ?",
+                    (new, old)).rowcount
+            conn.commit()
+        except Exception as e:
+            print(f"❌ Error remapping progress: {e}")
+        finally:
+            if conn:
+                conn.close()
+        return changed
+
+    def _purge_progress(self, targets) -> int:
+        removed = 0
+        conn = None
+        try:
+            conn = self._get_conn()
+            for path in targets:
+                removed += conn.execute(
+                    "DELETE FROM watch_progress WHERE path = ?", (path,)).rowcount
+            conn.commit()
+        except Exception as e:
+            print(f"❌ Error purging progress: {e}")
+        finally:
+            if conn:
+                conn.close()
+        return removed
 
     def get_all_users(self) -> List[User]:
         users = []
@@ -539,7 +697,7 @@ class UserStore:
             print(f"⚠️ Error migrating sensitive settings: {e}")
 
     def remap_paths_in_user_data(self, mapping) -> int:
-        """Schreibt Favoriten und Tags von einem Pfad auf einen anderen um.
+        """Schreibt Favoriten, Tags und Wiedergabefortschritt von einem Pfad auf einen anderen um.
 
         `mapping` ist `{alter Pfad: neuer Pfad}`. Zurückgegeben wird die Zahl
         der umgeschriebenen Einträge.
@@ -585,10 +743,12 @@ class UserStore:
                 if changed > before:
                     self.add_user(user)
 
+            changed += self._remap_progress(pairs)
+
         return changed
 
     def purge_paths_from_user_data(self, paths) -> int:
-        """Entfernt gelöschte Pfade aus Favoriten und Tags aller Nutzer.
+        """Entfernt gelöschte Pfade aus Favoriten, Tags und Fortschritt aller Nutzer.
 
         Zurückgegeben wird die Zahl der entfernten Einträge.
 
@@ -632,6 +792,8 @@ class UserStore:
 
                 if removed > before:
                     self.add_user(user)
+
+            removed += self._purge_progress(targets)
 
         return removed
 

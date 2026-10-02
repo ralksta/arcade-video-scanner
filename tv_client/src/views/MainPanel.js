@@ -22,7 +22,7 @@ import ImageViewer from '../components/ImageViewer';
 import homeCss from '../components/Home.module.less';
 import panelCss from './MainPanel.module.less';
 import displayName from '../displayName';
-import {listProgress, getProgress} from '../watchProgress';
+import {listProgress, getProgress, syncProgress} from '../watchProgress';
 import {matchesCollectionCriteria, videoResolution} from '../collectionMatch';
 
 // Rasterzelle in 4K-Pixeln: 680 breit, 16:9-Bild (382) plus 36 Rand für den
@@ -180,6 +180,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, progressVersion, ...props}) => 
 	const [durationIdx, setDurationIdx] = useState(0);
 	const [tagIdx, setTagIdx] = useState(0);
 	const [filterText, setFilterText] = useState('');
+	// Zählt hoch, wenn der Abgleich mit dem Server „Weiterschauen“ geändert hat.
+	const [syncVersion, setSyncVersion] = useState(0);
 
 	// Daten und Collections laden
 	useEffect(() => {
@@ -255,6 +257,12 @@ const MainPanel = ({onSelectVideo, onAuthFailed, progressVersion, ...props}) => 
 				setRecommendations(shuffled.slice(0, 16));
 
 				setLoading(false);
+
+				// Erst nach der Bibliothek: Ohne Sitzung gäbe es hier nur einen
+				// zweiten 401. Der Abgleich läuft nebenher, Home steht schon.
+				syncProgress().then(changed => {
+					if (changed) setSyncVersion(v => v + 1);
+				});
 			})
 			.catch(err => {
 				console.error('Fetch error:', err);
@@ -307,14 +315,15 @@ const MainPanel = ({onSelectVideo, onAuthFailed, progressVersion, ...props}) => 
 		sortVideos(allVideos.filter(v => v.favorite), 'newest').slice(0, 30),
 	[allVideos]);
 	// Weiterschauen: angefangene Videos, zuletzt gesehenes zuerst. Hängt an
-	// progressVersion, das App nach jedem Schließen des Players hochzählt.
+	// progressVersion, das App nach jedem Schließen des Players hochzählt, und
+	// an syncVersion (Abgleich mit dem Server nach dem Laden).
 	const continueWatching = useMemo(() => {
 		const byPath = new Map(allVideos.map(v => [v.FilePath, v]));
 		return listProgress()
 			.map(p => ({video: byPath.get(p.path), progress: p.d ? p.t / p.d : 0}))
 			.filter(x => x.video)
 			.slice(0, 20);
-	}, [allVideos, progressVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [allVideos, progressVersion, syncVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const continueProgress = useMemo(
 		() => new Map(continueWatching.map(x => [x.video.FilePath, x.progress])),
