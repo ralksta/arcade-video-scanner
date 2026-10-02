@@ -93,7 +93,6 @@ DEFAULT_SETTINGS_JSON = {
     "_comment_exclude_paths": "List of paths to ignore during scan.",
     "exclude_paths": [],
     "disabled_defaults": [],
-    "saved_views": [],
     "_comment_min_size_mb": "Ignore videos smaller than this size.",
     "min_size_mb": 100,
     "_comment_min_image_size_kb": "Ignore images smaller than this (KB). E.g., 500 filters out tiny icons.",
@@ -145,8 +144,6 @@ class AppSettings(BaseSettings):
     File loading is handled manually to preserve JSON comments.
     """
     disabled_defaults: List[str] = Field(default_factory=list)
-
-    saved_views: List[Dict[str, Any]] = Field(default_factory=list)
 
     min_size_mb: int = Field(100)
     min_image_size_kb: int = Field(100)
@@ -301,6 +298,33 @@ class ConfigManager:
         # schrieb, verwarf die Schlüssel des anderen — beide meldeten Erfolg.
         with _SETTINGS_WRITE_LOCK:
             return self._save_locked(updates)
+
+    def remove_keys(self, keys) -> bool:
+        """Entfernt Schlüssel aus settings.json — unter der Sperre, atomar.
+
+        Für Migrationen, die Werte aus der globalen Datei in die Nutzerdaten
+        verlegen. Vorher schrieb `cleanup_legacy_settings()` dafür selbst mit
+        `open(…, "w")`, an Zwischendatei und Sperre vorbei. True auch dann,
+        wenn nichts zu entfernen war.
+        """
+        with _SETTINGS_WRITE_LOCK:
+            try:
+                if not os.path.exists(SETTINGS_FILE):
+                    return True
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    current_raw = json.load(f)
+                present = [k for k in keys if k in current_raw]
+                if not present:
+                    return True
+                for key in present:
+                    del current_raw[key]
+                if not self._save_json_raw(current_raw):
+                    return False
+                self.settings = AppSettings(**current_raw)
+                return True
+            except Exception as e:
+                print(f"❌ Removing settings keys failed: {e}")
+                return False
 
     def _save_locked(self, updates: Dict[str, Any]) -> bool:
         try:

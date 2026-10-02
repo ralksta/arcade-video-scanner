@@ -85,6 +85,11 @@ class UserVideoData(BaseModel):
     # Smart Collections
     smart_collections: List[Dict[str, Any]] = Field(default_factory=_get_default_smart_collections, description="User defined smart collections")
 
+    # Gespeicherte Ansichten: {"id", "name", "search", "filter", "codec", "sort",
+    # "mode", "folder"}. Bis Phase 2 (2026-10-02) global in settings.json — jedes
+    # Konto sah Suchbegriffe und Ordner der anderen (ENTSCHEIDUNGEN.md, Punkt 2).
+    saved_views: List[Dict[str, Any]] = Field(default_factory=list, description="User specific saved views")
+
     # Auto-Tagging Rules: {"id", "name", "tag", "criteria", "enabled"}
     auto_tag_rules: List[Dict[str, Any]] = Field(default_factory=list, description="Rules that auto-apply a tag to matching files after each scan")
 

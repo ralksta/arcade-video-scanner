@@ -1,5 +1,12 @@
 # Gespeicherte Ansichten sind für alle Nutzer sichtbar
 
+> **Behoben am 2026-10-02 (UMSETZUNGSPLAN Phase 2).** `saved_views` liegt jetzt
+> in `UserVideoData`. `/api/settings` liefert und speichert die Ansichten pro
+> Konto. `UserStore.migrate_saved_views()` übergibt die bisherigen globalen
+> Ansichten einmalig an den Admin und entfernt sie erst danach aus
+> settings.json. Tests: `tests/test_saved_views_per_user.py`. Der Text unten
+> beschreibt den Zustand vorher.
+
 **Stand: 2026-08-17**, gefunden im Nachtlauf bei der Durchsicht der
 Datentrennung. **Nicht behoben — das ist eine Produktentscheidung, keine
 eindeutige Fehlfunktion.**

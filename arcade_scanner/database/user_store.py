@@ -309,6 +309,7 @@ class UserStore:
         self.migrate_scan_settings()
         self.migrate_tags()
         self.migrate_sensitive_settings()
+        self.migrate_saved_views()
         self.cleanup_legacy_settings()
 
     def migrate_tags(self):
@@ -375,6 +376,70 @@ class UserStore:
 
         except Exception as e:
             print(f"⚠️ Error migrating scan settings: {e}")
+
+    def migrate_saved_views(self) -> int:
+        """Verlegt die globalen gespeicherten Ansichten zum Admin — einmal.
+
+        Bis Phase 2 lebten Ansichten in settings.json und jedes Konto sah die
+        Suchbegriffe und Ordner der anderen (ENTSCHEIDUNGEN.md, Punkt 2).
+
+        „Einmal" hängt hier nicht an einem getrennten Aufräumschritt: Erst
+        übernehmen, und **nur bei Erfolg** den Schlüssel aus settings.json
+        entfernen. Andersherum gingen die Ansichten bei einem Fehler verloren;
+        ohne das Entfernen kehrten beim nächsten Start Ansichten zurück, die
+        der Admin inzwischen gelöscht hat. Zusammengeführt wird über die `id`,
+        ein Abbruch zwischen beiden Schritten erzeugt also keine Doppel.
+
+        Gibt die Zahl übernommener Ansichten zurück.
+        """
+        settings_path = os.path.join(config.hidden_data_dir, "settings.json")
+        if not os.path.exists(settings_path):
+            return 0
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                legacy = json.load(f).get("saved_views")
+        except Exception as e:
+            print(f"⚠️ Gespeicherte Ansichten nicht lesbar, nichts migriert: {e}")
+            return 0
+        if legacy is None:
+            return 0
+        if not legacy:
+            config.remove_keys(["saved_views"])
+            return 0
+
+        admin_name = self._migration_admin_name()
+        if admin_name is None:
+            print("⚠️ Kein Admin-Konto — gespeicherte Ansichten bleiben vorerst global.")
+            return 0
+
+        added = []
+
+        def take_over(user):
+            known = {v.get("id") for v in user.data.saved_views}
+            for view in legacy:
+                if isinstance(view, dict) and view.get("id") not in known:
+                    user.data.saved_views.append(view)
+                    known.add(view.get("id"))
+                    added.append(view)
+
+        if not self.update_user(admin_name, take_over):
+            print(f"⚠️ Ansichten nicht übernommen ({admin_name}) — bleiben in settings.json.")
+            return 0
+        if not config.remove_keys(["saved_views"]):
+            print("⚠️ Ansichten übernommen, aber nicht aus settings.json entfernt — "
+                  "beim nächsten Start wird erneut (ohne Doppel) zusammengeführt.")
+        if added:
+            print(f"📦 {len(added)} gespeicherte Ansichten an '{admin_name}' übergeben.")
+        return len(added)
+
+    def _migration_admin_name(self):
+        """`admin`, sonst das erste Admin-Konto — wohin globale Daten wandern."""
+        if self.get_user("admin") is not None:
+            return "admin"
+        for user in self.get_all_users():
+            if getattr(user, "is_admin", False):
+                return user.username
+        return None
 
     def migrate_collections(self):
         """Migrates smart collections from global settings to admin user."""
@@ -559,38 +624,24 @@ class UserStore:
         return removed
 
     def cleanup_legacy_settings(self):
-        """Removes migrated keys from settings.json."""
-        settings_path = os.path.join(config.hidden_data_dir, "settings.json")
-        if not os.path.exists(settings_path):
-            return
+        """Removes migrated keys from settings.json.
 
-        try:
-            with open(settings_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            keys_to_remove = [
-                "smart_collections",
-                "scan_targets",
-                "exclude_paths",
-                "available_tags",
-                "sensitive_dirs",
-                "sensitive_tags",
-                "sensitive_collections"
-            ]
-
-            modified = False
-            for k in keys_to_remove:
-                if k in data:
-                    del data[k]
-                    modified = True
-
-            if modified:
-                print("🧹 Cleaning up legacy keys from settings.json...")
-                with open(settings_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-
-        except Exception as e:
-            print(f"⚠️ Error cleaning settings: {e}")
+        Über `config.remove_keys()`: Vorher schrieb diese Methode die Datei mit
+        `open(…, "w")` — an Zwischendatei und Schreibsperre vorbei, und ein
+        Abbruch hinterließ eine leere Datei, die der nächste Start durch
+        Standardwerte ersetzt.
+        """
+        keys_to_remove = [
+            "smart_collections",
+            "scan_targets",
+            "exclude_paths",
+            "available_tags",
+            "sensitive_dirs",
+            "sensitive_tags",
+            "sensitive_collections"
+        ]
+        if not config.remove_keys(keys_to_remove):
+            print("⚠️ Error cleaning settings: legacy keys not removed")
 
 # Global instance
 user_db = UserStore()

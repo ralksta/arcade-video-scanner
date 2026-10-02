@@ -55,6 +55,7 @@ def handle_get_settings(handler) -> None:
         u = user_db.get_user(user_name)
         if u:
             settings_dump["smart_collections"]    = u.data.smart_collections
+            settings_dump["saved_views"]          = u.data.saved_views
             settings_dump["scan_targets"]         = u.data.scan_targets
             settings_dump["exclude_paths"]        = u.data.exclude_paths
             settings_dump["available_tags"]       = u.data.available_tags
@@ -65,6 +66,7 @@ def handle_get_settings(handler) -> None:
             settings_dump["sensitive_collections"] = u.data.sensitive_collections
         else:
             settings_dump["smart_collections"]     = []
+            settings_dump["saved_views"]           = []
             settings_dump["scan_targets"]          = []
             settings_dump["exclude_paths"]         = []
             settings_dump["available_tags"]        = []
@@ -123,11 +125,6 @@ def _unreachable(targets) -> list:
 # POST /api/settings
 # ---------------------------------------------------------------------------
 
-# Globale Schlüssel, die jedes Konto schreiben darf. Gespeicherte Ansichten
-# legt jeder an; nutzereigen werden sie mit Phase 2 (UMSETZUNGSPLAN).
-SHARED_KEYS_FOR_EVERYONE = frozenset({"saved_views"})
-
-
 def handle_post_settings(handler) -> None:
     """Save global config and user-specific overrides, then schedule report rebuild."""
     config, user_db, report_debouncer, MAX_REQUEST_SIZE = _get_singletons()
@@ -158,6 +155,7 @@ def handle_post_settings(handler) -> None:
 
         # Pop user-specific fields before saving to global config
         user_collections        = new_settings.pop("smart_collections", None)
+        user_views              = new_settings.pop("saved_views", None)
         user_targets            = new_settings.pop("scan_targets", None)
         user_excludes           = new_settings.pop("exclude_paths", None)
         user_tags               = new_settings.pop("available_tags", None)
@@ -179,7 +177,7 @@ def handle_post_settings(handler) -> None:
         account = user_db.get_user(user_name)
         ignored: list = []
         if not (account is not None and getattr(account, "is_admin", False)):
-            ignored = sorted(k for k in new_settings if k not in SHARED_KEYS_FOR_EVERYONE)
+            ignored = sorted(new_settings)
             for key in ignored:
                 new_settings.pop(key)
 
@@ -190,6 +188,7 @@ def handle_post_settings(handler) -> None:
                 # Kontos verwürfe sonst die Änderung der jeweils anderen.
                 changes = {
                     "smart_collections": user_collections,
+                    "saved_views": user_views,
                     "scan_targets": user_targets,
                     "exclude_paths": user_excludes,
                     "available_tags": user_tags,

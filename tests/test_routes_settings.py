@@ -219,12 +219,15 @@ def test_a_non_admin_cannot_write_global_keys():
     assert body["ignored"] == ["ffprobe_path", "min_size_mb", "proxy_root"]
 
 
-def test_a_non_admin_may_still_save_views():
-    """Gespeicherte Ansichten legt jeder an; nutzereigen werden sie mit Phase 2."""
+def test_a_non_admin_saves_views_as_their_own():
+    """Seit Phase 2 nutzereigen — weder global noch als „ignoriert" gemeldet."""
     h = FakeHandler("/api/settings", user="kim", body={"saved_views": [{"name": "Urlaub"}]})
     singletons = _as(is_admin=False)
     run(h, singletons, post=True)
-    singletons[0].save.assert_called_once_with({"saved_views": [{"name": "Urlaub"}]})
+    config, user_db = singletons[0], singletons[1]
+    assert "saved_views" not in config.save.call_args[0][0]
+    assert user_db.get_user.return_value.data.saved_views == [{"name": "Urlaub"}]
+    assert h.body()["ignored"] == []
 
 
 def test_an_admin_writes_global_keys():
