@@ -77,3 +77,30 @@
 .card:focus {
 	z-index: 2;
 }
+
+// „Alle anzeigen“ am Ende einer Reihe: gleiche Maße, ohne Bild.
+.more .frame {
+	background: #262626;
+	border: 4px solid rgba(255, 255, 255, 0.18);
+	box-sizing: border-box;
+}
+
+.moreText {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	font-size: 44px;
+	font-weight: 600;
+	text-align: center;
+}
+
+.moreCount {
+	margin-top: 8px;
+	font-size: 34px;
+	font-weight: 400;
+	color: rgba(255, 255, 255, 0.6);
+}

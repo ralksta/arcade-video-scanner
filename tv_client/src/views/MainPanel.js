@@ -17,7 +17,11 @@ import displayName from '../displayName';
 
 // Rasterzelle in 4K-Pixeln: 680 breit, 16:9-Bild (382) plus 36 Rand für den
 // Fokus. Ergibt auf Full HD fünf Spalten à 340 px.
-const GRID_ITEM = {minWidth: ri.scale(680), minHeight: ri.scale(418)};
+//
+// Eine Funktion, kein Modul-Konstante: Beim Import hat Limestone die
+// Bildschirmauflösung noch nicht ermittelt, `ri.scale` rechnet dann mit
+// Faktor 1 — auf dem Fernseher standen zwei riesige Spalten statt fünf.
+const gridItem = () => ({minWidth: ri.scale(680), minHeight: ri.scale(418)});
 
 const SORT_OPTIONS = [
 	{key: 'newest', label: '🕐 Neueste'},
@@ -322,6 +326,33 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		return groups;
 	}, [smartCollections]);
 
+	// Übersicht: jede Collection als Reihe, gruppiert nach Kategorie. Die
+	// Treffer werden hier einmal berechnet, nicht pro Render jeder Reihe.
+	const collectionRows = useMemo(() => {
+		return Object.keys(collectionsByCategory).sort().map(category => ({
+			category,
+			rows: collectionsByCategory[category].map(col => ({
+				col,
+				items: filterAndSort(allVideos.filter(v => matchesCollectionCriteria(v, col.criteria)))
+			}))
+		}));
+	}, [collectionsByCategory, allVideos, filterAndSort]);
+
+	// Zurück-Taste der Fernbedienung (461, ESC 27): aus einer geöffneten
+	// Collection zurück zur Übersicht, statt die App zu verlassen. Capture,
+	// damit Panels die Taste nicht zuerst als „App beenden“ deutet.
+	useEffect(() => {
+		if (!selectedCollectionId) return undefined;
+		const onBack = (ev) => {
+			if (ev.keyCode !== 461 && ev.keyCode !== 27) return;
+			ev.preventDefault();
+			ev.stopImmediatePropagation();
+			setSelectedCollectionId(null);
+		};
+		document.addEventListener('keydown', onBack, true);
+		return () => document.removeEventListener('keydown', onBack, true);
+	}, [selectedCollectionId]);
+
 	// Item Renderer Factory
 	// Titel, Vorschaubild und Metazeile einer Kachel — eine Stelle für Home
 	// und die Raster-Reiter.
@@ -424,7 +455,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						<VirtualGridList
 							dataSize={videos.length}
 							itemRenderer={makeRenderer(videos)}
-							itemSize={GRID_ITEM}
+							itemSize={gridItem()}
 							direction="vertical"
 						/>
 					</Tab>
@@ -432,7 +463,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						<VirtualGridList
 							dataSize={favorites.length}
 							itemRenderer={makeRenderer(favorites)}
-							itemSize={GRID_ITEM}
+							itemSize={gridItem()}
 							direction="vertical"
 						/>
 					</Tab>
@@ -440,7 +471,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						<VirtualGridList
 							dataSize={recent.length}
 							itemRenderer={makeRenderer(recent)}
-							itemSize={GRID_ITEM}
+							itemSize={gridItem()}
 							direction="vertical"
 						/>
 					</Tab>
@@ -448,64 +479,59 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						<VirtualGridList
 							dataSize={images.length}
 							itemRenderer={makeRenderer(images)}
-							itemSize={GRID_ITEM}
+							itemSize={gridItem()}
 							direction="vertical"
 						/>
 					</Tab>
 					<Tab title="Collections" icon="folder">
-						<div style={{display: 'flex', height: '100%', width: '100%', gap: '24px', padding: '16px', overflow: 'hidden'}}>
-							{/* Linke Spalte: Ordner/Collections */}
-							<div style={{width: '480px', flexShrink: 0, overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: '16px', display: 'flex', flexDirection: 'column', gap: '16px'}}>
-								{Object.keys(collectionsByCategory).length === 0 ? (
-									<div style={{color: 'gray', fontStyle: 'italic', padding: ri.scale(16) + 'px'}}>Keine Collections vorhanden</div>
+						{selectedCollection ? (
+							<div className={homeCss.detail}>
+								<div className={homeCss.detailBar}>
+									<Button icon="arrowlargeleft" onClick={() => setSelectedCollectionId(null)}>
+										Collections
+									</Button>
+									<span className={homeCss.dot} style={{background: selectedCollection.color || '#00f5e4'}} />
+									<span className={homeCss.detailTitle}>{selectedCollection.name}</span>
+									<span className={homeCss.rowCount}>{collectionVideos.length}</span>
+								</div>
+								{collectionVideos.length === 0 ? (
+									<div className={homeCss.centered}>Keine Medien in dieser Collection.</div>
 								) : (
-									Object.keys(collectionsByCategory).sort().map(category => {
-										const cols = collectionsByCategory[category];
-										return (
-											<div key={category} style={{display: 'flex', flexDirection: 'column', gap: ri.scale(8) + 'px'}}>
-												<div style={{fontSize: ri.scale(14) + 'px', fontWeight: 'bold', color: '#ff0090', textTransform: 'uppercase', paddingLeft: ri.scale(8) + 'px'}}>
-													📁 {category}
-												</div>
-												{cols.map(col => (
-													<Button
-														key={col.id}
-														size="small"
-														selected={selectedCollectionId === col.id}
-														onClick={() => setSelectedCollectionId(col.id)}
-														style={{justifyContent: 'flex-start', textAlign: 'left', width: '100%'}}
-													>
-														<span style={{color: col.color || '#00f5e4', marginRight: ri.scale(8) + 'px'}}>●</span>
-														{col.name}
-													</Button>
-												))}
-											</div>
-										);
-									})
+									<VirtualGridList
+										className={homeCss.detailGrid}
+										dataSize={collectionVideos.length}
+										itemRenderer={makeRenderer(collectionVideos)}
+										itemSize={gridItem()}
+										direction="vertical"
+									/>
 								)}
 							</div>
-
-							{/* Rechte Spalte: Video-Grid */}
-							<div style={{flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden'}}>
-								{selectedCollection ? (
-									collectionVideos.length === 0 ? (
-										<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'gray'}}>
-											Keine Medien in dieser Collection gefunden.
-										</div>
-									) : (
-										<VirtualGridList
-											dataSize={collectionVideos.length}
-											itemRenderer={makeRenderer(collectionVideos)}
-											itemSize={GRID_ITEM}
-											direction="vertical"
-										/>
-									)
-								) : (
-									<div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'gray'}}>
-										Bitte wähle eine Collection aus der linken Liste.
+						) : collectionRows.length === 0 ? (
+							<div className={homeCss.centered}>
+								Noch keine Collections — in der Web-App unter „Smart Collections“ anlegen.
+							</div>
+						) : (
+							<div className={homeCss.home}>
+								{collectionRows.map(({category, rows}) => (
+									<div key={category}>
+										<div className={homeCss.category}>{category}</div>
+										{rows.map(({col, items}) => (
+											<MediaRow
+												key={col.id}
+												title={col.name}
+												dotColor={col.color || '#00f5e4'}
+												items={items}
+												limit={20}
+												onMore={() => setSelectedCollectionId(col.id)}
+												cardProps={cardProps}
+												onSelect={onSelectVideo}
+												emptyText="Keine Medien in dieser Collection."
+											/>
+										))}
 									</div>
-								)}
+								))}
 							</div>
-						</div>
+						)}
 					</Tab>
 				</TabLayout>
 			)}

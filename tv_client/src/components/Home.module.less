@@ -109,3 +109,61 @@
 	font-style: italic;
 	color: rgba(255, 255, 255, 0.5);
 }
+
+// --- Collections ---
+
+.dot {
+	display: inline-block;
+	width: 28px;
+	height: 28px;
+	margin-right: 20px;
+	border-radius: 50%;
+	vertical-align: middle;
+}
+
+.category {
+	margin: 64px 0 0 66px;
+	font-size: 34px;
+	font-weight: 700;
+	letter-spacing: 4px;
+	text-transform: uppercase;
+	color: rgba(255, 255, 255, 0.45);
+
+	&:first-child {
+		margin-top: 24px;
+	}
+}
+
+// Kopfzeile der geöffneten Collection
+.detailBar {
+	display: flex;
+	align-items: center;
+	gap: 40px;
+	padding: 12px 66px 24px;
+}
+
+.detailTitle {
+	font-size: 60px;
+	font-weight: 700;
+	color: #fff;
+}
+
+.detail {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+.detailGrid {
+	flex: 1;
+	min-height: 0;
+}
+
+.centered {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	font-size: 40px;
+	color: rgba(255, 255, 255, 0.5);
+}

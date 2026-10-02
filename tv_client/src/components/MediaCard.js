@@ -52,4 +52,36 @@ MediaCard.propTypes = {
 	width: PropTypes.number
 };
 
+/**
+ * Letzte Kachel einer Reihe: öffnet die ganze Sammlung als Raster.
+ *
+ * @param {number} total - Gesamtzahl der Einträge
+ * @param {number} [width] - Breite in 4K-Pixeln
+ * @param {Function} onSelect
+ */
+const MoreCard = ({total, width, onSelect, ...rest}) => {
+	const handleFocus = useCallback((ev) => {
+		ev.currentTarget.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'smooth'});
+	}, []);
+	const style = width ? {width: ri.scale(width) + 'px'} : {width: '100%'};
+
+	return (
+		<SpottableDiv {...rest} className={css.card + ' ' + css.more} style={style} onClick={onSelect} onFocus={handleFocus}>
+			<div className={css.frame}>
+				<div className={css.moreText}>
+					Alle anzeigen →
+					<div className={css.moreCount}>{total} Einträge</div>
+				</div>
+			</div>
+		</SpottableDiv>
+	);
+};
+
+MoreCard.propTypes = {
+	onSelect: PropTypes.func.isRequired,
+	total: PropTypes.number.isRequired,
+	width: PropTypes.number
+};
+
+export {MoreCard};
 export default MediaCard;
