@@ -54,6 +54,11 @@ All notable changes to this project will be documented in this file.
   entfernt eine einmalige Migration die Vault-Markierungen aus users.db;
   Favoriten und Tags bleiben unberührt. Alte Lesezeichen auf `/vault` landen in
   der Bibliothek. Der abgesicherte Modus ist eine andere Funktion und bleibt.
+- **`webos_client/` entfernt.** Die Hülle leitete auf `/static/tv.html` um,
+  das seit `40c546f` (5. Juli) nicht mehr existiert. Damals hatte der
+  Enact-Client die Seite ersetzt. Die Hülle lieferte deshalb nur noch eine 404
+  und hatte dieselbe App-ID wie der echte TV-Client (`tv_client/`, dessen Build
+  als `.ipk` im Repo liegt). Letzter Stand: `057f68f`.
 - **iOS-Client zurückgezogen** (`ios_client/`). Er funktionierte seit `8c6008a`
   nicht mehr — die DeoVR-Routen, die er aufrief, gibt es nicht mehr, und er
   schickte keine Sitzung mit — und ließ sich ohne Mac und Xcode nicht prüfen
