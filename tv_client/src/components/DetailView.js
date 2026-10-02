@@ -25,7 +25,7 @@ const CONTAINER_ID = 'detail-view';
  * Die Zurück-Taste schließt die Ansicht (Capture, damit Panels sie nicht
  * zuerst als „App beenden“ deutet).
  */
-const DetailView = ({src, title, meta, tags, favorite, busy, onPlay, onToggleFavorite, onClose}) => {
+const DetailView = ({src, title, meta, tags, favorite, busy, resumeLabel, onPlay, onPlayFromStart, onToggleFavorite, onClose}) => {
 	useEffect(() => {
 		const timer = setTimeout(() => Spotlight.focus(CONTAINER_ID), 0);
 		const onBack = (ev) => {
@@ -48,13 +48,17 @@ const DetailView = ({src, title, meta, tags, favorite, busy, onPlay, onToggleFav
 			<div className={css.content}>
 				<div className={css.title}>{title}</div>
 				{meta ? <div className={css.meta}>{meta}</div> : null}
+				{resumeLabel ? <div className={css.resume}>{resumeLabel}</div> : null}
 				{tags && tags.length ? (
 					<div className={css.tags}>
 						{tags.map(t => <span key={t} className={css.tag}>{t}</span>)}
 					</div>
 				) : null}
 				<div className={css.actions}>
-					<Button className="spottable-default" icon="play" onClick={onPlay}>Abspielen</Button>
+					<Button className="spottable-default" icon="play" onClick={onPlay}>
+						{resumeLabel ? 'Fortsetzen' : 'Abspielen'}
+					</Button>
+					{resumeLabel ? <Button icon="refresh" onClick={onPlayFromStart}>Von vorn</Button> : null}
 					<Button
 						icon={favorite ? 'star' : 'starhollow'}
 						selected={favorite}
@@ -73,6 +77,8 @@ const DetailView = ({src, title, meta, tags, favorite, busy, onPlay, onToggleFav
 DetailView.propTypes = {
 	onClose: PropTypes.func.isRequired,
 	onPlay: PropTypes.func.isRequired,
+	onPlayFromStart: PropTypes.func,
+	resumeLabel: PropTypes.string,
 	onToggleFavorite: PropTypes.func.isRequired,
 	title: PropTypes.string.isRequired,
 	busy: PropTypes.bool,

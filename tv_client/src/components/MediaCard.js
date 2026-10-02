@@ -22,8 +22,9 @@ const SpottableDiv = Spottable('div');
  * @param {Function} onSelect - OK-Taste oder Klick
  * @param {boolean} [favorite] - Stern oben links
  * @param {string} [badge] - z. B. „4K“ oder „HD“, oben rechts
+ * @param {number} [progress] - 0…1, roter Balken am unteren Rand (Weiterschauen)
  */
-const MediaCard = ({src, title, meta, width, onSelect, favorite, badge, ...rest}) => {
+const MediaCard = ({src, title, meta, width, onSelect, favorite, badge, progress, ...rest}) => {
 	// Spotlight setzt den Fokus, scrollt aber nicht zwingend mit. In einer
 	// waagerechten Reihe bliebe die fokussierte Kachel sonst außer Sicht.
 	const handleFocus = useCallback((ev) => {
@@ -43,6 +44,11 @@ const MediaCard = ({src, title, meta, width, onSelect, favorite, badge, ...rest}
 					<div className={css.title}>{title}</div>
 					{meta ? <div className={css.meta}>{meta}</div> : null}
 				</div>
+				{progress > 0 ? (
+					<div className={css.progressTrack}>
+						<div className={css.progressBar} style={{width: Math.min(100, progress * 100) + '%'}} />
+					</div>
+				) : null}
 			</div>
 		</SpottableDiv>
 	);
@@ -54,6 +60,7 @@ MediaCard.propTypes = {
 	badge: PropTypes.string,
 	favorite: PropTypes.bool,
 	meta: PropTypes.string,
+	progress: PropTypes.number,
 	src: PropTypes.string,
 	width: PropTypes.number
 };

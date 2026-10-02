@@ -16,6 +16,7 @@ import HeroBanner from '../components/HeroBanner';
 import DetailView from '../components/DetailView';
 import homeCss from '../components/Home.module.less';
 import displayName from '../displayName';
+import {listProgress, getProgress} from '../watchProgress';
 import {matchesCollectionCriteria, videoResolution} from '../collectionMatch';
 
 // Rasterzelle in 4K-Pixeln: 680 breit, 16:9-Bild (382) plus 36 Rand für den
@@ -120,7 +121,7 @@ const formatDuration = (seconds) => {
 	return `${mins} Min`;
 };
 
-const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
+const MainPanel = ({onSelectVideo, onAuthFailed, progressVersion, ...props}) => {
 	const [allVideos, setAllVideos] = useState([]);
 	// Eintrag in der Detailansicht (null = keine offen)
 	const [detailPath, setDetailPath] = useState(null);
@@ -264,6 +265,21 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const homeFavorites = useMemo(() =>
 		sortVideos(allVideos.filter(v => v.favorite), 'newest').slice(0, 30),
 	[allVideos]);
+	// Weiterschauen: angefangene Videos, zuletzt gesehenes zuerst. Hängt an
+	// progressVersion, das App nach jedem Schließen des Players hochzählt.
+	const continueWatching = useMemo(() => {
+		const byPath = new Map(allVideos.map(v => [v.FilePath, v]));
+		return listProgress()
+			.map(p => ({video: byPath.get(p.path), progress: p.d ? p.t / p.d : 0}))
+			.filter(x => x.video)
+			.slice(0, 20);
+	}, [allVideos, progressVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+	const continueProgress = useMemo(
+		() => new Map(continueWatching.map(x => [x.video.FilePath, x.progress])),
+		[continueWatching]
+	);
+
 	const homeRecent = useMemo(() =>
 		sortVideos(allVideos, 'newest').slice(0, 30),
 	[allVideos]);
@@ -407,6 +423,22 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		onSelectVideo(detailVideo);
 	}, [detailVideo, onSelectVideo]);
 
+	const playDetailFromStart = useCallback(() => {
+		if (!detailVideo) return;
+		setDetailPath(null);
+		onSelectVideo(detailVideo, {fromStart: true});
+	}, [detailVideo, onSelectVideo]);
+
+	// „Fortsetzen bei 12:30“, wenn es eine gemerkte Position gibt
+	const detailResume = useMemo(() => {
+		if (!detailVideo) return '';
+		const t = getProgress(detailVideo.FilePath);
+		if (!t) return '';
+		const m = Math.floor(t / 60);
+		const sec = String(t % 60).padStart(2, '0');
+		return `Fortsetzen bei ${m}:${sec}`;
+	}, [detailVideo, progressVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
 	// Favorit umschalten — dieselbe Route wie die Web-App. Erst nach Erfolg
 	// lokal übernehmen, damit Stern und Server nicht auseinanderlaufen.
 	const toggleFavorite = useCallback(async () => {
@@ -522,6 +554,12 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 								/>
 							) : null}
 							<MediaRow
+								title="Weiterschauen"
+								items={continueWatching.map(x => x.video)}
+								cardProps={v => ({...cardProps(v), progress: continueProgress.get(v.FilePath)})}
+								onSelect={openDetail}
+							/>
+							<MediaRow
 								title="Deine Favoriten"
 								items={homeFavorites}
 								cardProps={cardProps}
@@ -611,7 +649,9 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 					{...cardProps(detailVideo)}
 					tags={detailVideo.tags || []}
 					busy={favoriteBusy}
+					resumeLabel={detailResume}
 					onPlay={playDetail}
+					onPlayFromStart={playDetailFromStart}
 					onToggleFavorite={toggleFavorite}
 					onClose={closeDetail}
 				/>
@@ -622,7 +662,8 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 
 MainPanel.propTypes = {
 	onSelectVideo: PropTypes.func.isRequired,
-	onAuthFailed: PropTypes.func
+	onAuthFailed: PropTypes.func,
+	progressVersion: PropTypes.number
 };
 
 export default MainPanel;
