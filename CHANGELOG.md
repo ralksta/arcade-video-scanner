@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
   echten Server auf.
 - Dateinamen mit `"` oder `\` brachen aus den Klick-Handlern der Karten aus.
   Neuer Helfer `jsArg()`.
+- GIF-Export nur noch aus den eigenen Scan-Ordnern. Vorher genügte es, dass
+  die Datei in den Ordnern *irgendeines* Kontos lag. `/stream` folgt mit Phase 6.
 
 ### Fixed (Nachtlauf 4)
 - Abbrechen während des Uploads ersetzte das Original trotzdem.

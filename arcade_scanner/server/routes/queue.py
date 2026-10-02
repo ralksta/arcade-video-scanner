@@ -40,6 +40,7 @@ from arcade_scanner.core.media_replace import (
     check_target_collision,
     verify_media_integrity,
 )
+from arcade_scanner.core.user_scope import visible_path_filter
 from arcade_scanner.database import db
 from arcade_scanner.database.sqlite_store import SQLiteStore
 from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
@@ -215,6 +216,19 @@ def _replace_media_entry(original_path: str, new_path: str, codec: str) -> None:
             user_db.remap_paths_in_user_data({original_path: new_path})
         except Exception as e:
             print(f"⚠️ Nutzerzustand nicht übernommen ({e!r}): {original_path}")
+
+
+def _user_may_see(user_name: str, path: str) -> bool:
+    """Liegt `path` in den Scan-Zielen dieses Kontos?
+
+    `sanitize_path()` prüft nur „in *irgendeinem* Scan-Ziel" — das sind die
+    Ziele **aller** Konten. Für den GIF-Export reicht das nicht: Ein Konto
+    konnte so eine Datei aus der Bibliothek eines anderen exportieren und
+    herunterladen, wenn es den Pfad kannte. Die Regel steht in
+    `core/user_scope.py`; ohne lesbaren Nutzerdatensatz: nein.
+    """
+    from arcade_scanner.server.api_handler import user_db
+    return visible_path_filter(user_db.get_user(user_name))(os.path.abspath(path))
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +580,12 @@ def handle_post(handler) -> bool:
             except (SecurityError, ValueError) as e:
                 print(f"🚨 Security violation in GIF export: {e}")
                 handler.send_error(403, "Forbidden - Invalid path")
+                return True
+
+            # Vor der Existenzprüfung: Sonst verriete 404 gegen 403, ob es
+            # eine fremde Datei gibt.
+            if not _user_may_see(user_name, video_path):
+                handler.send_error(403, "Forbidden - not in your library")
                 return True
 
             if not os.path.exists(video_path):
