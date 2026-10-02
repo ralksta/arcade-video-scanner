@@ -20,8 +20,10 @@ const SpottableDiv = Spottable('div');
  * @param {number} [width] - Breite in 4K-Pixeln; ohne Angabe füllt die Kachel
  *   ihre Zelle (VirtualGridList)
  * @param {Function} onSelect - OK-Taste oder Klick
+ * @param {boolean} [favorite] - Stern oben links
+ * @param {string} [badge] - z. B. „4K“ oder „HD“, oben rechts
  */
-const MediaCard = ({src, title, meta, width, onSelect, ...rest}) => {
+const MediaCard = ({src, title, meta, width, onSelect, favorite, badge, ...rest}) => {
 	// Spotlight setzt den Fokus, scrollt aber nicht zwingend mit. In einer
 	// waagerechten Reihe bliebe die fokussierte Kachel sonst außer Sicht.
 	const handleFocus = useCallback((ev) => {
@@ -35,6 +37,8 @@ const MediaCard = ({src, title, meta, width, onSelect, ...rest}) => {
 			<div className={css.frame}>
 				{src ? <img className={css.thumb} src={src} alt="" loading="lazy" /> : null}
 				<div className={css.shade} />
+				{favorite ? <div className={css.favorite} aria-label="Favorit">★</div> : null}
+				{badge ? <div className={css.badge}>{badge}</div> : null}
 				<div className={css.text}>
 					<div className={css.title}>{title}</div>
 					{meta ? <div className={css.meta}>{meta}</div> : null}
@@ -47,6 +51,8 @@ const MediaCard = ({src, title, meta, width, onSelect, ...rest}) => {
 MediaCard.propTypes = {
 	onSelect: PropTypes.func.isRequired,
 	title: PropTypes.string.isRequired,
+	badge: PropTypes.string,
+	favorite: PropTypes.bool,
 	meta: PropTypes.string,
 	src: PropTypes.string,
 	width: PropTypes.number

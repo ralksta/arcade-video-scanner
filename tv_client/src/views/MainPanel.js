@@ -7,14 +7,16 @@ import TabLayout, {Tab} from '@enact/limestone/TabLayout';
 import {VirtualGridList} from '@enact/limestone/VirtualList';
 import Button from '@enact/limestone/Button';
 import {InputField} from '@enact/limestone/Input';
+import Dropdown from '@enact/limestone/Dropdown';
 import ri from '@enact/ui/resolution';
 
 import MediaCard from '../components/MediaCard';
 import MediaRow from '../components/MediaRow';
 import HeroBanner from '../components/HeroBanner';
+import DetailView from '../components/DetailView';
 import homeCss from '../components/Home.module.less';
 import displayName from '../displayName';
-import {matchesCollectionCriteria} from '../collectionMatch';
+import {matchesCollectionCriteria, videoResolution} from '../collectionMatch';
 
 // Rasterzelle in 4K-Pixeln: 680 breit, 16:9-Bild (382) plus 36 Rand für den
 // Fokus. Ergibt auf Full HD fünf Spalten à 340 px.
@@ -24,12 +26,30 @@ import {matchesCollectionCriteria} from '../collectionMatch';
 // Faktor 1 — auf dem Fernseher standen zwei riesige Spalten statt fünf.
 const gridItem = () => ({minWidth: ri.scale(680), minHeight: ri.scale(418)});
 
+// Sortierung als Dropdown statt fünf Emoji-Knöpfen in zwei Zeilen.
 const SORT_OPTIONS = [
-	{key: 'newest', label: '🕐 Neueste'},
-	{key: 'name_az', label: '🔤 A → Z'},
-	{key: 'name_za', label: '🔤 Z → A'},
-	{key: 'size_desc', label: '📦 Größte'},
-	{key: 'size_asc', label: '📦 Kleinste'}
+	{key: 'newest', label: 'Neueste'},
+	{key: 'name_az', label: 'Name A–Z'},
+	{key: 'name_za', label: 'Name Z–A'},
+	{key: 'size_desc', label: 'Größte'},
+	{key: 'size_asc', label: 'Kleinste'},
+	{key: 'duration_desc', label: 'Längste'}
+];
+
+// Filter der Raster-Reiter. Index 0 heißt jeweils „kein Filter“ und trägt
+// den Namen des Filters — kurz, damit die schmalen Dropdowns nicht abschneiden.
+const RESOLUTION_FILTERS = [
+	{label: 'Auflösung'},
+	{label: '4K', value: '4k'},
+	{label: '1080p', value: '1080p'},
+	{label: '720p', value: '720p'},
+	{label: 'SD', value: 'sd'}
+];
+const DURATION_FILTERS = [
+	{label: 'Länge'},
+	{label: '< 10 Min', max: 600},
+	{label: '10–30 Min', min: 600, max: 1800},
+	{label: '> 30 Min', min: 1800}
 ];
 
 // Datum eines Eintrags, in Sekunden — dieselbe Regel wie entryDate() im
@@ -56,6 +76,8 @@ const sortVideos = (list, sortKey) => {
 			return sorted.sort((a, b) => (b.Size_MB || 0) - (a.Size_MB || 0));
 		case 'size_asc':
 			return sorted.sort((a, b) => (a.Size_MB || 0) - (b.Size_MB || 0));
+		case 'duration_desc':
+			return sorted.sort((a, b) => (b.Duration_Sec || 0) - (a.Duration_Sec || 0));
 		case 'newest':
 		default:
 			// Hier stand `sorted.reverse()`. Das dreht die Reihenfolge um, in
@@ -100,6 +122,9 @@ const formatDuration = (seconds) => {
 
 const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [allVideos, setAllVideos] = useState([]);
+	// Eintrag in der Detailansicht (null = keine offen)
+	const [detailPath, setDetailPath] = useState(null);
+	const [favoriteBusy, setFavoriteBusy] = useState(false);
 	const [smartCollections, setSmartCollections] = useState([]);
 	const [recommendations, setRecommendations] = useState([]);
 	const [selectedCollectionId, setSelectedCollectionId] = useState(null);
@@ -109,6 +134,9 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	// Mediathek wird trotzdem gezeigt (bis Phase 1 verhinderte das der Vault).
 	const [userDataFailed, setUserDataFailed] = useState(false);
 	const [sortKey, setSortKey] = useState('newest');
+	const [resolutionIdx, setResolutionIdx] = useState(0);
+	const [durationIdx, setDurationIdx] = useState(0);
+	const [tagIdx, setTagIdx] = useState(0);
 	const [filterText, setFilterText] = useState('');
 
 	// Daten und Collections laden
@@ -197,14 +225,48 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	}, []);
 
 	// Filtergruppen erstellen + sortieren
+	// Tags, die in der Bibliothek tatsächlich vorkommen — nur die lohnen sich
+	// als Filter. Index 0 im Dropdown ist „Alle Tags“.
+	const tagOptions = useMemo(() => {
+		const seen = new Set();
+		allVideos.forEach(v => (v.tags || []).forEach(t => seen.add(t)));
+		return [...seen].sort((a, b) => a.localeCompare(b, 'de'));
+	}, [allVideos]);
+
+	const filtersActive = Boolean(filterText.trim()) || resolutionIdx > 0 || durationIdx > 0 || tagIdx > 0;
+
+	const resetFilters = useCallback(() => {
+		setFilterText('');
+		setResolutionIdx(0);
+		setDurationIdx(0);
+		setTagIdx(0);
+	}, []);
+
 	const filterAndSort = useCallback((list) => {
 		let result = list;
 		if (filterText.trim()) {
 			const q = filterText.trim().toLowerCase();
 			result = result.filter(v => (v._fileName || '').toLowerCase().includes(q));
 		}
+		const res = RESOLUTION_FILTERS[resolutionIdx].value;
+		if (res) result = result.filter(v => videoResolution(v) === res);
+		const dur = DURATION_FILTERS[durationIdx];
+		if (dur.min !== undefined) result = result.filter(v => (v.Duration_Sec || 0) >= dur.min);
+		if (dur.max !== undefined) result = result.filter(v => (v.Duration_Sec || 0) < dur.max);
+		const tag = tagIdx > 0 ? tagOptions[tagIdx - 1] : null;
+		if (tag) result = result.filter(v => (v.tags || []).includes(tag));
 		return sortVideos(result, sortKey);
-	}, [filterText, sortKey]);
+	}, [filterText, sortKey, resolutionIdx, durationIdx, tagIdx, tagOptions]);
+
+	// Home ist kuratiert und zeigt keine Filterleiste — also auch keine
+	// Filter. Sonst leerte ein in „Alle Videos“ gesetzter Filter unsichtbar
+	// die Reihen auf Home.
+	const homeFavorites = useMemo(() =>
+		sortVideos(allVideos.filter(v => v.favorite), 'newest').slice(0, 30),
+	[allVideos]);
+	const homeRecent = useMemo(() =>
+		sortVideos(allVideos, 'newest').slice(0, 30),
+	[allVideos]);
 
 	const videos = useMemo(() =>
 		filterAndSort(allVideos.filter(v => (v.media_type || 'video') === 'video')),
@@ -287,8 +349,11 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		src: thumbnailUrl(v.thumb),
 		title: displayName(v),
 		meta: [formatDuration(v.Duration_Sec), resolutionLabel(v), formatSize(v.Size_MB)]
-			.filter(Boolean).join('  ·  ')
+			.filter(Boolean).join('  ·  '),
+		favorite: Boolean(v.favorite),
+		badge: {'4k': '4K', '1080p': 'HD'}[videoResolution(v)]
 	}), []);
+
 
 	// eslint-disable-next-line no-unused-vars
 	const makeRenderer = useCallback((list) => ({index, ...itemProps}) => {
@@ -298,20 +363,87 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 			<MediaCard
 				{...itemProps}
 				{...cardProps(v)}
-				onSelect={() => onSelectVideo(v)}
+				onSelect={() => setDetailPath(v.FilePath)}
 			/>
 		);
-	}, [onSelectVideo, cardProps]);
+	}, [cardProps]);
+
+	// Raster eines Reiters — oder ein Hinweis, warum es leer ist. Vorher
+	// blieb die Fläche einfach schwarz (der Bilder-Reiter zeigte nichts, ohne
+	// zu sagen, dass es keine Bilder gibt).
+	const renderGrid = (list, emptyText) => {
+		if (list.length > 0) {
+			return (
+				<VirtualGridList
+					dataSize={list.length}
+					itemRenderer={makeRenderer(list)}
+					itemSize={gridItem()}
+					direction="vertical"
+				/>
+			);
+		}
+		return (
+			<div className={homeCss.emptyState}>
+				<div>{filtersActive ? 'Keine Treffer für diese Filter.' : emptyText}</div>
+				{filtersActive ? (
+					<Button size="small" icon="closex" onClick={resetFilters}>Filter zurücksetzen</Button>
+				) : null}
+			</div>
+		);
+	};
+
+	// Detailansicht: per Pfad, damit sie nach dem Umschalten des Favoriten
+	// den aktualisierten Eintrag aus allVideos zeigt.
+	const openDetail = useCallback((v) => setDetailPath(v.FilePath), []);
+	const closeDetail = useCallback(() => setDetailPath(null), []);
+	const detailVideo = useMemo(
+		() => (detailPath ? allVideos.find(v => v.FilePath === detailPath) : null),
+		[detailPath, allVideos]
+	);
+
+	const playDetail = useCallback(() => {
+		if (!detailVideo) return;
+		setDetailPath(null);
+		onSelectVideo(detailVideo);
+	}, [detailVideo, onSelectVideo]);
+
+	// Favorit umschalten — dieselbe Route wie die Web-App. Erst nach Erfolg
+	// lokal übernehmen, damit Stern und Server nicht auseinanderlaufen.
+	const toggleFavorite = useCallback(async () => {
+		if (!detailVideo || favoriteBusy) return;
+		const next = !detailVideo.favorite;
+		const path = detailVideo.FilePath;
+		setFavoriteBusy(true);
+		try {
+			const token = getItem('arcade_session_token');
+			const res = await fetch(
+				serverUrl(`/favorite?path=${encodeURIComponent(path)}&state=${next}`),
+				{headers: token ? {Authorization: `Bearer ${token}`} : {}}
+			);
+			if (res.ok) {
+				setAllVideos(prev => prev.map(v => (v.FilePath === path ? {...v, favorite: next} : v)));
+			}
+		} catch (e) {
+			// Netzfehler: Zustand bleibt, der Knopf zeigt weiter den alten Stand.
+		} finally {
+			setFavoriteBusy(false);
+		}
+	}, [detailVideo, favoriteBusy]);
 
 	const handleTabSelect = useCallback((ev) => {
 		setTabIndex(ev.index);
 	}, []);
 
+	// Zählt, was der aktuelle Reiter zeigt — vorher immer „Alle Videos“,
+	// auch unter Favoriten.
+	const tabList = [null, videos, favorites, recent, images][tabIndex];
 	const baseSubtitle = loading
 		? 'Lade Mediathek...'
-		: filterText
-			? `${videos.length} Treffer für "${filterText}"`
-			: `${videos.length} Videos`;
+		: tabList && filtersActive
+			? `${tabList.length} Treffer`
+			: tabList
+				? `${tabList.length} Einträge`
+				: `${allVideos.length} Einträge`;
 	const subtitle = userDataFailed
 		? `${baseSubtitle} · Nutzerdaten fehlen (Favoriten, Tags)`
 		: baseSubtitle;
@@ -319,30 +451,62 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	return (
 		<Panel {...props}>
 			<Header
-				title="Arcade Scanner TV"
+				type="mini"
+				title="Arcade Scanner"
 				subtitle={subtitle}
 			/>
 
-			{/* Sortier- und Filterleiste — nur in den Raster-Reitern; Home ist
-			    eine kuratierte Ansicht und braucht sie nicht. */}
-			{tabIndex !== 0 && <div style={{display: 'flex', alignItems: 'center', gap: ri.scale(16) + 'px', padding: `${ri.scale(8)}px ${ri.scale(24)}px`, flexWrap: 'wrap'}}>
-				<InputField
-					placeholder="🔍 Suche nach Name..."
-					value={filterText}
-					onChange={handleFilterChange}
-					style={{minWidth: ri.scale(320) + 'px'}}
-				/>
-				{SORT_OPTIONS.map(opt => (
-					<Button
-						key={opt.key}
+			{/* Werkzeugleiste der Raster-Reiter: eine Zeile, Limestone-Icons statt
+			    Emoji. Home ist kuratiert und hat keine. */}
+			{tabIndex !== 0 && (
+				<div className={homeCss.toolbar}>
+					<InputField
+						className={homeCss.search}
+						iconBefore="search"
+						placeholder="Suchen"
+						value={filterText}
+						onChange={handleFilterChange}
 						size="small"
-						selected={sortKey === opt.key}
-						onClick={() => setSortKey(opt.key)}
+					/>
+					<Dropdown
+						size="small"
+						width="small"
+						selected={SORT_OPTIONS.findIndex(o => o.key === sortKey)}
+						onSelect={({selected}) => setSortKey(SORT_OPTIONS[selected].key)}
 					>
-						{opt.label}
-					</Button>
-				))}
-			</div>}
+						{SORT_OPTIONS.map(o => o.label)}
+					</Dropdown>
+					<Dropdown
+						size="small"
+						width="small"
+						selected={resolutionIdx}
+						onSelect={({selected}) => setResolutionIdx(selected)}
+					>
+						{RESOLUTION_FILTERS.map(o => o.label)}
+					</Dropdown>
+					<Dropdown
+						size="small"
+						width="small"
+						selected={durationIdx}
+						onSelect={({selected}) => setDurationIdx(selected)}
+					>
+						{DURATION_FILTERS.map(o => o.label)}
+					</Dropdown>
+					{tagOptions.length > 0 ? (
+						<Dropdown
+							size="small"
+							width="small"
+							selected={tagIdx}
+							onSelect={({selected}) => setTagIdx(selected)}
+						>
+							{['Tags', ...tagOptions]}
+						</Dropdown>
+					) : null}
+					{filtersActive ? (
+						<Button size="small" icon="closex" onClick={resetFilters}>Zurücksetzen</Button>
+					) : null}
+				</div>
+			)}
 
 
 			{!loading && (
@@ -359,56 +523,36 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 							) : null}
 							<MediaRow
 								title="Deine Favoriten"
-								items={favorites.slice(0, 30)}
+								items={homeFavorites}
 								cardProps={cardProps}
-								onSelect={onSelectVideo}
+								onSelect={openDetail}
 								emptyText="Noch keine Favoriten — markiere Videos in der Web-App mit dem Stern."
 							/>
 							<MediaRow
 								title="Zufällige Entdeckungen"
 								items={recommendations.slice(1)}
 								cardProps={cardProps}
-								onSelect={onSelectVideo}
+								onSelect={openDetail}
 							/>
 							<MediaRow
 								title="Zuletzt hinzugefügt"
-								items={recent.slice(0, 30)}
+								items={homeRecent}
 								cardProps={cardProps}
-								onSelect={onSelectVideo}
+								onSelect={openDetail}
 							/>
 						</div>
 					</Tab>
 					<Tab title="Alle Videos" icon="movies">
-						<VirtualGridList
-							dataSize={videos.length}
-							itemRenderer={makeRenderer(videos)}
-							itemSize={gridItem()}
-							direction="vertical"
-						/>
+						{renderGrid(videos, 'Keine Videos in der Bibliothek.')}
 					</Tab>
 					<Tab title="Favoriten" icon="star">
-						<VirtualGridList
-							dataSize={favorites.length}
-							itemRenderer={makeRenderer(favorites)}
-							itemSize={gridItem()}
-							direction="vertical"
-						/>
+						{renderGrid(favorites, 'Noch keine Favoriten. Markiere Videos mit dem Stern — in der Detailansicht oder in der Web-App.')}
 					</Tab>
-					<Tab title="Letzte Importe" icon="history">
-						<VirtualGridList
-							dataSize={recent.length}
-							itemRenderer={makeRenderer(recent)}
-							itemSize={gridItem()}
-							direction="vertical"
-						/>
+					<Tab title="Zuletzt hinzugefügt" icon="history">
+						{renderGrid(recent, 'Noch nichts hinzugefügt.')}
 					</Tab>
 					<Tab title="Bilder" icon="picture">
-						<VirtualGridList
-							dataSize={images.length}
-							itemRenderer={makeRenderer(images)}
-							itemSize={gridItem()}
-							direction="vertical"
-						/>
+						{renderGrid(images, 'Keine Bilder in der Bibliothek. In der Web-App unter Einstellungen „Include Photos“ aktivieren und neu scannen.')}
 					</Tab>
 					<Tab title="Collections" icon="folder">
 						{selectedCollection ? (
@@ -451,7 +595,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 												limit={20}
 												onMore={() => setSelectedCollectionId(col.id)}
 												cardProps={cardProps}
-												onSelect={onSelectVideo}
+												onSelect={openDetail}
 												emptyText="Keine Medien in dieser Collection."
 											/>
 										))}
@@ -462,6 +606,16 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 					</Tab>
 				</TabLayout>
 			)}
+			{detailVideo ? (
+				<DetailView
+					{...cardProps(detailVideo)}
+					tags={detailVideo.tags || []}
+					busy={favoriteBusy}
+					onPlay={playDetail}
+					onToggleFavorite={toggleFavorite}
+					onClose={closeDetail}
+				/>
+			) : null}
 		</Panel>
 	);
 };

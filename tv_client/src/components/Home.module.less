@@ -167,3 +167,33 @@
 	font-size: 40px;
 	color: rgba(255, 255, 255, 0.5);
 }
+
+// --- Werkzeugleiste der Raster-Reiter: eine Zeile ---
+
+.toolbar {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 0 48px 16px;
+	flex-wrap: nowrap;
+}
+
+.search {
+	width: 520px;
+}
+
+// Linksbündig: Bei ausgeklappter Reiterleiste ist der Inhaltsbereich breiter
+// als der sichtbare Teil — zentriert landete der Text rechts außen.
+.emptyState {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 40px;
+	height: 100%;
+	max-width: 1500px;
+	padding: 0 96px;
+	font-size: 56px;
+	line-height: 1.35;
+	color: rgba(255, 255, 255, 0.7);
+}
