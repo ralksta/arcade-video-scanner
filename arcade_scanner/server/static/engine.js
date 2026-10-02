@@ -297,14 +297,14 @@ function discardOptimized(opt) {
  * @returns {string} HTML für den Button
  */
 function _optimizeButton(v) {
-    const cls = 'w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center ' +
+    const cls = 'tech-only w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center ' +
                 'justify-center backdrop-blur text-white transition-all transform hover:scale-110';
 
     if (window.IS_DOCKER) {
         // Der Docker-Pfad reicht den Pfad als JS-String weiter, nicht als URL —
         // hier gibt es kein Encoding-Problem.
         return `
-                 <button class="${cls}" title="Queue for Mac" onclick="event.stopPropagation(); queueForRemoteEncode(${jsArg(v.FilePath)})">
+                 <button class="${cls}" title="An den Mac-Encoder schicken" onclick="event.stopPropagation(); queueForRemoteEncode(${jsArg(v.FilePath)})">
                     <span class="material-icons" aria-hidden="true">cloud_upload</span>
                  </button>`;
     }
@@ -318,7 +318,7 @@ function _optimizeButton(v) {
                  </button>`;
     }
     return `
-                 <button class="${cls}" title="Optimize" onclick="event.stopPropagation(); window.open(${jsArg(`/compress?path=${enc}&audio=standard`)}, 'h_frame')">
+                 <button class="${cls}" title="Optimieren" onclick="event.stopPropagation(); window.open(${jsArg(`/compress?path=${enc}&audio=standard`)}, 'h_frame')">
                     <span class="material-icons" aria-hidden="true">bolt</span>
                  </button>`;
 }
@@ -366,6 +366,9 @@ function createVideoCard(v) {
     // der Sitzung des Nutzers. Bei einer Bibliothek aus heruntergeladenen
     // Dateien ist das kein konstruierter Fall.
     const safeFileName = escapeHtml(fileName);
+    // Lesbarer Titel (formatters.js); der Dateiname bleibt im Tooltip.
+    const safeTitle = escapeHtml(typeof mediaTitle === 'function' ? mediaTitle(v) : fileName);
+    const watched = typeof watchProgressRatio === 'function' ? watchProgressRatio(v.FilePath) : 0;
 
     container.innerHTML = `
         <!-- Thumbnail (Card Media) -->
@@ -380,7 +383,7 @@ function createVideoCard(v) {
              <button class="favorite-btn absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-full bg-black/45 flex items-center justify-center transition-all ${v.favorite ? 'text-bitrate active' : 'text-white/70 opacity-0 group-hover:opacity-100'}"
                 onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))"
                 aria-label="${v.favorite ? 'Favorit entfernen' : 'Als Favorit markieren'}"
-                title="${v.favorite ? 'Favorit' : 'Add to Favorites'}">
+                title="${v.favorite ? 'Favorit' : 'Als Favorit markieren'}">
                 <span class="material-icons text-lg" aria-hidden="true">${v.favorite ? 'star' : 'star_border'}</span>
              </button>
 
@@ -398,11 +401,11 @@ function createVideoCard(v) {
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
                  ${window.IS_LOCAL_ACCESS ? `
-                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder(${jsArg(v.FilePath)})">
+                 <button class="tech-only w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Im Dateimanager zeigen" onclick="event.stopPropagation(); revealInFinder(${jsArg(v.FilePath)})">
                     <span class="material-icons" aria-hidden="true">folder_open</span>
                  </button>
                  ` : ''}
-                 <button class="w-11 h-11 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] flex items-center justify-center backdrop-blur transition-colors" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
+                 <button class="w-11 h-11 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] flex items-center justify-center backdrop-blur transition-colors" title="Abspielen" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
                     <span class="material-icons text-3xl" aria-hidden="true">play_arrow</span>
                  </button>
                   ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? _optimizeButton(v) : ''}
@@ -412,27 +415,29 @@ function createVideoCard(v) {
              <div class="absolute bottom-1.5 left-1.5 flex gap-1 flex-wrap pr-12 pointer-events-none">
                  ${v.media_type === 'image'
                     ? `<span class="ds-badge ds-badge-accent">IMG</span>`
-                    : `<span class="ds-badge ${v.Status === 'HIGH' ? 'ds-badge-bitrate' : 'ds-badge-neutral'}">${v.Status}</span>`
+                    : `<span class="tech-only ds-badge ${v.Status === 'HIGH' ? 'ds-badge-bitrate' : 'ds-badge-neutral'}">${v.Status}</span>`
                  }
-                 ${isHevc ? '<span class="ds-badge ds-badge-hevc">HEVC</span>' : ''}
-                 ${isAv1  ? '<span class="ds-badge ds-badge-av1">AV1</span>' : ''}
-                 ${fileName.includes('_opt.') ? '<span class="ds-badge ds-badge-optimized">OPT</span>' : ''}
+                 ${isHevc ? '<span class="tech-only ds-badge ds-badge-hevc">HEVC</span>' : ''}
+                 ${isAv1  ? '<span class="tech-only ds-badge ds-badge-av1">AV1</span>' : ''}
+                 ${fileName.includes('_opt.') ? '<span class="tech-only ds-badge ds-badge-optimized">OPT</span>' : ''}
              </div>
 
              <!-- Duration -->
              <span class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-semibold bg-black/70 text-white pointer-events-none">
                 ${v.Duration_Sec ? formatDuration(v.Duration_Sec) : ''}
              </span>
+
+             ${watched > 0 ? `<div class="card-progress" aria-hidden="true"><span style="width:${(watched * 100).toFixed(1)}%"></span></div>` : ''}
         </div>
 
         <!-- Content -->
         <div class="card-body px-[11px] py-2.5 flex flex-col gap-0.5">
-            <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${safeFileName}">${safeFileName}</h3>
-            <p class="text-[10.5px] text-text-muted truncate" title="${escapeHtml(v.FilePath)}">${escapeHtml(dirName)}</p>
+            <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${safeFileName}">${safeTitle}</h3>
+            <p class="tech-only text-[10.5px] text-text-muted truncate" title="${escapeHtml(v.FilePath)}">${escapeHtml(dirName)}</p>
 
             ${renderVideoCardTags(v.tags || [])}
 
-            <div class="flex items-center justify-between mt-2 text-[11px] font-mono text-label">
+            <div class="tech-only flex items-center justify-between mt-2 text-[11px] font-mono text-label">
                 <div class="flex items-center gap-2">
                     <span class="bg-[var(--ds-fill-soft)] text-label px-1.5 py-0.5 rounded-[4px]">${v.Size_MB.toFixed(0)} MB</span>
                     ${v.media_type === 'video' ? `<span style="color:${rateColor}">${v.Bitrate_Mbps.toFixed(1)} Mbps</span>` : ''}
@@ -441,7 +446,7 @@ function createVideoCard(v) {
 
             
             <!-- Bitrate-Bar: 3px, Track white/6, Fill in Tier-Farbe -->
-            <div class="mt-2 h-[3px] w-full bg-[var(--ds-fill)] rounded-[2px] overflow-hidden">
+            <div class="tech-only mt-2 h-[3px] w-full bg-[var(--ds-fill)] rounded-[2px] overflow-hidden">
                 <div class="h-full rounded-[2px] transition-all duration-500" style="width: ${barW}%; background: ${rateColor}"></div>
             </div>
         </div>

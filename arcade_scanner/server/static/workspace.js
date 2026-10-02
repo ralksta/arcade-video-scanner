@@ -428,7 +428,32 @@ function loadFromURL() {
     checkDeepLinks();
 }
 
+// --- SCHAU-MODUS ---
+// Codec, Größe, Bitrate, Pfad und Optimieren-Knöpfe tragen die Klasse
+// `tech-only`. Sie erscheinen in den Werkstatt-Ansichten (Review, Duplikate,
+// Kandidaten) immer, sonst nur mit „Details" (styles.css, SCHAU-MODUS).
+
+function applyTechDetails(on) {
+    document.body.classList.toggle('show-tech', on);
+    const btn = document.getElementById('techToggle');
+    if (btn) {
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.classList.toggle('active', on);
+    }
+}
+
+function toggleTechDetails() {
+    const on = !document.body.classList.contains('show-tech');
+    window.safeStorage.set('show_tech_details', on ? 'true' : 'false');
+    applyTechDetails(on);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    applyTechDetails(window.safeStorage.get('show_tech_details') === 'true');
+});
+
 // --- EXPORTS ---
+window.toggleTechDetails = toggleTechDetails;
 window.setWorkspaceMode = setWorkspaceMode;
 window.setLayout        = setLayout;
 window.toggleLayout     = toggleLayout;

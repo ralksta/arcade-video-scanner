@@ -86,6 +86,12 @@ body[data-workspace] {
 /* Sidebar nav active state: Accent-Tint + 3px-Indikator, kein Glow */
 .nav-item.active {
     background: rgb(var(--ds-accent-rgb) / 0.12);
+    color: var(--ds-text);
+    font-weight: 600;
+}
+
+.nav-item.active .material-icons {
+    color: var(--ds-accent-tint);
 }
 
 .nav-item.active .nav-indicator {
@@ -1809,12 +1815,8 @@ html {
         width: 100% !important;
         max-width: 100vw !important;
         position: static !important;
-        background-color: var(--arcade-bg, #090012) !important;
+        background-color: var(--ds-bg) !important;
         min-height: 100vh;
-    }
-
-    .dark body {
-        background: linear-gradient(180deg, #1a0530 0%, #090012 100%) !important;
     }
 
     * {
@@ -1940,6 +1942,12 @@ html {
         padding: 0 12px;
         font-size: 12px;
         flex: 1;
+    }
+
+    /* Links liegt das Sortier-Icon — ohne den Abstand stand es auf dem Text */
+    #sortSelect {
+        padding-left: 36px;
+        min-width: 150px;
     }
 
     /* Hide some controls on mobile */
@@ -3288,4 +3296,29 @@ body[data-workspace="home"] .workspace-indicator > :not(:first-child) {
 @media (prefers-reduced-motion: reduce) {
     .home-hero-backdrop { animation: none; }
     .home-card-thumb { transition: none; }
+}
+
+/* === SCHAU-MODUS ===
+   Technische Angaben (Klasse `tech-only`: Codec, Status, Größe, Bitrate,
+   Pfad, Optimieren) gehören in die Werkstatt. In Review, Duplikaten und
+   Kandidaten stehen sie immer, sonst nur mit „Details" (body.show-tech). */
+body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="duplicates"]):not([data-workspace="candidates"]) .tech-only {
+    display: none !important;
+}
+
+/* Wiedergabefortschritt auf der Karte — wie auf der Startseite */
+.card-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    z-index: 5;
+}
+.card-progress span {
+    display: block;
+    height: 100%;
+    background: var(--ds-accent);
 }

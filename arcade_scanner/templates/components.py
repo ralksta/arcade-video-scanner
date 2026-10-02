@@ -301,7 +301,7 @@ CINEMA_MODAL_COMPONENT = """
     <div id="cinemaInfoPanel" class="absolute top-20 right-[92px] w-80 bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md p-4 transform translate-x-[140%] transition-transform duration-300 z-40 text-sm text-body-text">
         <div class="flex items-center gap-2 mb-3 text-text-main font-semibold border-b border-[var(--ds-hairline-strong)] pb-2">
             <span class="material-icons text-[16px]" aria-hidden="true">info</span>
-            <span>Technical Details</span>
+            <span>Technische Angaben</span>
         </div>
         <div id="cinemaInfoContent" class="space-y-2 text-xs font-mono"></div>
     </div>
@@ -315,7 +315,7 @@ CINEMA_MODAL_COMPONENT = """
     <div id="cinemaTagPanel" class="hidden absolute top-1/2 right-[92px] -translate-y-1/2 bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md p-3 z-50 min-w-[200px] max-w-[320px]">
         <div class="flex items-center gap-2 mb-2 pb-2 border-b border-[var(--ds-hairline-strong)]">
             <span class="material-icons text-[16px] text-accent-tint" aria-hidden="true">label</span>
-            <span class="ds-eyebrow">Assign Tags</span>
+            <span class="ds-eyebrow">Tags zuweisen</span>
         </div>
         <div id="cinemaTagPicker" class="flex flex-wrap gap-1.5">
             <!-- Populated by JS -->
@@ -325,22 +325,22 @@ CINEMA_MODAL_COMPONENT = """
     <!-- Rechte Action-Rail: neutrale Buttons, Accent nur fuer die Primaeraktion -->
     <div id="cinemaActions" class="cinema-actions absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-3.5 z-40">
 
-        <button class="cinema-rail-btn" onclick="toggleCinemaInfo()" title="Technical Details [I]">
+        <button class="cinema-rail-btn" onclick="toggleCinemaInfo()" title="Technische Angaben [I]">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">info_outline</span></span>
             <span class="cinema-rail-label">Info</span>
         </button>
 
-        <button id="cinemaLocateBtn" class="cinema-rail-btn" onclick="cinemaLocate()" title="Show in Finder">
+        <button id="cinemaLocateBtn" class="tech-only cinema-rail-btn" onclick="cinemaLocate()" title="Im Ordner zeigen">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">folder_open</span></span>
-            <span class="cinema-rail-label">Locate</span>
+            <span class="cinema-rail-label">Ordner</span>
         </button>
 
-        <button class="cinema-rail-btn cinema-action-btn" onclick="cinemaFavorite()" title="Toggle Favorite [F]">
+        <button class="cinema-rail-btn cinema-action-btn" onclick="cinemaFavorite()" title="Favorit [F]">
             <span class="cinema-rail-icon"><span class="material-icons" id="cinemaFavIcon" aria-hidden="true">star_border</span></span>
-            <span class="cinema-rail-label">Favorite</span>
+            <span class="cinema-rail-label">Favorit</span>
         </button>
 
-        <button class="cinema-rail-btn" onclick="toggleCinemaTagPanel()" title="Manage Tags">
+        <button class="cinema-rail-btn" onclick="toggleCinemaTagPanel()" title="Tags verwalten">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">label</span></span>
             <span class="cinema-rail-label">Tags</span>
         </button>
@@ -350,7 +350,7 @@ CINEMA_MODAL_COMPONENT = """
             <span class="cinema-rail-label">Ähnlich</span>
         </button>
 
-        <button class="cinema-rail-btn" onclick="cinemaExportGif()" title="Export as GIF [G]">
+        <button class="tech-only cinema-rail-btn" onclick="cinemaExportGif()" title="Als GIF exportieren [G]">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">gif_box</span></span>
             <span class="cinema-rail-label">GIF</span>
         </button>
@@ -614,7 +614,7 @@ BATCH_BAR_COMPONENT = """
 
 FOLDER_SIDEBAR_COMPONENT = """
 <!-- Folder Sidebar (Off-Canvas) -->
-<div id="folderSidebar" class="fixed inset-y-0 left-0 w-80 bg-[#101018]/95 backdrop-blur-xl border-r border-ink/10 transform -translate-x-full transition-transform duration-300 z-30 flex flex-col pt-safe-top">
+<div id="folderSidebar" class="fixed inset-y-0 left-0 w-80 bg-surface/95 backdrop-blur-xl border-r border-ink/10 transform -translate-x-full transition-transform duration-300 z-30 flex flex-col pt-safe-top">
     <!-- Active class 'translate-x-0' handled by JS -->
 
     <div class="p-4 border-b border-ink/10 flex items-center justify-between">
@@ -916,7 +916,7 @@ TAG_MANAGER_MODAL_COMPONENT = """
 COLLECTION_MODAL_COMPONENT = """
 <!-- Collection Manager Modal -->
 <div id="collectionModal" class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
-    <div class="bg-[#101018] border border-ink/10 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] animate-glow-pulse glow-cyan">
+    <div class="bg-surface border border-ink/10 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
 
         <!-- Header -->
         <div class="p-4 border-b border-ink/5 flex items-center justify-between shrink-0">
@@ -2202,7 +2202,7 @@ FILTER_BAR_COMPONENT = """
     <!-- Search Input -->
     <div class="w-full md:w-80 lg:w-96 relative flex-shrink min-w-0">
         <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]" aria-hidden="true">search</span>
-        <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Search files..."
+        <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Suchen …" aria-label="Bibliothek durchsuchen"
                class="w-full bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] rounded-ds-sm pl-10 pr-4 py-2 text-[13px] text-text-main placeholder-text-muted focus:outline-none focus:border-accent transition-colors">
     </div>
 
@@ -2211,21 +2211,28 @@ FILTER_BAR_COMPONENT = """
         <!-- Unified Filters Button -->
         <button id="openFiltersBtn" onclick="openFilterPanel()" class="ds-chip flex items-center gap-2">
             <span class="material-icons text-[16px]" aria-hidden="true">tune</span>
-            <span>Filters</span>
+            <span>Filter</span>
             <span id="filterBadge" class="hidden bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] min-w-[18px] text-center">0</span>
         </button>
 
         <!-- Sort Dropdown -->
-        <div class="relative">
+        <div class="relative flex-shrink-0">
             <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px] pointer-events-none" aria-hidden="true">sort</span>
-            <select id="sortSelect" onchange="setSort(this.value)" class="ds-chip pl-9 pr-4 appearance-none min-w-[140px]">
-                <option value="date">Sort: date added</option>
-                <option value="bitrate">Sort: bitrate</option>
-                <option value="size">Sort: size</option>
-                <option value="runtime">Sort: runtime</option>
-                <option value="file_date">Sort: file date</option>
+            <select id="sortSelect" onchange="setSort(this.value)" class="ds-chip pl-9 pr-4 appearance-none min-w-[150px] whitespace-nowrap" aria-label="Sortierung">
+                <option value="date">Neueste zuerst</option>
+                <option value="runtime">Längste zuerst</option>
+                <option value="file_date">Nach Dateidatum</option>
+                <option value="bitrate">Nach Bitrate</option>
+                <option value="size">Nach Größe</option>
             </select>
         </div>
+
+        <!-- Technische Angaben auf den Karten (Schau-Modus vs. Werkstatt) -->
+        <button id="techToggle" onclick="toggleTechDetails()" aria-pressed="false" class="ds-chip flex items-center gap-2 flex-shrink-0"
+                title="Technische Angaben auf den Karten zeigen: Codec, Größe, Bitrate, Pfad">
+            <span class="material-icons text-[16px]" aria-hidden="true">info</span>
+            <span>Details</span>
+        </button>
 
         <!-- View Toggles & Grid Scale -->
         <div class="flex items-center bg-[var(--ds-fill-soft)] rounded-ds-sm p-0.5 border border-[var(--ds-hairline-strong)] flex-shrink-0">
@@ -2236,21 +2243,21 @@ FILTER_BAR_COMPONENT = """
                 <span class="material-icons text-[16px] text-text-muted" aria-hidden="true">photo_size_select_large</span>
             </div>
 
-            <button id="viewToggleGrid" onclick="setLayout('grid')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Grid View">
+            <button id="viewToggleGrid" onclick="setLayout('grid')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Raster">
                 <span class="material-icons text-[18px]" aria-hidden="true">grid_view</span>
             </button>
-            <button id="viewToggleList" onclick="setLayout('list')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="List View">
+            <button id="viewToggleList" onclick="setLayout('list')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Liste">
                  <span class="material-icons text-[18px]" aria-hidden="true">view_list</span>
             </button>
-            <button id="viewToggleTreemap" onclick="setLayout('treemap')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Tree View">
+            <button id="viewToggleTreemap" onclick="setLayout('treemap')" class="tech-only p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Speicherbelegung (Treemap)">
                 <span class="material-icons text-[18px]" aria-hidden="true">account_tree</span>
             </button>
-            <button id="viewToggleFolder" onclick="setLayout('folderbrowser')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Folder Browser">
+            <button id="viewToggleFolder" onclick="setLayout('folderbrowser')" class="p-1.5 rounded-[4px] hover:bg-[var(--ds-fill)] text-text-muted hover:text-text-main transition-colors" title="Ordner">
                 <span class="material-icons text-[18px]" aria-hidden="true">folder</span>
             </button>
         </div>
 
-        <button id="refreshBtn" onclick="rescanLibrary()" class="p-2 rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors flex items-center justify-center flex-shrink-0" title="Rescan Library">
+        <button id="refreshBtn" onclick="rescanLibrary()" class="tech-only p-2 rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors flex items-center justify-center flex-shrink-0" title="Bibliothek neu scannen">
             <span class="material-icons text-[18px]" aria-hidden="true">refresh</span>
         </button>
         <button id="stopScanBtn" onclick="stopScan()" class="hidden p-2 rounded-ds-sm border border-danger/40 text-danger hover:bg-danger/10 transition-colors flex items-center justify-center flex-shrink-0" title="Scan stoppen">
@@ -2264,11 +2271,11 @@ FILTER_BAR_COMPONENT = """
 
 <!-- Active Filters Row (shows when filters are active) -->
 <div id="activeFiltersRow" class="hidden sticky top-[100px] md:top-[110px] z-20 bg-bg px-2 md:px-[22px] py-2 border-b border-line/60 flex flex-wrap items-center gap-2">
-    <span class="ds-eyebrow">Active</span>
+    <span class="ds-eyebrow">Aktiv</span>
     <div id="activeFilterChips" class="flex flex-wrap gap-1.5">
         <!-- Chips injected by JS -->
     </div>
-    <button onclick="resetFilters()" class="ml-auto text-[12px] text-text-muted hover:text-accent-tint transition-colors">Clear all</button>
+    <button onclick="resetFilters()" class="ml-auto text-[12px] text-text-muted hover:text-accent-tint transition-colors">Alle entfernen</button>
 </div>
 """
 

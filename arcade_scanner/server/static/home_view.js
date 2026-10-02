@@ -34,10 +34,9 @@ function _homeShuffle(videos) {
     return _homeShuffled;
 }
 
-/** Anzeigename: Dateiname ohne Endung. */
+/** Anzeigetitel (formatters.js) — derselbe wie auf Karten und im Player. */
 function homeTitle(video) {
-    const name = String(video.FilePath || '').split(/[\\/]/).pop();
-    return name.replace(/\.[^.]+$/, '') || name;
+    return mediaTitle(video);
 }
 
 function _homeEl(tag, className, text) {
@@ -67,7 +66,7 @@ function _homeCard(video, list) {
     const card = _homeEl('button', 'home-card');
     card.type = 'button';
     card.setAttribute('data-path', video.FilePath);
-    card.title = homeTitle(video);
+    card.title = getFileName(video.FilePath);
 
     const thumb = _homeEl('div', 'home-card-thumb');
     thumb.appendChild(_homeThumb(video));

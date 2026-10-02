@@ -5,8 +5,30 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
-- Die Bibliothek ist standardmäßig nach „date added“ sortiert (neueste
-  zuerst), nicht mehr nach Bitrate.
+- **Schau-Modus statt Werkstatt.** Karten in Bibliothek und Favoriten zeigen
+  nur noch Bild, Titel, Laufzeit und Fortschritt. Status, Codec, Größe,
+  Bitrate, Pfad und die Optimieren-Knöpfe erscheinen in Review, Duplikaten
+  und Kandidaten weiter wie gewohnt. Überall sonst blendet „Details“ in der
+  Filterleiste sie ein, und der Browser merkt sich die Wahl. Im Player
+  wandern „Ordner“, „GIF“ und „Optimieren“ ebenfalls dorthin; G und O
+  funktionieren weiter.
+- **Lesbare Titel.** Statt `VID_20251025_121813_115.mp4` steht
+  „25. Okt. 2025 · 12:18“, und Optimierer-Anhängsel wie `_opt` oder
+  `__h265` fallen weg. Das gilt für Karten, Startseite, Player und
+  TV-App. Der Dateiname bleibt im Tooltip.
+- Die Seitenleiste trennt **Mediathek** (Start, Bibliothek, Favoriten) und
+  **Werkstatt** (Review, Duplikate, Kandidaten). Navigation, Filterleiste,
+  Player und Anmeldung sind durchgehend deutsch.
+- Die Bibliothek ist standardmäßig nach „Neueste zuerst“ sortiert, nicht
+  mehr nach Bitrate.
+
+### Fixed (Oberfläche)
+- In der Seitenleiste blieb der erste Eintrag hervorgehoben, egal welche
+  Ansicht offen war.
+- Auf dem Handy lag das Sortier-Icon auf dem Text, und die Anmeldekarte
+  reichte bis an den Bildschirmrand.
+- Kontextmenü, Befehlspalette, Ordner-Leiste und Collection-Dialog hatten
+  noch Farben aus der alten Arcade-Optik und ignorierten den hellen Modus.
 - TV-Client: Fehlen die Nutzerdaten, zeigt er die Mediathek ohne Favoriten und
   Tags und nennt den Grund im Untertitel. Bisher blieb das Raster leer, damit
   der Vault nicht sichtbar wurde.

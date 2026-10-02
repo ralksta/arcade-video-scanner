@@ -111,30 +111,30 @@ def render_header(theme: BaseTheme, hostname: str) -> str:
 
     <!-- Stat-Cluster -->
     <div class="hidden md:flex items-center gap-3 text-[12px] font-mono text-label">
-        <div class="flex items-center gap-1.5">
+        <div class="tech-only flex items-center gap-1.5">
             <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">dns</span>
             <span>{hostname}</span>
         </div>
-        <span class="opacity-30">|</span>
+        <span class="tech-only opacity-30">|</span>
         <div class="flex items-center gap-1.5">
             <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">movie</span>
-            <span id="header-video-count">...</span> videos
+            <span id="header-video-count">...</span> Videos
         </div>
         <span class="opacity-30" id="image-separator" style="display:none;">|</span>
         <div class="flex items-center gap-1.5" id="image-count-section" style="display:none;">
             <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">image</span>
-            <span id="header-image-count">...</span> images
+            <span id="header-image-count">...</span> Bilder
         </div>
-        <span class="opacity-30">|</span>
-        <div class="flex items-center gap-1.5">
+        <span class="tech-only opacity-30">|</span>
+        <div class="tech-only flex items-center gap-1.5">
             <span class="material-icons text-[15px] text-text-muted" aria-hidden="true">save</span>
             <span id="header-size">...</span>
         </div>
         <span class="opacity-30">|</span>
-        <button onclick="toggleTheme()" class="p-1 rounded-md text-text-muted hover:text-text-main transition-colors" title="Light / Dark">
+        <button onclick="toggleTheme()" class="p-1 rounded-md text-text-muted hover:text-text-main transition-colors" title="Hell / Dunkel" aria-label="Hell / Dunkel umschalten">
             <span class="material-icons text-[18px]" id="themeIcon" aria-hidden="true">light_mode</span>
         </button>
-        <button onclick="logout()" class="p-1 rounded-md text-text-muted hover:text-danger transition-colors" title="Logout">
+        <button onclick="logout()" class="p-1 rounded-md text-text-muted hover:text-danger transition-colors" title="Abmelden" aria-label="Abmelden">
             <span class="material-icons text-[18px]" aria-hidden="true">logout</span>
         </button>
     </div>
@@ -156,12 +156,16 @@ def render_navigation(theme: BaseTheme) -> str:
     """
 
     def nav_btn(id_val, onclick, icon, label, active=False):
+        # Hervorhebung nur über die Klasse `active` (styles.css), die
+        # setWorkspaceMode() umsetzt. Vorher kamen Hintergrund, Schriftgewicht
+        # und Icon-Farbe des Startzustands zusätzlich als feste Klassen aus
+        # dem Template — die entfernte niemand, und der erste Eintrag blieb
+        # hervorgehoben, egal wo man war.
         indicator_state = "" if active else "opacity-0"
-        icon_color = "text-accent-tint" if active else "text-text-muted"
         return f"""
-    <button id="{id_val}" onclick="{onclick}" class="nav-item {('active' if active else '')} {theme.button_nav(active)}">
+    <button id="{id_val}" onclick="{onclick}" class="nav-item {('active' if active else '')} {theme.button_nav(False)}">
         <span class="nav-indicator absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[15px] bg-accent rounded-r-[2px] transition-opacity {indicator_state}"></span>
-        <span class="material-icons text-[19px] {icon_color} transition-colors" aria-hidden="true">{icon}</span>
+        <span class="material-icons text-[19px] text-text-muted transition-colors" aria-hidden="true">{icon}</span>
         <span class="truncate">{label}</span>
         <span id="count-{id_val.replace('m-', '')}" class="ml-auto text-[11px] text-text-muted font-mono"></span>
     </button>
@@ -169,20 +173,23 @@ def render_navigation(theme: BaseTheme) -> str:
 
     return f"""
 <nav class="{theme.sidebar_container}">
-    <div class="ds-eyebrow !text-[10px] px-2.5 mb-2">Workspace</div>
+    <div class="ds-eyebrow !text-[10px] px-2.5 mb-2">Mediathek</div>
 
     {nav_btn("m-home", "setWorkspaceMode('home')", "home", "Start", active=True)}
-    {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "dashboard", "Lobby")}
+    {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "video_library", "Bibliothek")}
     {nav_btn("m-favorites", "setWorkspaceMode('favorites')", "star", "Favoriten")}
+
+    <!-- Werkstatt: Aufräumen und Optimieren, getrennt vom Schauen -->
+    <div class="ds-eyebrow !text-[10px] px-2.5 mt-5 mb-2">Werkstatt</div>
     {nav_btn("m-optimized", "setWorkspaceMode('optimized')", "offline_bolt", "Review")}
-    {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplicates")}
+    {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplikate")}
     {nav_btn("m-candidates", "setWorkspaceMode('candidates')", "savings", "Kandidaten")}
 
     <!-- Smart Collections Section -->
     <div class="mt-6 pt-4 border-t border-line/60">
         <div class="flex items-center justify-between px-2.5 mb-2">
             <span class="ds-eyebrow !text-[10px]">Collections</span>
-            <button onclick="openCollectionModal()" class="text-text-muted hover:text-accent-tint transition-colors" title="New Collection">
+            <button onclick="openCollectionModal()" class="text-text-muted hover:text-accent-tint transition-colors" title="Neue Collection" aria-label="Neue Collection">
                 <span class="material-icons text-[16px]" aria-hidden="true">add</span>
             </button>
         </div>
@@ -192,7 +199,7 @@ def render_navigation(theme: BaseTheme) -> str:
     <div class="mt-auto pt-4 border-t border-line/60">
         <button onclick="openSettings()" class="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-md text-[13px] text-label hover:bg-[var(--ds-fill-soft)] hover:text-text-main transition-colors">
             <span class="material-icons text-[19px] text-text-muted" aria-hidden="true">settings</span>
-            <span>Settings</span>
+            <span>Einstellungen</span>
         </button>
     </div>
 </nav>
@@ -204,12 +211,12 @@ def render_navigation(theme: BaseTheme) -> str:
         <span class="text-[9px] font-medium">Start</span>
     </button>
     <button onclick="setWorkspaceMode('lobby')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
-        <span class="material-icons text-[22px]" aria-hidden="true">dashboard</span>
-        <span class="text-[9px] font-medium">Lobby</span>
+        <span class="material-icons text-[22px]" aria-hidden="true">video_library</span>
+        <span class="text-[9px] font-medium">Bibliothek</span>
     </button>
     <button onclick="setWorkspaceMode('favorites')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
         <span class="material-icons text-[22px]" aria-hidden="true">star</span>
-        <span class="text-[9px] font-medium">Favs</span>
+        <span class="text-[9px] font-medium">Favoriten</span>
     </button>
     <button onclick="setLayout('folderbrowser')" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
         <span class="material-icons text-[22px]" aria-hidden="true">folder</span>
@@ -221,7 +228,7 @@ def render_navigation(theme: BaseTheme) -> str:
     </button>
     <button onclick="document.getElementById('mobileSearchInput').focus()" class="flex flex-col items-center justify-center p-1 w-12 gap-1 text-text-muted active:text-accent-tint transition-colors">
         <span class="material-icons text-[22px]" aria-hidden="true">search</span>
-        <span class="text-[9px] font-medium">Search</span>
+        <span class="text-[9px] font-medium">Suche</span>
     </button>
 </nav>
 """

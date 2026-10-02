@@ -57,7 +57,11 @@ function openCinema(container) {
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
     const image = document.getElementById('cinemaImage');
-    document.getElementById('cinemaTitle').innerText = fileName;
+    const titleEl = document.getElementById('cinemaTitle');
+    if (titleEl) {
+        titleEl.innerText = typeof mediaTitle === 'function' ? mediaTitle(path) : fileName;
+        titleEl.title = fileName;
+    }
 
     const streamUrl = `/stream?path=` + encodeURIComponent(path);
 
@@ -451,12 +455,26 @@ function updateCinemaMeta() {
     const v = currentCinemaVideo;
     if (!v) { meta.textContent = ''; return; }
 
-    const parts = [];
-    if (v.Width && v.Height) parts.push(`${v.Width}x${v.Height}`);
-    if (v.codec) parts.push(String(v.codec).toUpperCase());
-    if (v.media_type === 'video' && v.Bitrate_Mbps) parts.push(`${v.Bitrate_Mbps.toFixed(1)} Mbps`);
-    else if (v.Size_MB) parts.push(`${v.Size_MB.toFixed(0)} MB`);
-    meta.textContent = parts.join('  ·  ');
+    const watch = [];
+    if (v.Duration_Sec) watch.push(formatDuration(v.Duration_Sec));
+    if (typeof entryDate === 'function' && entryDate(v)) {
+        watch.push(new Date(entryDate(v) * 1000).toLocaleDateString('de-DE',
+            {day: 'numeric', month: 'short', year: 'numeric'}));
+    }
+
+    const tech = [];
+    if (v.Width && v.Height) tech.push(`${v.Width}x${v.Height}`);
+    if (v.codec) tech.push(String(v.codec).toUpperCase());
+    if (v.media_type === 'video' && v.Bitrate_Mbps) tech.push(`${v.Bitrate_Mbps.toFixed(1)} Mbps`);
+    else if (v.Size_MB) tech.push(`${v.Size_MB.toFixed(0)} MB`);
+
+    // Technik nur mit „Details" bzw. in der Werkstatt (styles.css, SCHAU-MODUS)
+    const watchSpan = document.createElement('span');
+    watchSpan.textContent = watch.join('  ·  ');
+    const techSpan = document.createElement('span');
+    techSpan.className = 'tech-only';
+    techSpan.textContent = (watch.length && tech.length ? '  ·  ' : '') + tech.join('  ·  ');
+    meta.replaceChildren(watchSpan, techSpan);
 }
 
 /**
@@ -542,14 +560,14 @@ function cinemaKeyHandler(e) {
         if (video && !video.classList.contains('hidden')) {
             const wasPaused = video.paused;
             cinemaTogglePlay();
-            showCinemaToast(wasPaused ? '▶ Play' : '⏸ Pause');
+            showCinemaToast(wasPaused ? '▶ Wiedergabe' : '⏸ Pause');
         }
 
     } else if (key === 'f') {
         e.preventDefault();
         if (currentCinemaPath) {
             cinemaFavorite();
-            showCinemaToast('Favorite toggled');
+            showCinemaToast('Favorit geändert');
         }
 
     } else if (key === 'g') {
@@ -557,7 +575,7 @@ function cinemaKeyHandler(e) {
         e.preventDefault();
         if (typeof cinemaExportGif === 'function') {
             cinemaExportGif();
-            showCinemaToast('GIF Export [G]');
+            showCinemaToast('GIF-Export [G]');
         }
 
     } else if (key === 'o') {

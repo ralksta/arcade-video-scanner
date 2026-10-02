@@ -157,9 +157,9 @@ def generate_html_report(report_file, server_port=8000):
     if config.optimizer_available and config.settings.enable_optimizer:
         # Die einzige Primaeraktion der Rail — traegt als einzige den Accent.
         opt_btn_html = """
-        <button class="cinema-rail-btn is-primary" onclick="cinemaOptimize()" title="Optimize Video [O]" aria-label="Optimize this video">
+        <button class="tech-only cinema-rail-btn is-primary" onclick="cinemaOptimize()" title="Video optimieren [O]" aria-label="Dieses Video optimieren">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">bolt</span></span>
-            <span class="cinema-rail-label">Optimize</span>
+            <span class="cinema-rail-label">Optimieren</span>
         </button>
         """
 
@@ -187,7 +187,7 @@ def generate_html_report(report_file, server_port=8000):
         {FOLDER_BROWSER_LEGEND_COMPONENT}
 
         <!-- Quick Stats Ribbon -->
-        <div id="quickStatsRibbon"
+        <div id="quickStatsRibbon" class="tech-only"
              style="display:none;align-items:center;gap:8px;flex-wrap:wrap;
                     padding:6px 16px;font-size:12px;
                     border-bottom:1px solid var(--surface-border, rgba(0,0,0,.08));
