@@ -1,32 +1,46 @@
 import React, {useState, useCallback, useEffect, useRef} from 'react';
-import {serverUrl} from '../serverConfig';
+import {serverUrl, posterUrl} from '../serverConfig';
 import {getItem} from '../safeStorage';
 import displayName from '../displayName';
 import {getProgress, saveProgress} from '../watchProgress';
 import ThemeDecorator from '@enact/limestone/ThemeDecorator';
-import Panels, {Panel} from '@enact/limestone/Panels';
+import Panels from '@enact/limestone/Panels';
 import VideoPlayer, {Video} from '@enact/limestone/VideoPlayer';
+import Spotlight from '@enact/spotlight';
+import SpotlightContainerDecorator from '@enact/spotlight/SpotlightContainerDecorator';
 
 import MainPanel from '../views/MainPanel';
 import LoginPanel from '../views/LoginPanel';
 import css from './App.module.less';
 
+// Der Player liegt als Ebene über der Hauptansicht, nicht als eigenes Panel:
+// Limestones Panels halten nur das aktive Panel im Speicher. Nach jedem
+// Video baute sich die Hauptansicht neu auf — zurück auf Home, Position weg,
+// die ganze Bibliothek neu geladen. Der Fokus bleibt in der Ebene.
+const PlayerLayer = SpotlightContainerDecorator({restrict: 'self-only'}, 'div');
+
+const MAIN = 0;
+const LOGIN = 1;
+
 const App = (props) => {
 	const existingToken = getItem('arcade_session_token');
 
-	// Starte direkt auf LoginPanel (index 2) wenn kein Token vorhanden
-	const [panelIndex, setPanelIndex] = useState(existingToken ? 0 : 2);
+	// Ohne Token direkt zum Login
+	const [panelIndex, setPanelIndex] = useState(existingToken ? MAIN : LOGIN);
 	const [activeVideo, setActiveVideo] = useState(null);
+	// Zählt hoch, wenn die Bibliothek neu geladen werden soll (App kehrt aus
+	// dem Hintergrund zurück).
+	const [reloadKey, setReloadKey] = useState(0);
 
-	// Ref damit der Back-Handler immer den aktuellen panelIndex sieht
-	// ohne bei jeder Änderung neu registriert zu werden
-	const panelIndexRef = useRef(panelIndex);
-	// Der Back-Handler wird einmal registriert; über die Ref sieht er immer
-	// die aktuelle Sicherungsfunktion.
+	// Ref, damit der Back-Handler den aktuellen Player sieht, ohne bei jeder
+	// Änderung neu registriert zu werden; ebenso die Sicherungsfunktion.
+	const activeVideoRef = useRef(null);
 	const saveRef = useRef(() => {});
+	// Kachel, von der aus abgespielt wurde — bekommt danach den Fokus zurück.
+	const returnFocusRef = useRef(null);
 	useEffect(() => {
-		panelIndexRef.current = panelIndex;
-	}, [panelIndex]);
+		activeVideoRef.current = activeVideo;
+	}, [activeVideo]);
 
 	// Wiedergabe: Position merken und dort fortsetzen („Weiterschauen“).
 	const playerRef = useRef(null);
@@ -40,8 +54,8 @@ const App = (props) => {
 	const handleSelectVideo = useCallback((video, options = {}) => {
 		lastSavedRef.current = 0;
 		pendingResumeRef.current = options.fromStart ? 0 : getProgress(video.FilePath);
+		returnFocusRef.current = options.returnFocus || Spotlight.getCurrent();
 		setActiveVideo(video);
-		setPanelIndex(1);
 	}, []);
 
 	const savePosition = useCallback(() => {
@@ -73,70 +87,97 @@ const App = (props) => {
 		savePosition();
 	}, [savePosition]);
 
-	const handleClosePlayer = useCallback(() => {
-		savePosition();
+	// Player schließen: Position sichern, „Weiterschauen“ auffrischen, Fokus
+	// zurück auf die Kachel, von der aus gestartet wurde.
+	const closePlayer = useCallback(() => {
+		saveRef.current();
 		setProgressVersion(v => v + 1);
-		setPanelIndex(0);
+		setActiveVideo(null);
+		const target = returnFocusRef.current;
+		returnFocusRef.current = null;
 		setTimeout(() => {
-			setActiveVideo(null);
-		}, 400);
-	}, [savePosition]);
+			if (target && document.body.contains(target)) Spotlight.focus(target);
+		}, 0);
+	}, []);
 
 	const handleAuthFailed = useCallback(() => {
-		setPanelIndex(2);
+		setActiveVideo(null);
+		setPanelIndex(LOGIN);
 	}, []);
 
 	const handleLoginSuccess = useCallback(() => {
-		setPanelIndex(0);
+		setPanelIndex(MAIN);
+		setReloadKey(k => k + 1);
 	}, []);
 
-	// Back-Taste (webOS: 461, ESC: 27) global auf document abfangen
-	// capture: true + stopImmediatePropagation verhindert dass VideoPlayer/Panels
-	// das Event zuerst sehen und die "App beenden"-Frage triggern
+	// Back-Taste (webOS: 461, ESC: 27) bei offenem Player: zurück zur
+	// Übersicht, nicht „App beenden“. Auf window und im Capture — das läuft vor
+	// den Document-Listenern der Hauptansicht (Detailansicht, Collection),
+	// sonst schlösse dieselbe Taste dahinter noch eine Collection.
 	useEffect(() => {
 		const handleBackKey = (ev) => {
 			if (ev.keyCode !== 461 && ev.keyCode !== 27) return;
-
-			const current = panelIndexRef.current;
-			if (current === 1) {
-				// Im VideoPlayer → zurück zum Grid, NICHT App beenden
-				ev.preventDefault();
-				ev.stopImmediatePropagation();
-				saveRef.current();
-				setProgressVersion(v => v + 1);
-				setPanelIndex(0);
-				setTimeout(() => setActiveVideo(null), 400);
-			}
-			// panelIndex 0 (Grid) oder 2 (Login) → Back-Taste normal durchlassen
+			if (!activeVideoRef.current) return;
+			ev.preventDefault();
+			ev.stopImmediatePropagation();
+			closePlayer();
 		};
+		window.addEventListener('keydown', handleBackKey, {capture: true});
+		return () => window.removeEventListener('keydown', handleBackKey, {capture: true});
+	}, [closePlayer]);
 
-		document.addEventListener('keydown', handleBackKey, {capture: true});
-		return () => document.removeEventListener('keydown', handleBackKey, {capture: true});
-	}, []); // Leere Deps — einmalig registrieren, Ref liest immer aktuellen Wert
+	// Zurück aus dem Hintergrund (Home-Taste, anderes Programm): Bibliothek
+	// neu laden. Startet der Server zwischendurch neu, verfällt die Sitzung —
+	// so landet man am Login statt vor Kacheln ohne Bilder.
+	useEffect(() => {
+		let hiddenAt = 0;
+		const onVisibility = () => {
+			if (document.hidden) {
+				hiddenAt = Date.now();
+			} else if (hiddenAt && Date.now() - hiddenAt > 60000 && !activeVideoRef.current) {
+				setReloadKey(k => k + 1);
+			}
+		};
+		const onRelaunch = () => {
+			if (!activeVideoRef.current) setReloadKey(k => k + 1);
+		};
+		document.addEventListener('visibilitychange', onVisibility);
+		document.addEventListener('webOSRelaunch', onRelaunch);
+		return () => {
+			document.removeEventListener('visibilitychange', onVisibility);
+			document.removeEventListener('webOSRelaunch', onRelaunch);
+		};
+	}, []);
 
 	const sessionToken = getItem('arcade_session_token', '');
 
 	return (
 		<div {...props} className={css.app}>
 			<Panels index={panelIndex} noCloseButton>
-				<MainPanel onSelectVideo={handleSelectVideo} onAuthFailed={handleAuthFailed} progressVersion={progressVersion} />
-				<Panel>
-					{activeVideo && (
-						<VideoPlayer
-							ref={playerRef}
-							title={displayName(activeVideo)}
-							onBack={handleClosePlayer}
-							onTimeUpdate={handleTimeUpdate}
-							autoCloseTimeout={3000}
-						>
-							<Video>
-								<source src={serverUrl(`/stream?path=${encodeURIComponent(activeVideo.FilePath)}&token=${encodeURIComponent(sessionToken || '')}`)} />
-							</Video>
-						</VideoPlayer>
-					)}
-				</Panel>
+				<MainPanel
+					key={reloadKey}
+					onSelectVideo={handleSelectVideo}
+					onAuthFailed={handleAuthFailed}
+					progressVersion={progressVersion}
+				/>
 				<LoginPanel onLoginSuccess={handleLoginSuccess} />
 			</Panels>
+			{activeVideo && panelIndex === MAIN ? (
+				<PlayerLayer className={css.player} spotlightId="player-layer">
+					<VideoPlayer
+						ref={playerRef}
+						title={displayName(activeVideo)}
+						poster={posterUrl(activeVideo.FilePath)}
+						onBack={closePlayer}
+						onTimeUpdate={handleTimeUpdate}
+						autoCloseTimeout={3000}
+					>
+						<Video>
+							<source src={serverUrl(`/stream?path=${encodeURIComponent(activeVideo.FilePath)}&token=${encodeURIComponent(sessionToken || '')}`)} />
+						</Video>
+					</VideoPlayer>
+				</PlayerLayer>
+			) : null}
 		</div>
 	);
 };
