@@ -1,4 +1,4 @@
-# Arcade Media Scanner 7.0.0
+# Arcade Media Scanner 7.1.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -11,7 +11,46 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 
 ---
 
-## 🚀 Version 7.0.0 Highlights (New!)
+## 🚀 Version 7.1.0 Highlights (New!)
+
+This release brings the trash can, a search language with suggestions, a
+roomier collection dialog, and a calmer library grid.
+
+### 🗑️ Trash with 30-day restore
+- **Nothing is final immediately.** Explicit deletions from duplicates and
+  multi-selection move the file into a hidden `.arcade-trash` folder inside
+  the matching scan target (same disk, so it is a rename).
+- **Restore or empty** under Settings → Storage. Favorites, tags and watch
+  progress survive the retention period; expired entries are cleaned up at
+  startup and when the trash is opened.
+
+### 🔎 Search language and suggestions
+- **More than a substring.** Multiple terms must all match, `-word` excludes,
+  quotes keep phrases together, `#tag` searches tags. Multiple paths are
+  OR-linked; `*` works inside paths, and matching respects folder boundaries.
+- **Suggestions while typing** include known folders, parent paths with their
+  file counts, recent searches, and tags. Chips in the collection dialog show
+  what is included or excluded, with a one-click "all N include/exclude".
+
+### 🎨 Calmer library
+- **Watch mode** shows image, title, duration and progress. A quiet line under
+  the title carries size and bitrate; path, codec and the bitrate bar stay
+  behind "Details".
+- **Sorting in both directions** for name (A–Z/Z–A), bitrate, size, runtime
+  and date. Existing saved views keep their stored sort values.
+- **The collection dialog** is wide, two-column on desktop, with the search
+  field and grouped suggestions at the top.
+
+### 💬 Confirmation dialogs in the design
+- Trash confirmations are styled dialogs instead of browser windows. They
+  list the affected filenames, focus "Cancel" by default, close on Escape or
+  a backdrop click, and trap focus.
+
+📖 **[Full CHANGELOG →](CHANGELOG.md)**
+
+---
+
+## 🚀 Version 7.0.0 Highlights
 
 This release adds **AV1 Encoding Support** (powered by FFmpeg 8.1) and a **Smart SSIM Skip Optimization** for faster video processing.
 

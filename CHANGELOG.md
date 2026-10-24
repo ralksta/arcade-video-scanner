@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-10-24
+
 ### Added
 - **Suchbegriffe mit mehr Funktionen.** Die Suchfelder in der Filterleiste
   und im Collection-Dialog schlagen beim Tippen bekannte Ordner vor —
@@ -39,6 +41,14 @@ All notable changes to this project will be documented in this file.
   automatisch ausgeschlossen.
 
 ### Changed
+- **Sortierung in beide Richtungen.** Das Auswahlfeld bietet jetzt Name A–Z
+  und Z–A, Bitrate und Größe jeweils von klein nach groß und von groß nach
+  klein sowie Laufzeit und Datum in beide Richtungen. Die bisherigen
+  Sortierwerte bleiben gültig, gespeicherte Ansichten brechen nicht.
+- **Kacheln zeigen Größe und Bitrate.** Eine leise Zeile unter dem Titel
+  nennt die Dateigröße und, bei Videos, die Bitrate. Die Länge bleibt das
+  Badge auf dem Vorschaubild; Pfad, Codec und Bitrate-Balken bleiben unter
+  „Details“.
 - **Collection-Dialog mit Platz.** Der Dialog ist jetzt breit (zwei Spalten
   auf dem Desktop, volle Höhe) statt eines schmalen Fensters mit
   zugeklappten Akkordeons. Der Suchbegriff steht oben und hat eine große
@@ -64,6 +74,10 @@ All notable changes to this project will be documented in this file.
   mehr nach Bitrate.
 
 ### Fixed (Oberfläche)
+- **Papierkorb-Rückfragen im Design.** Löschen und endgültiges Leeren fragen
+  nicht mehr mit dem Browser-Dialog, sondern mit einem gestylten Dialog.
+  Dateinamen stehen als Liste darin, „Abbrechen“ ist vorausgewählt, Escape
+  und ein Klick auf den Hintergrund schließen ihn.
 - In der Seitenleiste blieb der erste Eintrag hervorgehoben, egal welche
   Ansicht offen war.
 - Auf dem Handy lag das Sortier-Icon auf dem Text, und die Anmeldekarte
@@ -870,6 +884,18 @@ All notable changes to this project will be documented in this file.
 - **Browser Caching**: Thumbnails are cached for 7 days (`Cache-Control: public, max-age=604800`); static assets and the dashboard revalidate via `If-Modified-Since` and get cheap `304 Not Modified` answers instead of full re-downloads.
 - **Zero-Copy Streaming**: Video streaming uses kernel `sendfile()` (with automatic fallback for SSL and 1 MB chunks instead of 64 KB), plus support for suffix ranges (`bytes=-N`) and correct clamping of over-long ranges.
 - **Connection Hygiene**: Idle keep-alive connections time out after 60s; handler threads are daemonized so open connections never block shutdown.
+
+## [7.0.0] - 2026-03-17
+
+### Added
+- **AV1-Encoding (experimentell).** Optional zusätzlich zu HEVC, mit
+  Hardware-Unterstützung (`av1_videotoolbox` auf Apple M3/M4 und
+  `av1_nvenc` auf NVIDIA RTX 40xx) und automatischem Rückfall auf HEVC.
+  Die Codec-Wahl wird pro Auftrag in der Encoding-Queue gespeichert und ist
+  im Optimize-Panel umschaltbar.
+- **Smart SSIM Skip.** Die SSIM-Prüfung entfällt, wenn ein Durchlauf weniger
+  als 10 % Einsparung verspricht; der Optimierer geht direkt zum nächsten
+  Qualitätslevel.
 
 ## [6.8.0] - 2026-01-18
 
