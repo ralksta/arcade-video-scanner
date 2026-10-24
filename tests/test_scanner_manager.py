@@ -16,7 +16,7 @@ import pytest
 
 from arcade_scanner.models.media_asset import MediaAsset, MediaType, VideoMetadata
 from arcade_scanner.models.video_entry import VideoEntry
-from arcade_scanner.scanner.manager import ScannerManager
+from arcade_scanner.scanner.manager import ScannerManager, _scan_flags
 
 # ---------------------------------------------------------------------------
 # Doubles
@@ -104,6 +104,36 @@ def make_config(targets=(EXISTING_DIR,), **overrides):
     for key, value in overrides.items():
         setattr(cfg.settings, key, value)
     return cfg
+
+
+# ---------------------------------------------------------------------------
+# Scan flags
+# ---------------------------------------------------------------------------
+
+def _user(scan_images=False, scan_raw=False):
+    user = MagicMock()
+    user.data.scan_images = scan_images
+    user.data.scan_raw = scan_raw
+    return user
+
+
+def test_scan_flags_default_to_off():
+    user_db = MagicMock()
+    user_db.get_all_users.return_value = [_user()]
+    assert _scan_flags(user_db) == (False, False)
+
+
+def test_scan_flags_enable_raw_from_any_account():
+    user_db = MagicMock()
+    user_db.get_all_users.return_value = [_user(), _user(scan_raw=True)]
+    assert _scan_flags(user_db) == (False, True)
+
+
+def test_scan_flags_enable_both_independently():
+    user_db = MagicMock()
+    user_db.get_all_users.return_value = [
+        _user(scan_images=True), _user(scan_raw=True)]
+    assert _scan_flags(user_db) == (True, True)
 
 
 def run_scan(manager, fake_db, fake_scanner, cfg, stat_size=100.0, stat_mtime=1000,

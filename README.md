@@ -1,4 +1,4 @@
-# Arcade Media Scanner 7.1.0
+# Arcade Media Scanner 7.2.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
@@ -11,7 +11,25 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 
 ---
 
-## 🚀 Version 7.1.0 Highlights (New!)
+## 🚀 Version 7.2.0 Highlights (New!)
+
+### 📷 RAW photos
+- **Separate switch.** "RAW-Fotos" enables CR2, CR3, NEF, ARW, DNG, RAF, ORF,
+  RW2, PEF, SRW, RAW and RWL without pulling in JPG/PNG.
+- **Pillow only.** Metadata and previews come from the embedded JPEG:
+  TIFF-based files directly, RAF via its header, otherwise the largest
+  embedded JPEG. EXIF orientation is applied.
+- **Previews without ffmpeg.** Thumbnails are 480×270, posters 1280×720,
+  written from the embedded image.
+- **One extension list.** Walker, inspector and thumbnailer share
+  `core/media_extensions.py`, so RAW can no longer be known to one and
+  invisible to the other.
+
+📖 **[Full CHANGELOG →](CHANGELOG.md)**
+
+---
+
+## 🚀 Version 7.1.0 Highlights
 
 This release brings the trash can, a search language with suggestions, a
 roomier collection dialog, and a calmer library grid.

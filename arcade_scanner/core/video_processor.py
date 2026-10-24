@@ -1,12 +1,15 @@
+import contextlib
 import hashlib
 import json
 import logging
 import os
 import subprocess
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from arcade_scanner.config import config
+
+from . import media_extensions
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +19,7 @@ logger = logging.getLogger(__name__)
 THUMB_STALE_TOLERANCE_SEC = 2.0
 
 # Module-level constants (not recreated on every call)
-IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif'})
+IMAGE_EXTENSIONS = media_extensions.ALL_IMAGE_EXTENSIONS
 
 
 def get_video_metadata(filepath: str) -> Dict[str, Any]:
@@ -104,11 +107,37 @@ def _thumbnail_needs_rebuild(thumb_path: str, video_path: str) -> bool:
         return not os.path.exists(thumb_path)
 
 
+def _write_raw_preview(raw_path: str, out_path: str, size: Tuple[int, int],
+                       quality: int = 85) -> bool:
+    """RAW-Vorschau mit Pillow als JPEG schreiben. ffmpeg dekodiert RAW nicht."""
+    try:
+        from PIL import ImageOps
+
+        from . import raw_preview
+
+        preview = raw_preview.open_raw_preview(raw_path)
+        if preview is None:
+            logger.warning("No RAW preview for %s", raw_path)
+            return False
+        try:
+            fitted = ImageOps.pad(preview.convert("RGB"), size, color="black")
+            fitted.save(out_path, format="JPEG", quality=quality)
+        finally:
+            preview.close()
+        return os.path.exists(out_path) and os.path.getsize(out_path) > 0
+    except Exception as e:
+        logger.warning("RAW preview failed for %s: %s", raw_path, e)
+        return False
+
+
 def _render_thumbnail(video_path: str, out_path: str, duration: Optional[float]) -> bool:
     """Lässt ffmpeg das Vorschaubild nach `out_path` schreiben. True bei Erfolg."""
     print(f"🖼️  Generating thumbnail: {os.path.basename(video_path)}")
+    ext = os.path.splitext(video_path)[1].lower()
+    if ext in media_extensions.RAW_EXTENSIONS:
+        return _write_raw_preview(video_path, out_path, (480, 270))
     # Check if image (Image processing without seeking)
-    is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
+    is_image = ext in IMAGE_EXTENSIONS
 
     if is_image:
          vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
@@ -235,8 +264,25 @@ def create_poster(video_path: str, duration: Optional[float] = None) -> str:
     if not _thumbnail_needs_rebuild(out_path, video_path):
         return out_path
 
+    ext = os.path.splitext(video_path)[1].lower()
+    if ext in media_extensions.RAW_EXTENSIONS:
+        os.makedirs(config.thumb_dir, exist_ok=True)
+        tmp_path = os.path.join(
+            config.thumb_dir,
+            f".tmp-{uuid.uuid4().hex[:8]}-{os.path.basename(out_path)}")
+        try:
+            if _write_raw_preview(video_path, tmp_path,
+                                  (POSTER_MAX_W, POSTER_MAX_H), quality=88):
+                os.replace(tmp_path, out_path)
+                return out_path
+        finally:
+            with contextlib.suppress(OSError):
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+        return ""
+
     vf = (f"scale={POSTER_MAX_W}:{POSTER_MAX_H}:force_original_aspect_ratio=decrease")
-    is_image = os.path.splitext(video_path)[1].lower() in IMAGE_EXTENSIONS
+    is_image = ext in IMAGE_EXTENSIONS
     if is_image:
         seek: List[str] = []
     else:

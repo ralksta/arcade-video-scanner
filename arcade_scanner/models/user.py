@@ -101,6 +101,7 @@ class UserVideoData(BaseModel):
     scan_targets: List[str] = Field(default_factory=list, description="User specific scan directories")
     exclude_paths: List[str] = Field(default_factory=list, description="User specific exclusion patterns")
     scan_images: bool = Field(False, description="Enable scanning of image files (jpg, png, etc.)")
+    scan_raw: bool = Field(False, description="Enable scanning of RAW camera files (cr2, raf, dng, ...)")
 
     # Setup Status
     setup_complete: bool = Field(True, description="Whether first-run setup wizard has been completed")

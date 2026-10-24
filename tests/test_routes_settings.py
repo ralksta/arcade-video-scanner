@@ -97,6 +97,27 @@ def test_get_settings_merges_user_fields_for_session():
     assert h.body()["smart_collections"] == [{"id": "c1"}]
 
 
+def test_get_settings_exposes_raw_scanning_flag():
+    h = FakeHandler("/api/settings")
+    singletons = _singletons()
+    singletons[1].get_user.return_value.data.scan_raw = True
+    handled, _ = run(h, singletons)
+    assert handled is True
+    assert h.body()["enable_raw_scanning"] is True
+
+
+def test_post_settings_stores_scan_raw_in_the_user_record():
+    """RAW-Scan ist ein Konto-Feld, kein globaler Schlüssel."""
+    h = FakeHandler("/api/settings", user="kim", body={"enable_raw_scanning": True})
+    singletons = _as(is_admin=False)
+    run(h, singletons, post=True)
+    config, user_db = singletons[0], singletons[1]
+    saved = config.save.call_args[0][0]
+    assert "scan_raw" not in saved
+    assert "enable_raw_scanning" not in saved
+    assert user_db.get_user.return_value.data.scan_raw is True
+
+
 def test_search_history_is_per_account():
     """Der Verlauf gehört ins Nutzerkonto, nicht in localStorage.
 

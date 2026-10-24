@@ -62,6 +62,7 @@ def handle_get_settings(handler) -> None:
             settings_dump["available_tags"]       = u.data.available_tags
             # User-specific overrides
             settings_dump["enable_image_scanning"] = getattr(u.data, "scan_images", False)
+            settings_dump["enable_raw_scanning"] = getattr(u.data, "scan_raw", False)
             settings_dump["sensitive_dirs"]        = u.data.sensitive_dirs
             settings_dump["sensitive_tags"]        = u.data.sensitive_tags
             settings_dump["sensitive_collections"] = u.data.sensitive_collections
@@ -73,6 +74,7 @@ def handle_get_settings(handler) -> None:
             settings_dump["exclude_paths"]         = []
             settings_dump["available_tags"]        = []
             settings_dump["enable_image_scanning"] = False
+            settings_dump["enable_raw_scanning"]   = False
     else:
         settings_dump["smart_collections"] = []
         settings_dump["scan_targets"]      = []
@@ -168,6 +170,10 @@ def handle_post_settings(handler) -> None:
         if user_scan_images is None:
             user_scan_images = new_settings.pop("enable_image_scanning", None)
 
+        user_scan_raw = new_settings.pop("scan_raw", None)
+        if user_scan_raw is None:
+            user_scan_raw = new_settings.pop("enable_raw_scanning", None)
+
         user_sensitive_dirs        = new_settings.pop("sensitive_dirs", None)
         user_sensitive_tags        = new_settings.pop("sensitive_tags", None)
         user_sensitive_collections = new_settings.pop("sensitive_collections", None)
@@ -197,6 +203,7 @@ def handle_post_settings(handler) -> None:
                     "exclude_paths": user_excludes,
                     "available_tags": user_tags,
                     "scan_images": user_scan_images,
+                    "scan_raw": user_scan_raw,
                     "sensitive_dirs": user_sensitive_dirs,
                     "sensitive_tags": user_sensitive_tags,
                     "sensitive_collections": user_sensitive_collections,

@@ -3,6 +3,7 @@ import os
 import shutil
 from typing import Dict, Optional
 
+from ..core import media_extensions, raw_preview
 from ..models.media_asset import ImageMetadata, MediaAsset, MediaType
 from .inspector import MediaInspector
 
@@ -25,23 +26,7 @@ class ImageInspector(MediaInspector):
     SIPS_TIMEOUT_SEC = 30.0
 
     def __init__(self):
-        self.IMAGE_EXTENSIONS = (
-            # Standard formats
-            '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif',
-            # RAW formats
-            '.cr2',   # Canon RAW
-            '.cr3',   # Canon RAW (newer)
-            '.nef',   # Nikon RAW
-            '.arw',   # Sony RAW
-            '.dng',   # Adobe Digital Negative (universal RAW)
-            '.raf',   # Fujifilm RAW
-            '.orf',   # Olympus RAW
-            '.rw2',   # Panasonic RAW
-            '.pef',   # Pentax RAW
-            '.srw',   # Samsung RAW
-            '.raw',   # Generic RAW
-            '.rwl'    # Leica RAW
-        )
+        self.IMAGE_EXTENSIONS = media_extensions.ALL_IMAGE_EXTENSIONS
         self.has_sips = shutil.which('sips') is not None
 
         # Batch queue for sips calls
@@ -257,19 +242,37 @@ class ImageInspector(MediaInspector):
         """
         Fallback for non-macOS environments (Docker/Linux).
         Uses Pillow (PIL) for cross-platform image inspection.
+
+        RAW: Pillow liest TIFF-basierte Formate (CR2/DNG) direkt. Für RAF und
+        andere Formate kommt die eingebettete JPEG-Vorschau zum Zug; gemeldet
+        wird die Endung, nicht Pillows Container-Name.
         """
         try:
             from PIL import Image
 
+            is_raw = os.path.splitext(filepath)[1].lower() in media_extensions.RAW_EXTENSIONS
             loop = asyncio.get_event_loop()
 
             def _load_image():
-                with Image.open(filepath) as img:
-                    width, height = img.size
-                    fmt = img.format or 'unknown'
-                    return width, height, fmt
+                try:
+                    with Image.open(filepath) as img:
+                        width, height = img.size
+                        fmt = img.format or 'unknown'
+                        return width, height, fmt
+                except Exception:
+                    if not is_raw:
+                        raise
+                    preview = raw_preview.open_raw_preview(filepath)
+                    if preview is None:
+                        raise
+                    try:
+                        return preview.width, preview.height, 'raw'
+                    finally:
+                        preview.close()
 
             width, height, fmt = await loop.run_in_executor(None, _load_image)
+            if is_raw:
+                fmt = os.path.splitext(filepath)[1].lstrip('.').lower()
 
             i_meta = ImageMetadata(
                 width=width,

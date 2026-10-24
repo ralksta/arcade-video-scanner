@@ -89,6 +89,29 @@ class TestIsVideo:
         fs.allow_images = True
         assert fs._is_video(name) is True
 
+    def test_raw_is_rejected_until_allow_raw_is_set(self, fs):
+        assert fs._is_video("photo.cr2") is False
+        fs.allow_raw = True
+        assert fs._is_video("photo.cr2") is True
+
+    @pytest.mark.parametrize("name", [
+        "p.cr2", "p.cr3", "p.nef", "p.arw", "p.dng", "p.raf",
+        "p.orf", "p.rw2", "p.pef", "p.srw", "p.raw", "p.rwl",
+    ])
+    def test_raw_extensions_when_enabled(self, fs, name):
+        fs.allow_raw = True
+        assert fs._is_video(name) is True
+
+    def test_image_and_raw_toggles_are_independent(self, fs):
+        fs.allow_images = True
+        assert fs._is_video("photo.jpg") is True
+        assert fs._is_video("photo.cr2") is False
+
+        fs.allow_images = False
+        fs.allow_raw = True
+        assert fs._is_video("photo.jpg") is False
+        assert fs._is_video("photo.cr2") is True
+
 
 # ---------------------------------------------------------------------------
 # _is_valid_size
@@ -113,6 +136,15 @@ class TestIsValidSize:
         fs._load_settings()
         small = write_file(tmp_path / "small.jpg", 1024)
         big = write_file(tmp_path / "big.jpg", 4096)
+        assert fs._is_valid_size(str(small)) is False
+        assert fs._is_valid_size(str(big)) is True
+
+    def test_raw_uses_the_kilobyte_threshold(self, fs, fake_config, tmp_path):
+        fake_config.settings.min_size_mb = 100  # would reject everything
+        fake_config.settings.min_image_size_kb = 2
+        fs._load_settings()
+        small = write_file(tmp_path / "small.cr2", 1024)
+        big = write_file(tmp_path / "big.cr2", 4096)
         assert fs._is_valid_size(str(small)) is False
         assert fs._is_valid_size(str(big)) is True
 
@@ -278,6 +310,20 @@ class TestScanDirectories:
 
         fs.allow_images = True
         assert names(collect(fs, [str(tmp_path)])) == ["a.mp4", "photo.jpg"]
+
+    def test_raw_is_excluded_unless_allow_raw_is_set(self, fs, fake_config, tmp_path):
+        write_file(tmp_path / "a.mp4")
+        write_file(tmp_path / "photo.cr2")
+        write_file(tmp_path / "photo.jpg")
+
+        assert names(collect(fs, [str(tmp_path)])) == ["a.mp4"]
+
+        fs.allow_raw = True
+        assert names(collect(fs, [str(tmp_path)])) == ["a.mp4", "photo.cr2"]
+
+        fs.allow_images = True
+        assert names(collect(fs, [str(tmp_path)])) == [
+            "a.mp4", "photo.cr2", "photo.jpg"]
 
     def test_resource_forks_are_not_yielded(self, fs, fake_config, tmp_path):
         write_file(tmp_path / "a.mp4")
