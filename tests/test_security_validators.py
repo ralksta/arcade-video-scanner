@@ -233,3 +233,39 @@ class TestIsPathAllowed:
         d = tmp_path / "media"
         d.mkdir()
         assert not is_path_allowed("", allowed_dirs=[str(d)])
+
+    def test_rejects_a_sibling_directory_with_a_shared_prefix(self, tmp_path):
+        """
+        Der Vergleich muss auf einer Verzeichnisgrenze enden.
+
+        Vorher war es ein reines `startswith()`, und damit galt `/media` als
+        Erlaubnis für `/media_nas` und `/media_ralf` — kein erfundenes
+        Beispiel, sondern genau die Scan-Ziele dieser Installation.
+
+        Unauffällig blieb es, weil bislang **kein einziger** Aufruf eigene
+        Verzeichnisse übergibt: Die Vorgabe ist die Vereinigung der Ziele aller
+        Nutzer, und darin waren alle drei ohnehin enthalten. Erst als die
+        Duplikat-Löschung anfing, einzelne Nutzer einzuschränken, entschied
+        diese Zeile über etwas.
+        """
+        allowed = tmp_path / "media"
+        allowed.mkdir()
+        sibling = tmp_path / "media_nas"
+        sibling.mkdir()
+        f = sibling / "video.mp4"
+        f.write_bytes(b"\x00")
+
+        assert not is_path_allowed(str(f), allowed_dirs=[str(allowed)])
+
+    def test_allows_the_allowed_directory_itself(self, tmp_path):
+        d = tmp_path / "media"
+        d.mkdir()
+        assert is_path_allowed(str(d), allowed_dirs=[str(d)])
+
+    def test_a_trailing_separator_in_the_whitelist_changes_nothing(self, tmp_path):
+        d = tmp_path / "media"
+        d.mkdir()
+        f = d / "video.mp4"
+        f.write_bytes(b"\x00")
+
+        assert is_path_allowed(str(f), allowed_dirs=[str(d) + os.sep])

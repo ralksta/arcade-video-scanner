@@ -59,6 +59,7 @@ function openCinema(container) {
     const sourceMsg = document.getElementById('cinemaSourceMessage');
 
     // Reset visibility
+    hideCinemaPlaybackError();
     video.classList.add('hidden');
     if (image) image.classList.add('hidden');
     if (sourceMsg) {
@@ -100,14 +101,18 @@ function openCinema(container) {
         video.src = streamUrl;
         video.load();
         video.play().catch(() => {
+            // Der übliche Grund ist die Autoplay-Sperre des Browsers: stumm
+            // geht es dann doch. Scheitert auch das, liegt es nicht am Ton —
+            // dann übernimmt der error-Handler am Element.
             video.muted = true;
-            video.play();
+            video.play().catch(() => {});
         });
     }
 
     modal.classList.add('active');
 
     // Update UI components
+    initCinemaErrorReporting();
     initCinemaTransport();
     updateCinemaMeta();
     updateCinemaTransport();
@@ -125,6 +130,81 @@ function openCinema(container) {
     if (modal) {
         modal.tabIndex = -1;
         modal.focus();
+    }
+}
+
+/**
+ * Sagt, warum gerade nichts abspielt.
+ *
+ * Bisher gab es dafür gar nichts: Weder `<video>` noch `<img>` hatten einen
+ * error-Handler. Ist die Datei verschoben, gelöscht oder das Laufwerk nicht
+ * eingehängt, öffnete sich der Wiedergabe-Dialog mit einem schwarzen Bild und
+ * schwieg. Genau der Fall, in dem der Nutzer das Programm für kaputt hält.
+ *
+ * Der Grund wird nachgeschlagen statt geraten: Ein HEAD auf dieselbe Adresse
+ * unterscheidet „Datei nicht da" (404) von „Server sagt nein" (403) und von
+ * allem anderen — etwa einem Codec, den der Browser nicht kann.
+ */
+function showCinemaPlaybackError(path) {
+    const box = document.getElementById('cinemaPlaybackError');
+    const text = document.getElementById('cinemaPlaybackErrorText');
+    const pathBox = document.getElementById('cinemaPlaybackErrorPath');
+    if (!box || !text || !pathBox) return;
+
+    text.textContent = 'The file could not be played.';
+    pathBox.textContent = path || '';
+    box.classList.remove('hidden');
+    box.classList.add('flex');
+
+    if (!path) return;
+
+    fetch('/stream?path=' + encodeURIComponent(path), { method: 'HEAD' })
+        .then(response => {
+            if (response.status === 404) {
+                text.textContent = 'This file is no longer where the library '
+                    + 'expects it. It may have been moved, renamed or deleted — '
+                    + 'or its drive is not mounted right now.';
+            } else if (response.status === 403) {
+                text.textContent = 'The server refused access to this path.';
+            } else if (response.ok) {
+                text.textContent = 'The file is there, but this browser cannot '
+                    + 'play it — most likely an unsupported codec or container.';
+            }
+        })
+        .catch(() => {
+            // Auch der HEAD kommt nicht durch: dann ist die Verbindung das
+            // Problem, nicht die Datei. Die allgemeine Meldung bleibt stehen.
+        });
+}
+
+function hideCinemaPlaybackError() {
+    const box = document.getElementById('cinemaPlaybackError');
+    if (!box) return;
+    box.classList.remove('flex');
+    box.classList.add('hidden');
+}
+
+/**
+ * Hängt die error-Handler an. Zuweisung statt addEventListener, damit ein
+ * zweiter Aufruf nicht einen zweiten Handler anhängt.
+ */
+function initCinemaErrorReporting() {
+    const video = document.getElementById('cinemaVideo');
+    const image = document.getElementById('cinemaImage');
+
+    if (video) {
+        video.onerror = () => {
+            // Ein leeres src ist kein Fehler, sondern das Aufräumen beim
+            // Schließen und beim Umschalten auf Bild.
+            if (!video.getAttribute('src')) return;
+            showCinemaPlaybackError(currentCinemaPath);
+        };
+    }
+    if (image) {
+        image.onerror = () => {
+            if (!image.getAttribute('src')) return;
+            showCinemaPlaybackError(currentCinemaPath);
+        };
     }
 }
 
@@ -157,6 +237,7 @@ function closeCinema() {
         sourceMsg.classList.remove('flex');
         sourceMsg.classList.add('hidden');
     }
+    hideCinemaPlaybackError();
 
     currentCinemaPath = null;
     currentCinemaVideo = null;
@@ -655,22 +736,45 @@ function updateCinemaTags() {
     // Update assigned tags display
     const assignedContainer = document.getElementById('cinemaAssignedTags');
     if (assignedContainer) {
-        if (videoTags.length === 0) {
-            assignedContainer.innerHTML = '';
-        } else {
-            assignedContainer.innerHTML = videoTags.map(tagName => {
+        // Knoten statt String. Der Tag-Name ist frei eingegeben und stand hier
+        // in einem interpolierten `onclick` — ein Apostroph („Ralfs Auswahl")
+        // machte den Knopf schon funktionsunfähig, und alles darüber hinaus
+        // wäre eingeschleuster Code gewesen.
+        //
+        // HTML-Maskierung allein genügt an dieser Stelle **nicht**: Der Browser
+        // dekodiert Entitäten im Attributwert, bevor der Inhalt als JavaScript
+        // gelesen wird — aus `&#39;` würde wieder ein Apostroph. Deshalb der
+        // Weg über addEventListener, wie in tag_manager.js.
+        assignedContainer.replaceChildren();
+        if (videoTags.length > 0) {
+            videoTags.forEach(tagName => {
                 const tagData = availableTags.find(t => t.name === tagName);
                 const color = tagData?.color || '#888';
-                return `
-                 <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-ink/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none">
-                     <span class="w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]" style="background-color: ${color}; --color: ${color}"></span>
-                     <span class="text-xs text-white font-semibold tracking-wide drop-shadow-md">${tagName}</span>
-                     <button onclick="event.stopPropagation(); toggleCinemaTag('${tagName}')" class="ml-1 text-white/40 hover:text-red-400 hover:bg-ink/10 rounded-full p-0.5 transition-colors" title="Remove Tag">
-                         <span class="material-icons text-[14px] font-bold" aria-hidden="true">close</span>
-                     </button>
-                 </div>
-                 `;
-            }).join('');
+
+                const chip = document.createElement('div');
+                chip.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/60 border border-ink/20 backdrop-blur-sm shadow-xl transition-all hover:scale-105 group/chip select-none';
+
+                const dot = document.createElement('span');
+                dot.className = 'w-2 h-2 rounded-full shadow-[0_0_8px_var(--color)]';
+                dot.style.backgroundColor = color;
+                dot.style.setProperty('--color', color);
+
+                const label = document.createElement('span');
+                label.className = 'text-xs text-white font-semibold tracking-wide drop-shadow-md';
+                label.textContent = tagName;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'ml-1 text-white/40 hover:text-red-400 hover:bg-ink/10 rounded-full p-0.5 transition-colors';
+                removeBtn.title = 'Remove Tag';
+                removeBtn.innerHTML = '<span class="material-icons text-[14px] font-bold" aria-hidden="true">close</span>';
+                removeBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    toggleCinemaTag(tagName);
+                });
+
+                chip.append(dot, label, removeBtn);
+                assignedContainer.append(chip);
+            });
         }
     }
 
@@ -679,14 +783,22 @@ function updateCinemaTags() {
         return;
     }
 
-    container.innerHTML = availableTags.map(tag => `
-        <button class="cinema-tag-chip ${videoTags.includes(tag.name) ? 'active' : ''}"
-                onclick="toggleCinemaTag('${tag.name}')"
-                style="--tag-color: ${tag.color}">
-            <span class="tag-dot" style="background-color: ${tag.color}"></span>
-            ${tag.name}
-        </button>
-    `).join('');
+    // Gleiche Begründung wie oben: Name und Farbe kommen aus der Eingabe des
+    // Nutzers und gehören nicht in einen Attributstring.
+    container.replaceChildren();
+    availableTags.forEach(tag => {
+        const button = document.createElement('button');
+        button.className = 'cinema-tag-chip' + (videoTags.includes(tag.name) ? ' active' : '');
+        button.style.setProperty('--tag-color', tag.color || '');
+        button.addEventListener('click', () => toggleCinemaTag(tag.name));
+
+        const dot = document.createElement('span');
+        dot.className = 'tag-dot';
+        dot.style.backgroundColor = tag.color || '';
+
+        button.append(dot, document.createTextNode(tag.name));
+        container.append(button);
+    });
 }
 
 /**

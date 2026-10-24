@@ -420,8 +420,13 @@
     padding: 6px;
 }
 
-.number-input-wrapper input:focus {
-    outline: none;
+/* Hier stand `outline: none` und sonst nichts -- das Zahlenfeld gab beim
+   Fokus ueberhaupt keine Rueckmeldung. Der Ring liegt auf der Umrandung
+   statt auf dem Feld, weil das Feld randlos in ihr sitzt und ein Ring
+   direkt darum die Pfeilknoepfe durchschnitten haette. */
+.number-input-wrapper:has(input:focus-visible) {
+    outline: 2px solid var(--color-accent-blue);
+    outline-offset: 2px;
 }
 
 .number-stepper {
@@ -828,3 +833,12 @@
 }
 .encoding-preset-btn[data-value="best"].active .material-icons { color: #e040fb; }
 .encoding-preset-btn[data-value="best"].active .preset-label { color: #ffffff; }
+
+
+/* Auffangregel wie in styles.css: Was seinen Ring verloren hat und keinen
+   eigenen Ersatz mitbringt, bekommt hier einen. Am Dateiende, damit sie bei
+   gleicher Gewichtung gewinnt. */
+:focus-visible {
+    outline: 2px solid var(--color-accent-blue);
+    outline-offset: 2px;
+}

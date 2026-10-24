@@ -428,35 +428,28 @@ def apply_configuration(config: dict):
     """
     Apply the wizard configuration to settings and user database.
     """
-    import json
-
-    from arcade_scanner.config import SETTINGS_FILE
+    from arcade_scanner.config import config as app_config
 
     # 1. Update settings.json
-    settings_data = {}
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                settings_data = json.load(f)
-        except Exception:
-            pass
-
-    # Merge wizard config into settings
-    settings_data["first_run_completed"] = True
-    settings_data["min_size_mb"] = config["min_size_mb"]
-    settings_data["bitrate_threshold_kbps"] = config["bitrate_threshold_kbps"]
-
+    #
+    # Über `config.save()` statt mit eigenem json.dump: Die Methode liest die
+    # Datei frisch ein (damit Kommentarschlüssel erhalten bleiben), mischt die
+    # Angaben hinein und schreibt über eine Zwischendatei mit anschliessendem
+    # os.replace. Hier stand dieselbe Logik ein zweites Mal — nur ohne das
+    # Schreiben über die Zwischendatei, das genau diese Datei davor bewahrt,
+    # bei einem Abbruch als Fragment zurückzubleiben.
+    updates = {
+        "first_run_completed": True,
+        "min_size_mb": config["min_size_mb"],
+        "bitrate_threshold_kbps": config["bitrate_threshold_kbps"],
+    }
     if config.get("ffmpeg_path"):
-        settings_data["ffmpeg_path"] = config["ffmpeg_path"]
+        updates["ffmpeg_path"] = config["ffmpeg_path"]
     if config.get("ffprobe_path"):
-        settings_data["ffprobe_path"] = config["ffprobe_path"]
+        updates["ffprobe_path"] = config["ffprobe_path"]
 
-    # Save settings
-    try:
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump(settings_data, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print_error(f"Failed to save settings: {e}")
+    if not app_config.save(updates):
+        print_error("Failed to save settings")
 
     # 2. Update admin user with scan targets and exclusions
     from arcade_scanner.database.user_store import user_db
@@ -495,6 +488,21 @@ def apply_configuration(config: dict):
             print_success(f"Created user: {user_info['username']}")
 
 
+def installation_exists() -> bool:
+    """Gibt es hier schon Daten? Dann ist es kein Erstlauf, egal was sonst steht.
+
+    Der Assistent richtet eine leere Installation ein. Läuft er über einer
+    bestehenden, schreibt er die Konfiguration neu — und bietet an, Konten und
+    Bibliothek zu löschen.
+    """
+    from arcade_scanner.config import HIDDEN_DATA_DIR
+
+    for name in ("users.db", "media_library.db"):
+        if os.path.exists(os.path.join(HIDDEN_DATA_DIR, name)):
+            return True
+    return False
+
+
 def should_run_wizard() -> bool:
     """
     Check if the setup wizard should run.
@@ -504,6 +512,14 @@ def should_run_wizard() -> bool:
 
     from arcade_scanner.config import SETTINGS_FILE
 
+    # Bestehende Daten schlagen alles andere. Vorher hing die Entscheidung
+    # allein an settings.json — und ein *nicht lesbares* settings.json galt als
+    # „frische Installation". Zusammen mit dem gekürzten Schreiben (siehe
+    # config._save_json_raw) genügte ein Stromausfall beim Speichern, damit der
+    # Einrichtungsassistent über einer eingerichteten Installation loslief.
+    if installation_exists():
+        return False
+
     if not os.path.exists(SETTINGS_FILE):
         return True
 
@@ -511,8 +527,13 @@ def should_run_wizard() -> bool:
         with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             return not data.get("first_run_completed", False)
-    except Exception:
-        return True
+    except Exception as e:
+        # Nicht lesbar heisst nicht „neu". Eine falsche Antwort in diese
+        # Richtung kostet eine Konfiguration; in die andere Richtung kostet sie
+        # einen Assistenten, den man von Hand starten kann.
+        print_error(f"settings.json not readable ({e}) - skipping the setup wizard. "
+                    "Run it explicitly if this really is a fresh installation.")
+        return False
 
 
 def run_onboarding():
@@ -521,6 +542,16 @@ def run_onboarding():
     Checks if wizard should run, and if so, runs it and applies config.
     """
     if not should_run_wizard():
+        return False
+
+    # Ohne Terminal keinen interaktiven Assistenten. `prompt()` verschluckt
+    # EOFError und liefert den Vorgabewert zurück — der Assistent stürzt beim
+    # Start ohne stdin also nicht ab, sondern läuft still mit lauter Vorgaben
+    # durch und schreibt anschliessend die Konfiguration. Nachgemessen mit
+    # stdin auf /dev/null: alle Fragen „beantwortet", keine Meldung.
+    if not (sys.stdin and sys.stdin.isatty()):
+        print_error("No interactive terminal - skipping the setup wizard. "
+                    "Start the server from a terminal to run it.")
         return False
 
     try:

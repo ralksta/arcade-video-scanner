@@ -8,7 +8,7 @@
  */
 function toggleTheme() {
     const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    window.safeStorage.set('theme', isDark ? 'dark' : 'light');
 
     const icon = document.getElementById('themeIcon');
     if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
@@ -27,13 +27,24 @@ function isSensitive(video) {
     if (!video) return false;
 
     // 1. Check Tags
-    const sensitiveTags = window.userSettings?.sensitive_tags || ['nsfw', 'adult', '18+'];
-    if (video.tags && video.tags.some(t => sensitiveTags.includes(t.toLowerCase()))) {
+    //
+    // Beide Seiten kleinschreiben. Vorher wurde nur der Tag des Videos
+    // normalisiert, die eingestellte Liste nicht — wer "NSFW" in die
+    // Einstellungen tippte (die naheliegende Schreibweise), bekam den Vergleich
+    // 'NSFW'.includes('nsfw') und damit nie einen Treffer. Die Voreinstellungen
+    // sind klein geschrieben, deshalb fiel es nur eigenen Eingaben auf.
+    const configuredTags = window.userSettings?.sensitive_tags || ['nsfw', 'adult', '18+'];
+    const sensitiveTags = configuredTags.map(t => String(t).trim().toLowerCase());
+    if (video.tags && video.tags.some(t => sensitiveTags.includes(String(t).toLowerCase()))) {
         return true;
     }
 
     // 2. Check Paths
     const sensitiveDirs = window.userSettings?.sensitive_dirs || [];
+    // Ohne Pfad lässt sich nur der Tag-Teil beurteilen. Vorher warf die
+    // nächste Zeile hier — und zwar mitten in filterAndSort(), womit der
+    // gesamte Filter ausfiel und der abgesicherte Modus alles zeigte.
+    if (!video.FilePath) return false;
     // Normalize paths for comparison (forward slashes)
     const vPath = video.FilePath.replace(/\\/g, '/').toLowerCase();
 
@@ -50,7 +61,7 @@ function isSensitive(video) {
 
 // Init Theme
 (function initTheme() {
-    const saved = localStorage.getItem('theme');
+    const saved = window.safeStorage.get('theme');
     const isDark = saved ? saved === 'dark' : true; // Default to dark
 
     if (isDark) {
@@ -186,6 +197,33 @@ function safeEncodePath(path) {
     }
 }
 window.safeEncodePath = safeEncodePath;
+
+/**
+ * Wann ein Eintrag in der Bibliothek aufgetaucht ist, in Sekunden.
+ *
+ * `imported_at` ist der Zeitpunkt des ersten Scans, `mtime` der der letzten
+ * Änderung der Datei. Für „neu in meiner Bibliothek" ist das erste die
+ * Antwort; das zweite ist der Ersatz für Einträge, die noch aus der Zeit vor
+ * dem Feld stammen.
+ *
+ * Diese Regel stand an vier Stellen ausgeschrieben — im Datumsfilter, in den
+ * Sammlungen, in deren Python-Gegenstück und (unvollständig) in der
+ * Sortierung. Genau dort war sie dann anders: „Sortieren: Datum" rechnete
+ * allein mit `mtime`. Das ist nicht dieselbe Frage. Wer eine alte Aufnahme
+ * heute in die Bibliothek legt, steht im Filter „letzte 7 Tage" — und in der
+ * Sortierung ganz unten. Umgekehrt schiebt jedes Optimieren einen alten Film
+ * nach oben, weil die Datei neu geschrieben wurde.
+ *
+ * @param {Object} video - Eintrag aus ALL_VIDEOS
+ * @returns {number} Unix-Zeit in Sekunden, 0 wenn nichts bekannt ist
+ */
+function entryDate(video) {
+    if (!video) return 0;
+    const imported = Number(video.imported_at) || 0;
+    if (imported > 0) return imported;
+    return Number(video.mtime) || 0;
+}
+window.entryDate = entryDate;
 
 
 

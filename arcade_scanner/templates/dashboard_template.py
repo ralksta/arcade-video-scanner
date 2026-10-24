@@ -39,6 +39,9 @@ STYLESHEETS = [
 ]
 
 SCRIPT_MODULES = [
+    # Muss vorn stehen: store.js, utils.js, workspace.js, collections.js und
+    # settings.js greifen über `window.safeStorage` auf localStorage zu.
+    "safe_storage.js",
     "store.js",
     "formatters.js",
     "api.js",
@@ -99,9 +102,27 @@ def asset_url(filename: str) -> str:
     return f"/static/{filename}?v={version}"
 
 
-def generate_html_report(results, report_file, server_port=8000):
-    total_mb = sum(r["Size_MB"] for r in results)
+def generate_html_report(report_file, server_port=8000):
+    """Schreibt den statischen Dashboard-Dump.
 
+    Nimmt **keine** Medien-Einträge mehr entgegen. Der Dump enthält keine —
+    `window.ALL_VIDEOS` startet leer und wird zur Laufzeit über `/api/videos`
+    gefüllt, pro Nutzer gefiltert.
+
+    Der frühere Parameter `results` wurde zuletzt nirgends mehr gelesen, aber
+    von fünf Aufrufern beschafft, und zwar so::
+
+        results = [e.model_dump(by_alias=True) for e in db.get_all()]
+
+    Das sind 8788 Pydantic-Modelle plus 8788 Umwandlungen je Aufruf, für
+    nichts. An einer Stelle (`routes/files.py`, Hintergrund-Rescan) lief es
+    sogar über `media_cache.get()`, das bereits Dicts liefert — der Aufruf warf
+    dort jedes Mal einen `AttributeError`, und das umgebende `except` machte
+    daraus ein „❌ Rescan failed", nachdem der Scan längst durch war. Die
+    Zeilen danach — Cache verwerfen und Report neu erzeugen — wurden nie
+    erreicht.
+    """
+    #
     # Keine Ordner-Aggregation mehr im Dump: Diese Datei wird EINMAL erzeugt und
     # an jeden Nutzer ausgeliefert. Die Aggregation enthielt die Ordnerpfade der
     # gesamten Bibliothek — also auch die Verzeichnisse anderer Nutzer, obwohl
@@ -127,12 +148,7 @@ def generate_html_report(results, report_file, server_port=8000):
     active_theme = CURRENT_THEME
 
     # 1. Prepare Header (Themed)
-    header_html = render_header(
-        active_theme,
-        hostname=socket.gethostname().upper(),
-        count=len(results),
-        size_gb=f"{total_mb/1024:.1f}"
-    )
+    header_html = render_header(active_theme, hostname=socket.gethostname().upper())
 
     # 2. Prepare Cinema Modal (Conditional Optimize Button)
     opt_btn_html = ""
@@ -271,5 +287,40 @@ def generate_html_report(results, report_file, server_port=8000):
         scripts=full_scripts_block,
     )
 
-    with open(report_file, "w", encoding="utf-8") as f:
-        f.write(final_html)
+    _write_atomically(report_file, final_html)
+
+
+def _write_atomically(report_file, final_html) -> None:
+    """Schreibt daneben und tauscht dann um.
+
+    Vorher stand hier ``open(report_file, "w")``. Das kürzt die Datei sofort
+    auf null und füllt sie langsam wieder — und genau diese Datei liefert der
+    Server unter ``/`` aus. Wer währenddessen die Seite lädt, bekommt eine
+    halbe. Erzeugt wird sie nach **jedem** Schreibvorgang (Tags, Optimieren,
+    Einstellungen, Scan-Ende), im Haushalt also regelmäßig genau dann, wenn
+    auch jemand hinsieht.
+
+    Dazu kommt der zweite Fall: Zwei Erzeugungen gleichzeitig — der
+    Entprellungs-Timer und das Scan-Ende — schrieben beide in dieselbe offene
+    Datei. Deshalb trägt die Zwischendatei Prozess- und Thread-Nummer im
+    Namen; danach ist ``os.replace`` unteilbar, und der Verlierer überschreibt
+    höchstens mit demselben Inhalt.
+
+    Das Muster steht schon zweimal im Projekt — ``config.save()`` und
+    ``duplicate_detector`` machen es genauso.
+    """
+    import threading
+
+    tmp_path = f"{report_file}.tmp-{os.getpid()}-{threading.get_ident()}"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(final_html)
+        os.replace(tmp_path, report_file)
+    except Exception:
+        # Die alte Fassung bleibt stehen — eine halbe wäre schlechter als
+        # eine veraltete.
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise

@@ -1,5 +1,6 @@
 import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {serverUrl, thumbnailUrl} from '../serverConfig';
+import {getItem, removeItem} from '../safeStorage';
 import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import TabLayout, {Tab} from '@enact/limestone/TabLayout';
@@ -17,6 +18,19 @@ const SORT_OPTIONS = [
 	{key: 'size_asc', label: '📦 Kleinste'}
 ];
 
+// Datum eines Eintrags, in Sekunden — dieselbe Regel wie entryDate() im
+// Browser-Client (arcade_scanner/server/static/utils.js) und wie
+// matches_date_filter() in arcade_scanner/core/criteria_eval.py.
+//
+// `imported_at` ist der Zeitpunkt des ersten Scans, `mtime` der der letzten
+// Änderung der Datei. „Neueste" meint das erste: wann das hier in der
+// Bibliothek aufgetaucht ist. `mtime` bleibt der Ersatz für Einträge aus der
+// Zeit vor dem Feld.
+//
+// Vorher stand hier nur `v.mtime`. Damit schob jedes Optimieren einen alten
+// Film nach oben, weil die Datei dabei neu geschrieben wird.
+const entryDate = (v) => (Number(v && v.imported_at) || 0) || (Number(v && v.mtime) || 0);
+
 const sortVideos = (list, sortKey) => {
 	const sorted = [...list];
 	switch (sortKey) {
@@ -30,7 +44,15 @@ const sortVideos = (list, sortKey) => {
 			return sorted.sort((a, b) => (a.Size_MB || 0) - (b.Size_MB || 0));
 		case 'newest':
 		default:
-			return sorted.reverse();
+			// Hier stand `sorted.reverse()`. Das dreht die Reihenfolge um, in
+			// der /api/videos liefert — und das ist `SELECT * FROM media` ohne
+			// ORDER BY, also die Einfügereihenfolge des ersten Scans. Mit dem
+			// Alter der Dateien hat sie nichts zu tun.
+			//
+			// An der echten Bibliothek nachgemessen: Unter „newest" standen
+			// Aufnahmen vom Oktober 2025, während die tatsächlich neuesten vom
+			// August 2026 waren — null Überschneidung in den ersten zehn.
+			return sorted.sort((a, b) => entryDate(b) - entryDate(a));
 	}
 };
 
@@ -149,12 +171,16 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 	const [selectedCollectionId, setSelectedCollectionId] = useState(null);
 	const [tabIndex, setTabIndex] = useState(0);
 	const [loading, setLoading] = useState(true);
+	// Ohne die Nutzerdaten ist unbekannt, welche Einträge im Vault liegen —
+	// dann wird nichts angezeigt statt alles. Siehe den Kommentar bei
+	// setUserDataFailed unten.
+	const [userDataFailed, setUserDataFailed] = useState(false);
 	const [sortKey, setSortKey] = useState('newest');
 	const [filterText, setFilterText] = useState('');
 
 	// Daten und Collections laden
 	useEffect(() => {
-		const token = localStorage.getItem('arcade_session_token');
+		const token = getItem('arcade_session_token');
 		const headers = {
 			'Content-Type': 'application/json'
 		};
@@ -166,7 +192,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		const videosPromise = fetch(serverUrl('/api/videos'), { headers })
 			.then(res => {
 				if (res.status === 401) {
-					localStorage.removeItem('arcade_session_token');
+					removeItem('arcade_session_token');
 					if (onAuthFailed) onAuthFailed();
 					throw new Error('Unauthorized');
 				}
@@ -205,6 +231,20 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 						v.hidden = vaultSet.has(v.FilePath);
 						v.tags = tagMap[v.FilePath] || [];
 					});
+				}
+
+				// `userData` ist null, wenn /api/user/data nicht erreichbar war.
+				// Dann bleibt `v.hidden` auf jedem Eintrag undefined, und jeder
+				// Filter unten prüft `!v.hidden` — undefined ist falsy, also
+				// stünde der gesamte Vault im Raster. Auf einem Fernseher im
+				// Wohnzimmer ist das die denkbar falscheste Richtung.
+				//
+				// Derselbe Fehler steckte im Browser-Client; dort ist er in
+				// filter_engine.js behoben.
+				if (!userData) {
+					setUserDataFailed(true);
+					setLoading(false);
+					return;
 				}
 
 				setAllVideos(videosData);
@@ -248,8 +288,16 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		filterAndSort(allVideos.filter(v => v.favorite && !v.hidden)),
 	[allVideos, filterAndSort]);
 
+	// „Zuletzt hinzugefügt": ebenfalls nach Datum, nicht nach den letzten 48
+	// Zeilen der Datenbank. `slice(-48)` nahm das Ende der Einfügereihenfolge —
+	// dieselbe Verwechslung wie beim „newest"-Sortierschlüssel oben.
 	const recent = useMemo(() =>
-		filterAndSort([...allVideos].filter(v => !v.hidden).slice(-48)),
+		filterAndSort(
+			[...allVideos]
+				.filter(v => !v.hidden)
+				.sort((a, b) => entryDate(b) - entryDate(a))
+				.slice(0, 48)
+		),
 	[allVideos, filterAndSort]);
 
 	const images = useMemo(() =>
@@ -316,7 +364,9 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		setTabIndex(ev.index);
 	}, []);
 
-	const subtitle = loading
+	const subtitle = userDataFailed
+		? 'Nutzerdaten nicht abrufbar'
+		: loading
 		? 'Lade Mediathek...'
 		: filterText
 			? `${videos.length} Treffer für "${filterText}"`
@@ -349,7 +399,18 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 				))}
 			</div>
 
-			{!loading && (
+			{userDataFailed && (
+				<div style={{padding: ri.scale(48) + 'px', textAlign: 'center'}}>
+					<div style={{fontSize: ri.scale(24) + 'px', color: '#ff0090'}}>
+						Deine Nutzerdaten konnten nicht geladen werden.
+					</div>
+					<div style={{fontSize: ri.scale(16) + 'px', color: 'gray', marginTop: ri.scale(12) + 'px'}}>
+						Die Mediathek wird nicht angezeigt, weil sonst auch Einträge aus dem Vault sichtbar wären.
+					</div>
+				</div>
+			)}
+
+			{!loading && !userDataFailed && (
 				<TabLayout index={tabIndex} onSelect={handleTabSelect}>
 					<Tab title="Home" icon="home">
 						<div style={{overflowY: 'auto', height: '100%', padding: `${ri.scale(16)}px ${ri.scale(24)}px`, display: 'flex', flexDirection: 'column', gap: ri.scale(32) + 'px'}}>

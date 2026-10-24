@@ -43,6 +43,12 @@ def _stray_files():
                 continue
             if ".venv" in path.parts or "node_modules" in path.parts:
                 continue
+            # Arbeitskopien unter .claude/worktrees/ sind eigene Auscheckungen
+            # desselben Repos — ihr tests/-Verzeichnis heisst zu Recht so und
+            # ist keine verirrte Datei. pytest fasst sie ohnehin nicht an,
+            # weil `testpaths = tests/` in pyproject.toml steht.
+            if ".claude" in path.parts:
+                continue
             stray.append(path.relative_to(ROOT))
     return stray
 

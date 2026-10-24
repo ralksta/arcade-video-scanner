@@ -57,6 +57,11 @@ class FakeScanner:
 
     async def scan_directories(self, targets):
         for index, item in enumerate(self.items):
+            # Der Walker liefert seit der Mindestgrössen-Korrektur
+            # (Pfad, dir_changed, too_small). Ältere Fixtures geben nur zwei
+            # Werte an — die dritte Stelle ist dann False, also „gross genug".
+            if len(item) == 2:
+                item = (item[0], item[1], False)
             yield item
             if self.on_yield:
                 self.on_yield(index)
@@ -120,7 +125,9 @@ def run_scan(manager, fake_db, fake_scanner, cfg, stat_size=100.0, stat_mtime=10
     # through to the real one — os.path.exists() is built on os.stat, and
     # faking it wholesale would make every path look like it exists, including
     # the deliberately absent scan targets.
-    media_paths = {path for path, _ in fake_scanner.items}
+    # Fixtures kommen als (Pfad, dir_changed) oder als
+    # (Pfad, dir_changed, too_small) — nur der Pfad zählt hier.
+    media_paths = {item[0] for item in fake_scanner.items}
     real_stat = os.stat
 
     def fake_stat(path, *args, **kwargs):
@@ -331,6 +338,157 @@ class TestStatusClassification:
 
 
 # ---------------------------------------------------------------------------
+# Nicht lesbare Dateien
+#
+# Schlägt die Untersuchung fehl, stand dazu eine Zeile im Protokoll und sonst
+# nichts. Bei einem Durchlauf über tausende Dateien ist die längst
+# weggescrollt, wenn der Scan fertig ist — und das Ergebnis ist leise: Ein
+# bereits bekannter Eintrag behält seine **alten** Angaben, ein neuer entsteht
+# gar nicht erst. Von aussen sieht beides aus wie „alles in Ordnung".
+#
+# Einen Status dafür gibt es nicht mehr. "CORRUPT" kommt im gesamten Code
+# nicht vor, seit die Tiefenprüfung zugunsten der Scan-Geschwindigkeit
+# entfernt wurde ("Deep decoding pass was removed to optimize scan speed",
+# media_probe.py). Die wenigen Einträge, die den Status in dieser Installation
+# noch tragen, stammen aus der Zeit davor.
+# ---------------------------------------------------------------------------
+
+class TestScanSummary:
+    """
+    Die Abschlusszeile nannte jede betrachtete Datei „new/updated". An dieser
+    Bibliothek stand dort 9010, während in Wahrheit 222 Dateien Arbeit
+    machten — nämlich die, die sich nie speichern liessen und deshalb bei
+    jedem Durchlauf wieder als neu gelten.
+
+    Zwei Zahlen sind es, also nennt sie die Zeile auch getrennt.
+    """
+
+    def test_unchanged_files_are_counted_as_seen_not_as_processed(self, capsys):
+        cached = make_cached("/media/a.mp4", size_mb=100.0, mtime=1000)
+        db = FakeDB([cached])
+
+        run_scan(ScannerManager(), db, FakeScanner([("/media/a.mp4", True)]),
+                 make_config(), stat_size=100.0, stat_mtime=1000)
+
+        out = capsys.readouterr().out
+        assert "1 Dateien geprüft, davon 0 neu oder geändert" in out
+
+    def test_a_new_file_counts_as_processed(self, capsys):
+        run_scan(ScannerManager(), FakeDB([]), FakeScanner([("/media/neu.mp4", True)]),
+                 make_config())
+
+        assert "1 Dateien geprüft, davon 1 neu oder geändert" in capsys.readouterr().out
+
+    def test_the_two_numbers_differ_when_most_files_are_skipped(self, capsys):
+        """Der Alltagsfall: viel bekannt, wenig neu."""
+        bekannt = [make_cached(f"/media/alt_{i}.mp4", size_mb=100.0, mtime=1000)
+                   for i in range(5)]
+        pfade = [(f"/media/alt_{i}.mp4", True) for i in range(5)]
+        pfade.append(("/media/neu.mp4", True))
+
+        run_scan(ScannerManager(), FakeDB(bekannt), FakeScanner(pfade),
+                 make_config(), stat_size=100.0, stat_mtime=1000)
+
+        assert "6 Dateien geprüft, davon 1 neu oder geändert" in capsys.readouterr().out
+
+    def test_the_old_misleading_wording_is_gone(self):
+        """
+        Auf entkommentiertem Text geprüft. Der Begriff steht weiterhin im
+        Kommentar (er beschreibt ja, was falsch war) und im Docstring von
+        `run_scan`, wo er jetzt sogar zutrifft: Zurückgegeben wird die Zahl
+        der tatsächlich untersuchten Dateien.
+
+        Das ist heute Nacht der achte Muster-Test, der über meine eigene
+        Begründung gestolpert ist — wer einen alten Weg abschafft, schreibt
+        seinen Namen in die Erklärung.
+        """
+        from pathlib import Path
+
+        from test_dump_isolation import _code_only
+
+        quelle = (Path(__file__).parent.parent / "arcade_scanner" / "scanner"
+                  / "manager.py").read_text(encoding="utf-8")
+
+        assert "new/updated" not in _code_only(quelle)
+
+
+class TestUnreadableFiles:
+    def test_the_scan_reports_how_many_files_it_could_not_read(self, capsys):
+        manager = ScannerManager()
+        db = FakeDB([])
+        scanner = FakeScanner([("/media/kaputt.mp4", True)])
+
+        run_scan(manager, db, scanner, make_config(), inspect_result=None)
+
+        out = capsys.readouterr().out
+        assert "1 Datei(en) konnten nicht gelesen werden" in out
+        assert "/media/kaputt.mp4" in out
+
+    def test_a_clean_scan_says_nothing_about_failures(self, capsys):
+        manager = ScannerManager()
+        db = FakeDB([])
+        scanner = FakeScanner([("/media/gut.mp4", True)])
+
+        run_scan(manager, db, scanner, make_config())
+
+        assert "konnten nicht gelesen werden" not in capsys.readouterr().out
+
+    def test_the_list_is_capped_but_says_so(self, capsys):
+        """
+        Bei einer defekten Platte wären es tausende Zeilen — die Zahl ist die
+        Nachricht, die Beispiele sind nur der Einstieg.
+
+        Gruppiert wird nach Grund: 222 Zeilen „Permission denied"
+        untereinander sagen weniger als eine Zeile mit der Zahl davor. Genau
+        das ist an dieser Bibliothek passiert.
+        """
+        manager = ScannerManager()
+        db = FakeDB([])
+        paths = [(f"/media/kaputt_{i}.mp4", True) for i in range(15)]
+
+        run_scan(manager, db, FakeScanner(paths), make_config(), inspect_result=None)
+
+        out = capsys.readouterr().out
+        assert "15 Datei(en) konnten nicht gelesen werden" in out
+        assert "15× " in out, "der Grund wird nicht gezählt"
+        assert "und 12 weitere" in out
+
+    def test_the_reason_from_ffprobe_reaches_the_summary(self, capsys):
+        """
+        Der eigentliche Fund: Vorher stand dort pauschal „timeout or corrupt".
+        In dieser Bibliothek scheiterten 222 Dateien an fehlenden Leserechten
+        — wer der Meldung glaubte, suchte nach kaputten Dateien.
+        """
+        from arcade_scanner.scanner.media_probe import ProbeError
+
+        manager = ScannerManager()
+        db = FakeDB([])
+
+        run_scan(manager, db, FakeScanner([("/media/gesperrt.mp4", True)]),
+                 make_config(),
+                 inspect_result=ProbeError("/media/gesperrt.mp4: Permission denied"))
+
+        out = capsys.readouterr().out
+        assert "Permission denied" in out
+        assert "timeout or corrupt" not in out
+
+    def test_an_unreadable_file_leaves_the_old_entry_alone(self):
+        """
+        Festgehalten, wie es ist: Der alte Eintrag bleibt mit seinen alten
+        Angaben stehen. Ihn zu verwerfen wäre schlimmer — dann verschwände die
+        Datei aus der Bibliothek, weil sie einmal nicht lesbar war.
+        """
+        manager = ScannerManager()
+        cached = make_cached("/media/kaputt.mp4", size_mb=123.0)
+        db = FakeDB([cached])
+
+        run_scan(manager, db, FakeScanner([("/media/kaputt.mp4", True)]),
+                 make_config(), inspect_result=None)
+
+        assert db.removed == []
+
+
+# ---------------------------------------------------------------------------
 # Orphan pruning — deletes rows, so the guard conditions matter most
 # ---------------------------------------------------------------------------
 
@@ -374,6 +532,24 @@ class TestOrphanPruning:
 
         assert db.removed == [], (
             f"a stopped scan deleted {len(db.removed)} rows it never re-checked"
+        )
+
+    def test_an_empty_target_list_prunes_nothing(self):
+        """Ohne Ziele hat der Walk nichts gesehen — das ist kein Beleg dafür,
+        dass die Dateien weg sind.
+
+        Dieser Zustand ist neu erreichbar: `config.active_scan_targets` liefert
+        seit dem Fail-Closed-Fix eine leere Liste, wenn die Benutzerdatenbank
+        nicht lesbar ist (siehe tests/test_scan_targets_fallback.py). Genau dann
+        darf nicht die ganze Bibliothek als verschwunden gelten.
+        """
+        manager = ScannerManager()
+        db = FakeDB([make_cached(f"/media/{n}.mp4") for n in "abcdef"])
+
+        run_scan(manager, db, FakeScanner([]), make_config(targets=()))
+
+        assert db.removed == [], (
+            f"ohne Scan-Ziele wurden {len(db.removed)} Einträge gelöscht"
         )
 
     def test_an_unavailable_scan_target_prunes_nothing(self, tmp_path):

@@ -11,6 +11,7 @@ from .validators import (
     SecurityError,
     is_path_allowed,
     is_safe_directory_traversal,
+    path_is_within,
     sanitize_path,
     validate_filename,
 )
@@ -21,6 +22,7 @@ __all__ = [
     'validate_filename',
     'is_path_allowed',
     'is_safe_directory_traversal',
+    'path_is_within',
     'SecurityError',
     'session_manager'
 ]

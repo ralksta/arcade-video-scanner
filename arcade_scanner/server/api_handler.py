@@ -25,6 +25,7 @@ from arcade_scanner.database import db, user_db
 from arcade_scanner.security import (
     SecurityError,
     is_path_allowed,
+    path_is_within,
     session_manager,
     validate_filename,
 )
@@ -64,6 +65,10 @@ class _MediaCache:
         self._lock = threading.Lock()
         self._data: list | None = None
         self._timestamp: float = 0.0
+        # Zählt jede Invalidierung mit. Wer außerhalb des Locks liest, kann
+        # damit hinterher feststellen, ob sich die Datenlage inzwischen
+        # geändert hat — siehe get_with_version().
+        self._version: int = 0
         # Caches, die aus diesen Daten abgeleitet sind und darum gemeinsam
         # verfallen müssen.
         self._dependents: list = []
@@ -80,22 +85,52 @@ class _MediaCache:
 
     def get(self) -> list:
         """Gibt gecachte Resultate zurück (max. TTL alt) oder liest frisch aus DB."""
+        return self.get_with_version()[1]
+
+    def get_with_version(self) -> tuple[int, list]:
+        """Wie ``get()``, dazu der Stand, aus dem die Daten stammen.
+
+        Der Lesevorgang läuft absichtlich **außerhalb** des Locks — sonst
+        stünde jede andere Anfrage währenddessen. Genau darin lag aber ein
+        Fehler: Wird zwischen dem Lesen und dem Zurückschreiben etwas
+        geändert, landete der veraltete Stand trotzdem im Cache, und die
+        Invalidierung dazwischen war wirkungslos.
+
+            Anfrage A: get() → Cache leer → liest die Datenbank
+            Anfrage B: löscht eine Datei → invalidate()
+            Anfrage A: schreibt das *alte* Ergebnis in den Cache
+
+        Für diesen Cache hieß das bis zu 30 Sekunden alte Daten. Für den
+        daraus abgeleiteten ``/api/videos``-Cache hieß es **für immer**: Der
+        hat keine Verfallszeit, er lebt allein von der Invalidierung.
+
+        Der Zähler macht das entscheidbar: Ist er nach dem Lesen ein anderer,
+        wird nichts abgelegt. Die Antwort selbst geht trotzdem hinaus — sie
+        ist dann eben so alt wie der Augenblick, in dem sie begonnen wurde.
+        """
         now = time.monotonic()
         with self._lock:
             if self._data is not None and (now - self._timestamp) < self.TTL:
-                return self._data
+                return self._version, self._data
+            version = self._version
         # Cache-Miss: außerhalb des Locks lesen um Blocking zu minimieren
         fresh = db.get_all_dicts()
         with self._lock:
-            self._data = fresh
-            self._timestamp = time.monotonic()
-        return fresh
+            if version == self._version:
+                self._data = fresh
+                self._timestamp = time.monotonic()
+        return version, fresh
+
+    def version(self) -> int:
+        with self._lock:
+            return self._version
 
     def invalidate(self) -> None:
         """Muss nach jeder Schreiboperation aufgerufen werden."""
         with self._lock:
             self._data = None
             self._timestamp = 0.0
+            self._version += 1
         # Außerhalb des eigenen Locks, damit sich die Locks nicht verschränken.
         for dependent in self._dependents:
             dependent.invalidate()
@@ -122,19 +157,34 @@ class _VideosResponseCache:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._entries: dict[tuple, tuple[bytes, bytes]] = {}
+        # key -> (raw, gzipped, version), wobei `version` der Stand des
+        # Medien-Caches ist, aus dem die Antwort gebaut wurde.
+        self._entries: dict[tuple, tuple[bytes, bytes, int]] = {}
 
-    def get(self, key: tuple) -> tuple[bytes, bytes] | None:
-        """Liefert ``(raw, gzipped)`` oder None."""
+    def get(self, key: tuple, version: int | None = None) -> tuple[bytes, bytes] | None:
+        """Liefert ``(raw, gzipped)`` oder None.
+
+        Mit ``version`` wird nur geliefert, was aus genau diesem Stand stammt.
+        Dieser Cache hat keine Verfallszeit — er lebt allein von der
+        Invalidierung. Ein Eintrag, der aus einem überholten Stand hineingeriet
+        (siehe ``_MediaCache.get_with_version``), bliebe deshalb **für immer**
+        stehen.
+        """
         with self._lock:
-            return self._entries.get(key)
+            entry = self._entries.get(key)
+            if entry is None:
+                return None
+            raw, gzipped, entry_version = entry
+            if version is not None and version != entry_version:
+                return None
+            return raw, gzipped
 
-    def put(self, key: tuple, raw: bytes, gzipped: bytes) -> None:
+    def put(self, key: tuple, raw: bytes, gzipped: bytes, version: int = 0) -> None:
         with self._lock:
             if len(self._entries) >= self.MAX_ENTRIES:
                 # Ältesten Eintrag verwerfen (dict behält Einfügereihenfolge).
                 self._entries.pop(next(iter(self._entries)))
-            self._entries[key] = (raw, gzipped)
+            self._entries[key] = (raw, gzipped, version)
 
     def invalidate(self) -> None:
         """Muss nach jeder Schreiboperation auf der Medien-Tabelle laufen."""
@@ -162,6 +212,26 @@ class DuplicateScanManager:
             "next_offset": 0,
         }
         self._cache = None
+
+    def try_begin(self, **kwargs) -> bool:
+        """Belegt den Duplikat-Lauf, wenn keiner läuft. True heisst: Du darfst.
+
+        Nachsehen und Setzen muss zusammen passieren. Die Route davor prüft
+        nur ``is_running`` und startet dann einen Thread — zwei Anfragen kurz
+        hintereinander sahen also beide „läuft nicht" und starteten je einen
+        vollständigen Durchlauf. Der ist teuer (Wahrnehmungs-Hashes über die
+        ganze Bibliothek), und beide schreiben in denselben Fortschritt und
+        dieselbe Ergebnisliste: Der Balken springt, und wer zuletzt fertig
+        wird, überschreibt die Funde des anderen.
+
+        Dieselbe Stelle wie ``ScannerManager._claim()`` — dort stand derselbe
+        Fehler.
+        """
+        with self._lock:
+            if self._state.get("is_running"):
+                return False
+            self._state.update(is_running=True, **kwargs)
+            return True
 
     def update_state(self, **kwargs) -> None:
         with self._lock:
@@ -192,6 +262,9 @@ class ReportDebouncer:
         self.delay = delay
         self._timer = None
         self._lock = threading.Lock()
+        # Getrennt von `_lock`: Der Bau dauert, und solange dürfen weitere
+        # `schedule()`-Aufrufe nicht warten müssen.
+        self._generate_lock = threading.Lock()
 
     def schedule(self, port):
         with self._lock:
@@ -202,13 +275,16 @@ class ReportDebouncer:
             self._timer.start()
 
     def _generate(self, port):
-        try:
-            # Re-fetch results to ensure freshness (already dicts from cache)
-            results = _media_cache.get()
-            generate_html_report(results, config.report_file, server_port=port)
-            # print(f"✅ HTML Report regenerated (debounced)")
-        except Exception as e:
-            print(f"⚠️ Report generation failed: {e}")
+        # Zwei Erzeugungen gleichzeitig sind möglich: Der Timer feuert,
+        # während das Scan-Ende dieselbe Funktion direkt aufruft. Der Tausch
+        # in `_write_atomically` macht das ungefährlich, aber doppelt gebaut
+        # muss es deshalb nicht werden.
+        with self._generate_lock:
+            try:
+                generate_html_report(config.report_file, server_port=port)
+                # print(f"✅ HTML Report regenerated (debounced)")
+            except Exception as e:
+                print(f"⚠️ Report generation failed: {e}")
 
 report_debouncer = ReportDebouncer(delay=1.0)
 
@@ -260,13 +336,14 @@ def background_duplicate_scan(
     """
     from arcade_scanner.core.duplicate_detector import DuplicateDetector
 
-    _dup_mgr.update_state(
-        is_running=True,
+    if not _dup_mgr.try_begin(
         progress=0,
         message="Initializing scan...",
         has_more=False,
         batch_offset=batch_offset,
-    )
+    ):
+        print("⏸ Duplikat-Suche läuft bereits — zweite Anfrage übergangen.")
+        return
 
     try:
         def progress_cb(msg: str, pct: float) -> None:
@@ -285,7 +362,8 @@ def background_duplicate_scan(
         if user_scan_targets:
             all_videos = [
                 v for v in all_videos
-                if any(os.path.abspath(v.file_path).startswith(t) for t in user_scan_targets)
+                if any(path_is_within(os.path.abspath(v.file_path), t)
+                       for t in user_scan_targets)
             ]
             print(f"🔍 After user filter: {len(all_videos)} files match scan targets")
 
@@ -354,7 +432,44 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             self._length_header_sent = True
         super().send_header(keyword, value)
 
+    # Kopfzeilen, die auf jede Antwort gehoeren. Bisher gab es keine einzige
+    # davon -- und diese Oberflaeche kann Dateien loeschen und verschieben.
+    #
+    # `X-Frame-Options: DENY` und `frame-ancestors 'none'` sagen dasselbe
+    # zweimal, einmal fuer aeltere Browser: Ohne sie laesst sich die
+    # angemeldete Seite in einen fremden Rahmen legen und der Nutzer auf
+    # Schaltflaechen locken, die er nicht sieht.
+    #
+    # Die CSP ist an dem ausgerichtet, was die Oberflaeche wirklich laedt:
+    # Tailwind vom CDN, Schriften von Google, sonst nichts. `unsafe-inline`
+    # bei den Skripten ist noetig, weil in den Seiten 57 `onclick`-Attribute
+    # stehen; es faellt weg, sobald die durch addEventListener ersetzt sind.
+    # Der Gewinn liegt trotzdem: Kein anderer Rechner kann Skripte
+    # beisteuern, `connect-src 'self'` laesst nichts nach draussen abfliessen,
+    # und `object-src 'none'` schliesst die alten Einbettungswege.
+    _SICHERHEIT = (
+        ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "DENY"),
+        ("Referrer-Policy", "same-origin"),
+        ("Content-Security-Policy", "; ".join((
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "img-src 'self' data: blob:",
+            "media-src 'self' blob:",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+        ))),
+    )
+
     def end_headers(self):
+        for kopf, wert in self._SICHERHEIT:
+            self.send_header(kopf, wert)
+
         origin = self.headers.get("Origin")
         if origin:
             self.send_header("Access-Control-Allow-Origin", origin)
@@ -607,7 +722,17 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     file_path = os.path.abspath(os.path.join(thumb_dir_abs, rel_path))
 
                     # Ensure result is still inside thumb_dir (prevents ../ attacks)
-                    if not file_path.startswith(thumb_dir_abs):
+                    #
+                    # Der Vergleich muss auf einer Verzeichnisgrenze enden.
+                    # `startswith(thumb_dir_abs)` allein liess ein
+                    # Nachbarverzeichnis durch, dessen Name mit demselben
+                    # Präfix beginnt: `../thumbnails_alt/thumb_x.jpg` landet
+                    # nach dem Zusammensetzen bei `/…/thumbnails_alt/…` und
+                    # fängt buchstäblich mit `/…/thumbnails` an.
+                    #
+                    # Derselbe Grenzfehler steckte in `is_path_allowed()`.
+                    if file_path != thumb_dir_abs and not file_path.startswith(
+                            thumb_dir_abs + os.sep):
                         print(f"🚨 Path traversal attempt blocked: {rel_path}")
                         self.send_error(403, "Forbidden")
                         return
@@ -730,6 +855,23 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             #   /batch_compress?  /hide?  /batch_hide?  /favorite?  /batch_favorite?
             elif self.path.startswith("/stream?"):
                 try:
+                    # Sitzungspflichtig — bis hierher war sie es nicht.
+                    #
+                    # Geprüft wurde nur `is_path_allowed()`, also ob der Pfad
+                    # in einem Scan-Ziel liegt. Wer die Adresse kannte, bekam
+                    # die Datei: ohne Anmeldung, ohne Konto, an der
+                    # Vault-Markierung vorbei. Genau die Dateien, um die es in
+                    # diesem Programm geht, waren damit das einzige, was der
+                    # Login nicht geschützt hat.
+                    #
+                    # Beide Clients bringen ihre Kennung schon mit: Der Browser
+                    # schickt das Cookie am `<video>`-Element mit, der
+                    # TV-Client hängt `&token=` an (siehe `get_current_user`,
+                    # Punkt 3 — genau dafür gibt es den Query-Parameter).
+                    if not self.get_current_user():
+                        self.send_error(401, "Unauthorized")
+                        return
+
                     params = parse_qs(urlparse(self.path).query)
                     file_path = params.get("path", [None])[0]
 
@@ -831,7 +973,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 # serialisiert und komprimiert vor, sparen wir uns json.dumps
                 # und gzip komplett (zusammen ~90 ms bei 8788 Einträgen).
                 cache_key = (tuple(user_targets), bool(u.is_admin))
-                cached = _videos_response_cache.get(cache_key)
+                cached = _videos_response_cache.get(cache_key, _media_cache.version())
                 if cached is not None:
                     send_json_precompressed(self, cached[0], cached[1])
                     return
@@ -839,7 +981,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"🔍 API Debug: User '{user_name}' targets: {user_targets}")
 
                 filtered_videos = []
-                all_entries = _media_cache.get()
+                media_version, all_entries = _media_cache.get_with_version()
 
                 # ADMIN OVERRIDE: If no targets defined, Admin sees all.
                 if not user_targets and u.is_admin:
@@ -849,7 +991,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     match_count = 0
                     for entry in all_entries:
                         v_path = os.path.abspath(entry["FilePath"])
-                        is_match = any(v_path.startswith(t) for t in user_targets)
+                        is_match = any(path_is_within(v_path, t) for t in user_targets)
                         # Always show items in Review mode, regardless of scan targets
                         if entry["Status"] == "REVIEW" or is_match:
                              filtered_videos.append(entry)
@@ -858,7 +1000,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     if not filtered_videos and all_entries:
                          sample = os.path.abspath(all_entries[0]["FilePath"])
-                         print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(sample.startswith(t) for t in user_targets)})")
+                         print(f"⚠️ API Warning: Filtered ALL {len(all_entries)} videos for '{user_name}'. Sample: '{sample}' (Matches? {any(path_is_within(sample, t) for t in user_targets)})")
                     else:
                          print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
 
@@ -866,7 +1008,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 # Requests mit gleichem Target-Satz wiederverwenden.
                 raw = json.dumps(filtered_videos, default=str).encode("utf-8")
                 gzipped = gzip.compress(raw, compresslevel=6)
-                _videos_response_cache.put(cache_key, raw, gzipped)
+                _videos_response_cache.put(cache_key, raw, gzipped, media_version)
                 send_json_precompressed(self, raw, gzipped)
 
             elif self.path == "/api/debug/dump":
@@ -972,6 +1114,13 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
         try:
             if self.path.startswith("/stream?path="):
+                # Dieselbe Sitzungsprüfung wie in do_GET. Ohne sie beantwortet
+                # HEAD die Frage „gibt es diese Datei und wie groß ist sie?"
+                # für jeden, der den Pfad rät.
+                if not self.get_current_user():
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 # parse_qs instead of split("path="): otherwise any further
                 # query parameter ends up inside the file path.
                 params = parse_qs(urlparse(self.path).query)
@@ -1036,13 +1185,36 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     username = username.strip() if username else ""
 
                     # ── Brute-force rate limiting ────────────────────────────
+                    #
+                    # Die IP-Sperre allein war wirkungslos: X-Forwarded-For ist
+                    # ein Header, den der Client setzt. Wer den Server direkt
+                    # erreicht — im LAN oder über Tailscale — bekommt mit jedem
+                    # erfundenen Wert einen frischen Zähler und darf beliebig
+                    # oft raten.
+                    #
+                    # Ob dem Header zu trauen ist, hängt vom Aufbau ab (steht
+                    # ein nginx davor?) und lässt sich hier nicht entscheiden.
+                    # Deshalb kommt eine zweite Sperre dazu, die sich nicht
+                    # fälschen lässt: der Benutzername. Ein Angreifer, der ein
+                    # Konto knacken will, muss dessen Namen nennen — und der
+                    # zählt mit, egal welche IP im Header steht.
+                    #
+                    # Nebeneffekt in der richtigen Richtung: Hinter einem Proxy
+                    # teilen sich alle Nutzer eine IP. Die Konto-Sperre trifft
+                    # nur das angegriffene Konto, nicht den ganzen Haushalt.
                     client_ip = (
                         self.headers.get("X-Forwarded-For", "").split(",")[0].strip()
                         or self.client_address[0]
                     )
+                    account_key = f"user:{username.lower()}" if username else "user:"
 
                     if session_manager.is_locked_out(client_ip):
                         print(f"🔒 Blocked login attempt from locked-out IP {client_ip}")
+                        self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
+                        return
+
+                    if session_manager.is_locked_out(account_key):
+                        print(f"🔒 Blocked login attempt for locked-out account '{username}'")
                         self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
                         return
 
@@ -1051,6 +1223,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     if is_valid:
                         session_manager.record_success(client_ip)
+                        session_manager.record_success(account_key)
                         token = session_manager.create_session(username)
                         print(f"✅ Login succeeded for user: '{username}' from {client_ip}")
 
@@ -1081,8 +1254,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.end_headers()
                         self.wfile.write(json.dumps({"success": True, "token": token}).encode())
                     else:
-                        remaining = session_manager.record_failure(client_ip)
-                        print(f"❌ Login failed for IP {client_ip} ({remaining} attempts remaining)")
+                        remaining = min(
+                            session_manager.record_failure(client_ip),
+                            session_manager.record_failure(account_key),
+                        )
+                        print(f"❌ Login failed for '{username}' from {client_ip} "
+                              f"({remaining} attempts remaining)")
                         self.send_error(401, "Invalid credentials")
 
                 except Exception as e:

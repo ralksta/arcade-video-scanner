@@ -796,8 +796,29 @@ class DuplicateDetector:
             )
             dup_files.append(dup_file)
 
-        # Sort by quality (best first)
-        dup_files.sort(key=lambda f: f.quality_score, reverse=True)
+        # Sort by quality (best first). Bei Gleichstand entscheidet die Bitrate,
+        # dann die Größe, zuletzt der Pfad.
+        #
+        # Der Gleichstand ist hier nicht der Ausnahmefall, sondern der
+        # Regelfall: Der Bitratenanteil ist bei 50 Punkten gedeckelt, also ab
+        # 25 Mbps. Eine 4K-Quelle mit 80 Mbps und ihr 4K-Re-Encode mit 26 Mbps
+        # bekommen beide 50 + 30 = 80 Punkte — und in einer Re-Encode-Gruppe
+        # fällt der Codec-Anteil zusätzlich weg, der sie sonst getrennt hätte.
+        # Nachgerechnet: 85,0 gegen 85,0.
+        #
+        # Vorher entschied dann die Reihenfolge, in der die Dateien aus der
+        # Datenbank kamen, welche als „behalten" empfohlen wird. Bei
+        # Re-Encodes ist das genau die Frage, um die es geht — die Empfehlung
+        # konnte auf das Original zeigen oder auf die verlustbehaftete Kopie,
+        # je nachdem.
+        #
+        # Der Deckel bleibt, damit sich die Punktwerte insgesamt nicht
+        # verschieben; die Bitrate entscheidet nur noch dort, wo die Punkte
+        # ohnehin gleich sind. Der Pfad zuletzt, damit zwei Scans dieselbe
+        # Antwort geben.
+        dup_files.sort(
+            key=lambda f: (-f.quality_score, -(f.bitrate_mbps or 0), -f.size_mb, f.path)
+        )
 
         # Calculate savings (sum of all but the best)
         total_size = sum(f.size_mb for f in dup_files)
@@ -871,7 +892,24 @@ class DuplicateDetector:
         return self._find_image_duplicates_by_exact(images), 0
 
     def _find_image_duplicates_by_exact(self, images: List) -> List[DuplicateGroup]:
-        """Find duplicate images by exact size + resolution match."""
+        """Find duplicate images by size + resolution, dann inhaltlich geprüft.
+
+        Die Signatur allein reicht nicht. `round(size_mb, 2)` fasst alles
+        zusammen, was innerhalb von rund 10 KB gleich groß ist — zwei
+        verschiedene Aufnahmen derselben Kamera mit derselben Auflösung landen
+        mühelos im selben Fach. Die Gruppe hiess trotzdem ``"exact"`` und kam
+        mit Konfidenz 0,95 in eine Oberfläche, die das Löschen anbietet.
+
+        Der Video-Zweig hat diese Lehre längst gezogen — er filtert mit der
+        Signatur nur vor und prüft danach die Bytes („Verify with content
+        sampling to avoid false positives", Zeile 515). Hier fehlte derselbe
+        Schritt, obwohl `_verify_by_content_sample()` medienneutral ist: Bei
+        Bildern unter 1 MB liest sie die Datei ganz, der Vergleich ist dann
+        exakt.
+
+        Dieser Zweig läuft nur, wenn `imagehash` nicht verfügbar ist — also
+        selten, aber ausgerechnet dann, wenn schon etwas nicht stimmt.
+        """
         signature_map: Dict[str, List] = defaultdict(list)
 
         for img in images:
@@ -888,8 +926,11 @@ class DuplicateDetector:
         groups = []
         for signature, files in signature_map.items():
             if len(files) > 1:
-                group = self._create_image_group(files, match_type="exact")
-                groups.append(group)
+                for verified_files in self._verify_by_content_sample(files):
+                    if len(verified_files) > 1:
+                        groups.append(
+                            self._create_image_group(verified_files, match_type="exact")
+                        )
 
         return groups
 
@@ -1105,8 +1146,10 @@ class DuplicateDetector:
             )
             dup_files.append(dup_file)
 
-        # Sort by quality (best first)
-        dup_files.sort(key=lambda f: f.quality_score, reverse=True)
+        # Sort by quality (best first). Bilder haben keine Bitrate, hier
+        # entscheidet bei Gleichstand die Dateigröße und zuletzt der Pfad —
+        # damit zwei Scans dieselbe Empfehlung geben.
+        dup_files.sort(key=lambda f: (-f.quality_score, -f.size_mb, f.path))
 
         # Calculate savings
         total_size = sum(f.size_mb for f in dup_files)

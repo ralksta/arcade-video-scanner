@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import sqlite3
+import threading
 from typing import List, Optional
 
 from arcade_scanner.config import config
@@ -17,6 +18,29 @@ class UserStore:
     def __init__(self):
         self.db_path = os.path.join(config.hidden_data_dir, "users.db")
         self.json_path = os.path.join(config.hidden_data_dir, "users.json")
+
+        # Sagt dem Aufrufer, ob der letzte get_all_users() die Datenbank
+        # wirklich lesen konnte. Ohne das ist "keine Benutzer" von "nicht
+        # lesbar" nicht zu unterscheiden — und der Scanner leitet aus dem
+        # ersten Fall ab, dass er ersatzweise das ganze Home durchsucht.
+        self.last_read_ok = True
+
+        # Lesen-Ändern-Schreiben muss am Stück laufen.
+        #
+        # Der übliche Ablauf im Server ist `get_user()` → Feld ändern →
+        # `add_user()`, und `add_user()` schreibt den **gesamten**
+        # Nutzerdatensatz als ein JSON-Feld zurück. Der Server ist ein
+        # ThreadingTCPServer: Zwei gleichzeitige Anfragen desselben Kontos —
+        # ein Favorit auf dem Fernseher, ein Tag im Browser — lesen beide den
+        # alten Stand, und der zweite Schreibvorgang überschreibt die Änderung
+        # des ersten.
+        #
+        # Nachgemessen mit 60 gleichzeitigen Favoriten auf einem Testkonto:
+        # **4 kamen an, 56 gingen verloren.**
+        #
+        # Die Sperre ist wiedereintrittsfähig, weil `update_user()` innerhalb
+        # ihrer selbst `get_user()` und `add_user()` aufruft.
+        self._write_lock = threading.RLock()
 
         self._init_db()
         self._migrate_from_json_file()
@@ -139,9 +163,30 @@ class UserStore:
             if conn:
                 conn.close()
 
+    def update_user(self, username: str, mutate) -> bool:
+        """Liest den Nutzer, lässt ihn ändern und schreibt ihn zurück — am Stück.
+
+        `mutate` bekommt das `User`-Objekt und ändert es an Ort und Stelle; der
+        Rückgabewert wird nicht angesehen. False heisst: Der Nutzer existiert
+        nicht, es wurde nichts geschrieben.
+
+        Der Weg über diese Methode ist der einzige, der gegen gleichzeitige
+        Anfragen hält. Wer stattdessen `get_user()` und `add_user()` einzeln
+        aufruft, liest ausserhalb der Sperre — und verliert bei Gleichzeitigkeit
+        die Änderung des jeweils anderen.
+        """
+        with self._write_lock:
+            user = self.get_user(username)
+            if user is None:
+                return False
+            mutate(user)
+            self.add_user(user)
+            return True
+
     def get_all_users(self) -> List[User]:
         users = []
         conn = None
+        self.last_read_ok = True
         try:
             conn = self._get_conn()
             cursor = conn.execute("SELECT * FROM users")
@@ -163,6 +208,7 @@ class UserStore:
                     print(f"⚠️ Failed to load user: {e}")
         except Exception as e:
             print(f"⚠️ Error getting all users: {e}")
+            self.last_read_ok = False
         finally:
             if conn:
                 conn.close()
@@ -192,10 +238,31 @@ class UserStore:
     def hash_password(self, password: str, salt: bytes) -> bytes:
         return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
 
+    # Fester Salt für den Leerlauf-Durchgang unten. Er schützt nichts — sein
+    # einziger Zweck ist, dieselbe Rechenzeit zu verbrauchen wie ein echter
+    # Versuch.
+    _DUMMY_SALT = b"\x00" * 16
+
     def verify_password(self, username: str, password: str) -> bool:
+        """Prüft ein Passwort. False auch für unbekannte Benutzernamen.
+
+        Zur Laufzeit: Bei einem unbekannten Namen kehrte die Funktion früher
+        sofort zurück, bei einem bekannten lief die PBKDF2-Ableitung. Gemessen
+        waren das 0,28 ms gegen 62 ms — Faktor 220, über Netzwerk mühelos
+        unterscheidbar. Damit ließen sich gültige Benutzernamen erraten, ohne
+        ein Passwort zu kennen.
+
+        Das wiegt hier schwerer, seit die Anmeldesperre auch am Benutzernamen
+        hängt: Wer die gültigen Namen kennt, kann gezielt Konten aussperren.
+
+        Deshalb läuft die Ableitung auch für unbekannte Namen — mit einem
+        Wegwerf-Salt, dessen Ergebnis niemand ansieht. Die Antwort ist
+        dieselbe, die Dauer ebenfalls.
+        """
         import hmac as _hmac
         user = self.get_user(username)
         if not user:
+            self.hash_password(password, self._DUMMY_SALT)
             return False
 
         try:
@@ -382,6 +449,114 @@ class UserStore:
 
         except Exception as e:
             print(f"⚠️ Error migrating sensitive settings: {e}")
+
+    def remap_paths_in_user_data(self, mapping) -> int:
+        """Schreibt Favoriten, Vault und Tags von einem Pfad auf einen anderen um.
+
+        `mapping` ist `{alter Pfad: neuer Pfad}`. Zurückgegeben wird die Zahl
+        der umgeschriebenen Einträge.
+
+        Gedacht für den Fall, dass eine Datei **umgezogen** ist: Der
+        Nutzerzustand hängt hier ausschließlich am Pfad, ein Umbenennen im
+        Dateimanager sieht für die Bibliothek deshalb aus wie „alte Datei weg,
+        neue Datei da". Favoriten, Vault-Markierung und Tags blieben dabei auf
+        dem alten Pfad liegen — unsichtbar, aber für immer, und die neue Datei
+        stand ohne alles da.
+
+        Wer den Zustand des neuen Pfades **schon** gesetzt hat, behält ihn: Der
+        Umzug ergänzt, er überschreibt nicht. Sonst könnte ein Scan eine
+        Entscheidung zurücknehmen, die der Nutzer inzwischen getroffen hat.
+        """
+        pairs = {old: new for old, new in dict(mapping).items()
+                 if old and new and old != new}
+        if not pairs:
+            return 0
+
+        changed = 0
+        # Dieselbe Sperre und dasselbe Muster wie beim Aufräumen darunter:
+        # lesen, ändern, zurückschreiben — am Stück.
+        with self._write_lock:
+            for user in self.get_all_users():
+                before = changed
+
+                for old, new in pairs.items():
+                    if old in user.data.favorites:
+                        user.data.favorites.remove(old)
+                        if new not in user.data.favorites:
+                            user.data.favorites.append(new)
+                        changed += 1
+
+                    if old in user.data.vaulted:
+                        user.data.vaulted.remove(old)
+                        if new not in user.data.vaulted:
+                            user.data.vaulted.append(new)
+                        changed += 1
+
+                    if old in user.data.tags:
+                        alte_tags = user.data.tags.pop(old)
+                        vorhanden = user.data.tags.get(new, [])
+                        user.data.tags[new] = vorhanden + [
+                            t for t in alte_tags if t not in vorhanden
+                        ]
+                        changed += 1
+
+                if changed > before:
+                    self.add_user(user)
+
+        return changed
+
+    def purge_paths_from_user_data(self, paths) -> int:
+        """Entfernt gelöschte Pfade aus Favoriten, Vault und Tags aller Nutzer.
+
+        Zurückgegeben wird die Zahl der entfernten Einträge.
+
+        `db.remove()` löscht nur die Zeile in `media`. Der Nutzerzustand hängt
+        aber am **Pfad** und blieb unangetastet, für immer. Zwei Folgen:
+
+        1. Die Listen wachsen mit jeder gelöschten Datei. In dieser
+           Installation stehen bereits 12 Tag-Einträge und drei
+           Favoriten/Vault-Einträge auf Pfaden, die es nicht mehr gibt.
+
+        2. Die gefährlichere: Entsteht später **dieselbe Pfadangabe erneut** —
+           und beim Optimieren entsteht sie regelmäßig neu, weil aus
+           ``film.mkv`` wieder ``film.mp4`` wird —, erbt die neue Datei
+           stillschweigend den alten Zustand. Ein Video, das als „vaulted"
+           galt, ist nach dem Neuanlegen sofort wieder versteckt, ohne dass
+           irgendwo steht, warum.
+
+        Aufgerufen wird das bei **ausdrücklichen** Löschungen durch den
+        Nutzer. Nicht beim Aufräumen verwaister Einträge nach einem Scan: Dort
+        warnt der Code selbst, dass diese Angaben „no rescan can restore" —
+        und ein Scan, der sich irrt, würde sie sonst mitnehmen.
+        """
+        targets = {p for p in paths if p}
+        if not targets:
+            return 0
+
+        removed = 0
+        # Die ganze Schleife unter der Sperre: Sie liest jeden Nutzer, ändert
+        # ihn und schreibt ihn zurück — genau das Muster, das ohne Sperre die
+        # Änderung eines gleichzeitigen Aufrufers verwirft.
+        with self._write_lock:
+            for user in self.get_all_users():
+                before = removed
+
+                keep_fav = [p for p in user.data.favorites if p not in targets]
+                removed += len(user.data.favorites) - len(keep_fav)
+                user.data.favorites = keep_fav
+
+                keep_vault = [p for p in user.data.vaulted if p not in targets]
+                removed += len(user.data.vaulted) - len(keep_vault)
+                user.data.vaulted = keep_vault
+
+                keep_tags = {p: t for p, t in user.data.tags.items() if p not in targets}
+                removed += len(user.data.tags) - len(keep_tags)
+                user.data.tags = keep_tags
+
+                if removed > before:
+                    self.add_user(user)
+
+        return removed
 
     def cleanup_legacy_settings(self):
         """Removes migrated keys from settings.json."""

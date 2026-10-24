@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from arcade_scanner.config import IS_WIN, config
+from arcade_scanner.core.media_replace import TargetCollision, check_target_collision
 from arcade_scanner.database import db, user_db
 from arcade_scanner.security import SecurityError, is_path_allowed, sanitize_path
 
@@ -237,6 +238,35 @@ def _handle_mark_optimized(handler) -> None:
     handler.end_headers()
 
 
+def _busy_in_queue(paths: list[str]) -> set[str]:
+    """Welche dieser Dateien werden gerade über die Warteschlange bearbeitet?
+
+    Es gibt zwei voneinander unabhängige Wege, eine Datei umzuwandeln:
+
+        Warteschlange   /api/queue/next  →  mac_worker.py auf einem anderen Rechner
+        direkt          video_optimizer.py bzw. batch_controller.py, lokal
+
+    Nur der erste kennt eine Übernahme (`get_next_pending` per
+    Compare-and-Swap). Der zweite fragt nirgends nach. Eine Datei, die ein
+    Mac gerade umwandelt, liess sich hier also ein zweites Mal starten — zwei
+    Encoder auf derselben Quelle, beide mit demselben Zielnamen, und einer
+    löscht das Original, während der andere noch daraus liest.
+
+    Was diese Prüfung *nicht* abdeckt: zwei lokale Läufe derselben Datei. Die
+    tauchen in keiner Warteschlange auf. Dafür müssten lokale Umwandlungen dort
+    eingetragen werden — eine Entwurfsänderung, keine Korrektur.
+    """
+    try:
+        active = db.get_active_queue_paths()
+    except Exception as e:
+        # Im Zweifel nicht blockieren: Die Prüfung soll einen Doppellauf
+        # verhindern, nicht die Funktion lahmlegen, wenn die Warteschlange
+        # gerade nicht lesbar ist.
+        print(f"⚠️ Warteschlange nicht lesbar, Doppellauf-Prüfung entfällt: {e}")
+        return set()
+    return {p for p in paths if p in active}
+
+
 def _handle_compress(handler) -> None:
     user_name = handler.get_current_user()
     if not user_name:
@@ -274,6 +304,15 @@ def _handle_compress(handler) -> None:
         if video_mode not in ["compress", "copy"]:
             print(f"🚨 Invalid video mode: {video_mode}")
             handler.send_error(400, "Invalid video mode")
+            return
+
+        if _busy_in_queue([file_path]):
+            print(f"⛔ {file_path} steht bereits in der Warteschlange — kein zweiter Lauf")
+            handler.send_error(
+                409,
+                "Diese Datei wird bereits über die Warteschlange umgewandelt. "
+                "Ein zweiter Lauf würde dieselbe Datei gleichzeitig überschreiben."
+            )
             return
 
         current_port = handler.server.server_address[1]
@@ -422,6 +461,17 @@ def _handle_keep_optimized(handler) -> None:
                     opt_path_obj = Path(opt_abs)
                     new_path = orig_path_obj.with_suffix(opt_path_obj.suffix)
 
+                    # os.rename überschreibt auf POSIX wortlos. Trägt der
+                    # Zielname bereits eine andere Datei (film.mkv neben
+                    # film.mp4), wäre sie danach weg — und das Original ist eine
+                    # Zeile vorher schon gelöscht.
+                    try:
+                        check_target_collision(orig_path_obj, new_path)
+                    except TargetCollision as e:
+                        print(f"❌ Keeping optimized file aborted: {e}")
+                        handler.send_error(409, str(e))
+                        return True
+
                     if os.path.exists(orig_abs):
                         os.remove(orig_abs)
 
@@ -430,6 +480,16 @@ def _handle_keep_optimized(handler) -> None:
                     db.remove(opt_abs)
                     if orig_abs != str(new_path):
                         db.remove(orig_abs)
+                        # Favoriten, Vault und Tags hängen am Pfad, und aus
+                        # `film.mkv` wird hier `film.mp4`. Ohne das Umtragen
+                        # verliert der Nutzer sie beim Behalten der
+                        # optimierten Fassung — bei einer Datei, die für ihn
+                        # dieselbe ist.
+                        try:
+                            from arcade_scanner.database.user_store import user_db
+                            user_db.remap_paths_in_user_data({orig_abs: str(new_path)})
+                        except Exception as e:
+                            print(f"⚠️ Nutzerzustand nicht übernommen ({e!r}): {orig_abs}")
 
                 db.save()
                 _get_media_cache().invalidate()
@@ -541,15 +601,20 @@ def _handle_hide(handler) -> None:
 
     if path:
         abs_path = os.path.abspath(path)
-        u = user_db.get_user(user_name)
-        if u:
+
+        # Über update_user() statt get_user()/add_user() einzeln: Der Server
+        # bedient jede Anfrage in einem eigenen Thread, und add_user() schreibt
+        # den gesamten Nutzerdatensatz zurück. Zwei gleichzeitige Anfragen
+        # desselben Kontos lasen sonst beide den alten Stand, und die zweite
+        # verwarf die Änderung der ersten.
+        def toggle(u):
             if state:
                 if abs_path not in u.data.vaulted:
                     u.data.vaulted.append(abs_path)
-            else:
-                if abs_path in u.data.vaulted:
-                    u.data.vaulted.remove(abs_path)
-            user_db.add_user(u)
+            elif abs_path in u.data.vaulted:
+                u.data.vaulted.remove(abs_path)
+
+        if user_db.update_user(user_name, toggle):
             print(f"Updated vault state for {user_name}: {os.path.basename(abs_path)} -> hidden={state}")
 
     handler.send_response(204)
@@ -566,21 +631,21 @@ def _handle_batch_hide(handler) -> None:
     paths_list = paths_str.split("&state=")[0].split(",")
     state = "state=false" not in handler.path
 
-    u = user_db.get_user(user_name)
-    if u:
-        updated_count = 0
+    counted = {"n": 0}
+
+    def toggle_all(u):
         for p in paths_list:
             abs_p = os.path.abspath(p)
             if state:
                 if abs_p not in u.data.vaulted:
                     u.data.vaulted.append(abs_p)
-                    updated_count += 1
-            else:
-                if abs_p in u.data.vaulted:
-                    u.data.vaulted.remove(abs_p)
-                    updated_count += 1
-        user_db.add_user(u)
-        print(f"Batch updated vault state for {user_name} ({updated_count} files) -> hidden={state}")
+                    counted["n"] += 1
+            elif abs_p in u.data.vaulted:
+                u.data.vaulted.remove(abs_p)
+                counted["n"] += 1
+
+    if user_db.update_user(user_name, toggle_all):
+        print(f"Batch updated vault state for {user_name} ({counted['n']} files) -> hidden={state}")
     handler.send_response(204)
     handler.end_headers()
 
@@ -597,15 +662,15 @@ def _handle_favorite(handler) -> None:
 
     if path:
         abs_path = os.path.abspath(path)
-        u = user_db.get_user(user_name)
-        if u:
+
+        def toggle(u):
             if state:
                 if abs_path not in u.data.favorites:
                     u.data.favorites.append(abs_path)
-            else:
-                if abs_path in u.data.favorites:
-                    u.data.favorites.remove(abs_path)
-            user_db.add_user(u)
+            elif abs_path in u.data.favorites:
+                u.data.favorites.remove(abs_path)
+
+        if user_db.update_user(user_name, toggle):
             print(f"Updated favorite state for {user_name}: {os.path.basename(abs_path)} -> favorite={state}")
 
     handler.send_response(204)
@@ -622,22 +687,23 @@ def _handle_batch_favorite(handler) -> None:
     paths = params.get("paths", [""])[0].split(",")
     state = params.get("state", ["true"])[0].lower() == "true"
 
-    u = user_db.get_user(user_name)
-    if u:
-        updated_count = 0
+    counted = {"n": 0}
+
+    def toggle_all(u):
         for p in paths:
-            if p:
-                abs_path = os.path.abspath(p)
-                if state:
-                    if abs_path not in u.data.favorites:
-                        u.data.favorites.append(abs_path)
-                        updated_count += 1
-                else:
-                    if abs_path in u.data.favorites:
-                        u.data.favorites.remove(abs_path)
-                        updated_count += 1
-        user_db.add_user(u)
-        print(f"Batch updated favorite state for {user_name} ({updated_count} files) -> favorite={state}")
+            if not p:
+                continue
+            abs_path = os.path.abspath(p)
+            if state:
+                if abs_path not in u.data.favorites:
+                    u.data.favorites.append(abs_path)
+                    counted["n"] += 1
+            elif abs_path in u.data.favorites:
+                u.data.favorites.remove(abs_path)
+                counted["n"] += 1
+
+    if user_db.update_user(user_name, toggle_all):
+        print(f"Batch updated favorite state for {user_name} ({counted['n']} files) -> favorite={state}")
     handler.send_response(204)
     handler.end_headers()
 
@@ -663,6 +729,14 @@ def _handle_batch_compress(handler) -> None:
             except (SecurityError, ValueError) as e:
                 print(f"🚨 Skipping invalid path in batch: {p} - {e}")
                 continue
+
+        busy = _busy_in_queue(validated_paths)
+        if busy:
+            # Übersprungen statt abgebrochen: Der Rest der Auswahl soll laufen.
+            print(f"⛔ {len(busy)} Datei(en) stehen bereits in der Warteschlange, übersprungen:")
+            for p in sorted(busy):
+                print(f"   {p}")
+            validated_paths = [p for p in validated_paths if p not in busy]
 
         if not validated_paths:
             print("❌ No valid files to process in batch")
@@ -732,10 +806,14 @@ def _run_rescan_in_background(port: int) -> None:
         except Exception as e:
             print(f"⚠️ Auto-Tagging nach dem Scan fehlgeschlagen: {e!r}")
 
-        media_cache = _get_media_cache()
-        results = [e.model_dump(by_alias=True) for e in media_cache.get()]
-        media_cache.invalidate()
-        generate_html_report(results, config.report_file, server_port=port)
+        # `media_cache.get()` liefert bereits Dicts; hier stand darüber ein
+        # `e.model_dump(by_alias=True)`, das deshalb jedes Mal einen
+        # AttributeError warf. Das umgebende `except` machte daraus ein
+        # „Rescan failed", obwohl der Scan durch war — und die beiden Zeilen
+        # danach wurden nie erreicht: Der Medien-Cache blieb stehen und der
+        # Report wurde nicht neu erzeugt.
+        _get_media_cache().invalidate()
+        generate_html_report(config.report_file, server_port=port)
         print("✅ Rescan complete.")
     except Exception as e:
         print(f"❌ Rescan failed: {e}")

@@ -85,6 +85,24 @@ class SQLiteStore:
         self.on_change_callbacks.append(callback)
 
     def _notify_change(self):
+        """Meldet allen Beobachtern, dass sich die Daten geändert haben.
+
+        **Immer ausserhalb von ``_write_lock`` aufrufen.** Die Beobachter sind
+        fremde Objekte mit eigenen Sperren, und einer von ihnen hält seine
+        genau dann, wenn er hier hereinliest:
+
+            Anfrage A  /api/similar → SimilarityCache.get() nimmt seine Sperre
+                       und liest dann get_mean_vectors() → will _write_lock
+            Anfrage B  irgendein Schreibvorgang hält _write_lock
+                       und ruft hier hinein → will die Sperre von A
+
+        Beide warten auf den jeweils anderen. Und weil ``_write_lock`` dabei
+        gehalten bleibt, steht danach **jeder** weitere Schreibvorgang: Der
+        Server ist nicht langsam, er ist tot.
+
+        ``store_embedding`` hat es von Anfang an richtig gemacht; ``upsert``,
+        ``bulk_upsert`` und ``remove`` riefen innerhalb der Sperre.
+        """
         for cb in self.on_change_callbacks:
             try:
                 cb()
@@ -338,6 +356,35 @@ class SQLiteStore:
                 (username, rule_id),
             )
 
+    def forget_auto_tag_paths(self, file_paths) -> int:
+        """Buchführung für gelöschte Pfade vergessen. Gibt die Zahl der Zeilen zurück.
+
+        Der Auto-Tagger vergibt jeden Tag nur **einmal** je (Nutzer, Regel,
+        Pfad) — damit ein von Hand entfernter Tag entfernt bleibt. Diese
+        Buchführung hängt am Pfad, nicht an einem Eintrag; `remove()` fasst sie
+        nicht an.
+
+        Solange auch die Tags selbst liegen blieben, war das stimmig: Datei
+        weg, Tag noch da, Regel greift nicht mehr. Seit die Tags beim
+        ausdrücklichen Löschen mit aufgeräumt werden
+        (`user_store.purge_paths_from_user_data`), fielen beide auseinander —
+        entsteht später eine Datei unter demselben Pfad, hätte sie keinen Tag
+        und bekäme auch keinen mehr, weil die Regel sich für erledigt hält.
+
+        Die beiden Aufräumschritte gehören deshalb zusammen.
+        """
+        paths = [p for p in file_paths if p]
+        if not paths:
+            return 0
+
+        conn = self._ensure_connection()
+        with self._write_lock:
+            cursor = conn.executemany(
+                "DELETE FROM auto_tag_applied WHERE file_path = ?",
+                [(self._get_safe_path(p),) for p in paths],
+            )
+            return cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+
     # ------------------------------------------------------------------
     # Encoding Queue methods
     # ------------------------------------------------------------------
@@ -450,6 +497,14 @@ class SQLiteStore:
         job["file_path"] = self._decode_safe_path(job["file_path"])
         return job
 
+    # Jeder Zustand gehört in genau eine dieser beiden Mengen. Die
+    # Warteschlange entscheidet an mehreren Stellen anhand der Zugehörigkeit:
+    # ob eine Datei belegt ist, ob ein Job aufgeräumt werden darf, ob ein
+    # Fortschrittsbericht noch zählt.
+    ACTIVE_STATUSES = frozenset({"pending", "downloading", "encoding", "uploading"})
+    TERMINAL_STATUSES = frozenset({"done", "failed", "cancelled"})
+    VALID_STATUSES = ACTIVE_STATUSES | TERMINAL_STATUSES
+
     def update_job_status(self, job_id: int, status: str, guard_active: bool = False,
                           **kwargs: Any) -> bool:
         """Update a job's status and optional fields. Returns True if a row changed.
@@ -457,7 +512,19 @@ class SQLiteStore:
         With `guard_active` the update only fires while the job is still running,
         so a late status report from the worker cannot resurrect a job the user
         cancelled in the meantime.
+
+        Ein unbekannter Zustand wird abgelehnt. `/api/queue/complete` übernimmt
+        das Feld ungeprüft aus dem Rumpf der Anfrage, und ein Wert wie
+        ``"encoded"`` (statt ``"done"``) hätte den Job in ein Nirgendwo
+        versetzt: nicht aktiv, also wird er nie aufgeräumt — nicht endgültig,
+        also gilt er weiter als laufend, nimmt Fortschrittsmeldungen an und
+        bekommt nie ein ``completed_at``. Eine Zeile, die keine Stelle der
+        Warteschlange mehr anfasst.
         """
+        if status not in self.VALID_STATUSES:
+            print(f"⚠️ Unbekannter Job-Status '{status}' für Job {job_id} — abgelehnt")
+            return False
+
         conn = self._ensure_connection()
 
         sets = ["status = ?", "last_seen = ?"]
@@ -498,9 +565,27 @@ class SQLiteStore:
             return cursor.rowcount > 0
 
     def get_queue_status(self, limit: int = 20) -> List[dict]:
-        """Return active + recent jobs for the UI."""
+        """Return active + recent jobs for the UI.
+
+        Räumt dabei verwaiste Jobs auf. Das sah lange nach der falschen Stelle
+        aus — ein Lesezugriff, der schreibt —, ist aber die einzige, die im
+        entscheidenden Fall noch erreicht wird:
+
+        `_reclaim_stale_locked()` hing ausschließlich an `get_next_pending()`,
+        also daran, dass ein Arbeiter nach Arbeit fragt. Verschwindet der
+        letzte Arbeiter mitten im Encode (Neustart des Servers, Mac aus,
+        Batch-Controller abgeschossen), bleibt sein Job auf `encoding` stehen —
+        und niemand fragt mehr nach Arbeit, der ihn aufräumen könnte. Die
+        Datei zählte damit dauerhaft als „in Bearbeitung" und liess sich über
+        `queue_encode()` auch nicht neu einreihen. Der einzige Ausweg wäre die
+        Datenbank gewesen.
+
+        Das Dashboard fragt den Status regelmässig ab. Ein verwaister Job
+        heilt sich damit von selbst, sobald jemand hinsieht.
+        """
         conn = self._ensure_connection()
         with self._write_lock:
+            self._reclaim_stale_locked()
             cursor = conn.execute(
                 """SELECT id, file_path, status, size_bytes, created_at, started_at,
                           completed_at, worker_id, result_message, saved_bytes,
@@ -518,9 +603,15 @@ class SQLiteStore:
         return jobs
 
     def get_active_queue_paths(self) -> set[str]:
-        """file_paths of jobs currently pending or being processed."""
+        """file_paths of jobs currently pending or being processed.
+
+        Räumt vorher auf, damit ein verwaister Job eine Datei nicht dauerhaft
+        als belegt meldet — diese Menge entscheidet, ob sich eine Datei erneut
+        einreihen lässt.
+        """
         conn = self._ensure_connection()
         with self._write_lock:
+            self._reclaim_stale_locked()
             cursor = conn.execute(
                 "SELECT file_path FROM encoding_queue "
                 "WHERE status IN ('pending', 'downloading', 'encoding', 'uploading')"
@@ -702,7 +793,8 @@ class SQLiteStore:
                 f"INSERT OR REPLACE INTO media ({col_names}) VALUES ({placeholders})",
                 values,
             )
-            self._notify_change()
+        # Benachrichtigen erst nach der Sperre — siehe _notify_change().
+        self._notify_change()
 
     def bulk_upsert(self, entries) -> None:
         """Insert or replace multiple entries in a single transaction."""
@@ -732,7 +824,7 @@ class SQLiteStore:
             except Exception:
                 conn.execute("ROLLBACK")
                 raise
-            self._notify_change()
+        self._notify_change()
 
     def remove(self, path: str) -> None:
         """Delete an entry by file_path."""
@@ -740,7 +832,7 @@ class SQLiteStore:
             conn = self._ensure_connection()
             safe_path = self._get_safe_path(path)
             conn.execute("DELETE FROM media WHERE file_path = ?", (safe_path,))
-            self._notify_change()
+        self._notify_change()
 
     def delete_all_photos(self) -> int:
         """Delete all entries where media_type = 'image'. Returns the number of deleted rows."""

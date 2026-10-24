@@ -4,7 +4,7 @@ import json
 import os
 import threading
 import time
-from typing import AsyncIterator, List, Set, Tuple
+from typing import AsyncIterator, List, Optional, Set, Tuple
 
 from ..config import config
 
@@ -21,6 +21,8 @@ class AsyncFileSystem:
     def __init__(self):
         self.allow_images = False # Toggled by ScannerManager based on user settings
         self._last_scan_time = 0.0
+        # Wann der laufende Durchlauf *begonnen* hat. Siehe save_last_scan_time().
+        self._scan_started_at = 0.0
         self._scan_time_file = None  # Set lazily when config is available
         self._skipped_dirs = 0
 
@@ -28,11 +30,39 @@ class AsyncFileSystem:
         """Reload settings from config (called at scan start)."""
         self.min_size_bytes = config.settings.min_size_mb * 1024 * 1024
 
-        # Resolve excluded paths to absolute for robust matching
+        # Ausschlüsse kommen in drei Schreibweisen, und alle drei sind gewollt:
+        #
+        #   /home/ralf/privat     absoluter Pfad — genau dieser Baum
+        #   @eaDir                nackter Name   — jeder Ordner, der so heißt
+        #   AppData/Local/Temp    Teilpfad       — jeder Ordner, der so endet
+        #
+        # Vorher lief alles durch os.path.abspath(). Aus "@eaDir" wurde damit
+        # "<Arbeitsverzeichnis des Servers>/@eaDir" — ein Pfad, den es nicht
+        # gibt. Sämtliche mitgelieferten Voreinstellungen waren dadurch
+        # wirkungslos: @eaDir und #recycle (Synology), Temporary Items und
+        # Network Trash Folder, $RECYCLE.BIN und die Temp-Ordner unter Windows.
+        # Nachgemessen an einem Baum mit genau diesen Ordnern: alle vier
+        # Dateien landeten in der Bibliothek.
+        #
+        # Auf einem Synology-NAS ist das gut sichtbar — @eaDir enthält zu jeder
+        # Mediendatei eine Miniatur, die Bibliothek wäre doppelt so groß.
         self.exclude_abs: Set[str] = set()
+        self.exclude_names: Set[str] = set()
+        self.exclude_suffixes: Set[str] = set()
+
         for p in config.active_exclude_paths:
-            resolved = os.path.abspath(os.path.expanduser(p))
-            self.exclude_abs.add(resolved)
+            expanded = os.path.expanduser(p).strip()
+            if not expanded:
+                continue
+
+            normalized = expanded.replace("\\", os.sep).rstrip(os.sep)
+
+            if os.path.isabs(expanded):
+                self.exclude_abs.add(os.path.abspath(expanded))
+            elif os.sep in normalized:
+                self.exclude_suffixes.add(normalized)
+            else:
+                self.exclude_names.add(normalized)
 
         # Load last scan time
         self._scan_time_file = os.path.join(config.hidden_data_dir, ".last_scan_time")
@@ -50,27 +80,61 @@ class AsyncFileSystem:
             self._last_scan_time = 0.0
 
     def save_last_scan_time(self):
-        """Save the current time as last scan timestamp."""
+        """Merkt sich, wann der Durchlauf **begonnen** hat.
+
+        Hier stand `time.time()` — also der Zeitpunkt des Endes. Bei einer
+        großen Bibliothek liegen dazwischen Minuten, und was in dieser Zeit
+        passiert, fällt sonst dauerhaft durchs Raster:
+
+            02:00   Scan beginnt
+            02:00   /media wird durchlaufen
+            02:10   eine Datei in /media wird ersetzt → Ordner-mtime 02:10
+            02:30   Scan endet, merkt sich 02:30
+
+        Beim nächsten Durchlauf gilt `02:10 < 02:30`, der Ordner zählt als
+        unverändert und wird übersprungen. Die Änderung ist damit nicht bloß
+        einmal verpasst, sondern für immer — bis in demselben Ordner zufällig
+        etwas anderes passiert.
+
+        Der Beginn ist die sichere Wahl: Er lässt beim nächsten Mal höchstens
+        noch einmal nachsehen, wo sich nichts geändert hat. Zu viel zu prüfen
+        kostet Zeit, zu wenig kostet Richtigkeit.
+        """
         try:
             if self._scan_time_file:
                 os.makedirs(os.path.dirname(self._scan_time_file), exist_ok=True)
+                stand = self._scan_started_at or time.time()
                 with open(self._scan_time_file, 'w') as f:
-                    json.dump({'last_scan_time': time.time()}, f)
+                    json.dump({'last_scan_time': stand}, f)
         except Exception as e:
             print(f"⚠️ Could not save scan time: {e}")
 
-    async def scan_directories(self, targets: List[str]) -> AsyncIterator[Tuple[str, bool]]:
+    async def scan_directories(self, targets: List[str]) -> AsyncIterator[Tuple[str, bool, bool]]:
         """
-        Asynchronously yields ``(absolute_path, dir_changed)`` tuples for valid
-        media files found in targets.
+        Asynchronously yields ``(absolute_path, dir_changed, too_small)`` tuples
+        for media files found in targets.
+
+        ``too_small`` heisst: Die Datei liegt unter der eingestellten
+        Mindestgrösse. Sie wird trotzdem gemeldet — wer sie nicht meldet,
+        macht sie für den Aufräumschritt ununterscheidbar von einer
+        gelöschten.
         """
         # Reload settings fresh (picks up any changes to exclusions/min_size)
         self._load_settings()
+
+        # Vor dem ersten Verzeichnis merken, nicht am Ende: siehe
+        # save_last_scan_time().
+        self._scan_started_at = time.time()
 
         for target in targets:
             abs_target = os.path.abspath(os.path.expanduser(target))
             if not os.path.exists(abs_target):
                 print(f"⚠️ Warning: Scan target not found: {abs_target}")
+                continue
+
+            excludes = self._exclusions_for_target(abs_target)
+            if excludes is None:
+                print(f"🔒 Skipping excluded scan target: {target}")
                 continue
 
             # Bounded queue: limits RAM usage to ~500 paths at a time.
@@ -84,7 +148,7 @@ class AsyncFileSystem:
             # dies — one lost worker per abandoned scan.
             cancel = threading.Event()
             walker = asyncio.create_task(
-                self._walker_worker(abs_target, queue, cancel)
+                self._walker_worker(abs_target, queue, cancel, excludes)
             )
 
             try:
@@ -101,8 +165,63 @@ class AsyncFileSystem:
         if self._skipped_dirs > 0:
             print(f"\n⚡ Skipped {self._skipped_dirs} unchanged directories (incremental scan)")
 
+    def _matches_name_or_suffix(self, abs_path: str) -> bool:
+        """Trifft ein Name-Ausschluss oder ein Teilpfad-Ausschluss auf diesen Ordner?"""
+        if self.exclude_names:
+            parts = abs_path.split(os.sep)
+            if self.exclude_names.intersection(parts):
+                return True
+
+        for suffix in self.exclude_suffixes:
+            if abs_path == suffix or abs_path.endswith(os.sep + suffix):
+                return True
+
+        return False
+
+    def _exclusions_for_target(self, abs_target: str) -> Optional[Set[str]]:
+        """Ausschlüsse in der Schreibweise dieses Ziels. None = Ziel ganz überspringen.
+
+        Hintergrund: ``os.walk`` folgt Symlinks nicht, Unterverzeichnisse sind
+        also sicher. Das **Ziel selbst** wird aber betreten, egal ob es ein
+        Symlink ist — und die Pfade, die dabei entstehen, tragen den Namen des
+        Symlinks. Ein Ausschluss auf das echte Verzeichnis passt darauf nie.
+
+        Gemessen am Beispiel: Ziel ``…/alias/p`` (Symlink auf ``…/privat``),
+        Ausschluss ``…/privat`` — beide Dateien unter ``privat`` landeten in der
+        Bibliothek. Für eine Datenschutz-Funktion ist das die falsche Richtung
+        des Fehlers.
+
+        Deshalb werden die Ausschlüsse einmal je Ziel übersetzt, statt bei jedem
+        Verzeichnis aufzulösen: ein ``realpath`` pro Ausschluss statt eines pro
+        besuchtem Ordner. Die abgelegten Pfade bleiben dabei unverändert — sie
+        umzuschreiben würde bestehende Einträge, Favoriten und Tags entwerten.
+        """
+        real_target = os.path.realpath(abs_target)
+        if self._matches_name_or_suffix(abs_target) or self._matches_name_or_suffix(real_target):
+            return None
+
+        if real_target == abs_target and not any(
+            os.path.realpath(ex) != ex for ex in self.exclude_abs
+        ):
+            return self.exclude_abs
+
+        translated = set(self.exclude_abs)
+        for ex in self.exclude_abs:
+            real_ex = os.path.realpath(ex)
+
+            # Das Ziel liegt selbst im ausgeschlossenen Baum.
+            if real_target == real_ex or real_target.startswith(real_ex + os.sep):
+                return None
+
+            # Der Ausschluss liegt im Ziel — unter dem Namen, den der Walk sieht.
+            if real_ex.startswith(real_target + os.sep):
+                translated.add(abs_target + real_ex[len(real_target):])
+
+        return translated
+
     async def _walker_worker(self, root_dir: str, queue: asyncio.Queue,
-                             cancel: threading.Event) -> None:
+                             cancel: threading.Event,
+                             excludes: Optional[Set[str]] = None) -> None:
         """
         Worker that runs in a thread.
         Uses a bounded queue to prevent memory explosion with 50K+ files.
@@ -112,6 +231,7 @@ class AsyncFileSystem:
         while waiting on the queue so an abandoned scan gives its thread back.
         """
         loop = asyncio.get_event_loop()
+        exclude_abs = self.exclude_abs if excludes is None else excludes
 
         def put_blocking(payload) -> bool:
             """Hand one item to the queue. Returns False if the scan was abandoned."""
@@ -134,15 +254,17 @@ class AsyncFileSystem:
                     abs_root = os.path.abspath(root)
 
                     # 1. Skip root if it matches any exclusion (O(n_excludes))
-                    if any(abs_root == ex or abs_root.startswith(ex + os.sep)
-                           for ex in self.exclude_abs):
+                    if self._matches_name_or_suffix(abs_root) or any(
+                            abs_root == ex or abs_root.startswith(ex + os.sep)
+                            for ex in exclude_abs):
                         dirs.clear()  # Don't descend into excluded subtrees
                         continue
 
                     # 2. Prune excluded subdirs in-place
                     dirs[:] = [
                         d for d in dirs
-                        if os.path.abspath(os.path.join(root, d)) not in self.exclude_abs
+                        if os.path.abspath(os.path.join(root, d)) not in exclude_abs
+                        and d not in self.exclude_names
                     ]
 
                     # 3. Incremental scan: skip dirs unchanged since last scan
@@ -159,10 +281,27 @@ class AsyncFileSystem:
                         if not self._is_video(file):
                             continue
                         full_path = os.path.join(root, file)
-                        if dir_changed and not self._is_valid_size(full_path):
-                            continue
+
+                        # Unter der Mindestgröße: gemeldet wird sie trotzdem,
+                        # nur mit einem Vermerk.
+                        #
+                        # Vorher stand hier `continue`, und zwar nur für
+                        # geänderte Verzeichnisse. Damit war eine
+                        # herausgefilterte Datei für den Aufräumschritt nicht
+                        # von einer gelöschten zu unterscheiden — er entfernte
+                        # ihren Eintrag samt Vorschaubild. In unveränderten
+                        # Verzeichnissen griff der Filter gar nicht, dort
+                        # blieben die Einträge stehen.
+                        #
+                        # Ergebnis war ein schleichender Verlust ohne
+                        # erkennbaren Auslöser: An dieser Bibliothek
+                        # verschwanden 515 Einträge, weil in drei Ordnern
+                        # etwas gelöscht wurde — die Dateien selbst lagen
+                        # unverändert auf der Platte.
+                        too_small = not self._is_valid_size(full_path)
+
                         # Blocking put provides natural backpressure on the bounded queue
-                        if not put_blocking((full_path, dir_changed)):
+                        if not put_blocking((full_path, dir_changed, too_small)):
                             return
             except Exception as e:
                 print(f"❌ Error walking {root_dir}: {e}")
@@ -173,11 +312,6 @@ class AsyncFileSystem:
         # queue may be full, so this put would block forever.
         if not cancel.is_set():
             await queue.put(None)
-
-    def _is_excluded(self, parent: str, dirname: str) -> bool:
-        """Check if a subdirectory should be pruned (O(1) set lookup)."""
-        full = os.path.abspath(os.path.join(parent, dirname))
-        return full in self.exclude_abs
 
     def _is_video(self, filename: str) -> bool:
         # Skip macOS resource fork files (e.g., ._video.mp4)

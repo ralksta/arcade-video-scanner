@@ -7,7 +7,7 @@ one xfail documents a real security gap (see below) without fixing it blind.
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
+from fake_user_store import make_fake_user_db
 
 from arcade_scanner.server.routes import settings
 
@@ -62,9 +62,9 @@ def _singletons(save_result=True):
     config = MagicMock()
     config.settings.model_dump.return_value = {"bitrate_threshold_kbps": 8000}
     config.save.return_value = save_result
-    user_db = MagicMock()
-    user = MagicMock()
-    user_db.get_user.return_value = user
+    # Die Attrappe muss `update_user()` wirklich ausführen — siehe
+    # tests/fake_user_store.py.
+    user_db, _user = make_fake_user_db()
     debouncer = MagicMock()
     return config, user_db, debouncer, 1024 * 1024
 
@@ -95,14 +95,17 @@ def test_get_settings_merges_user_fields_for_session():
     assert h.body()["smart_collections"] == [{"id": "c1"}]
 
 
-@pytest.mark.xfail(
-    reason="SECURITY: POST /api/settings hat keinen Session-Check — config.save() "
-           "läuft auch für anonyme Requests (settings.py:80-108, user-Check erst "
-           "danach). Im Nachtlauf bewusst nur dokumentiert, nicht gefixt; "
-           "Fix-Muster analog c1caa24 (Queue-Endpoints).",
-    strict=False,
-)
 def test_post_settings_anonymous_is_rejected():
+    """Behoben. Der Mangel stand hier seit einem früheren Nachtlauf als xfail:
+
+        "POST /api/settings hat keinen Session-Check — config.save() läuft
+         auch für anonyme Requests"
+
+    Er stimmte: Die Prüfung stand hinter `config.save()`, eine anonyme Anfrage
+    konnte also Scan-Schwellen, ffmpeg-Pfade, `proxy_root` und `review_dir`
+    schreiben und scheiterte erst danach still am fehlenden Nutzer. Die Prüfung
+    steht jetzt vor dem Lesen des Rumpfes.
+    """
     h = FakeHandler("/api/settings", user=None, body={"bitrate_threshold_kbps": 1})
     handled, singletons = run(h, post=True)
     assert handled is True

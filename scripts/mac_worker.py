@@ -412,6 +412,9 @@ def _run_job(client, job, job_id, filename, stem, job_dir, reporter):
             copy_audio=False,
             audio_mode="enhanced",
             video_mode="compress",
+            # The job was explicitly queued by a user; skipping it here would
+            # surface as a bogus "Encoding failed" upstream.
+            force=True,
             progress_callback=reporter.on_encode_progress,
         )
 

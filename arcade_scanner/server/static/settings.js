@@ -58,6 +58,8 @@ async function openSettings() {
         if (verboseScanningCheckbox) verboseScanningCheckbox.checked = data.verbose_scanning === true;
 
 
+        renderUnavailableTargets(data.unavailable_targets || []);
+
         // Show default paths hint
         document.getElementById('defaultTargetsHint').textContent =
             `Standard: ${data.default_scan_targets.slice(0, 2).join(', ')}${data.default_scan_targets.length > 2 ? '...' : ''}`;
@@ -228,7 +230,7 @@ async function saveSettings() {
             const newSafeMode = document.getElementById('settingsSafeMode').checked;
             if (newSafeMode !== window.safeMode) {
                 window.safeMode = newSafeMode;
-                localStorage.setItem('safe_mode', window.safeMode);
+                window.safeStorage.set('safe_mode', window.safeMode);
             }
 
             // Always refresh content to reflect potential changes in sensitive lists or other settings
@@ -634,6 +636,36 @@ function rescanLibrary() {
 }
 
 /**
+ * Zeigt an, welche der eigenen Scan-Ziele gerade nicht erreichbar sind.
+ *
+ * Der Scanner weiß das und schreibt es ins Protokoll — dorthin, wo niemand
+ * hinsieht, der den Server als Dienst laufen lässt. Zu sehen war stattdessen
+ * eine vollständige Bibliothek, in der nichts abspielt: Das sieht nach einem
+ * kaputten Programm aus, nicht nach einem nicht eingehängten Laufwerk.
+ *
+ * Die Pfade kommen als Textknoten in die Liste, nicht als Markup — es sind
+ * frei eingegebene Zeichenketten.
+ */
+function renderUnavailableTargets(targets) {
+    const card = document.getElementById('unavailableTargetsCard');
+    const list = document.getElementById('unavailableTargetsList');
+    if (!card || !list) return;
+
+    list.replaceChildren();
+    if (!targets.length) {
+        card.classList.add('hidden');
+        return;
+    }
+
+    targets.forEach(path => {
+        const item = document.createElement('li');
+        item.textContent = path;
+        list.append(item);
+    });
+    card.classList.remove('hidden');
+}
+
+/**
  * Stop a running library scan (partial results are kept; orphan cleanup is
  * skipped server-side to protect existing entries).
  */
@@ -790,7 +822,12 @@ function saveSettingsWithoutReload() {
  * Export current settings as JSON file download
  */
 function exportSettings() {
-    window.location.href = '/api/user/export';
+    // '/api/user/export' gab es nie. Der Knopf wurde zusammen mit der
+    // Beschriftung „Saves as arcade_settings_backup.json" eingebaut — und
+    // genau diesen Dateinamen liefert '/api/backup', die einzige
+    // Sicherungsroute, die der Server tatsächlich hat. Sie hatte bis hierher
+    // keinen einzigen Aufrufer.
+    window.location.href = '/api/backup';
 }
 
 /**
@@ -971,13 +1008,11 @@ async function loadQueueStatus() {
             return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-ink/10 text-gray-400'}">${s}</span>`;
         };
 
-        const timeAgo = (ts) => {
-            if (!ts) return '—';
-            const diff = Math.floor(Date.now() / 1000 - ts);
-            if (diff < 60) return `${diff}s ago`;
-            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-            return `${Math.floor(diff / 3600)}h ago`;
-        };
+        // Vorher stand hier eine eigene Fassung, die bei Stunden aufhörte:
+        // Ein Auftrag vom April stand als „2952h ago" in der Liste.
+        // formatRelativeTime() aus formatters.js kann Tage, Wochen und Monate
+        // und war schon da — nur benutzt hat sie niemand.
+        const timeAgo = (ts) => (ts ? formatRelativeTime(ts) : '—');
 
         const eta = (secs) => {
             if (!secs || secs <= 0) return '';

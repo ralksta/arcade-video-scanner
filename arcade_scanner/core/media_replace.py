@@ -52,6 +52,41 @@ def verify_media_integrity(path: Path, expected_duration: float,
     return (True, "ok")
 
 
+class TargetCollision(RuntimeError):
+    """Der Zielname gehört bereits einer anderen Datei."""
+
+
+def check_target_collision(original: Path, target: Path) -> None:
+    """Verhindert, dass ein Encode eine *fremde* Datei überschreibt.
+
+    Der Optimierer schreibt immer ``.mp4``. Aus ``film.mkv`` wird also
+    ``film.mp4`` — und wenn daneben schon eine ``film.mp4`` liegt, ist das eine
+    andere Datei mit anderem Inhalt. ``os.replace`` und ``os.rename``
+    überschreiben sie auf POSIX wortlos.
+
+    Zwei Wege dorthin, beide in einer Mediensammlung nicht ausgefallen:
+
+      * dieselbe Aufnahme in zwei Behältern (``film.mkv`` neben ``film.mp4``) —
+        wer die mkv optimiert, verliert die mp4
+      * zwei Quellen mit gleichem Stamm (``film.mkv``, ``film.avi``), beide in
+        der Warteschlange — die zweite fertige Umwandlung überschreibt die erste,
+        und beide Originale sind zu dem Zeitpunkt schon gelöscht
+
+    Deshalb wird hier abgebrochen statt umbenannt: Ein selbst gewählter
+    Ausweichname (``film_opt.mp4``) wäre stillschweigend etwas anderes als das,
+    was der Nutzer angestoßen hat. Welche der beiden Dateien er behalten will,
+    kann nur er entscheiden.
+    """
+    original, target = Path(original), Path(target)
+    if original == target:
+        return
+    if target.exists():
+        raise TargetCollision(
+            f"'{target.name}' existiert bereits und gehört nicht zu "
+            f"'{original.name}' — die Umwandlung würde sie überschreiben"
+        )
+
+
 def atomic_replace(staging: Path, target: Path) -> None:
     """Move `staging` onto `target` atomically.
 

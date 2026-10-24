@@ -8,6 +8,8 @@ it here — the restore lands separately with PR #33.
 import json
 from unittest.mock import MagicMock, patch
 
+from fake_user_store import make_fake_user_db
+
 from arcade_scanner.server.routes import tags
 
 
@@ -52,11 +54,10 @@ class FakeHandler:
 
 
 def _user_deps():
-    user_db = MagicMock()
     u = MagicMock()
     u.data.available_tags = [{"name": "work", "color": "#fff"}]
     u.data.tags = {}
-    user_db.get_user.return_value = u
+    user_db, _ = make_fake_user_db(u)
     return user_db, 1024 * 1024
 
 

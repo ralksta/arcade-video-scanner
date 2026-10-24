@@ -78,7 +78,7 @@ function renderFolderSidebar() {
         const folderName = path.split(/[\\\\/]/).pop() || path;
 
         item.innerHTML = `
-            <div class="folder-name" title="${path}">${folderName}</div>
+            <div class="folder-name" title="${escapeHtml(path)}">${escapeHtml(folderName)}</div>
             <div class="folder-meta">
                 <span>${data.count} Videos</span>
                 <span>${formatSize(data.size_mb)}</span>
@@ -420,7 +420,7 @@ function createFolderCard(folder) {
 
         <!-- Content -->
         <div class="absolute bottom-0 left-0 right-0 p-4">
-            <h3 class="text-base font-bold text-text-main truncate group-hover:text-arcade-cyan transition-colors" title="${folder.path}">${folder.name}</h3>
+            <h3 class="text-base font-bold text-text-main truncate group-hover:text-arcade-cyan transition-colors" title="${escapeHtml(folder.path)}">${escapeHtml(folder.name)}</h3>
             <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
                 <span class="flex items-center gap-1">
                     <span class="material-icons text-sm" aria-hidden="true">video_library</span>
@@ -479,7 +479,7 @@ function createFolderRow(folder) {
             ${thumbHtml}
         </div>
         <div class="min-w-0 flex-1">
-            <div class="text-sm font-bold text-text-main truncate" title="${folder.path}">${folder.name}</div>
+            <div class="text-sm font-bold text-text-main truncate" title="${escapeHtml(folder.path)}">${escapeHtml(folder.name)}</div>
             <div class="text-xs text-text-muted truncate">${folder.count} · ${formatSize(folder.size_mb)}</div>
         </div>
         <span class="material-icons text-text-muted flex-shrink-0" aria-hidden="true">${folder.hasSubfolders ? 'chevron_right' : 'play_arrow'}</span>
@@ -526,14 +526,33 @@ function renderFolderBrowser() {
     // Update breadcrumb
     if (breadcrumbEl) {
         const breadcrumbs = getFolderBreadcrumbs();
-        breadcrumbEl.innerHTML = breadcrumbs.map((crumb, idx) => {
+        // Der Pfad steckte in einem interpolierten onclick, abgesichert nur
+        // gegen einfache Anführungszeichen. Ein Ordner namens
+        // `a"onmouseover=...` bricht damit aus dem Attribut aus — das
+        // Anführungszeichen begrenzt es, nicht das Apostroph. Knoten bauen
+        // löst beide Ebenen auf einmal.
+        breadcrumbEl.innerHTML = '';
+
+        breadcrumbs.forEach((crumb, idx) => {
             const isLast = idx === breadcrumbs.length - 1;
-            const clickHandler = isLast ? '' : `onclick="setFolderBrowserPath(${crumb.path === null ? 'null' : `'${crumb.path.replace(/'/g, "\\'")}'`})"`;
-            return `
-                <span class="flex-shrink-0 ${isLast ? 'text-text-main font-bold' : 'text-arcade-cyan hover:text-text-main cursor-pointer transition-colors'}" ${clickHandler}>${crumb.name}</span>
-                ${!isLast ? '<span class="text-gray-600 mx-1 flex-shrink-0">/</span>' : ''}
-            `;
-        }).join('');
+
+            const item = document.createElement('span');
+            item.className = 'flex-shrink-0 ' + (isLast
+                ? 'text-text-main font-bold'
+                : 'text-arcade-cyan hover:text-text-main cursor-pointer transition-colors');
+            item.textContent = crumb.name;
+            if (!isLast) {
+                item.addEventListener('click', () => setFolderBrowserPath(crumb.path));
+            }
+            breadcrumbEl.appendChild(item);
+
+            if (!isLast) {
+                const separator = document.createElement('span');
+                separator.className = 'text-gray-600 mx-1 flex-shrink-0';
+                separator.textContent = '/';
+                breadcrumbEl.appendChild(separator);
+            }
+        });
 
         // Bei tiefen Pfaden ans Ende scrollen, damit der aktuelle Ordner sichtbar ist
         const scroller = breadcrumbEl.parentElement;

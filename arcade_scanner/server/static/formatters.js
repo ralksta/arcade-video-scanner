@@ -90,6 +90,9 @@ function formatRelativeTime(timestamp) {
     const now = Date.now() / 1000;
     const diff = now - timestamp;
 
+    // Auch für negative Abstände: Ein Zeitstempel aus der Zukunft entsteht
+    // durch eine falsch gestellte Uhr auf einem entfernten Arbeiter, und
+    // „-3 minutes ago" wäre die schlechtere Auskunft.
     if (diff < 60) return 'just now';
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;

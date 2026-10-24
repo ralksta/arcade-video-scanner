@@ -14,6 +14,61 @@ from .media_probe import MediaProbe
 from .video_inspector import VideoInspector
 
 
+def _apply_detected_moves(existing_entries, orphans, newcomers) -> dict:
+    """Trägt Favoriten, Vault, Tags und das Aufnahmedatum auf den neuen Pfad um.
+
+    `existing_entries` ist der Stand **vor** dem Scan, `orphans` sind die
+    daraus verschwundenen Pfade, `newcomers` die neu hinzugekommenen.
+
+    Der Aufruf steht unmittelbar vor dem Löschen der verwaisten Zeilen — das
+    ist der letzte Zeitpunkt, zu dem der alte Zustand noch existiert.
+
+    Fehler hier dürfen den Scan nicht abbrechen: Das Aufräumen danach ist
+    wichtiger als das Umtragen, und ein nicht umgetragener Eintrag ist genau
+    der Zustand, den es vorher immer gab.
+    """
+    if not orphans or not newcomers:
+        return {}
+
+    try:
+        from ..database.user_store import user_db
+        from .move_detect import detect_moves
+
+        gone = {p: existing_entries[p] for p in orphans if p in existing_entries}
+        arrived = {}
+        for path in newcomers:
+            entry = db.get(path)
+            if entry is not None:
+                arrived[path] = entry
+
+        moves = detect_moves(gone, arrived)
+        if not moves:
+            return {}
+
+        umgetragen = user_db.remap_paths_in_user_data(moves)
+
+        # Das Aufnahmedatum gehört zur Datei, nicht zum Pfad. Ohne diesen
+        # Schritt stünde jede verschobene Datei in „zuletzt hinzugefügt" ganz
+        # oben — obwohl sich nur ihr Name geändert hat.
+        for alt, neu in moves.items():
+            altes_datum = getattr(existing_entries[alt], "imported_at", 0) or 0
+            neuer_eintrag = db.get(neu)
+            if neuer_eintrag is None or not altes_datum:
+                continue
+            if not (getattr(neuer_eintrag, "imported_at", 0) or 0) or \
+                    altes_datum < neuer_eintrag.imported_at:
+                neuer_eintrag.imported_at = altes_datum
+                db.upsert(neuer_eintrag)
+
+        print(f"↪ {len(moves)} Datei(en) umgezogen — Tags, Favoriten und "
+              f"Aufnahmedatum übernommen ({umgetragen} Nutzereinträge).")
+        return moves
+    except Exception as e:
+        print(f"⚠️ Umzugserkennung übersprungen ({e!r}) — "
+              "verschobene Dateien verlieren ihre Tags wie bisher.")
+        return {}
+
+
 class ScannerManager:
     """
     Orchestrates the scanning process:
@@ -24,6 +79,9 @@ class ScannerManager:
     """
     def __init__(self):
         self.is_scanning = False
+        # Schützt genau das Paar „nachsehen und setzen" in run_scan(). Ohne
+        # die Sperre können zwei Anfragen beide den freien Zustand sehen.
+        self._state_lock = threading.Lock()
         # A threading.Event, not an asyncio one: main.py runs the scan inside a
         # daemon thread with its own event loop, so stop() is always called from
         # a different thread than the scan. asyncio.Event.set() is not
@@ -38,14 +96,35 @@ class ScannerManager:
         self.sem_video = None
         self.sem_image = None
 
+    def _claim(self) -> bool:
+        """Belegt den Scanner, wenn er frei ist. True heisst: Du darfst.
+
+        Eine eigene Methode, damit „nachsehen und setzen" **eine** Sache ist
+        und auch von aussen als solche geprüft werden kann. Stünden die beiden
+        Zeilen einzeln im Ablauf, wäre das Fenster wieder da.
+        """
+        with self._state_lock:
+            if self.is_scanning:
+                return False
+            self.is_scanning = True
+            return True
+
     async def run_scan(self, progress_callback: Optional[Callable[[str], None]] = None, force_rescan: bool = False) -> int:
         """
         Full scan pipeline. Returns number of new/updated files processed.
         """
-        if self.is_scanning:
+        # Nachsehen und Belegen muss zusammen passieren.
+        #
+        # Vorher standen die beiden Zeilen einzeln da, und die Route davor
+        # prüft ebenfalls nur und startet dann einen Thread. Zwei Anfragen
+        # kurz hintereinander — der Fernseher und der Browser, oder zweimal
+        # geklickt — sahen damit beide „läuft nicht" und starteten je einen
+        # vollständigen Durchlauf: doppelte ffprobe-Last auf allen Kernen und
+        # zwei Schreiber auf derselben Datenbank.
+        if not self._claim():
+            print("⏸ Scan bereits im Gang — zweite Anfrage übergangen.")
             return 0
 
-        self.is_scanning = True
         self._stop_event.clear()
 
         start_time = time.time()
@@ -75,7 +154,11 @@ class ScannerManager:
 
         # 1. Load Cache
         db.load()
-        existing_paths = {entry.file_path for entry in db.get_all()}
+        # Nicht nur die Pfade: Um einen Umzug zu erkennen, braucht der
+        # Aufräumschritt unten den Fingerabdruck der Einträge, wie sie **vor**
+        # diesem Scan aussahen. Danach ist die alte Zeile weg.
+        existing_entries = {entry.file_path: entry for entry in db.get_all()}
+        existing_paths = set(existing_entries)
         found_paths: Set[str] = set()
 
         # Snapshot the targets once: the orphan cleanup below decides whether it
@@ -93,7 +176,30 @@ class ScannerManager:
         # "this file is gone" apart from "we never got that far".
         discovery_complete = True
 
+        # Zwei Zahlen, weil es zwei verschiedene sind: `seen_count` zählt jede
+        # Datei, die der Durchlauf betrachtet hat, `processed_count` nur die,
+        # die tatsächlich untersucht wurden. Vorher gab es nur die erste — und
+        # die Abschlusszeile nannte sie „new/updated". Bei dieser Bibliothek
+        # stand dort 9010, während in Wahrheit 222 Dateien Arbeit machten.
+        seen_count = 0
         processed_count = 0
+        # Dateien, die der Scan nicht lesen konnte. Bisher stand dazu je eine
+        # Zeile im Protokoll und sonst nichts: Wer nicht mitliest, erfährt nie,
+        # dass etwas fehlt. Und fehlen tut es leise — ein bereits bekannter
+        # Eintrag behält seine alten Angaben, ein neuer entsteht gar nicht
+        # erst.
+        #
+        # Einen Status dafür gibt es nicht mehr: "CORRUPT" kommt im gesamten
+        # Code nicht vor, seit die Tiefenprüfung zugunsten der
+        # Scan-Geschwindigkeit entfernt wurde (media_probe.py). Die wenigen
+        # Einträge, die ihn in der Datenbank noch tragen, stammen aus der Zeit
+        # davor. Deshalb hier wenigstens eine Zählung mit Beispielen.
+        # (Pfad, Grund) — der Grund kommt aus ffprobe, nicht aus einer Vermutung.
+        failed_paths: List[Tuple[str, str]] = []
+        # Einträge, deren Datei unter die Mindestgrösse gerutscht ist. Getrennt
+        # von den verwaisten: Die Datei ist da, sie gehört nur nicht mehr in
+        # die Bibliothek.
+        undersized_paths: List[str] = []
         batch_entries: List[Any] = []
 
         # 2. Worker Queue Pattern
@@ -139,7 +245,7 @@ class ScannerManager:
                 batch_entries = []
 
         async def _worker():
-            nonlocal processed_count
+            nonlocal seen_count
             while True:
                 try:
                     item = await queue.get()
@@ -152,7 +258,7 @@ class ScannerManager:
                     await _check_system_load()
                     await _process_path(path, dir_changed, idx, total)
 
-                    processed_count += 1
+                    seen_count += 1
                     queue.task_done()
                 except Exception as e:
                     print(f"❌ Worker error: {e}")
@@ -209,6 +315,9 @@ class ScannerManager:
             if not (needs_update or force_rescan):
                 return
 
+            nonlocal processed_count
+            processed_count += 1
+
             # --- HEAVY TASK (Inside Semaphore) ---
             async with sem:
                 if self._stop_event.is_set():
@@ -223,11 +332,12 @@ class ScannerManager:
                     print(f"🔍 {progress_prefix}Analyzing (FULL PATH): {path}")
                 elif (processed_count > 0 and processed_count % 10 == 0) or current_idx == total_count:
                     if processed_count > 0:
-                        print(f"📊 {progress_prefix}Indexing media... ({processed_count} new/updated)")
+                        print(f"📊 {progress_prefix}Indexing media... ({processed_count} neu oder geändert)")
 
                 # 3. Probe using Selected Inspector
                 entry: Optional[MediaAsset] = None
                 scan_start_time = time.time()
+                grund = ""
                 try:
                     entry = await inspector.inspect(path)
                     scan_duration = time.time() - scan_start_time
@@ -235,11 +345,16 @@ class ScannerManager:
                         print(f"⏱️  Finished in {scan_duration:.2f}s: {os.path.basename(path)}")
                 except Exception as e:
                     scan_duration = time.time() - scan_start_time
-                    print(f"❌ {progress_prefix}Inspect failed in {scan_duration:.2f}s for {path}: {e}")
+                    # Der Grund kommt jetzt aus ffprobe selbst (ProbeError) —
+                    # vorher stand hier pauschal „timeout or corrupt", und das
+                    # war bei fehlenden Leserechten schlicht falsch.
+                    grund = str(e) or type(e).__name__
                     entry = None
 
                 if not entry:
-                    print(f"❌ {progress_prefix}Metadata extraction failed for {os.path.basename(path)} (timeout or corrupt)")
+                    grund = grund or "kein Ergebnis von ffprobe"
+                    failed_paths.append((path, grund))
+                    print(f"❌ {progress_prefix}{os.path.basename(path)}: {grund}")
                 else:
                     parent_dir = os.path.basename(os.path.dirname(path)).lower()
                     is_source_dir = parent_dir in ['source', 'originals', 'raw']
@@ -283,13 +398,27 @@ class ScannerManager:
 
             # 2. Discovery Loop -> Feed Queue (Streaming for better performance)
             idx = 0
-            async for file_path, dir_changed in fs_scanner.scan_directories(scan_targets):
+            async for file_path, dir_changed, too_small in fs_scanner.scan_directories(scan_targets):
                 if self._stop_event.is_set():
                     discovery_complete = False
                     break
 
                 idx += 1
+                # **Immer** als gefunden vermerken, auch wenn die Datei unter
+                # der Mindestgrösse liegt. Sonst hält der Aufräumschritt sie
+                # für gelöscht und wirft ihren Eintrag samt Vorschaubild weg,
+                # obwohl sie unverändert auf der Platte liegt.
                 found_paths.add(file_path)
+
+                if too_small:
+                    # Nichts zu untersuchen — aber wenn sie bisher in der
+                    # Bibliothek stand, gehört sie dort nicht mehr hin. Das
+                    # wird getrennt gezählt und getrennt gemeldet: „unter der
+                    # Mindestgrösse" ist etwas anderes als „gelöscht".
+                    if file_path in existing_paths:
+                        undersized_paths.append(file_path)
+                    continue
+
                 await queue.put((file_path, dir_changed, idx, 0)) # Stream it!
 
             # Stop Workers
@@ -304,20 +433,91 @@ class ScannerManager:
             # identical to a deleted file from here, and these rows carry user
             # state — favorites, tags, vault flags — that no rescan can restore.
             # A stopped scan or an unmounted drive must therefore prune nothing.
-            if not discovery_complete:
+            if not scan_targets:
+                # Erreichbar, seit config.active_scan_targets bei unlesbarer
+                # Benutzerdatenbank eine leere Liste liefert statt ersatzweise
+                # das Home-Verzeichnis. Ohne Ziele hat der Walk nichts gesehen —
+                # das ist kein Beleg dafür, dass die Dateien weg sind. Der
+                # `elif found_paths` unten fängt das schon ab; hier steht es,
+                # damit es beim nächsten Umbau nicht versehentlich zu einem
+                # `else` wird, der die ganze Bibliothek löscht.
+                print("⏸ No scan targets — skipping orphan cleanup.")
+            elif not discovery_complete:
                 print("⏸ Scan stopped early — skipping orphan cleanup to protect existing entries.")
             elif unavailable_targets:
                 print(f"⏸ {len(unavailable_targets)} scan target(s) unavailable — "
                       "skipping orphan cleanup to protect existing entries.")
             elif found_paths:
+                from arcade_scanner.core.video_processor import remove_thumbnail_for
+
                 orphans = existing_paths - found_paths
+
+                # Umzüge zuerst: Wer eine Datei umbenennt oder verschiebt,
+                # sieht von hier aus aus wie „alte weg, neue da". Der
+                # Nutzerzustand hängt aber am Pfad — er wäre mit der alten
+                # Zeile verloren, und die neue Datei stünde ohne Tags da.
+                _apply_detected_moves(existing_entries, orphans,
+                                      found_paths - existing_paths)
+
                 removed_count = 0
+                thumbs_removed = 0
                 for orphan in orphans:
                     db.remove(orphan)
+                    # Das Vorschaubild hängt am Pfad und wurde bisher nie
+                    # entfernt. In dieser Installation lagen dadurch 1141
+                    # Bilder ohne Eintrag im Verzeichnis. Anders als Favoriten
+                    # oder Tags ist es jederzeit neu berechenbar — ein Irrtum
+                    # kostet hier eine ffmpeg-Sekunde, kein Datum. Deshalb
+                    # darf es hier mit, wo der Nutzerzustand bewusst nicht
+                    # angefasst wird.
+                    if remove_thumbnail_for(orphan):
+                        thumbs_removed += 1
                     removed_count += 1
 
                 if removed_count > 0:
-                    print(f"🗑 Removed {removed_count} files (deleted or now excluded).")
+                    print(f"🗑 Removed {removed_count} files (deleted or now excluded), "
+                          f"{thumbs_removed} thumbnails.")
+
+            # Unter die Mindestgrösse gerutscht: Die Datei liegt da, sie
+            # gehört nur nicht mehr in die Bibliothek. Bewusst **ausserhalb**
+            # der Verwaisten-Schutzbedingungen oben — hier ist nichts zu
+            # vermuten, die Datei wurde gesehen und vermessen.
+            if undersized_paths:
+                from arcade_scanner.core.video_processor import remove_thumbnail_for
+
+                for pfad in undersized_paths:
+                    db.remove(pfad)
+                    remove_thumbnail_for(pfad)
+
+                grenze = config.settings.min_size_mb
+                print(f"📏 {len(undersized_paths)} Eintrag/Einträge entfernt: "
+                      f"Datei liegt unter der Mindestgrösse von {grenze} MB. "
+                      "Die Dateien selbst bleiben unangetastet.")
+                for pfad in undersized_paths[:3]:
+                    print(f"   {pfad}")
+                if len(undersized_paths) > 3:
+                    print(f"   … und {len(undersized_paths) - 3} weitere")
+
+            if failed_paths:
+                # Am Ende, wo die Zusammenfassung steht — die Einzelzeilen sind
+                # bei einem Durchlauf über tausende Dateien längst
+                # weggescrollt.
+                print(f"⚠️ {len(failed_paths)} Datei(en) konnten nicht gelesen werden. "
+                      "Ihre Angaben in der Bibliothek sind entweder alt oder fehlen ganz.")
+
+                # Nach Grund gruppiert: 222 Zeilen „Permission denied"
+                # untereinander sagen weniger als eine Zeile mit der Zahl.
+                nach_grund: dict = {}
+                for pfad, grund in failed_paths:
+                    nach_grund.setdefault(grund, []).append(pfad)
+
+                for grund, pfade in sorted(nach_grund.items(),
+                                           key=lambda kv: -len(kv[1])):
+                    print(f"   {len(pfade)}× {grund}")
+                    for pfad in pfade[:3]:
+                        print(f"      {pfad}")
+                    if len(pfade) > 3:
+                        print(f"      … und {len(pfade) - 3} weitere")
 
             # Save scan timestamp for incremental scanning
             fs_scanner.save_last_scan_time()
@@ -327,7 +527,8 @@ class ScannerManager:
         finally:
             self.is_scanning = False
             duration = time.time() - start_time
-            print(f"✅ Scan completed in {duration:.2f}s. Processed {processed_count} new/updated files.")
+            print(f"✅ Scan completed in {duration:.2f}s. "
+                  f"{seen_count} Dateien geprüft, davon {processed_count} neu oder geändert.")
 
         return processed_count
 

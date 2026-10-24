@@ -27,9 +27,22 @@ JS_FILES = sorted(STATIC_DIR.glob("*.js"))
 VALID_TYPES = {"info", "success", "error", "warning"}
 
 
+def _code_lines(source: str) -> str:
+    """Quelltext ohne Kommentarzeilen.
+
+    Kommentare erklären oft genau das, wovor der Test warnt — hier stand
+    `alert(1)` in der Begründung einer behobenen Stelle und löste den Wächter
+    aus. Ein Wächter mit Fehlalarmen wird beim nächsten Mal ignoriert.
+    """
+    return "\n".join(
+        "" if line.strip().startswith(("//", "*", "/*")) else line
+        for line in source.splitlines()
+    )
+
+
 @pytest.mark.parametrize("js_file", JS_FILES, ids=lambda p: p.name)
 def test_no_blocking_alert_dialogs(js_file):
-    source = js_file.read_text(encoding="utf-8")
+    source = _code_lines(js_file.read_text(encoding="utf-8"))
     hits = [
         f"{js_file.name}:{source[:m.start()].count(chr(10)) + 1}"
         for m in re.finditer(r"(?<![\w.])alert\s*\(", source)
@@ -43,7 +56,7 @@ def test_no_blocking_alert_dialogs(js_file):
 @pytest.mark.parametrize("js_file", JS_FILES, ids=lambda p: p.name)
 def test_toast_types_are_known(js_file):
     """Ein Tippfehler im Typ fällt sonst nur daran auf, dass die Farbe fehlt."""
-    source = js_file.read_text(encoding="utf-8")
+    source = _code_lines(js_file.read_text(encoding="utf-8"))
     bad = []
     for m in re.finditer(r"showToast\([^;]*?,\s*'([a-z]+)'", source, re.S):
         if m.group(1) not in VALID_TYPES:

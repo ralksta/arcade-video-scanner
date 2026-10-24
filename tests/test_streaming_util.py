@@ -207,3 +207,255 @@ class TestServeFileRange:
         h = FakeHandler()
         serve_file_range(h, str(big))
         assert len(h.wfile.getvalue()) == CHUNK_SIZE + 4096
+
+
+# ---------------------------------------------------------------------------
+# Kurz gelieferte Streams
+#
+# `socket.sendfile()` wirft nicht, wenn die Datei kürzer ist als erwartet — sie
+# gibt die tatsächlich gesendete Zahl zurück. Nachgemessen mit einem echten
+# Socket-Paar: bei einer auf 100 Bytes gekürzten Datei meldet sie 100, obwohl
+# 10000 angefordert waren. Kein Fehler, keine Ausnahme.
+#
+# Der Content-Length-Kopf ist zu dem Zeitpunkt längst raus. Der Client wartet
+# also auf Bytes, die nie kommen: bei Keep-Alive bis zum Timeout, und danach
+# wird die Verbindung in verdorbenem Zustand wiederverwendet — genau das
+# Szenario, gegen das die Clamping-Tests weiter oben schützen sollten.
+#
+# Erreichbar ist das hier ganz konkret: Zwischen `os.stat()` und dem Senden
+# liegt ein Zeitfenster, und der Optimierer ersetzt Mediendateien an Ort und
+# Stelle (`atomic_replace`, `keep_optimized`). Wer ein Video ansieht, während
+# es umgewandelt wird, landet hier.
+#
+# Verhindern lässt es sich nicht — die Datei *ist* dann kürzer. Aus einem
+# hängenden Client wird aber ein sauber abgebrochener.
+# ---------------------------------------------------------------------------
+
+class _ShortSendConnection(_FakeConnection):
+    """Ein sendfile, das weniger liefert als angefordert."""
+
+    def __init__(self, wfile, actually_sends):
+        super().__init__(wfile)
+        self._actually_sends = actually_sends
+
+    def sendfile(self, f, offset=0, count=None):
+        self.sendfile_calls.append((offset, count))
+        f.seek(offset)
+        self._wfile.write(f.read(self._actually_sends))
+        return self._actually_sends
+
+
+class TestShortSend:
+    def test_a_short_sendfile_closes_the_connection(self, video_file):
+        h = FakeHandler(with_sendfile=True)
+        h.connection = _ShortSendConnection(h.wfile, actually_sends=100)
+
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is True, (
+            "Der Client wartet sonst auf 10140 Bytes, die nie kommen"
+        )
+
+    def test_a_complete_sendfile_keeps_the_connection(self, video_file):
+        h = FakeHandler(with_sendfile=True)
+
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is False
+
+    def test_the_short_send_is_reported(self, video_file, capsys):
+        h = FakeHandler(with_sendfile=True)
+        h.connection = _ShortSendConnection(h.wfile, actually_sends=100)
+
+        serve_file_range(h, str(video_file))
+
+        out = capsys.readouterr().out
+        assert "verkürzt" in out
+        assert "100" in out and "10240" in out
+
+    def test_a_short_range_send_closes_the_connection(self, video_file):
+        """Auch im 206-Fall — dort ist die angekündigte Länge der Bereich."""
+        h = FakeHandler(range_header="bytes=0-999", with_sendfile=True)
+        h.connection = _ShortSendConnection(h.wfile, actually_sends=10)
+
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is True
+
+    def test_a_truncated_file_in_the_chunk_loop_also_closes(self, tmp_path):
+        """
+        Der Rückfallweg ohne sendfile bricht bei EOF genauso still ab. Hier
+        wird die Datei zwischen `os.stat()` und dem Lesen wirklich gekürzt.
+        """
+        path = tmp_path / "clip.mp4"
+        path.write_bytes(b"X" * 10000)
+
+        h = FakeHandler()  # kein `connection` → Leseschleife
+
+        import arcade_scanner.server.streaming_util as su
+
+        real_open = open
+
+        def shrinking_open(p, *args, **kwargs):
+            # Genau im Moment des Öffnens ist die Datei nur noch 100 Bytes lang
+            if str(p) == str(path):
+                path.write_bytes(b"X" * 100)
+            return real_open(p, *args, **kwargs)
+
+        su_open = getattr(su, "open", None)
+        try:
+            su.open = shrinking_open
+            serve_file_range(h, str(path))
+        finally:
+            if su_open is None:
+                del su.open
+            else:
+                su.open = su_open
+
+        assert h.close_connection is True
+
+    def test_a_client_that_hangs_up_still_closes_the_connection(self, video_file):
+        """Das Verhalten, das schon vorher stimmte, darf nicht verloren gehen."""
+        h = FakeHandler()
+
+        class Exploding(io.BytesIO):
+            def write(self, data):
+                raise BrokenPipeError("client weg")
+
+        h.wfile = Exploding()
+        serve_file_range(h, str(video_file))
+
+        assert h.close_connection is True
+
+
+# ---------------------------------------------------------------------------
+# Validator: ETag und If-Range
+#
+# Die Auslieferung schickte bis hierher keinen Validator. Für einen normalen
+# Dateiserver ist das lässlich; hier nicht, weil sich unter derselben Adresse
+# zwei verschiedene Dateien verbergen können:
+#
+#   * Der Optimierer ersetzt Originale an Ort und Stelle.
+#   * Bei eingeschaltetem Proxy-Streaming entscheidet die Netzwerkadresse des
+#     Clients, ob das Original oder der kleinere Proxy geliefert wird
+#     (proxy_resolver.resolve_stream_path) -- unter demselben Pfad.
+#
+# Ein Client, der beim Springen einen Bereich nachfordert, bekam die Bytes aus
+# der Datei, die *jetzt* dort liegt. Aus zwei Fassungen wird dann eine kaputte
+# Wiedergabe -- und anders als beim verkürzten Stream weiter oben fällt das
+# nicht als Hänger auf, sondern als Bildfehler mitten im Video.
+# ---------------------------------------------------------------------------
+
+class TestEntityTag:
+    def test_an_etag_is_sent_on_a_full_response(self, video_file):
+        h = FakeHandler()
+        serve_file_range(h, str(video_file))
+
+        assert h.sent_headers.get("etag", "").startswith('"')
+
+    def test_an_etag_is_sent_on_a_range_response(self, video_file):
+        h = FakeHandler(range_header="bytes=0-99")
+        serve_file_range(h, str(video_file))
+
+        assert h.status == 206
+        assert "etag" in h.sent_headers
+
+    def test_the_same_file_yields_the_same_etag(self, video_file):
+        a, b = FakeHandler(), FakeHandler()
+        serve_file_range(a, str(video_file))
+        serve_file_range(b, str(video_file))
+
+        assert a.sent_headers["etag"] == b.sent_headers["etag"]
+
+    def test_a_changed_file_yields_a_different_etag(self, tmp_path):
+        """
+        Der Fall, um den es geht: Derselbe Pfad, anderer Inhalt — sei es, weil
+        der Optimierer ersetzt hat, sei es, weil statt des Originals der Proxy
+        ausgeliefert wird.
+        """
+        path = tmp_path / "clip.mp4"
+        path.write_bytes(b"A" * 5000)
+        first = FakeHandler()
+        serve_file_range(first, str(path))
+
+        path.write_bytes(b"B" * 4000)
+        second = FakeHandler()
+        serve_file_range(second, str(path))
+
+        assert first.sent_headers["etag"] != second.sent_headers["etag"]
+
+    def test_two_files_of_equal_size_written_in_the_same_second_differ(self, tmp_path):
+        """
+        Deshalb Nanosekunden statt Sekunden: Proxy und Original können gleich
+        gross sein, und ein Austausch dauert keine ganze Sekunde.
+        """
+        a, b = tmp_path / "a.mp4", tmp_path / "b.mp4"
+        a.write_bytes(b"X" * 1000)
+        b.write_bytes(b"Y" * 1000)
+
+        ha, hb = FakeHandler(), FakeHandler()
+        serve_file_range(ha, str(a))
+        serve_file_range(hb, str(b))
+
+        assert ha.sent_headers["etag"] != hb.sent_headers["etag"]
+
+
+class TestIfRange:
+    def _etag_of(self, path):
+        h = FakeHandler()
+        serve_file_range(h, str(path))
+        return h.sent_headers["etag"]
+
+    def test_a_matching_if_range_still_serves_the_range(self, video_file):
+        etag = self._etag_of(video_file)
+
+        h = FakeHandler(range_header="bytes=100-199")
+        h.headers["If-Range"] = etag
+        serve_file_range(h, str(video_file))
+
+        assert h.status == 206
+        assert h.sent_headers["content-length"] == "100"
+
+    def test_a_stale_if_range_serves_the_whole_file(self, video_file):
+        """
+        Der eigentliche Schutz: Passt die Kennung nicht, verlangt RFC 9110 die
+        ganze Datei. Der Client fängt sauber neu an, statt Bytes zweier
+        Fassungen zusammenzusetzen.
+        """
+        h = FakeHandler(range_header="bytes=100-199")
+        h.headers["If-Range"] = '"veraltet-0"'
+        serve_file_range(h, str(video_file))
+
+        assert h.status == 200
+        assert h.sent_headers["content-length"] == str(video_file.stat().st_size)
+        assert "content-range" not in h.sent_headers
+
+    def test_a_stale_if_range_after_a_real_replacement(self, tmp_path):
+        """Derselbe Ablauf, aber mit echtem Dateiwechsel statt erfundener Kennung."""
+        path = tmp_path / "clip.mp4"
+        path.write_bytes(b"A" * 5000)
+        old_etag = self._etag_of(path)
+
+        path.write_bytes(b"B" * 5000)
+
+        h = FakeHandler(range_header="bytes=1000-1999")
+        h.headers["If-Range"] = old_etag
+        serve_file_range(h, str(path))
+
+        assert h.status == 200, "Bereich aus einer anderen Fassung ausgeliefert"
+
+    def test_without_if_range_nothing_changes(self, video_file):
+        """Der übliche Fall bleibt, wie er war — die meisten Clients fragen nicht."""
+        h = FakeHandler(range_header="bytes=0-99")
+        serve_file_range(h, str(video_file))
+
+        assert h.status == 206
+
+    def test_whitespace_around_the_validator_is_tolerated(self, video_file):
+        etag = self._etag_of(video_file)
+
+        h = FakeHandler(range_header="bytes=0-99")
+        h.headers["If-Range"] = f"  {etag}  "
+        serve_file_range(h, str(video_file))
+
+        assert h.status == 206

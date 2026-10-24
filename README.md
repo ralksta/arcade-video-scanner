@@ -4,7 +4,7 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 
 ### Core Features:
 - **Visual Analysis**: Instantly see which videos are "High Bitrate" (candidates for compression) vs. "Optimized".
-- **Privacy-First**: No data ever leaves your computer. The scan, database, and web dashboard run 100% locally.
+- **Privacy-First**: Your media never leaves your computer — the scan, the database and every file stay local, and nothing is uploaded anywhere. One caveat, stated plainly: the dashboard still pulls Tailwind and its fonts from public CDNs (`cdn.tailwindcss.com`, Google Fonts), so those servers see your IP and when you use the app. Details and the path to removing that in [`dev-docs/external-resources.md`](dev-docs/external-resources.md).
 - **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, file size, media type, and image formats.
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.

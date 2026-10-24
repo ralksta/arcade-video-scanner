@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from arcade_scanner.scanner.media_probe import MediaProbe
+from arcade_scanner.scanner.media_probe import MediaProbe, ProbeError
 
 # ---------------------------------------------------------------------------
 # Fake ffprobe process
@@ -40,10 +40,10 @@ class FakeProcess:
 
 
 def run_probe(payload=None, *, returncode=0, raw_stdout=None, ffprobe_path="",
-              process=None, capture=None):
+              process=None, capture=None, stderr=b""):
     """Run _run_ffprobe against a fake process; returns its result."""
     stdout = raw_stdout if raw_stdout is not None else json.dumps(payload or {}).encode()
-    proc = process or FakeProcess(stdout=stdout, returncode=returncode)
+    proc = process or FakeProcess(stdout=stdout, returncode=returncode, stderr=stderr)
 
     cfg = MagicMock()
     cfg.settings.ffprobe_path = ffprobe_path
@@ -116,13 +116,42 @@ class TestRunFfprobe:
         assert capture[0][-1] == "/fake/clip.mp4"
         assert "-of" in capture[0] and "json" in capture[0]
 
-    def test_nonzero_exit_yields_empty_dict(self):
-        assert run_probe({"streams": [{"codec_type": "video"}]}, returncode=1) == {}
+    def test_nonzero_exit_reports_ffprobes_own_reason(self):
+        """
+        Vorher gab jeder Fehlschlag ein leeres Dict zurück, und der Scanner
+        machte daraus „(timeout or corrupt)". In dieser Bibliothek scheiterten
+        222 Dateien in Wahrheit an fehlenden Leserechten — wer der Meldung
+        glaubte, suchte nach kaputten Dateien und fand nichts.
 
-    def test_malformed_json_yields_empty_dict(self):
-        assert run_probe(raw_stdout=b"not json at all") == {}
+        `stderr` wurde dabei schon abgefangen und dann weggeworfen.
+        """
+        with pytest.raises(ProbeError) as fehler:
+            run_probe({"streams": [{"codec_type": "video"}]}, returncode=1,
+                      stderr=b"/media/clip.mp4: Permission denied\n")
 
-    def test_spawn_failure_yields_empty_dict(self):
+        assert "Permission denied" in str(fehler.value)
+
+    def test_a_reason_without_stderr_still_names_the_exit_code(self):
+        with pytest.raises(ProbeError) as fehler:
+            run_probe({}, returncode=69, stderr=b"")
+
+        assert "69" in str(fehler.value)
+
+    def test_only_the_first_line_of_stderr_is_used(self):
+        """ffmpeg schreibt gern fünf Zeilen. Die erste sagt, worum es geht."""
+        with pytest.raises(ProbeError) as fehler:
+            run_probe({}, returncode=1,
+                      stderr=b"moov atom not found\nnoch eine Zeile\nund noch eine\n")
+
+        assert str(fehler.value) == "moov atom not found"
+
+    def test_malformed_json_reports_the_reason(self):
+        with pytest.raises(ProbeError) as fehler:
+            run_probe(raw_stdout=b"not json at all")
+
+        assert "JSON" in str(fehler.value)
+
+    def test_spawn_failure_says_ffprobe_is_missing(self):
         cfg = MagicMock()
         cfg.settings.ffprobe_path = ""
 
@@ -132,7 +161,10 @@ class TestRunFfprobe:
         with patch("arcade_scanner.scanner.media_probe.config", cfg), \
              patch("arcade_scanner.scanner.media_probe.asyncio.create_subprocess_exec",
                    side_effect=boom):
-            assert asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4")) == {}
+            with pytest.raises(ProbeError) as fehler:
+                asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
+
+        assert "nicht gefunden" in str(fehler.value)
 
 
 class TestFfprobeTimeout:
@@ -162,9 +194,10 @@ class TestFfprobeTimeout:
                    side_effect=fake_exec), \
              patch("arcade_scanner.scanner.media_probe.asyncio.wait_for",
                    side_effect=instant_timeout):
-            result = asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
+            with pytest.raises(ProbeError) as fehler:
+                asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
 
-        assert result == {}
+        assert "Zeitüberschreitung" in str(fehler.value)
         assert proc.kill_calls == 1, "timed-out ffprobe process was never killed"
         assert proc.wait_calls == 1, "killed process was never reaped"
 
@@ -180,9 +213,9 @@ class TestFfprobeTimeout:
         with patch("arcade_scanner.scanner.media_probe.config", cfg), \
              patch("arcade_scanner.scanner.media_probe.asyncio.create_subprocess_exec",
                    side_effect=fake_exec):
-            result = asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
+            with pytest.raises(ProbeError):
+                asyncio.run(MediaProbe()._run_ffprobe("/fake/clip.mp4"))
 
-        assert result == {}
         assert proc.kill_calls == 0
 
 
@@ -309,7 +342,6 @@ class TestMetadataDegradedInput:
 
     @pytest.mark.parametrize("field,attribute", [
         ("duration", "duration_sec"),
-        ("bit_rate", "bitrate_mbps"),
         ("size", "size_mb"),
     ])
     def test_non_numeric_format_field_zeroes_only_that_field(self, field, attribute):
@@ -318,6 +350,10 @@ class TestMetadataDegradedInput:
         One such field must not cost the whole file: a media inventory that
         silently omits a video is worse than one that shows it with a zeroed
         duration.
+
+        `bit_rate` steht seit dem Rückgriff unten nicht mehr in dieser Liste:
+        Fehlt es, wird es aus Größe und Dauer ausgerechnet, statt auf null zu
+        fallen.
         """
         fmt = {**FORMAT, field: "N/A"}
         entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
@@ -327,6 +363,51 @@ class TestMetadataDegradedInput:
         # The rest of the metadata survives.
         assert entry.codec == "h264"
         assert entry.width == 1920
+
+    def test_a_missing_bitrate_is_computed_from_size_and_duration(self):
+        """Nicht jeder Container meldet eine Gesamtbitrate.
+
+        Bleibt sie null, ist die Datei für den gesamten Optimierungs-Weg
+        unsichtbar: `estimate_heuristic()` steigt bei `source_kbps <= 0` sofort
+        aus, und die HIGH/SOURCE-Einstufung im Scanner greift ebenfalls nicht.
+        Es fehlt dabei nichts sichtbar — die Datei taucht nur nie in einem
+        Vorschlag auf.
+
+        In dieser Bibliothek betrifft das genau eine von 8788 Dateien.
+        """
+        fmt = {**FORMAT, "bit_rate": "N/A", "size": str(60 * 1024 * 1024),
+               "duration": "80.0"}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        # 60 MiB = 62.914.560 Bytes × 8 = 503.316.480 Bit, geteilt durch 80 s
+        # und durch 1.000.000 → 6,29 Mbit/s.
+        #
+        # Ausgeschrieben, weil ich hier zuerst 6,0 erwartet und MiB mit MB
+        # verwechselt habe. Der Unterschied sind 4,9 % — genug, um eine
+        # Einstufung an einer Schwelle kippen zu lassen.
+        assert entry.bitrate_mbps == pytest.approx(6.29, abs=0.01)
+
+    def test_the_reported_bitrate_wins_over_the_computed_one(self):
+        """Der Rückgriff greift nur, wenn nichts gemeldet wurde."""
+        fmt = {**FORMAT, "bit_rate": "3000000", "size": str(60 * 1024 * 1024),
+               "duration": "80.0"}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        assert entry.bitrate_mbps == pytest.approx(3.0, abs=0.01)
+
+    def test_without_a_duration_nothing_is_computed(self):
+        """Sonst teilte die Rechnung durch null."""
+        fmt = {**FORMAT, "bit_rate": "N/A", "duration": "0",
+               "size": str(60 * 1024 * 1024)}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        assert entry.bitrate_mbps == 0.0
+
+    def test_without_a_size_nothing_is_computed(self):
+        fmt = {**FORMAT, "bit_rate": "N/A", "size": "0", "duration": "80.0"}
+        entry = run_metadata(probe_payload(VIDEO, AUDIO, fmt))
+
+        assert entry.bitrate_mbps == 0.0
 
     def test_non_numeric_dimensions_zero_only_those_fields(self):
         payload = probe_payload({**VIDEO, "width": "N/A", "height": "N/A"},

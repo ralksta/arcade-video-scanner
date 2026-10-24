@@ -114,6 +114,26 @@ function setSort(s) {
  */
 function filterAndSort(scrollToTop = false) {
     try {
+        // Ohne die Nutzerdaten ist unbekannt, welche Einträge im Vault liegen.
+        //
+        // `loadUserData()` setzt `v.hidden` aus `/api/user/data`. Schlägt der
+        // Aufruf fehl, protokolliert er das und kehrt zurück — `v.hidden`
+        // bleibt dann `undefined`, und die Zeile weiter unten
+        //
+        //     if (workspaceMode === 'lobby' && isHidden) return false;
+        //
+        // lässt jede versteckte Datei durch. Ein einzelner Serverfehler hätte
+        // also den gesamten Vault in der normalen Ansicht ausgebreitet.
+        //
+        // Die Prüfung steht hier und nicht an der Aufrufstelle, weil ganz am
+        // Ende von engine.js ein `setTimeout(..., 500)` noch einmal
+        // `filterAndSort()` anstösst — ein früher Abbruch dort wäre 500 ms
+        // später wieder überholt worden.
+        if (window.userDataLoaded === false) {
+            renderLibraryUnavailable();
+            return;
+        }
+
         // Duplicates/Candidates modes have their own rendering logic
         if (workspaceMode === 'duplicates' || workspaceMode === 'candidates') {
             return;
@@ -238,7 +258,7 @@ function filterAndSort(scrollToTop = false) {
                 // Date filter
                 if (dateFilter !== 'all') {
                     const now = Date.now() / 1000;
-                    const fileTime = v.imported_at > 0 ? v.imported_at : (v.mtime || 0);
+                    const fileTime = entryDate(v);
                     const ageSec = now - fileTime;
                     const maxAge = { '1d': 86400, '7d': 7 * 86400, '30d': 30 * 86400 }[dateFilter];
                     if (maxAge && ageSec > maxAge) return false;
@@ -281,7 +301,20 @@ function filterAndSort(scrollToTop = false) {
                 if (currentSort === 'size') return (b.Size_MB || 0) - (a.Size_MB || 0);
                 if (currentSort === 'runtime') return (b.Duration_Sec || 0) - (a.Duration_Sec || 0);
                 if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
-                if (currentSort === 'date') return (b.mtime || 0) - (a.mtime || 0);
+                // entryDate statt mtime: dieselbe Frage wie im Datumsfilter drei
+                // Dutzend Zeilen weiter oben — „wann kam das in die Bibliothek",
+                // nicht „wann wurde die Datei zuletzt geschrieben". Sonst schiebt
+                // jedes Optimieren einen alten Film nach oben.
+                // Zwei Fragen, zwei Sortierungen — vorher hieß beides „date"
+                // und antwortete auf die zweite.
+                //
+                //   'date'       wann kam das in die Bibliothek (entryDate)
+                //   'file_date'  wann wurde die Datei zuletzt geschrieben
+                //
+                // Der Wert 'date' bleibt, wie er ist: Gespeicherte Ansichten
+                // tragen ihn.
+                if (currentSort === 'date') return entryDate(b) - entryDate(a);
+                if (currentSort === 'file_date') return (b.mtime || 0) - (a.mtime || 0);
                 return 0;
             });
         } else {
@@ -365,7 +398,24 @@ function _updateQuickStats(stats, workspaceMode) {
 }
 
 // --- EXPORTS ---
+/**
+ * Ersetzt das Raster durch einen Hinweis, statt eine Bibliothek zu zeigen,
+ * deren Vault-Zustand unbekannt ist. Gleiche Machart wie der Fehlerzweig der
+ * Verzeichnisliste im Einrichtungs-Assistenten.
+ */
+function renderLibraryUnavailable() {
+    const grid = document.getElementById('videoGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="col-span-full text-center py-16 text-danger">'
+        + '<div class="font-medium">Deine Nutzerdaten konnten nicht geladen werden.</div>'
+        + '<div class="text-sm text-text-muted mt-2">Die Bibliothek wird nicht angezeigt, '
+        + 'weil sonst auch Einträge aus dem Vault sichtbar wären.</div>'
+        + '<button onclick="location.reload()" class="underline mt-4">Neu laden</button>'
+        + '</div>';
+}
+
 window.filterAndSort  = filterAndSort;
+window.renderLibraryUnavailable = renderLibraryUnavailable;
 window.onSearchInput  = onSearchInput;
 window.setFilter      = setFilter;
 window.setCodecFilter = setCodecFilter;

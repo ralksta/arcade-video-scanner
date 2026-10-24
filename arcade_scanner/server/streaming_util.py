@@ -63,10 +63,12 @@ def _send_file_slice(handler, file_path, start, length):
         if sendfile is not None:
             try:
                 handler.wfile.flush()
-                sendfile(f, offset=start, count=length)
+                sent = sendfile(f, offset=start, count=length)
             except (ConnectionResetError, BrokenPipeError, OSError, ValueError):
                 # Partial send state is unknown — never reuse this connection.
                 handler.close_connection = True
+                return
+            _check_short_send(handler, file_path, sent, length)
             return
 
         f.seek(start)
@@ -79,8 +81,66 @@ def _send_file_slice(handler, file_path, start, length):
                 handler.wfile.write(data)
             except (ConnectionResetError, BrokenPipeError):
                 handler.close_connection = True
-                break
+                return
             remaining -= len(data)
+
+        _check_short_send(handler, file_path, length - remaining, length)
+
+
+def _check_short_send(handler, file_path, sent, expected):
+    """Weniger gesendet als angekündigt? Dann die Verbindung schliessen.
+
+    ``socket.sendfile()`` wirft nicht, wenn die Datei kürzer ist als erwartet —
+    sie gibt einfach die tatsächlich gesendete Zahl zurück. Nachgemessen: bei
+    einer auf 100 Bytes gekürzten Datei meldet sie 100, obwohl 10000
+    angefordert waren. Die Leseschleife darunter bricht bei EOF genauso still
+    ab.
+
+    Der ``Content-Length``-Kopf ist zu dem Zeitpunkt schon raus. Der Client
+    wartet also auf Bytes, die nie kommen — bei Keep-Alive bis zum Timeout,
+    und die Verbindung wird danach in verdorbenem Zustand wiederverwendet.
+
+    Erreichbar ist das in genau diesem Produkt: Zwischen ``os.stat()`` und dem
+    Senden liegt ein Zeitfenster, und der Optimierer ersetzt Mediendateien an
+    Ort und Stelle (``atomic_replace``, ``keep_optimized``). Wer ein Video
+    ansieht, während es umgewandelt wird, landet hier.
+
+    Verhindern lässt es sich nicht — die Datei *ist* dann kürzer. Aus einem
+    hängenden Client wird aber ein sauber abgebrochener.
+    """
+    if sent >= expected:
+        return
+
+    handler.close_connection = True
+    print(
+        f"⚠️ Stream verkürzt: {os.path.basename(file_path)} lieferte {sent} "
+        f"von {expected} angekündigten Bytes — Datei wurde während der "
+        "Auslieferung verändert. Verbindung geschlossen."
+    )
+
+
+def _entity_tag(stat) -> str:
+    """Kennung der ausgelieferten Fassung, aus Änderungszeit und Größe.
+
+    Bis hierher schickte die Auslieferung **keinen** Validator — kein `ETag`,
+    kein `If-Range`. Für einen normalen Dateiserver ist das lässlich; hier
+    nicht, weil sich unter derselben Adresse zwei verschiedene Dateien
+    verbergen können:
+
+    * Der Optimierer ersetzt Originale an Ort und Stelle.
+    * Bei eingeschaltetem Proxy-Streaming entscheidet die *Netzwerkadresse des
+      Clients*, ob das Original oder der kleinere Proxy geliefert wird
+      (`proxy_resolver.resolve_stream_path`).
+
+    Ein Client, der beim Springen einen Bereich nachfordert, bekam die Bytes
+    aus der Datei, die *jetzt* dort liegt — ohne Möglichkeit zu merken, dass es
+    eine andere ist als die, deren Anfang er schon hat. Aus zwei Fassungen wird
+    dann eine kaputte Wiedergabe.
+
+    Nanosekunden-Auflösung, damit zwei Schreibvorgänge innerhalb derselben
+    Sekunde unterscheidbar bleiben.
+    """
+    return f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
 
 
 def serve_file_range(handler, file_path, method="GET", extra_headers=None):
@@ -105,7 +165,19 @@ def serve_file_range(handler, file_path, method="GET", extra_headers=None):
     if not mime_type:
         mime_type = "video/mp4"
 
-    byte_range = parse_range_header(handler.headers.get("Range"), file_size)
+    etag = _entity_tag(stat)
+
+    # `If-Range` ist die Frage des Clients: „Ist das noch dieselbe Datei?"
+    # Passt die Kennung nicht, verlangt RFC 9110 die Auslieferung der ganzen
+    # Datei statt des Bereichs — der Client fängt dann sauber neu an, statt
+    # Bytes zweier Fassungen zusammenzusetzen.
+    if_range = handler.headers.get("If-Range")
+    range_allowed = if_range is None or if_range.strip() == etag
+
+    byte_range = (
+        parse_range_header(handler.headers.get("Range"), file_size)
+        if range_allowed else None
+    )
 
     if byte_range == "unsatisfiable":
         handler.send_response(416)
@@ -126,6 +198,7 @@ def serve_file_range(handler, file_path, method="GET", extra_headers=None):
         handler.send_header("Accept-Ranges", "bytes")
         handler.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
         handler.send_header("Content-Length", str(length))
+        handler.send_header("ETag", etag)
         handler.send_header("Last-Modified", handler.date_time_string(stat.st_mtime))
         _send_extra()
         handler.end_headers()
@@ -140,6 +213,7 @@ def serve_file_range(handler, file_path, method="GET", extra_headers=None):
     handler.send_header("Content-type", mime_type)
     handler.send_header("Content-Length", str(file_size))
     handler.send_header("Accept-Ranges", "bytes")
+    handler.send_header("ETag", etag)
     handler.send_header("Last-Modified", handler.date_time_string(stat.st_mtime))
     _send_extra()
     handler.end_headers()

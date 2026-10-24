@@ -120,7 +120,7 @@ def test_generated_html_versions_every_asset(tmp_path):
     from arcade_scanner.templates.dashboard_template import generate_html_report
 
     out = tmp_path / "asset_version_report.html"
-    generate_html_report([], str(out), server_port=8000)
+    generate_html_report(str(out), server_port=8000)
     html = out.read_text(encoding="utf-8")
 
     unversioned = [

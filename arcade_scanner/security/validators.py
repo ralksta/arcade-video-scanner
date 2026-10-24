@@ -103,6 +103,28 @@ def sanitize_path(path: str, allowed_dirs: Optional[List[str]] = None) -> str:
     return validator.validate(path)
 
 
+def path_is_within(candidate: str, directory: str) -> bool:
+    """Liegt `candidate` in `directory` — auf einer Verzeichnisgrenze geprüft?
+
+    Ein reines ``startswith`` lässt Nachbarverzeichnisse durch, deren Name mit
+    dem erlaubten beginnt::
+
+        /media        erlaubt
+        /media/x.mp4  richtig
+        /media_nas/…  falsch — anderes Verzeichnis
+        /media_ralf/… falsch — anderes Verzeichnis
+
+    Das sind keine erfundenen Namen, sondern die Scan-Ziele dieser
+    Installation. Die Rechnung stand an vier Stellen einzeln da (Pfadprüfung,
+    Nutzer-Filter für /api/videos, Duplikat-Scan, Auslieferung der
+    Vorschaubilder) — dreimal ohne diese Grenze.
+    """
+    if not candidate or not directory:
+        return False
+    directory = directory.rstrip(os.sep)
+    return candidate == directory or candidate.startswith(directory + os.sep)
+
+
 def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool:
     """
     Check if a path is allowed based on scan targets and security rules.
@@ -134,7 +156,23 @@ def is_path_allowed(path: str, allowed_dirs: Optional[List[str]] = None) -> bool
             return p.lower() if (IS_WIN or sys.platform == "darwin") else p
 
         path_norm = platform_norm(abs_path)
-        is_whitelisted = any(path_norm.startswith(platform_norm(allowed)) for allowed in allowed_abs)
+
+        # Der Vergleich muss auf einer Verzeichnisgrenze enden. Ein reines
+        # startswith() lässt Nachbarverzeichnisse durch, deren Name mit dem
+        # erlaubten beginnt:
+        #
+        #     erlaubt  /media
+        #     passt    /media/film.mkv        richtig
+        #     passt    /media_nas/film.mkv    falsch — anderes Verzeichnis
+        #     passt    /media_ralf/film.mkv   falsch — anderes Verzeichnis
+        #
+        # Das sind keine erfundenen Namen: Genau so heissen die Scan-Ziele
+        # dieser Installation. Solange die Prüfung ohne eigene Verzeichnisse
+        # aufgerufen wurde, fiel es nicht auf — die Vereinigung enthielt alle
+        # drei ohnehin. Sobald sie einen Nutzer einschränkt, entscheidet sie.
+        is_whitelisted = any(
+            path_is_within(path_norm, platform_norm(allowed)) for allowed in allowed_abs
+        )
 
         if not is_whitelisted:
             print(f"⚠️ Path not in whitelist: {abs_path}")

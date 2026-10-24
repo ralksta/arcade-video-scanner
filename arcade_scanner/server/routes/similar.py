@@ -6,6 +6,7 @@ from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
 from arcade_scanner.core.similarity import decode_vector, top_k
+from arcade_scanner.core.user_scope import visible_path_filter
 from arcade_scanner.server.response_helpers import send_json
 
 
@@ -21,22 +22,46 @@ class SimilarityCache:
         self._lock = threading.Lock()
         self._vectors: Optional[dict[str, list[float]]] = None
         self._hooked = False
+        self._version = 0
 
     def invalidate(self) -> None:
         with self._lock:
             self._vectors = None
+            self._version += 1
 
     def get(self, media_db: Any) -> dict[str, list[float]]:
+        """Lädt die Vektoren — **ohne** die eigene Sperre zu halten.
+
+        Vorher lief das Lesen innerhalb der Sperre. Das ist die eine Hälfte
+        einer Verklemmung: ``get_mean_vectors()`` will die Schreibsperre der
+        Datenbank, und ein gleichzeitiger Schreibvorgang hält sie und will
+        über ``_notify_change`` hier herein. Die andere Hälfte ist im Store
+        behoben (dort wird jetzt ausserhalb der Sperre benachrichtigt); diese
+        Seite gehört trotzdem geradegezogen — eine Verklemmung braucht beide
+        Richtungen, und wer nur eine repariert, verlässt sich darauf, dass die
+        andere so bleibt.
+
+        Der Zähler übernimmt dabei dieselbe Aufgabe wie in ``_MediaCache``:
+        Wird während des Lesens invalidiert, wird das Ergebnis zwar geliefert,
+        aber nicht abgelegt.
+        """
         with self._lock:
             if not self._hooked:
                 # store_embedding fires _notify_change, so fresh indexer runs
                 # are picked up without a server restart
                 media_db.register_on_change(self.invalidate)
                 self._hooked = True
-            if self._vectors is None:
-                self._vectors = {path: decode_vector(blob)
-                                 for path, _model, blob in media_db.get_mean_vectors()}
-            return self._vectors
+            if self._vectors is not None:
+                return self._vectors
+            version = self._version
+
+        vectors = {path: decode_vector(blob)
+                   for path, _model, blob in media_db.get_mean_vectors()}
+
+        with self._lock:
+            if version == self._version:
+                self._vectors = vectors
+        return vectors
 
 
 _cache = SimilarityCache()
@@ -104,12 +129,27 @@ def handle_get(handler) -> bool:
             handler.send_error(404, "File not indexed")
             return True
 
-        exclude = {query_path}
+        # Ohne den Nutzerdatensatz ist weder bekannt, was im Vault liegt, noch
+        # welche Verzeichnisse ihm gehören. Dann lieber nichts ausliefern:
+        # Beides fiele sonst in die offene Richtung aus — genau der Fehler, der
+        # in beiden Clients steckte.
         u = user_db.get_user(user_name)
-        if u and u.data.vaulted:
-            exclude.update(os.path.abspath(p) for p in u.data.vaulted)
+        if u is None:
+            handler.send_error(503, "User data unavailable")
+            return True
 
-        results = top_k(query_vector, vectors.items(), k=limit, exclude=exclude)
+        exclude = {query_path}
+        exclude.update(os.path.abspath(p) for p in u.data.vaulted)
+
+        # Der Index ist installationsweit, die Bibliotheken sind es nicht.
+        # Ohne diese Einschränkung liefert die Suche Pfade aus den Zielen
+        # *anderer* Konten zurück, vollständig und mit Verzeichnisnamen.
+        # Die Regel steht in core/user_scope.py, damit sie nicht an jeder
+        # Stelle neu beantwortet wird.
+        may_see = visible_path_filter(u)
+        candidates = [(p, v) for p, v in vectors.items() if may_see(p)]
+
+        results = top_k(query_vector, candidates, k=limit, exclude=exclude)
         send_json(handler, {"status": "ok",
                             "results": [{"file_path": p, "score": round(s, 4)}
                                         for p, s in results]})

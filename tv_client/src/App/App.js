@@ -1,5 +1,6 @@
 import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {serverUrl} from '../serverConfig';
+import {getItem} from '../safeStorage';
 import ThemeDecorator from '@enact/limestone/ThemeDecorator';
 import Panels, {Panel} from '@enact/limestone/Panels';
 import VideoPlayer, {Video} from '@enact/limestone/VideoPlayer';
@@ -9,7 +10,7 @@ import LoginPanel from '../views/LoginPanel';
 import css from './App.module.less';
 
 const App = (props) => {
-	const existingToken = typeof window !== 'undefined' ? localStorage.getItem('arcade_session_token') : null;
+	const existingToken = getItem('arcade_session_token');
 
 	// Starte direkt auf LoginPanel (index 2) wenn kein Token vorhanden
 	const [panelIndex, setPanelIndex] = useState(existingToken ? 0 : 2);
@@ -64,7 +65,7 @@ const App = (props) => {
 		return () => document.removeEventListener('keydown', handleBackKey, {capture: true});
 	}, []); // Leere Deps — einmalig registrieren, Ref liest immer aktuellen Wert
 
-	const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('arcade_session_token') : '';
+	const sessionToken = getItem('arcade_session_token', '');
 
 	return (
 		<div {...props} className={css.app}>

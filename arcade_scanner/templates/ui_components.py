@@ -87,8 +87,20 @@ def render_base_layout(theme: BaseTheme, content: str, scripts: str) -> str:
 """
 
 
-def render_header(theme: BaseTheme, hostname: str, count: int, size_gb: str) -> str:
-    """App-Topbar: Accent-Dot + Wortmarke links, Mono-Stat-Cluster rechts."""
+def render_header(theme: BaseTheme, hostname: str) -> str:
+    """App-Topbar: Accent-Dot + Wortmarke links, Mono-Stat-Cluster rechts.
+
+    Zahl und Größe der Bibliothek stehen hier bewusst als `...` — sie werden
+    zur Laufzeit aus `ALL_VIDEOS` gefüllt (`updateHeaderStats()` in engine.js),
+    und das ist pro Nutzer gefiltert.
+
+    Die Funktion nahm dafür einmal `count` und `size_gb` entgegen und benutzte
+    beide **nicht**; der Aufrufer rechnete die Gesamtgröße der Bibliothek aus,
+    um sie zu übergeben. Das war nicht bloss überflüssig, sondern eine
+    Einladung: Diese Datei wird EINMAL erzeugt und an jedes Konto ausgeliefert.
+    Wer die Platzhalter „repariert", indem er die Parameter einsetzt, schreibt
+    die Zahlen der gesamten Bibliothek in die Kopfzeile jedes Nutzers.
+    """
     return f"""
 <header class="{theme.header_container}">
     <!-- Wortmarke -->

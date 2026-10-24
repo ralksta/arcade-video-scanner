@@ -1005,6 +1005,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 }
                 console.log(`✅ User data loaded: ${favSet.size} favs, ${vaultSet.size} vaulted.`);
+                window.userDataLoaded = true;
+                return true;
             } else {
                 console.warn("User data load failed:", res.status);
                 // If unauthorized (session expired?), reload to trigger login check
@@ -1013,6 +1015,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {
             console.error("Error loading user data:", e);
         }
+        // Fehlgeschlagen. Der Filter zeigt daraufhin gar nichts an, statt eine
+        // Bibliothek auszubreiten, deren Vault-Zustand unbekannt ist.
+        window.userDataLoaded = false;
+        return false;
     }
 
     // 1. Load Settings FIRST (async)

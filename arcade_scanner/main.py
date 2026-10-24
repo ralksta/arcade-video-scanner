@@ -3,6 +3,7 @@ import asyncio
 import time
 import webbrowser
 
+from arcade_scanner import __version__
 from arcade_scanner.config import config
 from arcade_scanner.core.maintenance import purge_broken_media, purge_media, purge_thumbnails
 from arcade_scanner.database import db, user_db
@@ -12,11 +13,11 @@ from arcade_scanner.templates.dashboard_template import generate_html_report
 
 
 def run_scanner(args_list=None):
-    parser = argparse.ArgumentParser(description="Arcade Media Scanner 6.3")
-    parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and previews and regenerate them.")
+    parser = argparse.ArgumentParser(description=f"Arcade Media Scanner {__version__}")
+    parser.add_argument("--rebuild", action="store_true", help="Delete all thumbnails and regenerate them.")
     parser.add_argument("--rebuild-thumbs", action="store_true", help="Delete only thumbnails and regenerate them.")
 
-    parser.add_argument("--cleanup", action="store_true", help="Remove orphan thumbnails and previews.")
+    parser.add_argument("--cleanup", action="store_true", help="Remove thumbnails whose generation failed (0 bytes).")
     parser.add_argument("--ssl", action="store_true", help="Enable HTTPS mode with self-signed certificate.")
     parser.add_argument("--skip-setup", action="store_true", help="Skip the first-run setup wizard.")
     args, _ = parser.parse_known_args(args_list)
@@ -26,7 +27,7 @@ def run_scanner(args_list=None):
         from arcade_scanner.onboarding import run_onboarding
         run_onboarding()
 
-    print("--- Arcade Media Scanner 6.7 ---")
+    print(f"--- Arcade Media Scanner {__version__} ---")
 
     # 0. Maintenance
     if args.rebuild:
@@ -50,8 +51,7 @@ def run_scanner(args_list=None):
     server, port = start_server(use_ssl=args.ssl)
 
     # 3. Generate initial report from cache
-    results = [e.model_dump(by_alias=True) for e in db.get_all()]
-    generate_html_report(results, config.report_file, server_port=port)
+    generate_html_report(config.report_file, server_port=port)
 
     # 4. Open browser immediately
     protocol = "https" if args.ssl else "http"
@@ -92,8 +92,7 @@ def run_scanner(args_list=None):
             run_post_scan_auto_tagging()
 
             # Regenerate report with fresh data
-            results = [e.model_dump(by_alias=True) for e in db.get_all()]
-            generate_html_report(results, config.report_file, server_port=port)
+            generate_html_report(config.report_file, server_port=port)
 
         except KeyboardInterrupt:
             print("\n⚠️ Scan interrupted.")

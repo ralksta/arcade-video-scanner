@@ -34,6 +34,35 @@ Unkritisch, aber leicht zu verwechseln: `container.setAttribute('data-path',
 v.FilePath)` setzt den rohen Pfad — `setAttribute` maskiert selbst. Wird das je
 auf String-Interpolation umgestellt, ist es eine Lücke; ein Test hält es fest.
 
+## Behoben in einer zweiten Runde (Loop J)
+
+`tag_manager.js` und `folder_browser.js` — die beiden Dateien, die unten als
+vorrangig benannt waren, weil sie die einzigen mit echtem Fremdeinfluss sind
+(frei eingegebene Tags, Ordnernamen vom Dateisystem).
+
+Gefunden wurden **fünf interpolierte `onclick`-Handler**:
+
+```javascript
+onclick="deleteTag('${t.name}')"
+onclick="toggleTagFilter('${tag.name}')"
+onclick="toggleBatchTagOption('${tag.name}')"
+onclick="editTagShortcut('${t.name}', '${shortcutValue}')"
+onclick="setFolderBrowserPath('${crumb.path.replace(/'/g, "\\'")}')"
+```
+
+Der letzte war sogar abgesichert — aber nur gegen Apostrophe. Das Attribut wird
+von *Anführungszeichen* begrenzt: ein Ordner namens `a"onmouseover=…` bricht
+trotzdem aus.
+
+Alle fünf Renderer bauen jetzt DOM-Knoten mit `textContent` und
+`addEventListener`. Farben gehen über `style.backgroundColor` statt über
+interpolierte `style`-Attribute — ungültige Werte verwirft der Browser dann,
+statt Markup zu übernehmen.
+
+Die Zahl der Interpolationen von Namensfeldern ist damit von 87 auf 60
+gefallen. Der Rest betrifft Felder ohne Fremdeinfluss (Zahlen, feste Auswahl,
+bereits geprüfte Werte) — die Angriffsfläche ist abgedeckt.
+
 ## Was offen ist
 
 Eine Erhebung über alle statischen JS-Dateien fand **87 Interpolationen** von

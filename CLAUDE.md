@@ -33,6 +33,12 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # User management
 .venv/bin/python3 scripts/manage_users.py list|add <name> [--admin]|passwd <name>
 
+# Similarity index (optional; the "similar media" bar stays empty without it).
+# Standalone by design: torch/open_clip are lazy imports, never server deps.
+.venv/bin/pip install -e ".[indexer]"
+.venv/bin/python3 scripts/media_indexer.py [--rebuild] [--watch] [--model NAME]
+# Coverage is visible at GET /api/similar/status
+
 # webOS TV client (in tv_client/; Enact/React)
 npm run serve   # dev server
 npm run pack    # production build
@@ -44,7 +50,7 @@ Some tests require `node` on PATH (JS syntax/contract tests shell out to `node -
 
 ## Architecture
 
-**No web framework.** The server is Python stdlib only: `socketserver.ThreadingTCPServer` + a custom `http.server` handler (`FinderHandler` in `arcade_scanner/server/api_handler.py`). Route handlers live in `arcade_scanner/server/routes/` (files, queue, tags, settings, duplicates). Runtime dependencies are just pydantic, Pillow, imagehash — keep it that way.
+**No web framework.** The server is Python stdlib only: `socketserver.ThreadingTCPServer` + a custom `http.server` handler (`FinderHandler` in `arcade_scanner/server/api_handler.py`). Route handlers live in `arcade_scanner/server/routes/` (autotag, candidates, duplicates, files, queue, settings, similar, tags). There is **no global auth gate** — every route checks the session in its own branch, so a new one can silently forget to; `tests/test_debug_route_authorization.py` sweeps all GET/POST branches and demands either a check or a documented exception. Runtime dependencies are just pydantic, Pillow, imagehash — keep it that way.
 
 **Server-generated frontend.** The dashboard HTML is built from Python string templates: `arcade_scanner/templates/dashboard_template.py` assembles component constants from `templates/components.py` / `ui_components.py` / `theme.py`. The client-side logic is vanilla JS modules in `arcade_scanner/server/static/` (engine.js, filter_engine.js, cinema.js, store.js, etc.) — no bundler, no build step for the web client.
 
@@ -68,4 +74,4 @@ When you add/rename an element ID or a JS global, update both sides or these tes
 - Commit style: conventional commits with scope, e.g. `fix(web): ...`, `feat(tv): ...`. Work happens on `dev`; `main` is for PRs.
 - Comments in the codebase are mixed German/English; either is fine.
 - Update `CHANGELOG.md` for user-facing changes; `ROADMAP.md` tracks planned features.
-- Version numbers drift across files (pyproject.toml, README, banner strings in main.py) — don't trust any single one as authoritative.
+- The version lives in exactly one place: `arcade_scanner/__version__`. `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, `main.py` prints it, and `tests/test_version_consistency.py` keeps it that way. (It used to drift across five files — 4.9.0 / 6.3 / 6.7 / 6.8.0 / 7.0.0.) Note: 7.0.0 has no CHANGELOG section; the release notes were never written.

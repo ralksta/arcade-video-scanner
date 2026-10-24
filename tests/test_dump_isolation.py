@@ -19,30 +19,39 @@ import pytest
 
 from arcade_scanner.templates.dashboard_template import generate_html_report
 
+# Diese Angaben werden dem Dump **nicht mehr übergeben** — die Funktion nimmt
+# gar keine Einträge mehr entgegen. Sie stehen hier trotzdem, weil die Tests
+# unten prüfen, dass nichts davon in der erzeugten Datei auftaucht: Der Dump
+# könnte sie sich auch selbst beschaffen.
+GEHEIM = {
+    "pfad": "/geheim/privat/urlaub_2019.mp4",
+    "tags": ["intim", "nicht_teilen"],
+}
+
 
 @pytest.fixture
 def rendered(tmp_path):
-    entries = [
-        {
-            "FilePath": "/geheim/privat/urlaub_2019.mp4",
-            "Size_MB": 512.0,
-            "Bitrate_Mbps": 8.0,
-            "Status": "OK",
-            "media_type": "video",
-            "codec": "h264",
-            "Duration_Sec": 120.0,
-            "Width": 1920,
-            "Height": 1080,
-            "favorite": True,
-            "hidden": True,
-            "tags": ["intim", "nicht_teilen"],
-            "thumb": "thumb_x.jpg",
-            "mtime": 1_700_000_000.0,
-        }
-    ]
     out = tmp_path / "index.html"
-    generate_html_report(entries, str(out), server_port=8000)
+    generate_html_report(str(out), server_port=8000)
     return out.read_text(encoding="utf-8")
+
+
+def test_the_dump_cannot_be_handed_any_entries():
+    """
+    Die stärkste Form der Trennung: nicht „die Einträge werden nicht
+    eingebettet", sondern „es gibt keine Einträge zu übergeben".
+
+    Der Parameter existierte noch, wurde aber von keiner Zeile mehr gelesen —
+    und von fünf Aufrufern mit 8788 Pydantic-Umwandlungen befüllt. Ein
+    Parameter, der Mediendaten annimmt und nichts damit tut, ist eine
+    Einladung, ihn zu benutzen.
+    """
+    import inspect
+
+    parameters = inspect.signature(generate_html_report).parameters
+
+    assert "results" not in parameters
+    assert list(parameters) == ["report_file", "server_port"]
 
 
 def test_no_media_entries_are_embedded(rendered):
@@ -55,6 +64,7 @@ def test_no_media_entries_are_embedded(rendered):
 def test_no_file_paths_leak_into_the_dump(rendered):
     assert "urlaub_2019.mp4" not in rendered
     assert "/geheim/privat" not in rendered
+    assert GEHEIM["pfad"] not in rendered
 
 
 @pytest.mark.parametrize("secret", ["intim", "nicht_teilen"])
@@ -88,6 +98,30 @@ def test_folder_tree_is_built_from_the_per_user_video_list():
     assert "window.ALL_VIDEOS" in js.split("function buildFoldersData()", 1)[1][:900]
 
 
+def _code_only(source: str) -> str:
+    """Kommentare und Docstrings raus, nur ausführbarer Code bleibt.
+
+    Ohne das prüfen die Muster-Tests hier die Erklärung statt des Codes: Der
+    Kommentar, der beschreibt, *warum* etwas entfernt wurde, nennt das
+    Entfernte beim Namen. Genau daran ist dieser Test schon gescheitert — und
+    das ist kein Einzelfall, sondern die Regel: Wer einen alten Weg abschafft,
+    schreibt seinen Namen in die Begründung.
+
+    Über den AST statt über Zeichenketten, weil ein Docstring selbst
+    Anführungszeichen enthalten darf.
+    """
+    import ast
+
+    # `ast.unparse()` gibt nur Code zurück — Kommentare kennt der Baum gar
+    # nicht. Zu entfernen bleiben also die Docstrings.
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+                             ast.Module)) and ast.get_docstring(node):
+            node.body = node.body[1:] or [ast.Pass()]
+    return ast.unparse(tree)
+
+
 def test_dead_stripping_loop_is_gone():
     """
     Die Schleife baute 8788 Dict-Kopien pro Neugenerierung und verwarf sie.
@@ -95,9 +129,35 @@ def test_dead_stripping_loop_is_gone():
     wieder toter Code.
     """
     import inspect
+    import textwrap as _tw
 
-    source = inspect.getsource(generate_html_report)
+    source = _code_only(_tw.dedent(inspect.getsource(generate_html_report)))
     assert "clean_results" not in source
+
+
+def test_the_dump_asserts_no_library_wide_numbers():
+    """
+    Die Kopfzeile zeigt Anzahl und Größe als `...`; gefüllt wird zur Laufzeit
+    aus `ALL_VIDEOS`, das pro Nutzer gefiltert ist.
+
+    `render_header()` nahm dafür einmal zwei Argumente entgegen und benutzte
+    beide nicht — der Aufrufer rechnete die Gesamtgröße der Bibliothek aus, um
+    sie zu übergeben. Das war eine Einladung: Diese Datei wird EINMAL erzeugt
+    und an jedes Konto ausgeliefert. Wer die Platzhalter „repariert", indem er
+    die Argumente einsetzt, schreibt die Zahlen der gesamten Bibliothek in die
+    Kopfzeile jedes Nutzers.
+    """
+    import inspect
+
+    from arcade_scanner.templates.ui_components import render_header
+
+    parameters = inspect.signature(render_header).parameters
+    assert "count" not in parameters
+    assert "size_gb" not in parameters
+
+    body = inspect.getsource(render_header)
+    assert 'id="header-video-count">...' in body
+    assert 'id="header-size">...' in body
 
 
 def test_claude_md_describes_the_actual_mechanism():
