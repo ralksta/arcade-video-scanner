@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [7.2.0] - 2026-10-24
+
+### Added
+- **RAW-Fotos scannen.** Ein eigener Schalter „RAW-Fotos“ (unabhängig von
+  „Include Photos“) nimmt CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW,
+  RAW und RWL auf; JPG/PNG bleiben draußen. Metadaten und Vorschaubilder
+  kommen aus der eingebetteten JPEG-Vorschau, nur mit Pillow: TIFF-basiert
+  direkt, RAF über den Kopf bei Byte 84–91, sonst das größte eingebettete
+  JPEG. EXIF-Ausrichtung inklusive. Vorschaubilder 480×270, Poster 1280×720,
+  ohne ffmpeg. Die Endungslisten liegen jetzt in einer gemeinsamen Quelle
+  (`core/media_extensions.py`).
+
 ## [7.1.0] - 2026-10-24
 
 ### Added
