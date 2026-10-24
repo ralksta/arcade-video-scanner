@@ -16,6 +16,7 @@ const TRAPPED_MODALS = [
     'tagManagerModal',
     'collectionModal',
     'hiddenPathModal',
+    'confirmDialog',
     'shortcutsModal',
     'duplicateCheckerModal',
     'batchTagModal',

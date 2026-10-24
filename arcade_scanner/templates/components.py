@@ -1416,6 +1416,48 @@ HIDDEN_PATH_MODAL_COMPONENT = """
 </style>
 """
 
+CONFIRM_DIALOG_COMPONENT = """
+<!-- Gestylter Bestätigungsdialog (confirm_dialog.js) — Ersatz für window.confirm() -->
+<div id="confirmDialog" class="fixed inset-0 z-[200] hidden bg-black/70 backdrop-blur-sm items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle"
+     aria-describedby="confirmDialogMessage" aria-hidden="true">
+    <div class="w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-lg shadow-2xl">
+        <div class="p-5 flex items-start gap-3.5">
+            <span id="confirmDialogIcon" class="material-icons text-2xl shrink-0" aria-hidden="true">delete_outline</span>
+            <div class="min-w-0 flex-1">
+                <h2 id="confirmDialogTitle" class="text-[16px] font-bold text-text-main leading-6">Bestätigen</h2>
+                <p id="confirmDialogMessage" class="text-[13px] text-text-muted leading-6 mt-1.5"></p>
+                <div id="confirmDialogDetails"
+                     class="hidden mt-3 max-h-40 overflow-y-auto rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline)] px-3 py-2.5 text-[12px] text-body-text font-mono space-y-1"></div>
+            </div>
+        </div>
+        <div class="px-5 py-3 bg-[var(--ds-fill-soft)] border-t border-[var(--ds-hairline)] flex items-center justify-end gap-2">
+            <button type="button" id="confirmDialogCancel"
+                    class="px-4 py-2 rounded-ds-sm text-[13px] font-medium text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors">
+                Abbrechen
+            </button>
+            <button type="button" id="confirmDialogOk"
+                    class="px-4 py-2 rounded-ds-sm text-[13px] font-bold text-white transition-colors">
+                Bestätigen
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    #confirmDialog.active { display: flex !important; }
+    #confirmDialog > div { transform: scale(0.97); transition: transform 0.15s ease-out; }
+    #confirmDialog.active > div { transform: scale(1); }
+    #confirmDialogIcon { color: var(--ds-accent); }
+    #confirmDialogIcon.is-danger { color: #ef4444; }
+    #confirmDialogOk { background: var(--ds-accent); }
+    #confirmDialogOk:hover { filter: brightness(1.08); }
+    #confirmDialogOk.is-danger { background: #ef4444; }
+    #confirmDialogOk.is-danger:hover { background: #dc2626; filter: none; }
+</style>
+"""
+
+
 SHORTCUTS_MODAL_COMPONENT = """
 <!-- Keyboard Shortcuts Help Overlay -->
 <div id="shortcutsModal" class="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200 flex items-center justify-center p-4"
@@ -2262,10 +2304,17 @@ FILTER_BAR_COMPONENT = """
             <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px] pointer-events-none" aria-hidden="true">sort</span>
             <select id="sortSelect" onchange="setSort(this.value)" class="ds-chip pl-9 pr-4 appearance-none min-w-[150px] whitespace-nowrap" aria-label="Sortierung">
                 <option value="date">Neueste zuerst</option>
-                <option value="runtime">Längste zuerst</option>
-                <option value="file_date">Nach Dateidatum</option>
-                <option value="bitrate">Nach Bitrate</option>
-                <option value="size">Nach Größe</option>
+                <option value="date_asc">Älteste zuerst</option>
+                <option value="name">Name A–Z</option>
+                <option value="name_desc">Name Z–A</option>
+                <option value="bitrate">Bitrate: hoch → niedrig</option>
+                <option value="bitrate_asc">Bitrate: niedrig → hoch</option>
+                <option value="size">Größe: groß → klein</option>
+                <option value="size_asc">Größe: klein → groß</option>
+                <option value="runtime">Laufzeit: lang → kurz</option>
+                <option value="runtime_asc">Laufzeit: kurz → lang</option>
+                <option value="file_date">Dateidatum: neu → alt</option>
+                <option value="file_date_asc">Dateidatum: alt → neu</option>
             </select>
         </div>
 

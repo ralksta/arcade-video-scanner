@@ -304,9 +304,13 @@ function filterAndSort(scrollToTop = false) {
         if (workspaceMode !== 'optimized') {
             filteredVideos.sort((a, b) => {
                 if (currentSort === 'bitrate') return (b.Bitrate_Mbps || 0) - (a.Bitrate_Mbps || 0);
+                if (currentSort === 'bitrate_asc') return (a.Bitrate_Mbps || 0) - (b.Bitrate_Mbps || 0);
                 if (currentSort === 'size') return (b.Size_MB || 0) - (a.Size_MB || 0);
+                if (currentSort === 'size_asc') return (a.Size_MB || 0) - (b.Size_MB || 0);
                 if (currentSort === 'runtime') return (b.Duration_Sec || 0) - (a.Duration_Sec || 0);
+                if (currentSort === 'runtime_asc') return (a.Duration_Sec || 0) - (b.Duration_Sec || 0);
                 if (currentSort === 'name') return a.FilePath.localeCompare(b.FilePath);
+                if (currentSort === 'name_desc') return b.FilePath.localeCompare(a.FilePath);
                 // entryDate statt mtime: dieselbe Frage wie im Datumsfilter drei
                 // Dutzend Zeilen weiter oben — „wann kam das in die Bibliothek",
                 // nicht „wann wurde die Datei zuletzt geschrieben". Sonst schiebt
@@ -320,7 +324,9 @@ function filterAndSort(scrollToTop = false) {
                 // Der Wert 'date' bleibt, wie er ist: Gespeicherte Ansichten
                 // tragen ihn.
                 if (currentSort === 'date') return entryDate(b) - entryDate(a);
+                if (currentSort === 'date_asc') return entryDate(a) - entryDate(b);
                 if (currentSort === 'file_date') return (b.mtime || 0) - (a.mtime || 0);
+                if (currentSort === 'file_date_asc') return (a.mtime || 0) - (b.mtime || 0);
                 return 0;
             });
         } else {

@@ -366,7 +366,16 @@ async function deleteDuplicate(groupIdx, fileIdx) {
     const path = file.path;
     const filename = path.split(/[\\/]/).pop();
 
-    if (!confirm(`Move "${filename}" to the trash?\n\nRestorable in Settings → Storage for 30 days.`)) {
+    const confirmed = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: 'Datei in den Papierkorb?',
+            message: `"${filename}" wird in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.`,
+            confirmLabel: 'In den Papierkorb',
+            danger: true,
+            icon: 'delete_outline',
+        })
+        : confirm(`"${filename}" wird in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.`);
+    if (!confirmed) {
         return;
     }
 
@@ -516,13 +525,19 @@ async function deleteAllDuplicates() {
     }
 
     // Confirmation dialog with details
-    const confirmation = confirm(
-        `MOVE ALL DUPLICATES TO TRASH\n\n` +
-        `This will move ${filesToDelete.length} file(s) across ${duplicateData.groups.length} groups to the trash.\n\n` +
-        `Space freed after emptying the trash: ${totalSavingsMb.toFixed(1)} MB\n\n` +
-        `The best quality file in each group will be kept.\n\n` +
-        `Restorable in Settings → Storage for 30 days. Continue?`
-    );
+    const confirmation = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: 'Alle Duplikate in den Papierkorb?',
+            message: `${filesToDelete.length} Dateien aus ${duplicateData.groups.length} Gruppen werden in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.`,
+            details: [
+                `Frei nach dem Leeren: ${totalSavingsMb.toFixed(1)} MB`,
+                'Die beste Datei jeder Gruppe bleibt erhalten.',
+            ],
+            confirmLabel: 'In den Papierkorb',
+            danger: true,
+            icon: 'delete_sweep',
+        })
+        : confirm(`Alle ${filesToDelete.length} Duplikate in den Papierkorb verschieben? Wiederherstellen unter Einstellungen → Storage, 30 Tage lang.`);
 
     if (!confirmation) {
         return;
@@ -876,8 +891,20 @@ async function keepDuplicateFile(side) {
         return;
     }
 
-    const fileNames = filesToDelete.map(f => f.path.split(/[\\/]/).pop()).join(', ');
-    if (!confirm(`Move ${filesToDelete.length} file(s) to the trash?\n\n${fileNames}\n\nRestorable in Settings → Storage for 30 days.`)) {
+    const fileNames = filesToDelete.map(f => f.path.split(/[\\/]/).pop());
+    const details = fileNames.slice(0, 6);
+    if (fileNames.length > 6) details.push(`… und ${fileNames.length - 6} weitere`);
+    const confirmed = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: filesToDelete.length === 1 ? 'Andere Datei in den Papierkorb?' : 'Andere Dateien in den Papierkorb?',
+            message: `${filesToDelete.length} Datei(en) aus dieser Gruppe werden in den Papierkorb verschoben. Die gewählte Datei bleibt erhalten. Du kannst sie 30 Tage lang wiederherstellen.`,
+            details,
+            confirmLabel: 'In den Papierkorb',
+            danger: true,
+            icon: 'delete_outline',
+        })
+        : confirm(`Move ${filesToDelete.length} file(s) to the trash?\n\n${fileNames.join(', ')}\n\nRestorable in Settings → Storage for 30 days.`);
+    if (!confirmed) {
         return;
     }
 

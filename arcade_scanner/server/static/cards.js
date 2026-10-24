@@ -120,11 +120,27 @@ async function triggerBatchDelete() {
     const selected = document.querySelectorAll('.video-card-container input[type="checkbox"]:checked');
     if (selected.length === 0) return;
 
-    if (!confirm(`Move these ${selected.length} file(s) to the trash? They can be restored in Settings → Storage for 30 days.`)) {
+    const paths = Array.from(selected).map(cb => cb.closest('.video-card-container').getAttribute('data-path'));
+    const names = paths.map(p => p.split(/[\\/]/).pop());
+    const details = names.slice(0, 6);
+    if (names.length > 6) details.push(`… und ${names.length - 6} weitere`);
+
+    const confirmed = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: selected.length === 1 ? 'Datei in den Papierkorb?' : 'Dateien in den Papierkorb?',
+            message: selected.length === 1
+                ? 'Die Datei wird in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.'
+                : `Diese ${selected.length} Dateien werden in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.`,
+            details,
+            confirmLabel: 'In den Papierkorb',
+            danger: true,
+            icon: 'delete_outline',
+        })
+        : confirm(`Move these ${selected.length} file(s) to the trash? They can be restored in Settings → Storage for 30 days.`);
+
+    if (!confirmed) {
         return;
     }
-
-    const paths = Array.from(selected).map(cb => cb.closest('.video-card-container').getAttribute('data-path'));
 
     try {
         const response = await fetch('/api/bulk_delete', {

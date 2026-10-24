@@ -7,6 +7,7 @@ from arcade_scanner.templates.components import (
     BATCH_BAR_COMPONENT,
     CINEMA_MODAL_COMPONENT,
     COLLECTION_MODAL_COMPONENT,
+    CONFIRM_DIALOG_COMPONENT,
     DUPLICATE_CHECKER_MODAL_COMPONENT,
     FILTER_BAR_COMPONENT,
     FILTER_PANEL_COMPONENT,
@@ -46,6 +47,7 @@ SCRIPT_MODULES = [
     "formatters.js",
     "api.js",
     "utils.js",
+    "confirm_dialog.js",
     # Suchsprache (Begriffe, Pfade, Ausschlüsse) — filter_engine.js und
     # collections.js werten sie aus, deshalb vor beiden laden.
     "search_query.js",
@@ -256,6 +258,7 @@ def generate_html_report(report_file, server_port=8000):
     {COLLECTION_MODAL_COMPONENT}
     {SETUP_WIZARD_COMPONENT}
     {HIDDEN_PATH_MODAL_COMPONENT}
+    {CONFIRM_DIALOG_COMPONENT}
     {SHORTCUTS_MODAL_COMPONENT}
     {BATCH_BAR_COMPONENT}
 

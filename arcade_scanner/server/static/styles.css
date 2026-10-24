@@ -3310,6 +3310,17 @@ body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="dupl
     display: none !important;
 }
 
+/* Kompakte Metazeile (Größe · Bitrate) auf der Kachel. Sie ist bewusst
+   immer sichtbar und ersetzt im Schau-Modus die ausführliche tech-only-Zeile.
+   Wo Details oder eine Werkstatt-Ansicht ohnehin Größe und Bitrate zeigen,
+   wird sie ausgeblendet, damit die Angaben nicht doppelt stehen. */
+body.show-tech .card-meta-line,
+body[data-workspace="optimized"] .card-meta-line,
+body[data-workspace="duplicates"] .card-meta-line,
+body[data-workspace="candidates"] .card-meta-line {
+    display: none !important;
+}
+
 /* Wiedergabefortschritt auf der Karte — wie auf der Startseite */
 .card-progress {
     position: absolute;

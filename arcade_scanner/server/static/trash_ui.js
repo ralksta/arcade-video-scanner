@@ -129,7 +129,16 @@ async function restoreTrashEntry(id, button) {
 }
 
 async function emptyTrash() {
-    if (!confirm('Alle Dateien im Papierkorb endgültig löschen? Das lässt sich nicht rückgängig machen.')) {
+    const confirmed = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: 'Papierkorb endgültig leeren?',
+            message: 'Alle Dateien im Papierkorb werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.',
+            confirmLabel: 'Endgültig löschen',
+            danger: true,
+            icon: 'delete_forever',
+        })
+        : confirm('Alle Dateien im Papierkorb endgültig löschen? Das lässt sich nicht rückgängig machen.');
+    if (!confirmed) {
         return;
     }
     try {

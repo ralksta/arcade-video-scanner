@@ -369,6 +369,11 @@ function createVideoCard(v) {
     // Lesbarer Titel (formatters.js); der Dateiname bleibt im Tooltip.
     const safeTitle = escapeHtml(typeof mediaTitle === 'function' ? mediaTitle(v) : fileName);
     const watched = typeof watchProgressRatio === 'function' ? watchProgressRatio(v.FilePath) : 0;
+    // Kompakte Metazeile: Größe und Bitrate immer sichtbar, ohne den
+    // Details-Schalter. Die Länge steht weiterhin als Badge auf dem Bild.
+    // In Details- und Werkstatt-Ansichten übernimmt die ausführliche
+    // tech-only-Zeile (styles.css blendet diese hier aus).
+    const metaLine = escapeHtml(typeof cardMetaLine === 'function' ? cardMetaLine(v) : '');
 
     container.innerHTML = `
         <!-- Thumbnail (Card Media) -->
@@ -433,6 +438,7 @@ function createVideoCard(v) {
         <!-- Content -->
         <div class="card-body px-[11px] py-2.5 flex flex-col gap-0.5">
             <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${safeFileName}">${safeTitle}</h3>
+            <p class="card-meta-line text-[10.5px] text-text-muted font-mono truncate">${metaLine}</p>
             <p class="tech-only text-[10.5px] text-text-muted truncate" title="${escapeHtml(v.FilePath)}">${escapeHtml(dirName)}</p>
 
             ${renderVideoCardTags(v.tags || [])}

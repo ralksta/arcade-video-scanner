@@ -28,6 +28,18 @@ function formatSizeCompact(mb) {
 }
 
 /**
+ * Kompakte Metazeile einer Kachel: Größe · Bitrate.
+ * Bilder zeigen nur die Größe; die Länge steht als Badge auf dem Bild.
+ * @param {Object} v - Eintrag aus ALL_VIDEOS
+ * @returns {string} z. B. "1.4 GB · 8.2 Mbps" oder "500.0 MB"
+ */
+function cardMetaLine(v) {
+    const size = formatSizeCompact((v && v.Size_MB) || 0);
+    if (v && v.media_type === 'image') return size;
+    return `${size} · ${(Number(v && v.Bitrate_Mbps) || 0).toFixed(1)} Mbps`;
+}
+
+/**
  * Format duration from seconds to HH:MM:SS or MM:SS
  * @param {number} seconds - Duration in seconds
  * @returns {string} Formatted duration string (e.g., "1:23:45" or "5:30")
@@ -203,6 +215,7 @@ function mediaTitle(videoOrPath) {
 if (typeof window !== 'undefined') {
     window.titleFromFileName = titleFromFileName;
     window.mediaTitle = mediaTitle;
+    window.cardMetaLine = cardMetaLine;
 }
 
 // Export for ES modules (if supported)
@@ -219,6 +232,7 @@ if (typeof module !== 'undefined' && module.exports) {
         getDirPath,
         truncateText,
         titleFromFileName,
-        mediaTitle
+        mediaTitle,
+        cardMetaLine
     };
 }
