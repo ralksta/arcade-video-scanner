@@ -1035,8 +1035,9 @@ COLLECTION_MODAL_COMPONENT = """
                         <div id="collectionSearchChips" class="search-chips hidden" aria-label="Gewählte Filter"></div>
                         <p class="mt-2 text-[11px] leading-relaxed text-gray-500">
                             Vorschlag anklicken = einschließen, <code>−</code> rechts = ausschließen ·
-                            mehrere Ordner gelten als <em>oder</em> · <code>#tag</code> sucht Tags ·
-                            Chips: Symbol schaltet um, <code>×</code> entfernt
+                            mehrere Ordner gelten als <em>oder</em> ·
+                            <code>*</code> als Platzhalter (z. B. <code>-*/web*</code>) ·
+                            <code>#tag</code> sucht Tags · Chips: Symbol schaltet um, <code>×</code> entfernt
                         </p>
                     </section>
 

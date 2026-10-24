@@ -51,6 +51,14 @@ def test_multiple_folder_chips_stay_separate_and_are_ored(result):
     assert multiple["composed"] == "/media/a /media/b"
 
 
+def test_glob_patterns_survive_as_path_chips(result):
+    glob_chip = result["globChip"]
+    assert glob_chip["chips"] == [
+        {"type": "folder", "value": "*/web*", "negated": True},
+    ]
+    assert glob_chip["composed"] == "-*/web*"
+
+
 def test_plain_keywords_do_not_create_chips(result):
     assert result["freeOnly"] == {
         "input": "web -trailer",

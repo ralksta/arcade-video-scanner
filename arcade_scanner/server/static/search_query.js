@@ -38,6 +38,24 @@
             .replace(/ß/g, 'ss');
     }
 
+    /**
+     * Pfad-Muster zu einer Regex: `*` steht für beliebig viele Zeichen —
+     * auch für `/`. Damit trifft `*<<slash>>web*` jeden Pfad, in dem ein
+     * Verzeichnis mit „web" beginnt (web, Web, web_videos, web/Fist …).
+     */
+    function globToRegExp(pattern) {
+        let source = '^';
+        for (let i = 0; i < pattern.length; i++) {
+            const ch = pattern[i];
+            if (ch === '*') {
+                source += '.*';
+            } else {
+                source += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+        }
+        return new RegExp(source + '$');
+    }
+
     // --- Parser -----------------------------------------------------------
 
     /**
@@ -99,12 +117,17 @@
                 searchValue = value;
             }
 
+            const isPath = !isTag && (searchValue.indexOf('/') !== -1 || searchValue.indexOf('\\') !== -1);
+            const folded = foldSearchText(searchValue);
             terms.push({
                 value: searchValue,
-                folded: foldSearchText(searchValue),
+                folded: folded,
                 negated: negated,
                 isTag: isTag,
-                isPath: !isTag && (searchValue.indexOf('/') !== -1 || searchValue.indexOf('\\') !== -1)
+                isPath: isPath,
+                glob: (isPath && searchValue.indexOf('*') !== -1)
+                    ? globToRegExp(folded.replace(/\\/g, '/'))
+                    : null
             });
         }
 
@@ -214,6 +237,8 @@
                     hit = tags.some(function (tag) {
                         return foldSearchText(tag) === term.folded;
                     });
+                } else if (term.glob) {
+                    hit = term.glob.test(path.replace(/\\/g, '/'));
                 } else if (term.isPath) {
                     hit = foldedPathMatches(path, term.folded);
                 } else {
@@ -346,6 +371,28 @@
         });
     }
 
+    /**
+     * Nur die obersten Treffer einer Ordnerfrage: Liegt ein Ordner bereits
+     * unter einem anderen Treffer, fällt er weg. So liefert „web" fünf
+     * Web-Ordner statt zusätzlich noch deren Unterordner (web/Fist usw.).
+     * Das ist die Menge für „alle passenden einschließen/ausschließen".
+     */
+    function getTopLevelFolderSuggestions(query, limit) {
+        const all = folderSuggestions(query, limit || 500);
+        const kept = [];
+
+        all.forEach(function (item) {
+            const path = item.path.replace(/\\/g, '/').replace(/\/+$/, '');
+            const covered = kept.some(function (parent) {
+                const parentPath = parent.path.replace(/\\/g, '/').replace(/\/+$/, '');
+                return path === parentPath || path.indexOf(parentPath + '/') === 0;
+            });
+            if (!covered) kept.push(item);
+        });
+
+        return kept;
+    }
+
     /** Setzt einen Ordnerpfad als Suchbegriff — mit Anführungszeichen, wenn nötig. */
     function quoteSearchTerm(value) {
         const text = String(value == null ? '' : value);
@@ -451,6 +498,7 @@
     window.pathMatches = pathMatches;
     window.getFolderSuggestions = folderSuggestions;
     window.getSearchSuggestions = getSearchSuggestions;
+    window.getTopLevelFolderSuggestions = getTopLevelFolderSuggestions;
     window.tokenForSuggestion = tokenForSuggestion;
     window.quoteSearchTerm = quoteSearchTerm;
     window.quoteTagTerm = quoteTagTerm;

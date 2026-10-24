@@ -106,6 +106,13 @@ const multiplePaths = {
     composed: getText()
 };
 
+setFromText('-*/web*');
+const globChip = {
+    input: input.value,
+    chips: getChips(),
+    composed: getText()
+};
+
 setFromText('');
 const empty = {
     input: input.value,
@@ -113,4 +120,4 @@ const empty = {
     composed: getText()
 };
 
-process.stdout.write(JSON.stringify({mixed, freeOnly, multiplePaths, empty}));
+process.stdout.write(JSON.stringify({mixed, freeOnly, multiplePaths, globChip, empty}));

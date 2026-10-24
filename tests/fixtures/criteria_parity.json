@@ -727,6 +727,111 @@
    "expected": false
   },
   {
+   "name": "glob matches a web folder with underscore",
+   "video": {
+    "FilePath": "/media/a/ProSessions/Lena/web_videos/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "*/web*"
+   },
+   "expected": true
+  },
+  {
+   "name": "glob matches a web folder with subfolders",
+   "video": {
+    "FilePath": "/media/a/web/Fist/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "*/web*"
+   },
+   "expected": true
+  },
+  {
+   "name": "glob needs a slash before web",
+   "video": {
+    "FilePath": "/media/a/cobweb/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "*/web*"
+   },
+   "expected": false
+  },
+  {
+   "name": "negative glob excludes web folders",
+   "video": {
+    "FilePath": "/media/a/web/Fist/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" -\"*/web*\""
+   },
+   "expected": false
+  },
+  {
+   "name": "negative glob keeps non-web files",
+   "video": {
+    "FilePath": "/media/a/Lena/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" -\"*/web*\""
+   },
+   "expected": true
+  },
+  {
    "name": "search folds umlauts",
    "video": {
     "FilePath": "/media/Müller/clip.mp4",

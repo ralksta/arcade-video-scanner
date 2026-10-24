@@ -70,6 +70,16 @@ function foldSearchText (value) {
 		.replace(/ß/g, 'ss');
 }
 
+// Pfad-Muster: `*` steht für beliebig viele Zeichen, auch für `/`.
+function globToRegExp (pattern) {
+	let source = '^';
+	for (let i = 0; i < pattern.length; i++) {
+		const ch = pattern[i];
+		source += ch === '*' ? '.*' : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	}
+	return new RegExp(source + '$');
+}
+
 function parseSearchQuery (text) {
 	const raw = String(text == null ? '' : text);
 	const terms = [];
@@ -118,12 +128,17 @@ function parseSearchQuery (text) {
 			searchValue = value;
 		}
 
+		const isPath = !isTag && (searchValue.indexOf('/') !== -1 || searchValue.indexOf('\\') !== -1);
+		const folded = foldSearchText(searchValue);
 		terms.push({
 			value: searchValue,
-			folded: foldSearchText(searchValue),
+			folded: folded,
 			negated: negated,
 			isTag: isTag,
-			isPath: !isTag && (searchValue.indexOf('/') !== -1 || searchValue.indexOf('\\') !== -1)
+			isPath: isPath,
+			glob: (isPath && searchValue.indexOf('*') !== -1)
+				? globToRegExp(folded.replace(/\\/g, '/'))
+				: null
 		});
 	}
 
@@ -170,6 +185,8 @@ function searchMatches (filePath, text, tags) {
 		let hit;
 		if (term.isTag) {
 			hit = foldedTags.indexOf(term.folded) !== -1;
+		} else if (term.glob) {
+			hit = term.glob.test(foldedPath.replace(/\\/g, '/'));
 		} else if (term.isPath) {
 			hit = foldedPathMatches(foldedPath, term.folded);
 		} else {

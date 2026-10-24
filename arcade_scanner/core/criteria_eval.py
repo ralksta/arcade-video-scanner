@@ -8,6 +8,7 @@ behaviour here, change collections.js identically or that test fails.
 """
 from __future__ import annotations
 
+import re
 import time
 import unicodedata
 from typing import Any, Optional
@@ -95,6 +96,15 @@ def _parse_search_query(text: Any) -> tuple[list[tuple[str, bool, bool, bool]], 
     return terms, len(terms) == 0
 
 
+def _glob_regex(pattern: str) -> re.Pattern:
+    """Pfad-Muster: `*` steht für beliebig viele Zeichen, auch für `/`."""
+    parts = ['^']
+    for ch in pattern:
+        parts.append('.*' if ch == '*' else re.escape(ch))
+    parts.append('$')
+    return re.compile(''.join(parts))
+
+
 def _folded_path_matches(folded_file: str, folded_prefix: str) -> bool:
     """Präfix-Vergleich auf Ordnergrenzen (wie foldedPathMatches in JS)."""
     file = folded_file.replace("\\", "/")
@@ -133,14 +143,27 @@ def _search_matches(file_path: str, search: Any, tags: Optional[list] = None) ->
         literal = _fold_search_text(raw)
         return literal in folded_path or literal in folded_name
 
-    # Positive Pfade sind eine ODER-Gruppe: „/a /b" = unter /a oder /b.
-    has_positive_path = any((not negated) and is_path for _, negated, is_path, _ in terms)
-    path_hit = not has_positive_path
-
+    # Begriffe vorbereiten (Pfade normalisieren, Muster einmal kompilieren).
+    prepared = []
     for value, negated, is_path, is_tag in terms:
         folded = _fold_search_text(value)
+        glob_re = None
+        if is_path:
+            folded = folded.replace("\\", "/")
+            if "*" in folded:
+                glob_re = _glob_regex(folded)
+        prepared.append((folded, negated, is_path, is_tag, glob_re))
+
+    # Positive Pfade sind eine ODER-Gruppe: „/a /b" = unter /a oder /b.
+    has_positive_path = any((not negated) and is_path for _, negated, is_path, _, _ in prepared)
+    path_hit = not has_positive_path
+    folded_path_norm = folded_path.replace("\\", "/")
+
+    for folded, negated, is_path, is_tag, glob_re in prepared:
         if is_tag:
             hit = folded in folded_tags
+        elif glob_re is not None:
+            hit = bool(glob_re.match(folded_path_norm))
         elif is_path:
             hit = _folded_path_matches(folded_path, folded)
         else:

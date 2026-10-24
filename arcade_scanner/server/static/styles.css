@@ -3533,3 +3533,39 @@ body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="dupl
 .search-chip-label:hover .search-chip-action {
     opacity: 1;
 }
+
+/* Sammel-Aktion am Ende der Vorschlagsliste. Bleibt beim Scrollen sichtbar,
+   damit „Alle 5 ausschließen" nicht unten aus dem Blick rutscht. */
+.search-suggestion-bulk {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid var(--ds-hairline);
+    background: var(--ds-bg);
+}
+
+.search-suggestion-bulk-btn {
+    flex: 1 1 auto;
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid var(--ds-hairline-strong);
+    border-radius: 7px;
+    background: var(--ds-fill-soft);
+    color: var(--ds-text);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.search-suggestion-bulk-btn:hover,
+.search-suggestion-bulk-btn:focus-visible {
+    background: var(--ds-fill);
+}
+
+.search-suggestion-bulk-btn:last-child {
+    border-color: rgb(var(--ds-danger-rgb) / 0.4);
+    color: var(--ds-danger);
+}

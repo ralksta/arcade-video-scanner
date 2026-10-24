@@ -1306,6 +1306,33 @@ function handleCollectionSearchSuggestion(item, token) {
     return true;
 }
 
+/**
+ * Sammel-Aktion aus der Vorschlagsliste: alle obersten Treffer eines
+ * Begriffs auf einmal einschließen oder ausschließen.
+ */
+function handleCollectionSearchBulk(items, mode, token) {
+    if (!Array.isArray(items) || !items.length) return false;
+
+    const input = document.getElementById('collectionSearch');
+    items.forEach((item) => {
+        if (item && item.type === 'folder') {
+            addCollectionSearchChip('folder', item.value, mode === 'exclude');
+        }
+    });
+
+    if (input) {
+        input.value = input.value.slice(0, token.start) + input.value.slice(token.end);
+        const pos = Math.min(token.start, input.value.length);
+        input.focus();
+        if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+    }
+
+    renderCollectionSearchChips();
+    updateCollectionPreviewCount();
+    updateCollectionSearchBadge();
+    return true;
+}
+
 function onCollectionSearchInput() {
     updateCollectionSearchBadge();
     updateCollectionPreviewCount();
@@ -1316,7 +1343,9 @@ function ensureCollectionSearchSuggestions() {
     window.bindSearchSuggestions({
         inputId: 'collectionSearch',
         boxId: 'collectionSearchSuggestions',
+        bulk: true,
         onSelect: handleCollectionSearchSuggestion,
+        onBulk: handleCollectionSearchBulk,
         afterChange: onCollectionSearchInput
     });
 }
@@ -1325,6 +1354,7 @@ function ensureCollectionSearchSuggestions() {
 window.ensureCollectionSearchSuggestions = ensureCollectionSearchSuggestions;
 window.onCollectionSearchInput = onCollectionSearchInput;
 window.handleCollectionSearchSuggestion = handleCollectionSearchSuggestion;
+window.handleCollectionSearchBulk = handleCollectionSearchBulk;
 window.setCollectionSearchFromText = setCollectionSearchFromText;
 window.getCollectionSearchText = getCollectionSearchText;
 window.getCollectionSearchChips = function () {

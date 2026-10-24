@@ -15,11 +15,15 @@ All notable changes to this project will be documented in this file.
   Chips schaltet ein Symbol zwischen ein- und ausschließen um, das X entfernt
   den Filter. Chips zeigen die letzten zwei Pfadsegmente (etwa
   „Miss Blossom/web"), damit mehrere `web`-Ordner unterscheidbar bleiben.
-  Gespeichert wird weiterhin ein einziger Suchtext.
+  Unter der Liste stehen **„Alle N einschließen/ausschließen"** für die
+  obersten Treffer eines Begriffs — damit reicht für „ProSessions ohne
+  Web-Ordner" ein Klick. Gespeichert wird weiterhin ein einziger Suchtext.
 - Die Suche versteht mehrere Begriffe (alle müssen passen), Ausschlüsse
   (`-wort`), Anführungszeichen für Phrasen und `#tag` für Tags. Mehrere
   **Pfade** sind dagegen ODER-verknüpft: „/a /b" findet alles unter `/a` oder
-  `/b` — das entspricht dem Anklicken mehrerer Ordner-Chips. Pfade mit `/`
+  `/b` — das entspricht dem Anklicken mehrerer Ordner-Chips. In Pfaden steht
+  `*` als Platzhalter für beliebig viele Zeichen (auch `/`), etwa
+  `-*/web*` für „alle Ordner, deren Name mit web beginnt". Pfade mit `/`
   gelten auf Ordnergrenze: `/media_ralf/OD` trifft nicht mehr
   `/media_ralf/ODX`. Groß-/Kleinschreibung, Umlaute und ß sind egal. Dieselbe
   Regel gilt in Filterleiste, Treemap, Auto-Tag-Regeln und auf dem Fernseher;

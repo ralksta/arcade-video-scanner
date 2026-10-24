@@ -219,7 +219,7 @@
         if (!input || !box || boundInputs.has(input)) return;
         boundInputs.add(input);
 
-        const state = {items: [], index: -1};
+        const state = {items: [], index: -1, bulkFolders: []};
 
         function hide() {
             box.classList.add('hidden');
@@ -227,6 +227,7 @@
             input.removeAttribute('aria-activedescendant');
             state.items = [];
             state.index = -1;
+            state.bulkFolders = [];
         }
 
         function setActive(index) {
@@ -270,6 +271,41 @@
                 const text = window.tokenForSuggestion ? window.tokenForSuggestion(item) : item.value;
                 addSearchHistory((token.negated ? '-' : '') + text);
             }
+        }
+
+        /**
+         * Sammel-Aktion am Ende der Liste: alle obersten Treffer eines
+         * Begriffs auf einmal einschließen oder ausschließen. Damit reicht
+         * für „ProSessions ohne web" ein Ausschluss statt fünf Klicks.
+         */
+        function renderBulkActions(folders, token) {
+            const footer = document.createElement('div');
+            footer.className = 'search-suggestion-bulk';
+
+            function makeButton(label, mode) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'search-suggestion-bulk-btn';
+                button.textContent = label;
+                button.addEventListener('mousedown', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const handled = typeof options.onBulk === 'function'
+                        ? options.onBulk(folders, mode, token)
+                        : false;
+                    if (handled) {
+                        if (token.value) {
+                            addSearchHistory((token.negated ? '-' : '') + token.value);
+                        }
+                        hide();
+                    }
+                });
+                return button;
+            }
+
+            footer.appendChild(makeButton('Alle ' + folders.length + ' einschließen', 'include'));
+            footer.appendChild(makeButton('Alle ' + folders.length + ' ausschließen', 'exclude'));
+            box.appendChild(footer);
         }
 
         function select(index, forceNegated) {
@@ -325,8 +361,20 @@
                 items.push(suggestions[i]);
             }
 
+            // Sammel-Aktion nur bei einer echten Ordnerfrage. Zu viele Treffer
+            // (etwa bei einem einzelnen Buchstaben) wären ein gefährlicher
+            // „alles"-Knopf; dann lieber weiter eingrenzen.
+            const bulkFolders = (options.bulk && !token.isTag && token.value)
+                ? ((typeof window.getTopLevelFolderSuggestions === 'function')
+                    ? window.getTopLevelFolderSuggestions(token.value, 30)
+                    : [])
+                : [];
+
             state.items = items;
             state.index = -1;
+            state.bulkFolders = (bulkFolders.length >= 2 && bulkFolders.length <= 20)
+                ? bulkFolders
+                : [];
             input.removeAttribute('aria-activedescendant');
 
             box.textContent = '';
@@ -351,6 +399,10 @@
                     select(i, true);
                 }));
             });
+
+            if (state.bulkFolders.length) {
+                renderBulkActions(state.bulkFolders, token);
+            }
 
             box.classList.remove('hidden');
             input.setAttribute('aria-expanded', 'true');
@@ -466,9 +518,16 @@
         bindSearchSuggestions({
             inputId: 'collectionSearch',
             boxId: 'collectionSearchSuggestions',
+            bulk: true,
             onSelect: function (item, token) {
                 if (typeof window.handleCollectionSearchSuggestion === 'function') {
                     return window.handleCollectionSearchSuggestion(item, token);
+                }
+                return false;
+            },
+            onBulk: function (items, mode, token) {
+                if (typeof window.handleCollectionSearchBulk === 'function') {
+                    return window.handleCollectionSearchBulk(items, mode, token);
                 }
                 return false;
             },
