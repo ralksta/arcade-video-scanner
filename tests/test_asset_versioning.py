@@ -50,13 +50,22 @@ def test_repeated_calls_are_stable():
     assert asset_url("engine.js") == first
 
 
-def test_versions_are_not_all_identical():
+def test_versions_are_not_all_identical(tmp_path, monkeypatch):
     """
     Mit ``time.time()`` trugen alle Assets denselben Wert. Unterschiedliche
     Dateien haben unterschiedliche mtimes — trüge weiterhin alles denselben
     Wert, wäre die Umstellung wirkungslos.
+
+    Die echten Dateien im Repo haben in einem frischen Checkout oft dieselbe
+    mtime (git setzt sie beim Auschecken). Deshalb prüfen wir zwei Dateien mit
+    bewusst verschiedenen Zeiten in einem temporären Verzeichnis.
     """
-    versions = {asset_url(name).split("?v=")[1] for name in SCRIPT_MODULES}
+    monkeypatch.setattr(dashboard_template, "config", _StubConfig(tmp_path))
+    for name, mtime in (("a.js", 1_700_000_000), ("b.js", 1_700_000_001)):
+        (tmp_path / name).write_text("// " + name)
+        os.utime(tmp_path / name, (mtime, mtime))
+
+    versions = {asset_url(name).split("?v=")[1] for name in ("a.js", "b.js")}
     assert len(versions) > 1, "Alle Assets tragen dieselbe Version — Zeitstempel statt mtime?"
 
 
