@@ -3,7 +3,7 @@
 // --- WORKSPACE & LAYOUT ---
 
 /**
- * Switch between workspace modes (lobby, vault, favorites, duplicates, optimized)
+ * Switch between workspace modes (lobby, favorites, duplicates, optimized)
  * Updates UI theming, navigation highlights, and triggers appropriate filtering
  *
  * @param {string} mode - Workspace mode to activate
@@ -51,10 +51,6 @@ function setWorkspaceMode(mode, preserveCollection = false) {
             const indicator = modeBtn.querySelector('.nav-indicator');
             if (indicator) indicator.classList.remove('opacity-0');
         }
-
-        // Legacy vault mode class
-        if (mode === 'vault') document.body.classList.add('vault-mode');
-        else document.body.classList.remove('vault-mode');
 
         // Design System: alle Workspaces teilen sich EINEN Accent. Der Indikator
         // wird komplett ueber CSS-Tokens gestylt — kein Inline-Farb-Mapping mehr.
@@ -155,6 +151,10 @@ function updateGridScale(value) {
  * @param {boolean} [skipURLUpdate=false] - If true, don't update browser URL
  */
 function setLayout(layout, skipURLUpdate = false) {
+    // Die Startseite hat kein Layout — Raster, Liste, Treemap und Ordner
+    // gehören zur Bibliothek.
+    if (workspaceMode === 'home') setWorkspaceMode('lobby');
+
     currentLayout = layout;
 
     // Treemap und Ordner-Browser rendern nicht über renderUI() — der Leer-Zustand
@@ -295,13 +295,16 @@ function setLayout(layout, skipURLUpdate = false) {
 /**
  * Update browser URL to reflect current application state
  * Enables deep linking and browser back/forward navigation
- * Maps workspace modes to paths: /lobby, /favorites, /vault, /duplicates, /review
+ * Maps workspace modes to paths: /lobby, /favorites, /duplicates, /review
  */
 function updateURL() {
     let path = '/';
 
-    // Special handling for Treemap
-    if (currentLayout === 'treemap') {
+    // Startseite zuerst: Sie hat kein Layout, auch wenn zuletzt die Treemap
+    // offen war.
+    if (workspaceMode === 'home') {
+        path = '/';
+    } else if (currentLayout === 'treemap') {
         path = '/treeview';
         const params = new URLSearchParams();
         const treemapFolder = typeof getTreemapCurrentFolder === 'function' ? getTreemapCurrentFolder() : null;
@@ -314,7 +317,6 @@ function updateURL() {
         // Map workspace mode to path
         if (workspaceMode === 'optimized') path = '/review';
         else if (workspaceMode === 'favorites') path = '/favorites';
-        else if (workspaceMode === 'vault') path = '/vault';
         else if (workspaceMode === 'duplicates') path = '/duplicates';
         else if (workspaceMode === 'candidates') path = '/candidates';
         else if (path.startsWith('/collections/')) { } // Keep existing path for collections
@@ -351,19 +353,19 @@ function updateURL() {
 /**
  * Initialize application state from current URL on page load
  * Parses path and query params to restore workspace, layout, and collection filters
- * Supports deep links to /favorites, /vault, /duplicates, /review, /treeview, /collections/*
+ * Supports deep links to /favorites, /duplicates, /review, /treeview, /collections/*
  */
 function loadFromURL() {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
 
-    // Default
-    let mode = 'lobby';
+    // Default: Startseite. Ein `view`-Parameter gehört zur Bibliothek.
     let layout = params.get('view') || 'grid';
+    let mode = params.get('view') ? 'lobby' : 'home';
 
-    if (path === '/favorites') mode = 'favorites';
+    if (path === '/lobby') mode = 'lobby';
+    else if (path === '/favorites') mode = 'favorites';
     else if (path === '/review') mode = 'optimized';
-    else if (path === '/vault') mode = 'vault';
     else if (path === '/duplicates') mode = 'duplicates';
     else if (path === '/candidates') mode = 'candidates';
     else if (path === '/treeview') {
@@ -426,7 +428,32 @@ function loadFromURL() {
     checkDeepLinks();
 }
 
+// --- SCHAU-MODUS ---
+// Codec, Größe, Bitrate, Pfad und Optimieren-Knöpfe tragen die Klasse
+// `tech-only`. Sie erscheinen in den Werkstatt-Ansichten (Review, Duplikate,
+// Kandidaten) immer, sonst nur mit „Details" (styles.css, SCHAU-MODUS).
+
+function applyTechDetails(on) {
+    document.body.classList.toggle('show-tech', on);
+    const btn = document.getElementById('techToggle');
+    if (btn) {
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.classList.toggle('active', on);
+    }
+}
+
+function toggleTechDetails() {
+    const on = !document.body.classList.contains('show-tech');
+    window.safeStorage.set('show_tech_details', on ? 'true' : 'false');
+    applyTechDetails(on);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    applyTechDetails(window.safeStorage.get('show_tech_details') === 'true');
+});
+
 // --- EXPORTS ---
+window.toggleTechDetails = toggleTechDetails;
 window.setWorkspaceMode = setWorkspaceMode;
 window.setLayout        = setLayout;
 window.toggleLayout     = toggleLayout;

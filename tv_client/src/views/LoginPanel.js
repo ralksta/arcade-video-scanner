@@ -2,7 +2,9 @@ import React, {useState, useCallback, useEffect} from 'react';
 import {serverUrl} from '../serverConfig';
 import {setItem} from '../safeStorage';
 import PropTypes from 'prop-types';
-import {Panel, Header} from '@enact/limestone/Panels';
+import {Panel} from '@enact/limestone/Panels';
+import Brand from '../components/Brand';
+import css from './LoginPanel.module.less';
 import {InputField} from '@enact/limestone/Input';
 import Button from '@enact/limestone/Button';
 import Heading from '@enact/limestone/Heading';
@@ -58,6 +60,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 			.then(data => {
 				if (data.success && data.token) {
 					setItem('arcade_session_token', data.token);
+					setItem('arcade_user', username);
 					onLoginSuccess(data.token);
 				} else {
 					throw new Error('Login fehlgeschlagen.');
@@ -92,6 +95,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 				.then(data => {
 					if (data.success && data.token) {
 						setItem('arcade_session_token', data.token);
+						setItem('arcade_user', credentials.username);
 						onLoginSuccess(data.token);
 					} else {
 						throw new Error('Automatischer Login fehlgeschlagen.');
@@ -106,9 +110,11 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 	}, [onLoginSuccess, hasCredentials]);
 
 	return (
-		<Panel {...props}>
-			<Header title="Login" subtitle="Bitte melde dich an, um auf die Mediathek zuzugreifen." />
-			<div style={{maxWidth: '600px', margin: '40px auto', display: 'flex', flexDirection: 'column', gap: '20px'}}>
+		<Panel {...props} css={css}>
+			<div className={css.stage}>
+				<Brand size="large" />
+				<div className={css.tagline}>Deine Mediathek. Auf dem großen Bildschirm.</div>
+			<div className={css.card}>
 				<div>
 					<Heading size="small">Benutzername</Heading>
 					<InputField 
@@ -140,6 +146,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 				>
 					{loading ? 'Anmelden...' : 'Anmelden'}
 				</Button>
+			</div>
 			</div>
 		</Panel>
 	);

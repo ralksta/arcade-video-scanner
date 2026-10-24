@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import subprocess
+import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from arcade_scanner.config import config
@@ -103,88 +104,175 @@ def _thumbnail_needs_rebuild(thumb_path: str, video_path: str) -> bool:
         return not os.path.exists(thumb_path)
 
 
+def _render_thumbnail(video_path: str, out_path: str, duration: Optional[float]) -> bool:
+    """Lässt ffmpeg das Vorschaubild nach `out_path` schreiben. True bei Erfolg."""
+    print(f"🖼️  Generating thumbnail: {os.path.basename(video_path)}")
+    # Check if image (Image processing without seeking)
+    is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
+
+    if is_image:
+         vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
+         cmd = ["ffmpeg", "-i", video_path, "-threads", "1", "-strict", "unofficial", "-vf", vf_filter, out_path, "-y", "-loglevel", "error"]
+         try:
+            # Use os.fsencode to handle surrogates safely in subprocess
+            encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
+            subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, timeout=60)
+            if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                return True
+         except Exception as e:
+            logger.warning("Image thumbnail failed for %s: %s", video_path, e)
+         return False
+
+    # Get duration for smart seeking if not provided
+    if duration is None:
+        try:
+            cmd_dur: List[Union[str, bytes]] = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
+            duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
+        except Exception as e:
+            logger.debug("Duration probe failed for %s: %s", video_path, e)
+            duration = 0
+
+    # Smart seek: 10% into the video, max 60s
+    ss = "0"
+    if duration > 5:
+        ss = str(min(60, int(duration * 0.1)))
+
+    def try_extract(seek_time, use_scene_detect=False):
+        vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
+        if use_scene_detect:
+            vf_filter = f"select='gt(scene\\,0.4)',{vf_filter}"
+
+        cmd = ["ffmpeg", "-ss", seek_time]
+        if use_scene_detect:
+            cmd.extend(["-t", "10"])  # Search up to 10 seconds for a scene change
+
+        cmd.extend([
+            "-i", video_path,
+            "-vframes", "1", "-q:v", "4",
+            "-threads", "1",
+            "-strict", "unofficial",
+            "-vf", vf_filter,
+            out_path, "-y", "-loglevel", "error"
+        ])
+        try:
+            # Use os.fsencode to handle surrogates safely in subprocess
+            encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
+            subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, timeout=60)
+            return os.path.exists(out_path) and os.path.getsize(out_path) > 0
+        except Exception as e:
+            logger.warning("Thumbnail extract failed at %s (scene_detect=%s) for %s: %s", seek_time, use_scene_detect, video_path, e)
+            return False
+
+    # Attempt 1: Simple Smart Seek (Fastest)
+    success = try_extract(ss, use_scene_detect=False)
+
+    # Attempt 2: Smart Seek with Scene Detection (Optional fallback)
+    # We only do this if Attempt 1 failed or we really want fancy thumbnails
+    # For now, let's keep it simple to avoid timeouts
+    if not success:
+        success = try_extract(ss, use_scene_detect=True)
+
+    # Attempt 3: Fallback to 0s if failed
+    if not success and ss != "0":
+        success = try_extract("0", use_scene_detect=False)
+
+    return success
+
+
 def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
     # Use surrogateescape to handle Windows-originating surrogate characters in paths
     thumb_name = thumbnail_name_for(video_path)
     thumb_path = os.path.join(config.thumb_dir, thumb_name)
 
-    if _thumbnail_needs_rebuild(thumb_path, video_path):
-        print(f"🖼️  Generating thumbnail: {os.path.basename(video_path)}")
-        # Check if image (Image processing without seeking)
-        is_image = any(video_path.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
+    if not _thumbnail_needs_rebuild(thumb_path, video_path):
+        return thumb_name
 
-        if is_image:
-             vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
-             cmd = ["ffmpeg", "-i", video_path, "-threads", "1", "-strict", "unofficial", "-vf", vf_filter, thumb_path, "-y", "-loglevel", "error"]
-             try:
-                # Use os.fsencode to handle surrogates safely in subprocess
-                encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
-                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, timeout=60)
-                if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
-                    return thumb_name
-             except Exception as e:
-                logger.warning("Image thumbnail failed for %s: %s", video_path, e)
-             return ""
+    # Erst daneben schreiben, dann an die Stelle setzen. ffmpeg schrieb
+    # direkt in die ausgelieferte Datei: Beim Neuerzeugen kürzte `-y` sie
+    # sofort, und ein Request in diesem Moment bekam ein halbes JPEG — mit
+    # `max-age=604800`, also eine Woche lang im Browser. Scheiterte der
+    # Neuaufbau, war das alte, intakte Bild obendrein verloren.
+    #
+    # Der Name beginnt mit einem Punkt: Die Auslieferung verlangt `thumb_…`
+    # und die Aufräumroutinen ebenso, eine Zwischendatei ist für beide
+    # unsichtbar. Er endet auf `.jpg`, weil ffmpeg daran das Format erkennt.
+    tmp_path = os.path.join(config.thumb_dir, f".tmp-{uuid.uuid4().hex[:8]}-{thumb_name}")
+    try:
+        if not _render_thumbnail(video_path, tmp_path, duration):
+            return ""
+        os.replace(tmp_path, thumb_path)
+        return thumb_name
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError as e:
+            logger.debug("Could not remove thumbnail temp file %s: %s", tmp_path, e)
 
-        # Get duration for smart seeking if not provided
+
+POSTER_PREFIX = "poster_"
+# Gross genug für ein Titelbild auf dem Fernseher, klein genug für ffmpeg in
+# unter einer Sekunde. Die Vorschaubilder (480×270) wirkten dort verwaschen.
+POSTER_MAX_W, POSTER_MAX_H = 1280, 720
+
+
+def poster_name_for(video_path: str) -> str:
+    """Dateiname des grossen Standbilds — derselbe Hash wie beim Vorschaubild."""
+    return POSTER_PREFIX + thumbnail_name_for(video_path)[len("thumb_"):]
+
+
+def create_poster(video_path: str, duration: Optional[float] = None) -> str:
+    """Grosses Standbild (bis 1280×720) für Titelbild und Detailansicht des TV.
+
+    Wird nur auf Anfrage erzeugt (``GET /poster``), nicht beim Scan: Gebraucht
+    wird es für die paar Einträge, die gerade gross zu sehen sind. Liegt neben
+    den Vorschaubildern, mit eigenem Präfix; ``--rebuild-thumbs`` räumt beide
+    ab (maintenance.purge_thumbnails).
+
+    Gibt den absoluten Pfad zurück, oder ``""``, wenn ffmpeg scheiterte.
+    """
+    out_path = os.path.join(config.thumb_dir, poster_name_for(video_path))
+    if not _thumbnail_needs_rebuild(out_path, video_path):
+        return out_path
+
+    vf = (f"scale={POSTER_MAX_W}:{POSTER_MAX_H}:force_original_aspect_ratio=decrease")
+    is_image = os.path.splitext(video_path)[1].lower() in IMAGE_EXTENSIONS
+    if is_image:
+        seek: List[str] = []
+    else:
         if duration is None:
             try:
-                cmd_dur: List[Union[str, bytes]] = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
-                duration = float(subprocess.check_output(cmd_dur, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
+                probe: List[Union[str, bytes]] = [
+                    "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1", os.fsencode(video_path)]
+                duration = float(subprocess.check_output(
+                    probe, stderr=subprocess.DEVNULL, timeout=60).decode().strip())
             except Exception as e:
                 logger.debug("Duration probe failed for %s: %s", video_path, e)
                 duration = 0
+        # Dieselbe Stelle wie beim Vorschaubild: 10 %, höchstens 60 s.
+        seek = ["-ss", str(min(60, int(duration * 0.1)) if duration > 5 else 0)]
 
-        # Smart seek: 10% into the video, max 60s
-        ss = "0"
-        if duration > 5:
-            ss = str(min(60, int(duration * 0.1)))
-
-        def try_extract(seek_time, use_scene_detect=False):
-            vf_filter = "scale=480:270:force_original_aspect_ratio=decrease,pad=480:270:(ow-iw)/2:(oh-ih)/2:black"
-            if use_scene_detect:
-                vf_filter = f"select='gt(scene\\,0.4)',{vf_filter}"
-
-            cmd = ["ffmpeg", "-ss", seek_time]
-            if use_scene_detect:
-                cmd.extend(["-t", "10"])  # Search up to 10 seconds for a scene change
-
-            cmd.extend([
-                "-i", video_path,
-                "-vframes", "1", "-q:v", "4",
-                "-threads", "1",
-                "-strict", "unofficial",
-                "-vf", vf_filter,
-                thumb_path, "-y", "-loglevel", "error"
-            ])
-            try:
-                # Use os.fsencode to handle surrogates safely in subprocess
-                encoded_cmd = [os.fsencode(arg) if isinstance(arg, str) else arg for arg in cmd]
-                subprocess.run(encoded_cmd, stdout=subprocess.DEVNULL, timeout=60)
-                return os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0
-            except Exception as e:
-                logger.warning("Thumbnail extract failed at %s (scene_detect=%s) for %s: %s", seek_time, use_scene_detect, video_path, e)
-                return False
-
-        # Attempt 1: Simple Smart Seek (Fastest)
-        success = try_extract(ss, use_scene_detect=False)
-
-        # Attempt 2: Smart Seek with Scene Detection (Optional fallback)
-        # We only do this if Attempt 1 failed or we really want fancy thumbnails
-        # For now, let's keep it simple to avoid timeouts
-        if not success:
-            success = try_extract(ss, use_scene_detect=True)
-
-        # Attempt 3: Fallback to 0s if failed
-        if not success and ss != "0":
-            success = try_extract("0", use_scene_detect=False)
-
-        if not success:
-            return ""
-
-    return thumb_name
-
-
+    os.makedirs(config.thumb_dir, exist_ok=True)
+    # Wie beim Vorschaubild: daneben schreiben, dann ersetzen — ein paralleler
+    # Request bekommt nie ein halbes JPEG.
+    tmp_path = os.path.join(config.thumb_dir, f".tmp-{uuid.uuid4().hex[:8]}-{os.path.basename(out_path)}")
+    cmd = ["ffmpeg", *seek, "-i", video_path, "-vframes", "1", "-q:v", "3", "-threads", "1",
+           "-vf", vf, tmp_path, "-y", "-loglevel", "error"]
+    try:
+        subprocess.run([os.fsencode(a) for a in cmd], stdout=subprocess.DEVNULL, timeout=60)
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            os.replace(tmp_path, out_path)
+            return out_path
+    except Exception as e:
+        logger.warning("Poster failed for %s: %s", video_path, e)
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+    return ""
 
 
 # --- HARDWARE ENCODER DETECTION ---
@@ -211,8 +299,6 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[s
                 if entry.get("mtime") == mtime and entry.get("size_mb") == size_mb and "codec" in entry:
                     thumb_path = os.path.join(config.thumb_dir, entry["thumb"])
                     if os.path.exists(thumb_path):
-                        if "hidden" not in entry:
-                            entry["hidden"] = False
                         return entry
 
         meta = get_video_metadata(filepath)
@@ -232,7 +318,6 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[s
         # Preview generation removed
         preview = ""
 
-        is_hidden = cached_entry.get("hidden", False)
         is_favorite = cached_entry.get("favorite", False)
 
         result = {
@@ -245,7 +330,6 @@ def process_video(filepath: str, cache: Dict[str, Any], rebuild_mode: Optional[s
             "mtime": mtime,
             "size_mb": size_mb,
             "codec": codec,
-            "hidden": is_hidden,
             "favorite": is_favorite
         }
         return result

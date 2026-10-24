@@ -44,6 +44,7 @@ verify_*.py
 *.sh
 *.zip
 !run.sh
+!scripts/build_tv_ipk.sh
 
 # Generated HTML report (user-specific)
 video_dashboard.html

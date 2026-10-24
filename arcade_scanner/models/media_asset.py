@@ -60,7 +60,6 @@ class MediaAsset(BaseModel):
 
     # User User State (Global for now, until full user-db split is finalized)
     favorite: bool = Field(False, description="Is marked as favorite")
-    vaulted: bool = Field(False, alias="hidden", description="Is moved to vault/hidden")
     tags: List[str] = Field(default_factory=list, description="User defined tags")
 
     # Assets

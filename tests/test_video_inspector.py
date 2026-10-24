@@ -119,14 +119,12 @@ class TestInspectMapping:
     def test_user_state_is_carried_over(self):
         entry = full_entry()
         entry.favorite = True
-        entry.vaulted = True
         entry.tags = ["holiday", "4k"]
         entry.thumb = "thumb_abc.jpg"
 
         asset = inspect(entry)
 
         assert asset.favorite is True
-        assert asset.vaulted is True
         assert asset.tags == ["holiday", "4k"]
         assert asset.thumb == "thumb_abc.jpg"
 

@@ -51,10 +51,9 @@ def store(tmp_path):
         yield s
 
 
-def give(store, favorites=(), vaulted=(), tags=None):
+def give(store, favorites=(), tags=None):
     user = store.get_user("ralf")
     user.data.favorites = list(favorites)
-    user.data.vaulted = list(vaulted)
     user.data.tags = dict(tags or {})
     store.add_user(user)
 
@@ -101,20 +100,6 @@ def test_tags_survive_the_optimization(replace_umgebung, store):
     queue_route._replace_media_entry("/media/film.mkv", neu, "hevc")
 
     assert store.get_user("ralf").data.tags == {neu: ["urlaub", "4k"]}
-
-
-def test_the_vault_mark_survives_the_optimization(replace_umgebung, store):
-    """
-    Die folgenreichste: Ginge sie verloren, wäre eine weggelegte Datei nach
-    dem Optimieren für alle sichtbar — ohne dass irgendwo steht, warum.
-    """
-    queue_route, neu = replace_umgebung
-    give(store, vaulted=["/media/film.mkv"])
-
-    assert store.get_user("ralf").data.vaulted == ["/media/film.mkv"]
-    queue_route._replace_media_entry("/media/film.mkv", neu, "hevc")
-
-    assert store.get_user("ralf").data.vaulted == [neu]
 
 
 def test_an_unchanged_path_writes_nothing(replace_umgebung, store):

@@ -178,41 +178,6 @@ function selectAllVisible() {
 }
 
 /**
- * Set hidden/vault state for all selected videos
- *
- * @param {boolean} state - True to hide (move to vault), false to restore
- */
-function triggerBatchHide(state) {
-    const selected = document.querySelectorAll('.video-card-container input:checked');
-    const paths = Array.from(selected).map(i => i.closest('.video-card-container').getAttribute('data-path'));
-
-    const previous = new Map();
-    paths.forEach(p => {
-        const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
-        if (v) {
-            previous.set(p, v.hidden);
-            v.hidden = state;
-        }
-    });
-
-    apiWrite(`/batch_hide?paths=` + encodeURIComponent(paths.join(',')) + `&state=${state}`, {}, {
-        action: state
-            ? `${paths.length} Dateien in den Vault verschieben`
-            : `${paths.length} Dateien aus dem Vault holen`,
-        rollback: () => {
-            previous.forEach((wasHidden, p) => {
-                const v = window.ALL_VIDEOS.find(vid => vid.FilePath === p);
-                if (v) v.hidden = wasHidden;
-            });
-            filterAndSort();
-        },
-    });
-
-    filterAndSort();
-    clearSelection();
-}
-
-/**
  * Start batch compression for all selected videos
  * Filters out files under BATCH_MIN_SIZE_MB and shows confirmation dialog
  * with details about which files will be processed vs skipped

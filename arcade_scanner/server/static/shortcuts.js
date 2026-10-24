@@ -29,7 +29,6 @@ const SHORTCUT_SECTIONS = [
             { keys: ['→'], label: 'Nächstes Medium' },
             { keys: ['Space'], label: 'Play / Pause' },
             { keys: ['F'], label: 'Favorit umschalten' },
-            { keys: ['V'], label: 'In den Vault verschieben' },
             { keys: ['I'], label: 'Info-Panel' },
             { keys: ['S'], label: 'Ähnliche Medien' },
             { keys: ['G'], label: 'GIF-Export' },

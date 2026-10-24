@@ -11,15 +11,14 @@ Zwei Folgen, und die zweite ist die unangenehme:
 
 1. Die Listen wachsen mit jeder gelöschten Datei. In dieser Installation
    standen zum Zeitpunkt des Fundes bereits **12 Tag-Einträge**, zwei
-   Favoriten und eine Vault-Marke auf Pfaden, die es nicht mehr gibt.
+   Favoriten und Tags auf Pfaden, die es nicht mehr gibt.
 
 2. Entsteht später **dieselbe Pfadangabe erneut**, erbt die neue Datei
    stillschweigend den alten Zustand. Und sie entsteht regelmäßig neu: Beim
    Optimieren wird aus ``film.mkv`` wieder ``film.mp4`` — genau der Name, den
-   die gelöschte Datei trug. Ein Video, das einmal als „vaulted" markiert war,
-   ist nach dem Neuanlegen sofort wieder versteckt, und nirgends steht, warum.
-   Das ist kein Datenverlust, aber es ist unerklärlich, und unerklärlich ist
-   bei einer Sichtbarkeits-Einstellung schlimm genug.
+   die gelöschte Datei trug. Die neue Datei trägt dann Favorit und Tags der
+   alten, und nirgends steht, warum. (Bis Phase 1 traf es auch die
+   Vault-Marke — dann war die neue Datei sofort versteckt.)
 
 Aufgeräumt wird jetzt bei **ausdrücklichen** Löschungen über die
 Duplikat-Routen. Bewusst **nicht** beim Aufräumen verwaister Einträge nach
@@ -55,10 +54,9 @@ def store(tmp_path):
         yield s
 
 
-def give(store, username, favorites=(), vaulted=(), tags=None):
+def give(store, username, favorites=(), tags=None):
     user = store.get_user(username)
     user.data.favorites = list(favorites)
-    user.data.vaulted = list(vaulted)
     user.data.tags = dict(tags or {})
     store.add_user(user)
     return user
@@ -72,18 +70,6 @@ def test_a_deleted_path_leaves_no_favorite_behind(store):
     store.purge_paths_from_user_data(["/media/weg.mp4"])
 
     assert store.get_user("ralf").data.favorites == ["/media/bleibt.mp4"]
-
-
-def test_a_deleted_path_leaves_no_vault_mark_behind(store):
-    """
-    Die folgenreichste der drei: Eine liegengebliebene Vault-Marke versteckt
-    eine später neu angelegte Datei desselben Namens, ohne erkennbaren Grund.
-    """
-    give(store, "ralf", vaulted=["/media/weg.mp4"])
-
-    store.purge_paths_from_user_data(["/media/weg.mp4"])
-
-    assert store.get_user("ralf").data.vaulted == []
 
 
 def test_a_deleted_path_leaves_no_tags_behind(store):
@@ -100,13 +86,13 @@ def test_the_state_of_every_user_is_cleaned(store):
     ausgerechnet dort wieder geerbt.
     """
     give(store, "ralf", favorites=["/media/weg.mp4"])
-    give(store, "gast", vaulted=["/media/weg.mp4"], tags={"/media/weg.mp4": ["x"]})
+    give(store, "gast", favorites=["/media/weg.mp4"], tags={"/media/weg.mp4": ["x"]})
 
     removed = store.purge_paths_from_user_data(["/media/weg.mp4"])
 
     assert removed == 3
     assert store.get_user("ralf").data.favorites == []
-    assert store.get_user("gast").data.vaulted == []
+    assert store.get_user("gast").data.favorites == []
     assert store.get_user("gast").data.tags == {}
 
 
@@ -114,14 +100,14 @@ def test_a_new_file_at_the_same_path_starts_clean(store):
     """
     Der Ablauf, um den es geht: `film.mkv` wird optimiert, das Ergebnis heisst
     `film.mp4`, die alte `film.mp4` daneben wurde vorher als Duplikat gelöscht.
-    Ohne das Aufräumen wäre die neue Datei sofort versteckt.
+    Ohne das Aufräumen erbte die neue Datei Favorit und Tags der alten.
     """
-    give(store, "ralf", vaulted=["/media/film.mp4"], tags={"/media/film.mp4": ["alt"]})
+    give(store, "ralf", favorites=["/media/film.mp4"], tags={"/media/film.mp4": ["alt"]})
 
     store.purge_paths_from_user_data(["/media/film.mp4"])
 
     user = store.get_user("ralf")
-    assert "/media/film.mp4" not in user.data.vaulted
+    assert "/media/film.mp4" not in user.data.favorites
     assert "/media/film.mp4" not in user.data.tags
 
 
@@ -129,14 +115,13 @@ def test_a_new_file_at_the_same_path_starts_clean(store):
 
 def test_untouched_paths_survive(store):
     give(store, "ralf",
-         favorites=["/media/a.mp4"], vaulted=["/media/b.mp4"],
+         favorites=["/media/a.mp4", "/media/b.mp4"],
          tags={"/media/c.mp4": ["t"]})
 
     assert store.purge_paths_from_user_data(["/media/ganz_anders.mp4"]) == 0
 
     user = store.get_user("ralf")
-    assert user.data.favorites == ["/media/a.mp4"]
-    assert user.data.vaulted == ["/media/b.mp4"]
+    assert user.data.favorites == ["/media/a.mp4", "/media/b.mp4"]
     assert user.data.tags == {"/media/c.mp4": ["t"]}
 
 

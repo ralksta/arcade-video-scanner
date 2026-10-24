@@ -27,10 +27,9 @@ Suffix am Ende, zwei nicht (`…_MP4_opt Upscaled.mp4`, `…_opt_test.mp4`). Ob
 die mitgezählt werden sollen, ist eine Frage an den Nutzer und keine an den
 Code; in einem reinen Anzeigefilter ist zwei zu viel harmlos.
 
-**3. `vaulted` und `favorite` stehen noch in der Medientabelle.**
+**3. `favorite` (und bis Phase 1 `vaulted`) steht noch in der Medientabelle.**
 
-Mit dem Alias `hidden` bzw. `favorite` — also unter genau den Namen, die das
-Frontend pro Nutzer überschreibt. Das sah nach einem Leck zwischen Konten aus.
+Unter genau dem Namen, den das Frontend pro Nutzer überschreibt. Das sah nach einem Leck zwischen Konten aus.
 Ist es nicht: Alle 8788 Zeilen tragen dort 0, geschrieben wird nur beim
 Durchreichen des Modells. Der Test unten hält das fest, damit es auffällt,
 wenn wieder jemand anfängt, dorthin zu schreiben — dann wäre es eins.
@@ -69,7 +68,7 @@ def video(path, **extra):
         "FilePath": path, "Status": "OK", "Size_MB": 100.0, "codec": "h264",
         "_fileNameLower": path.rsplit("/", 1)[-1].lower(), "_codecLower": "h264",
         "_folder": path.rsplit("/", 1)[0], "tags": [], "favorite": False,
-        "hidden": False, "mtime": 1700000000,
+        "mtime": 1700000000,
     }
     entry.update(extra)
     return entry
@@ -145,8 +144,8 @@ def test_the_optimized_filter_looks_at_the_whole_path():
 
 def test_the_shared_columns_are_never_written_from_user_actions():
     """
-    `vaulted`/`favorite` in der Medientabelle tragen die Aliasse `hidden` und
-    `favorite` — dieselben Namen, die das Frontend pro Nutzer überschreibt. Das
+    `favorite` in der Medientabelle trägt denselben Namen, den das Frontend pro
+    Nutzer überschreibt (bis Phase 1 auch `vaulted` mit dem Alias `hidden`). Das
     sah nach einem Leck zwischen Konten aus; alle 8788 Zeilen tragen dort
     jedoch 0, und geschrieben wird nur beim Durchreichen des Modells.
 
@@ -173,12 +172,11 @@ def test_the_shared_columns_are_never_written_from_user_actions():
 
 def test_the_per_user_state_is_the_authoritative_one():
     """
-    Der Beleg für die Richtung: Das Frontend überschreibt `hidden` und
-    `favorite` nach dem Laden aus `/api/user/data`.
+    Der Beleg für die Richtung: Das Frontend überschreibt `favorite` nach dem
+    Laden aus `/api/user/data`.
     """
     engine = (ROOT / "arcade_scanner" / "server" / "static" / "engine.js").read_text(
         encoding="utf-8")
     block = engine.split("async function loadUserData()", 1)[1].split("\n    }", 1)[0]
 
-    assert "v.hidden = vaultSet.has(v.FilePath)" in block
     assert "v.favorite = favSet.has(v.FilePath)" in block

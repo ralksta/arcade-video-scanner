@@ -60,11 +60,13 @@ SCRIPT_MODULES = [
     "folder_browser.js",
     "engine.js",
     "optimizer.js",
+    "watch_progress.js",
     "cinema.js",
     "similar.js",
     "timeline_scrubber.js",
     "gif_export.js",
     "collections.js",
+    "home_view.js",
     "context_menu.js",
     "shortcuts.js",
     "empty_state.js",
@@ -155,9 +157,9 @@ def generate_html_report(report_file, server_port=8000):
     if config.optimizer_available and config.settings.enable_optimizer:
         # Die einzige Primaeraktion der Rail — traegt als einzige den Accent.
         opt_btn_html = """
-        <button class="cinema-rail-btn is-primary" onclick="cinemaOptimize()" title="Optimize Video [O]" aria-label="Optimize this video">
+        <button class="tech-only cinema-rail-btn is-primary" onclick="cinemaOptimize()" title="Video optimieren [O]" aria-label="Dieses Video optimieren">
             <span class="cinema-rail-icon"><span class="material-icons" aria-hidden="true">bolt</span></span>
-            <span class="cinema-rail-label">Optimize</span>
+            <span class="cinema-rail-label">Optimieren</span>
         </button>
         """
 
@@ -185,7 +187,7 @@ def generate_html_report(report_file, server_port=8000):
         {FOLDER_BROWSER_LEGEND_COMPONENT}
 
         <!-- Quick Stats Ribbon -->
-        <div id="quickStatsRibbon"
+        <div id="quickStatsRibbon" class="tech-only"
              style="display:none;align-items:center;gap:8px;flex-wrap:wrap;
                     padding:6px 16px;font-size:12px;
                     border-bottom:1px solid var(--surface-border, rgba(0,0,0,.08));
@@ -196,6 +198,9 @@ def generate_html_report(report_file, server_port=8000):
 
         <!-- Main Content Container with safe area padding -->
         <main class="flex-1 p-2 md:p-6 pb-[80px] md:pb-6 relative w-full overflow-x-hidden" id="mainContentArea">
+
+            <!-- Startseite (home_view.js): Titelbild + Reihen -->
+            <div id="homeView" class="home-view"></div>
 
             <!-- Video Grid -->
             <div id="videoGrid" class="responsive-grid transition-opacity duration-300 overflow-hidden">

@@ -51,6 +51,12 @@ def handle_get(handler) -> bool:
 
 def handle_post(handler) -> bool:
     if handler.path == "/api/tags":
+        # Sitzung zuerst: Vorher prüfte die Route den Rumpf und erst danach,
+        # wer fragt — anonyme Anfragen bekamen 400 statt 401.
+        user_name = handler.get_current_user()
+        if not user_name:
+            handler.send_error(401, "Unauthorized")
+            return True
         try:
             user_db, MAX_REQUEST_SIZE = _get_deps()
             content_length = int(handler.headers.get("Content-Length", 0))
@@ -69,11 +75,6 @@ def handle_post(handler) -> bool:
 
             if not tag_name:
                 handler.send_error(400, "Tag name is required")
-                return True
-
-            user_name = handler.get_current_user()
-            if not user_name:
-                handler.send_error(401, "Unauthorized")
                 return True
 
             # Die Prüfung auf einen bereits vorhandenen Namen gehört mit unter

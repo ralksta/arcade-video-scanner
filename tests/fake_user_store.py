@@ -33,7 +33,6 @@ def make_fake_user_db(user=None):
         user.data.auto_tag_rules = []
         user.data.tags = {}
         user.data.favorites = []
-        user.data.vaulted = []
 
     user_db = MagicMock()
     user_db.get_user.return_value = user

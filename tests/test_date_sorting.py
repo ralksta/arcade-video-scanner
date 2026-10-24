@@ -142,8 +142,8 @@ def test_the_stored_value_of_saved_views_still_works():
 def test_both_options_are_offered_and_named_apart():
     from arcade_scanner.templates.components import FILTER_BAR_COMPONENT
 
-    assert '<option value="date">Sort: date added</option>' in FILTER_BAR_COMPONENT
-    assert '<option value="file_date">Sort: file date</option>' in FILTER_BAR_COMPONENT
+    assert '<option value="date">Neueste zuerst</option>' in FILTER_BAR_COMPONENT
+    assert '<option value="file_date">Nach Dateidatum</option>' in FILTER_BAR_COMPONENT
 
 
 def test_the_other_sortings_are_untouched():

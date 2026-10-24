@@ -6,7 +6,7 @@ Der Antwort-Cache für ``/api/videos``.
 Gemessen an der echten Bibliothek (8788 Einträge, 4,95 MB JSON): ``json.dumps``
 kostet ~40 ms, ``gzip.compress(level=6)`` ~54 ms — und beides lief bei *jedem*
 Request neu, obwohl sich zwischen zwei Requests meist nichts ändert. Drei
-Clients (Browser, TV, iOS) zahlen den Posten unabhängig voneinander.
+Clients (Browser, TV) zahlen den Posten unabhängig voneinander.
 
 Ein Cache auf so einem Pfad ist nur so gut wie seine Invalidierung. Die Tests
 hier zielen deshalb weniger auf „ist es schnell" als auf „liefert es nie etwas

@@ -143,7 +143,7 @@ class _VideosResponseCache:
     gzip liefen bisher bei *jedem* Request neu — bei 8788 Einträgen gemessene
     ~40 ms für ``json.dumps`` und ~54 ms für ``gzip.compress(level=6)`` auf
     einem 4,95-MB-Body. Das ist der teuerste Einzelposten des Endpunkts, und
-    die drei Clients (Browser, TV, iOS) zahlen ihn unabhängig voneinander.
+    die Clients (Browser, TV) zahlen ihn unabhängig voneinander.
 
     Der Body hängt ausschließlich vom Scan-Target-Satz des Nutzers und seinem
     Admin-Flag ab (die Filterung ist reine Pfad-Präfix-Prüfung, sie verändert
@@ -619,6 +619,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 candidates,
                 duplicates,
                 files,
+                progress,
                 queue,
                 settings,
                 similar,
@@ -637,6 +638,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if candidates.handle_get(self):
                 return
             if similar.handle_get(self):
+                return
+            if progress.handle_get(self):
                 return
             if files.handle_get(self):
                 return
@@ -670,7 +673,9 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
             # 1. ROOT / INDEX -> Serve REPORT_FILE
-            spa_routes = ["/", "/index.html", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
+            # /vault: Den Vault gibt es nicht mehr (Phase 1); alte Lesezeichen landen
+            # in der normalen Bibliothek.
+            spa_routes = ["/", "/index.html", "/home", "/lobby", "/favorites", "/review", "/vault", "/treeview", "/duplicates", "/candidates"]
             clean_path = self.path.split('?')[0]
             if clean_path in spa_routes or clean_path.startswith("/collections/"):
 
@@ -714,8 +719,18 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
             # 2. THUMBNAILS -> Serve from THUMB_DIR (with security checks + lazy generation)
             elif self.path.startswith("/thumbnails/"):
+                # Sitzungspflichtig seit UMSETZUNGSPLAN Phase 6 (2026-10-02).
+                # Vorher bewusst offen, weil der TV-Client kein Cookie hat;
+                # jetzt hängt er sein Token an (serverConfig.thumbnailUrl), der
+                # Browser schickt das Cookie. Kein LAN-Sonderfall — der hätte
+                # sich per X-Forwarded-For fälschen lassen.
+                if not self.get_current_user():
+                    self.send_error(401, "Unauthorized")
+                    return
                 try:
-                    rel_path = unquote(self.path[12:])  # remove /thumbnails/
+                    # Nur der Pfad, ohne Query: Der TV-Client hängt `?token=`
+                    # an, und `self.path[12:]` nahm das mit in den Dateinamen.
+                    rel_path = unquote(urlparse(self.path).path[12:])  # remove /thumbnails/
 
                     # Security Fix C-4: Prevent path traversal
                     thumb_dir_abs = os.path.abspath(config.thumb_dir)
@@ -772,6 +787,50 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"❌ Error serving thumbnail: {e}")
                     self.send_error(500)
                     return
+
+            # 2b. POSTER -> grosses Standbild für Titelbild/Detailansicht des TV
+            elif self.path.startswith("/poster?"):
+                # Erst die Sitzung, dann die Eingabe (test_anonymous_route_sweep).
+                name = self.get_current_user()
+                if not name:
+                    self.send_error(401, "Unauthorized")
+                    return
+                try:
+                    from arcade_scanner.core.user_scope import visible_path_filter
+                    from arcade_scanner.core.video_processor import create_poster
+
+                    params = parse_qs(urlparse(self.path).query)
+                    file_path = params.get("path", [None])[0]
+                    if not file_path:
+                        self.send_error(400, "Missing path parameter")
+                        return
+                    # Nur Einträge der Bibliothek, und nur die eigenen: Ein
+                    # Standbild zeigt den Inhalt — dieselbe Regel wie /api/videos.
+                    # Ohne den DB-Abgleich startete jeder gültige Pfad ffmpeg.
+                    entry = db.get(file_path)
+                    may_see = visible_path_filter(user_db.get_user(name))
+                    if (entry is None or not is_path_allowed(file_path)
+                            or not may_see(os.path.abspath(file_path))):
+                        self.send_error(404)
+                        return
+
+                    poster = create_poster(file_path, entry.duration_sec or None)
+                    if not poster:
+                        self.send_error(404)
+                        return
+                    fs = os.stat(poster)
+                    if send_not_modified_if_unchanged(self, fs.st_mtime):
+                        return
+                    with open(poster, "rb") as f:
+                        body = f.read()
+                    # Privat: Das Bild gehört zu einem Konto, kein geteilter Cache.
+                    send_bytes(self, body, "image/jpeg",
+                               cache_control="private, max-age=86400",
+                               last_modified=fs.st_mtime)
+                except Exception as e:
+                    print(f"❌ Error serving poster: {e}")
+                    self.send_error(500)
+                return
 
             # 3. STATIC ASSETS -> Catch-all for any path containing /static/
             elif "/static/" in self.path:
@@ -852,15 +911,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             #   /reveal?         /api/mark_optimized?   /compress?
             #   /api/keep_optimized?  /api/discard_optimized?
             #   /api/rescan      /api/backup
-            #   /batch_compress?  /hide?  /batch_hide?  /favorite?  /batch_favorite?
+            #   /batch_compress?  /favorite?  /batch_favorite?
             elif self.path.startswith("/stream?"):
                 try:
                     # Sitzungspflichtig — bis hierher war sie es nicht.
                     #
                     # Geprüft wurde nur `is_path_allowed()`, also ob der Pfad
                     # in einem Scan-Ziel liegt. Wer die Adresse kannte, bekam
-                    # die Datei: ohne Anmeldung, ohne Konto, an der
-                    # Vault-Markierung vorbei. Genau die Dateien, um die es in
+                    # die Datei: ohne Anmeldung, ohne Konto. Genau die Dateien, um die es in
                     # diesem Programm geht, waren damit das einzige, was der
                     # Login nicht geschützt hat.
                     #
@@ -1154,7 +1212,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         self._response_started = False
         try:
-            from .routes import autotag, duplicates, queue, settings, tags
+            from .routes import autotag, duplicates, progress, queue, settings, tags
             if queue.handle_post(self):
                 return
             if settings.handle_post(self):
@@ -1164,6 +1222,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if tags.handle_post(self):
                 return
             if autotag.handle_post(self):
+                return
+            if progress.handle_post(self):
                 return
         except Exception as e:
             print(f"Module route error POST: {e}")
@@ -1208,13 +1268,12 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     )
                     account_key = f"user:{username.lower()}" if username else "user:"
 
-                    if session_manager.is_locked_out(client_ip):
-                        print(f"🔒 Blocked login attempt from locked-out IP {client_ip}")
-                        self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
-                        return
-
-                    if session_manager.is_locked_out(account_key):
-                        print(f"🔒 Blocked login attempt for locked-out account '{username}'")
+                    # Prüfen und Zählen in einem Schritt, **vor** dem Passwort:
+                    # Getrennt kamen parallele Anfragen alle an der Prüfung
+                    # vorbei, solange PBKDF2 lief — 40 von 40 statt fünf.
+                    # Siehe SessionManager.begin_attempt().
+                    if not session_manager.begin_attempt(client_ip, account_key):
+                        print(f"🔒 Blocked login attempt for '{username}' from {client_ip}")
                         self.send_error(429, "Too many failed attempts. Try again in 15 minutes.")
                         return
 
@@ -1254,10 +1313,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.end_headers()
                         self.wfile.write(json.dumps({"success": True, "token": token}).encode())
                     else:
-                        remaining = min(
-                            session_manager.record_failure(client_ip),
-                            session_manager.record_failure(account_key),
-                        )
+                        # Schon in begin_attempt() gezählt — hier nur ablesen.
+                        remaining = session_manager.remaining_attempts(client_ip, account_key)
                         print(f"❌ Login failed for '{username}' from {client_ip} "
                               f"({remaining} attempts remaining)")
                         self.send_error(401, "Invalid credentials")

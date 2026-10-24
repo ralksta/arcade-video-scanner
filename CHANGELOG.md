@@ -4,7 +4,149 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Schau-Modus statt Werkstatt.** Karten in Bibliothek und Favoriten zeigen
+  nur noch Bild, Titel, Laufzeit und Fortschritt. Status, Codec, Größe,
+  Bitrate, Pfad und die Optimieren-Knöpfe erscheinen in Review, Duplikaten
+  und Kandidaten weiter wie gewohnt. Überall sonst blendet „Details“ in der
+  Filterleiste sie ein, und der Browser merkt sich die Wahl. Im Player
+  wandern „Ordner“, „GIF“ und „Optimieren“ ebenfalls dorthin; G und O
+  funktionieren weiter.
+- **Lesbare Titel.** Statt `VID_20251025_121813_115.mp4` steht
+  „25. Okt. 2025 · 12:18“, und Optimierer-Anhängsel wie `_opt` oder
+  `__h265` fallen weg. Das gilt für Karten, Startseite, Player und
+  TV-App. Der Dateiname bleibt im Tooltip.
+- Die Seitenleiste trennt **Mediathek** (Start, Bibliothek, Favoriten) und
+  **Werkstatt** (Review, Duplikate, Kandidaten). Navigation, Filterleiste,
+  Player und Anmeldung sind durchgehend deutsch.
+- Die Bibliothek ist standardmäßig nach „Neueste zuerst“ sortiert, nicht
+  mehr nach Bitrate.
+
+### Fixed (Oberfläche)
+- In der Seitenleiste blieb der erste Eintrag hervorgehoben, egal welche
+  Ansicht offen war.
+- Auf dem Handy lag das Sortier-Icon auf dem Text, und die Anmeldekarte
+  reichte bis an den Bildschirmrand.
+- Kontextmenü, Befehlspalette, Ordner-Leiste und Collection-Dialog hatten
+  noch Farben aus der alten Arcade-Optik und ignorierten den hellen Modus.
+- TV-Client: Fehlen die Nutzerdaten, zeigt er die Mediathek ohne Favoriten und
+  Tags und nennt den Grund im Untertitel. Bisher blieb das Raster leer, damit
+  der Vault nicht sichtbar wurde.
+- Tag-Kürzel: G, I, O und S sind beim Anlegen gesperrt, weil das Cinema sie
+  belegt; bisher ließen sie sich vergeben und griffen nie. V ist frei.
+- **Gespeicherte Ansichten gehören jetzt dem Konto** (ENTSCHEIDUNGEN.md,
+  Punkt 2). Bisher lagen sie in der globalen settings.json, und jedes Konto
+  sah Suchbegriffe und Ordner der anderen. Beim ersten Start gehen vorhandene
+  Ansichten einmalig an den Admin.
+
+### Security
+- **Vorschaubilder verlangen eine Anmeldung** (Phase 6). `/thumbnails` war
+  bewusst offen, weil der TV-Client kein Cookie hat. Jetzt hängt er sein Token
+  an, und die Route gilt ohne LAN-Ausnahme. Eine Ausnahme hätte an der
+  fälschbaren Client-Adresse gehangen. Der Rundum-Test für anonyme Zugriffe
+  prüft jetzt alle 56 Routen statt nur `/api/…`.
+- `POST /api/restore` überschrieb ohne Anmeldung die globalen Einstellungen
+  (darunter `ffprobe_path`). Jetzt sind Sitzung und Admin nötig.
+- Parallele Anmeldeversuche umgingen die Brute-Force-Sperre (40 statt 5).
+- `GET /api/settings`, `/api/duplicates/status` und `POST /api/tags`
+  antworteten ohne Anmeldung. Ein neuer Test ruft jede Route anonym am
+  echten Server auf.
+- Dateinamen mit `"` oder `\` brachen aus den Klick-Handlern der Karten aus.
+  Neuer Helfer `jsArg()`.
+- Globale Einstellungen (Scan-Schwellen, Proxy, Review-Ordner, ffmpeg-Pfade)
+  ändern nur noch Admins. Nicht-Admins speichern weiter ihre eigenen Felder,
+  globale Schlüssel werden verworfen und in der Antwort genannt; der Dialog
+  blendet die Felder für sie aus. Gespeicherte Ansichten bleiben für alle
+  speicherbar (bis Phase 2). Die Sicherung gibt es nur noch für Admins.
+- GIF-Export nur noch aus den eigenen Scan-Ordnern. Vorher genügte es, dass
+  die Datei in den Ordnern *irgendeines* Kontos lag. `/stream` folgt mit Phase 6.
+
+### Fixed (TV-App)
+- Collections zeigten auf dem Fernseher immer die ganze Bibliothek. Der
+  Matcher übersprang Medientyp, Größe, Datum und weitere Kriterien; jetzt
+  urteilt er wie der Browser, für jede Fixture geprüft.
+- Leere Reiter (etwa „Bilder“) erklären sich, statt schwarz zu bleiben.
+- Nach einem Video landete man wieder auf Home, die Position war weg, und
+  die ganze Bibliothek wurde neu geladen. Jetzt geht es an derselben Kachel
+  weiter.
+- Bilder öffneten den Videoplayer, der nichts zeigte.
+- **Anmeldungen überleben einen Neustart des Servers.** Sitzungen lebten nur
+  im Speicher: Jedes Update und jeder Docker-Neustart meldete alle Geräte ab,
+  am Fernseher hieß das, Benutzername und Passwort mit der Fernbedienung neu
+  einzutippen. Jetzt stehen sie zusätzlich in `arcade_data/sessions.db`, nur
+  als SHA-256 des Tokens. Wer die Datei liest, kann sich damit nicht anmelden.
+  Die Laufzeit bleibt bei 30 Tagen, Abmelden wirkt auch über einen Neustart.
+- Nach einem Neustart des Servers stand der Fernseher vor Kacheln ohne Bilder.
+  Kommt die App aus dem Hintergrund zurück, lädt sie neu und führt bei
+  abgelaufener Sitzung zum Login.
+
+### Fixed (Nachtlauf 4)
+- Abbrechen während des Uploads ersetzte das Original trotzdem.
+- Gleichzeitiges Speichern der Einstellungen verlor Änderungen.
+- Vorschaubilder konnten halb ausgeliefert und eine Woche gecacht werden.
+- Zwei GIF-Exporte mit gleichem Dateinamen schrieben in dieselbe Datei.
+- „Ähnliche Medien" verglich Vektoren verschiedener Modelle.
+- Videos mit sehr langem Namen ließen sich nicht optimieren.
+- Die Ordnerliste des Einrichtungs-Assistenten brauchte über 30 s.
+
+### Removed
+- **Vault entfernt** (ENTSCHEIDUNGEN.md, Punkt 4). Weg sind der Reiter, der
+  Knopf auf den Karten, die Taste V im Cinema, der Batch-Knopf, der Eintrag im
+  Kontextmenü, der Reiter „Archiv“ im TV-Client und die Routen `/hide` und
+  `/batch_hide`. Bisher versteckte Dateien sind wieder sichtbar. Beim Start
+  entfernt eine einmalige Migration die Vault-Markierungen aus users.db;
+  Favoriten und Tags bleiben unberührt. Alte Lesezeichen auf `/vault` landen in
+  der Bibliothek. Der abgesicherte Modus ist eine andere Funktion und bleibt.
+- **`webos_client/` entfernt.** Die Hülle leitete auf `/static/tv.html` um,
+  das seit `40c546f` (5. Juli) nicht mehr existiert. Damals hatte der
+  Enact-Client die Seite ersetzt. Die Hülle lieferte deshalb nur noch eine 404
+  und hatte dieselbe App-ID wie der echte TV-Client (`tv_client/`, dessen Build
+  als `.ipk` im Repo liegt). Letzter Stand: `057f68f`.
+- **iOS-Client zurückgezogen** (`ios_client/`). Er funktionierte seit `8c6008a`
+  nicht mehr — die DeoVR-Routen, die er aufrief, gibt es nicht mehr, und er
+  schickte keine Sitzung mit — und ließ sich ohne Mac und Xcode nicht prüfen
+  (ENTSCHEIDUNGEN.md, Punkt 1). Der letzte Stand liegt in der Historie:
+  `git checkout dec7163 -- ios_client`; `dev-docs/ios-client-status.md`
+  beschreibt, was eine Rückholung reparieren müsste.
+
 ### Added
+- **Startseite im Browser.** Nach dem Login öffnet sich jetzt eine Startseite
+  wie in der TV-App statt des Rasters der ganzen Bibliothek: oben ein
+  Titelbild mit „Abspielen“ bzw. „Fortsetzen bei …“, darunter Reihen für
+  Weiterschauen, Neu hinzugefügt, Favoriten, eigene Collections, Zufällige
+  Entdeckungen und Neue Bilder. Die Bibliothek mit allen Filtern bleibt unter
+  „Lobby“. Wer auf der Startseite sucht, landet direkt in den Treffern.
+- **Weiterschauen auf allen Geräten.** Der Wiedergabefortschritt liegt jetzt
+  pro Konto auf dem Server (`/api/progress`). Der Browser-Player setzt dort
+  fort, wo man aufgehört hat, auch wenn das am Fernseher war, und umgekehrt.
+  Pos1 springt an den Anfang. Ab 95 % gilt ein Video als gesehen. Was die
+  TV-App bisher nur lokal gespeichert hatte, lädt sie beim nächsten Start
+  einmal hoch.
+- **TV-App im Stil von Netflix und HBO.** Eine eigene Kopfleiste mit dem Logo
+  ARCADE im Markenverlauf ersetzt die Reiter. Darunter liegt ein randloses
+  Titelbild, das alle neun Sekunden zum nächsten Eintrag wechselt, mit
+  „Abspielen“ und „Mehr Infos“. Es folgen waagerechte Reihen: Weiterschauen,
+  Favoriten, Neu hinzugefügt, Zufällige Entdeckungen. Die Kacheln sind 16:9,
+  tragen Titel, Metadaten, Stern, 4K/HD und „NEU“ und leuchten beim Fokus in
+  der Markenfarbe. Detailansicht und Login sind im selben Stil gehalten. Beim
+  Laden schimmern Platzhalter, statt dass die Fläche leer bleibt.
+- **Scharfe Titelbilder:** `GET /poster` erzeugt bei Bedarf ein Standbild bis
+  1280×720 für Titelbild, Detailansicht und Player. Bisher wurden dort die
+  Vorschaubilder mit 480×270 hochgezogen. Der Endpunkt verlangt eine Sitzung
+  und zeigt nur eigene Einträge; `--rebuild-thumbs` räumt die Standbilder mit
+  ab.
+- TV-App: Collections erscheinen als große Kacheln in ihrer Farbe und als
+  Reihen nach Kategorie. „Alle anzeigen“ öffnet das Raster, die Zurück-Taste
+  führt zurück. Die Standard-Collections tragen deutsche Namen, leere werden
+  ausgeblendet.
+- TV-App: Bilder öffnen einen Vollbild-Betrachter in voller Auflösung, mit
+  ◀ ▶ blättert man.
+- TV-App: Filterleiste in einer Zeile mit Suche, Sortierung (neu „Längste“)
+  und Filtern nach Auflösung, Länge und Tag.
+- TV-App: Detailansicht vor dem Abspielen mit „Favorit“ zum Umschalten.
+  Favoriten lassen sich damit erstmals auf dem Fernseher setzen.
+- TV-App: „Weiterschauen“ merkt sich die Position und setzt dort fort, auf
+  Wunsch auch „Von vorn“.
 - **Endpunkt-Vertrag zwischen Server und Clients**: Ein Test liest die
   API-Pfade aus dem Quelltext von TV-, iOS- und webOS-Client und prüft sie
   gegen die Routen des Servers. Solche Brüche fallen sonst niemandem auf — die

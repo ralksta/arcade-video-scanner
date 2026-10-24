@@ -10,7 +10,7 @@ NOW = 1_786_000_000
 
 def _video(path="/lib/gopro/a.mp4", **kw) -> dict:
     base = {"FilePath": path, "Size_MB": 100.0, "Status": "OK", "codec": "h264",
-            "tags": [], "hidden": False, "favorite": False, "Width": 1920,
+            "tags": [], "favorite": False, "Width": 1920,
             "Height": 1080, "Duration_Sec": 60.0, "media_type": "video",
             "imported_at": NOW - 3600, "mtime": NOW - 3600}
     base.update(kw)
@@ -22,10 +22,9 @@ def _rule(rule_id="r1", tag="gopro", enabled=True, search="gopro") -> dict:
             "criteria": {"search": search}}
 
 
-def _user(rules, tags=None, vaulted=None) -> User:
+def _user(rules, tags=None) -> User:
     return User(username="alice", password_hash="x", salt="y",
-                data=UserVideoData(auto_tag_rules=rules, tags=tags or {},
-                                   vaulted=vaulted or []))
+                data=UserVideoData(auto_tag_rules=rules, tags=tags or {}))
 
 
 class FakeMediaDB:
@@ -88,13 +87,6 @@ def test_disabled_rule_skipped_and_no_rules_no_write():
     counts = auto_tagger.run_auto_tag_rules("alice", user_db=udb, media_db=FakeMediaDB([_video()]), now=NOW)
     assert counts == {}
     udb.add_user.assert_not_called()
-
-
-def test_vaulted_file_never_matches():
-    user = _user([_rule()], vaulted=["/lib/gopro/a.mp4"])
-    media = FakeMediaDB([_video()])
-    counts = auto_tagger.run_auto_tag_rules("alice", user_db=_user_db(user), media_db=media, now=NOW)
-    assert counts == {"r1": 0}
 
 
 def test_user_tags_feed_rule_criteria():

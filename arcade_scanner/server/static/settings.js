@@ -13,6 +13,23 @@
 // ============================================================================
 
 /**
+ * Globale Einstellungen nur für Admins zeigen.
+ *
+ * Der Server verwirft globale Schlüssel von Nicht-Admins ohnehin
+ * (routes/settings.py); ohne diese Ausblendung sähe ein Nicht-Admin Felder,
+ * deren Änderung still verloren geht. Über `style.display`, nicht über die
+ * Klasse `hidden` — die schaltet die Reiter-Inhalte um.
+ *
+ * @param {boolean} isAdmin
+ */
+function applyAdminOnlyVisibility(isAdmin) {
+    document.querySelectorAll('[data-admin-only]').forEach(el => {
+        el.style.display = isAdmin ? '' : 'none';
+    });
+}
+window.applyAdminOnlyVisibility = applyAdminOnlyVisibility;
+
+/**
  * Open the settings modal and populate with current settings
  */
 async function openSettings() {
@@ -22,6 +39,8 @@ async function openSettings() {
     try {
         const response = await fetch('/api/settings');
         const data = await response.json();
+
+        applyAdminOnlyVisibility(data.is_admin === true);
 
         // Populate form fields
         document.getElementById('settingsTargets').value = data.scan_targets.join('\n');
@@ -75,10 +94,10 @@ async function openSettings() {
             const item = document.createElement('label');
             item.className = 'checkbox-item';
             item.innerHTML = `
-                <input type="checkbox" data-path="${exc.path}" ${isEnabled ? 'checked' : ''}>
+                <input type="checkbox" data-path="${escapeHtml(exc.path)}" ${isEnabled ? 'checked' : ''}>
                 <div class="checkbox-item-content">
-                    <div class="checkbox-item-title">${exc.path}</div>
-                    <div class="checkbox-item-description">${exc.desc}</div>
+                    <div class="checkbox-item-title">${escapeHtml(exc.path)}</div>
+                    <div class="checkbox-item-description">${escapeHtml(exc.desc)}</div>
                 </div>
             `;
             container.appendChild(item);

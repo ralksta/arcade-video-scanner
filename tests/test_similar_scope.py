@@ -62,11 +62,10 @@ class FakeHandler:
         pass
 
 
-def make_user(targets, vaulted=(), is_admin=False):
+def make_user(targets, is_admin=False):
     u = MagicMock()
     u.is_admin = is_admin
     u.data.scan_targets = list(targets)
-    u.data.vaulted = list(vaulted)
     return u
 
 
@@ -92,7 +91,8 @@ def query(user, path="/media_ralf/eigenes.mp4", vectors=None):
         sent.update(payload)
 
     with patch.object(similar, "_get_deps", return_value=(media_db, user_db)), \
-         patch.object(similar._cache, "get", return_value=dict(vectors or VECTORS)), \
+         patch.object(similar._cache, "get", return_value={
+             p: ("m", v) for p, v in (vectors or VECTORS).items()}), \
          patch.object(similar, "send_json", capture):
         similar.handle_get(handler)
 
@@ -129,13 +129,6 @@ def test_the_query_file_itself_is_never_returned():
     _handler, paths = query(make_user(["/media_ralf"]))
 
     assert "/media_ralf/eigenes.mp4" not in paths
-
-
-def test_vaulted_files_are_excluded():
-    _handler, paths = query(
-        make_user(["/media_ralf"], vaulted=["/media_ralf/privat.mp4"]))
-
-    assert "/media_ralf/privat.mp4" not in paths
 
 
 # --- 2. Wenn der Nutzer nicht lesbar ist ---

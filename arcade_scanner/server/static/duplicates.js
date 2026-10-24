@@ -319,7 +319,7 @@ function renderDuplicatesView() {
                                         
                                         ${window.IS_LOCAL_ACCESS ? `
                                         <!-- Reveal in Finder Button (only on local access) -->
-                                        <button onclick="revealInFinder('${escapeHtml(file.path.replace(/'/g, "\\'"))}')"
+                                        <button onclick="revealInFinder(${jsArg(file.path)})"
                                                 class="w-full py-1.5 rounded-lg bg-ink/5 text-gray-400 hover:bg-ink/10 hover:text-text-main border border-ink/10 text-xs transition-all flex items-center justify-center gap-1">
                                             <span class="material-icons text-sm" aria-hidden="true">folder_open</span>
                                             Reveal in Finder

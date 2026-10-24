@@ -3,7 +3,8 @@
  *
  * Features:
  * - Video playback and image display
- * - Keyboard navigation (←→ for prev/next, F for favorite, V for vault)
+ * - Keyboard navigation (←→ for prev/next, F for favorite, Pos1 for restart)
+ * - Resumes where the account stopped (watch_progress.js, also across devices)
  * - Tag assignment via shortcuts (A-Z keys mapped to tags)
  * - Info panel with media metadata
  * - Tag picker panel
@@ -43,6 +44,10 @@ function openCinema(container) {
 
     if (!path) return;
 
+    // Wird aus dem laufenden Player heraus ein anderes Medium geöffnet (Leiste
+    // „Ähnliche"), gehört die Position noch dem bisherigen.
+    flushCinemaProgress();
+
     const fileName = path.split(/[\\\/]/).pop();
     currentCinemaPath = path;
 
@@ -52,7 +57,11 @@ function openCinema(container) {
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
     const image = document.getElementById('cinemaImage');
-    document.getElementById('cinemaTitle').innerText = fileName;
+    const titleEl = document.getElementById('cinemaTitle');
+    if (titleEl) {
+        titleEl.innerText = typeof mediaTitle === 'function' ? mediaTitle(path) : fileName;
+        titleEl.title = fileName;
+    }
 
     const streamUrl = `/stream?path=` + encodeURIComponent(path);
 
@@ -97,6 +106,20 @@ function openCinema(container) {
             image.src = '';
         }
         video.classList.remove('hidden');
+
+        // Fortsetzen, wo das Konto aufgehört hat. Erst nach loadedmetadata —
+        // vorher kennt das Element die Dauer nicht und verwirft currentTime.
+        const resumeAt = typeof resumePositionFor === 'function' ? resumePositionFor(path) : 0;
+        if (resumeAt > 0) {
+            video.addEventListener('loadedmetadata', () => {
+                if (currentCinemaPath !== path) return;
+                if (isFinite(video.duration) && resumeAt < video.duration * WATCH_PROGRESS_FINISHED_RATIO) {
+                    video.currentTime = resumeAt;
+                    showCinemaToast(`Fortgesetzt bei ${formatCinemaTime(resumeAt)} · Pos1: von vorn`);
+                }
+            }, {once: true});
+        }
+        _cinemaLastProgressSave = Date.now();
 
         video.src = streamUrl;
         video.load();
@@ -213,6 +236,7 @@ function initCinemaErrorReporting() {
  */
 function closeCinema() {
     window.removeEventListener('keydown', cinemaKeyHandler, true);
+    flushCinemaProgress();
 
     const modal = document.getElementById('cinemaModal');
     const video = document.getElementById('cinemaVideo');
@@ -241,6 +265,12 @@ function closeCinema() {
 
     currentCinemaPath = null;
     currentCinemaVideo = null;
+
+    // „Weiterschauen" auf der Startseite zeigt sonst den Stand von vorher.
+    if (typeof workspaceMode !== 'undefined' && workspaceMode === 'home'
+            && typeof renderHome === 'function') {
+        renderHome();
+    }
 
     // Close any open panels
     if (typeof closeOptimize === 'function') closeOptimize();
@@ -273,6 +303,7 @@ function navigateCinema(direction) {
 
     const newVideo = sourceList[newIndex];
     if (newVideo) {
+        flushCinemaProgress();
         // Clean up current streams to avoid file handle leak
         const video = document.getElementById('cinemaVideo');
         const image = document.getElementById('cinemaImage');
@@ -299,6 +330,23 @@ function navigateCinema(direction) {
 
 let _cinemaTransportReady = false;
 let _cinemaScrubbing = false;
+let _cinemaLastProgressSave = 0;
+
+/**
+ * Meldet die aktuelle Position des laufenden Videos (watch_progress.js).
+ * Bilder und SOURCE-Dateien (die nicht abgespielt werden) zählen nicht.
+ *
+ * @param {boolean} [beacon=false] - beim Schließen der Seite: per sendBeacon
+ */
+function flushCinemaProgress(beacon = false) {
+    if (!currentCinemaPath || typeof recordWatchProgress !== 'function') return;
+    if (currentCinemaVideo && (currentCinemaVideo.media_type === 'image'
+            || currentCinemaVideo.Status === 'SOURCE')) return;
+    const video = document.getElementById('cinemaVideo');
+    if (!video || !video.currentSrc || !isFinite(video.duration)) return;
+    recordWatchProgress(currentCinemaPath, video.currentTime, video.duration, {beacon});
+    _cinemaLastProgressSave = Date.now();
+}
 
 /**
  * Format seconds as MM:SS (or H:MM:SS past an hour) for the transport readouts
@@ -328,7 +376,14 @@ function initCinemaTransport() {
 
     video.addEventListener('timeupdate', () => {
         if (!_cinemaScrubbing) updateCinemaTransport();
+        // Alle fünf Sekunden sichern — ein abgestürzter Tab soll nicht alles
+        // verlieren.
+        if (Date.now() - _cinemaLastProgressSave > 5000) flushCinemaProgress();
     });
+    video.addEventListener('pause', () => flushCinemaProgress());
+    video.addEventListener('ended', () => flushCinemaProgress());
+    // Tab schließen oder neu laden mitten im Video: fetch würde abgebrochen.
+    window.addEventListener('pagehide', () => flushCinemaProgress(true));
     video.addEventListener('loadedmetadata', updateCinemaTransport);
     video.addEventListener('play', updateCinemaTransport);
     video.addEventListener('pause', updateCinemaTransport);
@@ -400,12 +455,26 @@ function updateCinemaMeta() {
     const v = currentCinemaVideo;
     if (!v) { meta.textContent = ''; return; }
 
-    const parts = [];
-    if (v.Width && v.Height) parts.push(`${v.Width}x${v.Height}`);
-    if (v.codec) parts.push(String(v.codec).toUpperCase());
-    if (v.media_type === 'video' && v.Bitrate_Mbps) parts.push(`${v.Bitrate_Mbps.toFixed(1)} Mbps`);
-    else if (v.Size_MB) parts.push(`${v.Size_MB.toFixed(0)} MB`);
-    meta.textContent = parts.join('  ·  ');
+    const watch = [];
+    if (v.Duration_Sec) watch.push(formatDuration(v.Duration_Sec));
+    if (typeof entryDate === 'function' && entryDate(v)) {
+        watch.push(new Date(entryDate(v) * 1000).toLocaleDateString('de-DE',
+            {day: 'numeric', month: 'short', year: 'numeric'}));
+    }
+
+    const tech = [];
+    if (v.Width && v.Height) tech.push(`${v.Width}x${v.Height}`);
+    if (v.codec) tech.push(String(v.codec).toUpperCase());
+    if (v.media_type === 'video' && v.Bitrate_Mbps) tech.push(`${v.Bitrate_Mbps.toFixed(1)} Mbps`);
+    else if (v.Size_MB) tech.push(`${v.Size_MB.toFixed(0)} MB`);
+
+    // Technik nur mit „Details" bzw. in der Werkstatt (styles.css, SCHAU-MODUS)
+    const watchSpan = document.createElement('span');
+    watchSpan.textContent = watch.join('  ·  ');
+    const techSpan = document.createElement('span');
+    techSpan.className = 'tech-only';
+    techSpan.textContent = (watch.length && tech.length ? '  ·  ' : '') + tech.join('  ·  ');
+    meta.replaceChildren(watchSpan, techSpan);
 }
 
 /**
@@ -449,7 +518,6 @@ function cinemaToggleFullscreen() {
  *   ← / →        – Previous / Next in playlist
  *   Space        – Play / Pause video
  *   F            – Toggle Favorite
- *   V            – Move to Vault
  *   G            – Toggle GIF Export panel
  *   O            – Toggle Optimizer panel
  *   I            – Toggle Info panel
@@ -476,6 +544,15 @@ function cinemaKeyHandler(e) {
         e.preventDefault();
         navigateCinema(1);
 
+    } else if (e.key === 'Home') {
+        // Von vorn — das Gegenstück zum automatischen Fortsetzen
+        const video = document.getElementById('cinemaVideo');
+        if (video && !video.classList.contains('hidden')) {
+            e.preventDefault();
+            video.currentTime = 0;
+            showCinemaToast('Von vorn');
+        }
+
     } else if (e.key === ' ' || e.code === 'Space') {
         // Play / Pause
         e.preventDefault();
@@ -483,21 +560,14 @@ function cinemaKeyHandler(e) {
         if (video && !video.classList.contains('hidden')) {
             const wasPaused = video.paused;
             cinemaTogglePlay();
-            showCinemaToast(wasPaused ? '▶ Play' : '⏸ Pause');
+            showCinemaToast(wasPaused ? '▶ Wiedergabe' : '⏸ Pause');
         }
 
     } else if (key === 'f') {
         e.preventDefault();
         if (currentCinemaPath) {
             cinemaFavorite();
-            showCinemaToast('Favorite toggled');
-        }
-
-    } else if (key === 'v') {
-        e.preventDefault();
-        if (currentCinemaPath) {
-            cinemaVault();
-            showCinemaToast('Moved to Vault');
+            showCinemaToast('Favorit geändert');
         }
 
     } else if (key === 'g') {
@@ -505,7 +575,7 @@ function cinemaKeyHandler(e) {
         e.preventDefault();
         if (typeof cinemaExportGif === 'function') {
             cinemaExportGif();
-            showCinemaToast('GIF Export [G]');
+            showCinemaToast('GIF-Export [G]');
         }
 
     } else if (key === 'o') {
@@ -532,7 +602,8 @@ function cinemaKeyHandler(e) {
 
     } else {
         // Check custom tag shortcuts (A-Z except reserved)
-        const reservedKeys = ['f', 'v', 'g', 'o', 'i', 's', ' ', 'escape', 'arrowleft', 'arrowright'];
+        // Muss zu tag_manager.js passen — dort wird beim Anlegen geprüft.
+        const reservedKeys = ['f', 'g', 'o', 'i', 's', ' ', 'escape', 'arrowleft', 'arrowright'];
         if (key.length === 1 && /[a-z]/i.test(key) && !reservedKeys.includes(key)) {
             const tags = window.userSettings?.available_tags || [];
             const matchingTag = tags.find(t => t.shortcut && t.shortcut.toLowerCase() === key);
@@ -577,21 +648,6 @@ function cinemaFavorite() {
 }
 
 /**
- * Move current cinema item to vault (hide)
- */
-function cinemaVault() {
-    if (!currentCinemaPath) return;
-
-    apiWrite(`/hide?path=` + encodeURIComponent(currentCinemaPath) + `&state=true`, {}, {
-        action: 'In den Vault verschieben',
-    }).then(response => {
-        if (!response) return;   // Fehler gemeldet — Cinema bleibt offen
-        closeCinema();
-        location.reload();
-    });
-}
-
-/**
  * Reveal current cinema item in system file browser
  */
 function cinemaLocate() {
@@ -602,7 +658,7 @@ function cinemaLocate() {
 // --- UI UPDATE FUNCTIONS ---
 
 /**
- * Update cinema action button states (favorite, vault indicators)
+ * Update cinema action button states (favorite indicator)
  */
 function updateCinemaButtons() {
     if (!currentCinemaVideo) return;
@@ -613,12 +669,6 @@ function updateCinemaButtons() {
         favBtn.title = currentCinemaVideo.favorite ? 'Already a Favorite' : 'Add to Favorites';
         const icon = document.getElementById('cinemaFavIcon');
         if (icon) icon.textContent = currentCinemaVideo.favorite ? 'star' : 'star_border';
-    }
-
-    const vaultBtn = document.querySelector('.cinema-action-btn[onclick="cinemaVault()"]');
-    if (vaultBtn) {
-        vaultBtn.classList.toggle('is-active', !!currentCinemaVideo.hidden);
-        vaultBtn.title = currentCinemaVideo.hidden ? 'Already in Vault' : 'Move to Vault';
     }
 }
 
@@ -880,7 +930,6 @@ window.openCinema         = openCinema;
 window.closeCinema        = closeCinema;
 window.navigateCinema     = navigateCinema;
 window.cinemaFavorite     = cinemaFavorite;
-window.cinemaVault        = cinemaVault;
 window.cinemaLocate       = cinemaLocate;
 window.toggleCinemaInfo   = toggleCinemaInfo;
 window.toggleCinemaTagPanel = toggleCinemaTagPanel;

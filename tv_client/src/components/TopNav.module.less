@@ -1,0 +1,100 @@
+@import './tokens.less';
+
+.nav {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: 80px;
+	height: @nav-height;
+	padding: 0 @gutter;
+	box-sizing: border-box;
+	// Über dem Titelbild: nur ein Schatten von oben, damit die Schrift lesbar bleibt.
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0) 100%);
+	transition: background 260ms ease-out, box-shadow 260ms ease-out;
+}
+
+.solid {
+	background: rgba(11, 11, 15, 0.97);
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.items {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.item {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 18px 34px;
+	border-radius: 999px;
+	font-size: 44px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.72);
+	outline: none;
+	transition: background 140ms ease-out, color 140ms ease-out, transform 140ms ease-out;
+}
+
+.itemIcon {
+	color: inherit;
+}
+
+// Aktiver Bereich: weiß, fett, mit Strich im Markenverlauf darunter.
+.active {
+	color: #fff;
+	font-weight: 800;
+
+	&::after {
+		content: '';
+		position: absolute;
+		left: 34px;
+		right: 34px;
+		bottom: 0;
+		height: 8px;
+		border-radius: 4px;
+		background: @brand-gradient;
+	}
+}
+
+.item:focus {
+	background: #fff;
+	color: @bg;
+	transform: scale(1.06);
+	box-shadow: @focus-glow;
+
+	&::after {
+		display: none;
+	}
+}
+
+.right {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 36px;
+}
+
+.status {
+	font-size: 34px;
+	color: @text-dim;
+}
+
+.avatar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 96px;
+	height: 96px;
+	border-radius: 18px;
+	background: @brand-gradient;
+	color: #fff;
+	font-size: 48px;
+	font-weight: 800;
+}

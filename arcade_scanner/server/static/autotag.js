@@ -52,8 +52,8 @@ function renderAutoTagRules() {
                     <input type="checkbox" ${r.enabled ? 'checked' : ''}
                            onchange="toggleAutoTagRule('${r.id}', this.checked)">
                     <div class="min-w-0 flex-1">
-                        <div class="text-sm font-medium truncate">${r.name}</div>
-                        <div class="text-xs text-gray-400">Tag: ${r.tag}</div>
+                        <div class="text-sm font-medium truncate">${escapeHtml(r.name)}</div>
+                        <div class="text-xs text-gray-400">Tag: ${escapeHtml(r.tag)}</div>
                     </div>
                     <button onclick="deleteAutoTagRule('${r.id}')"
                             class="text-xs text-red-400 hover:text-red-300">Löschen</button>

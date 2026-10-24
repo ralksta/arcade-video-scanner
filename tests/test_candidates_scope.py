@@ -87,11 +87,10 @@ LIBRARY = [
 ]
 
 
-def make_user(targets, vaulted=(), is_admin=False):
+def make_user(targets, is_admin=False):
     u = MagicMock()
     u.is_admin = is_admin
     u.data.scan_targets = list(targets)
-    u.data.vaulted = list(vaulted)
     return u
 
 
@@ -134,13 +133,6 @@ def test_a_sibling_directory_with_a_shared_prefix_is_outside():
 
     assert not any(p.startswith("/media_ralf") or p.startswith("/media_nas")
                    for p in paths), paths
-
-
-def test_vaulted_files_are_not_suggested():
-    _handler, paths = ask(
-        make_user(["/media_ralf"], vaulted=["/media_ralf/privat.mp4"]))
-
-    assert "/media_ralf/privat.mp4" not in paths
 
 
 def test_already_queued_files_are_not_suggested():

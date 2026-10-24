@@ -114,16 +114,13 @@ function setSort(s) {
  */
 function filterAndSort(scrollToTop = false) {
     try {
-        // Ohne die Nutzerdaten ist unbekannt, welche Einträge im Vault liegen.
+        // Ohne die Nutzerdaten fehlen die Listen des abgesicherten Modus.
         //
-        // `loadUserData()` setzt `v.hidden` aus `/api/user/data`. Schlägt der
-        // Aufruf fehl, protokolliert er das und kehrt zurück — `v.hidden`
-        // bleibt dann `undefined`, und die Zeile weiter unten
-        //
-        //     if (workspaceMode === 'lobby' && isHidden) return false;
-        //
-        // lässt jede versteckte Datei durch. Ein einzelner Serverfehler hätte
-        // also den gesamten Vault in der normalen Ansicht ausgebreitet.
+        // `loadUserData()` setzt `userSettings.sensitive_*` aus
+        // `/api/user/data`. Schlägt der Aufruf fehl, bleiben sie leer, und
+        // `isSensitive()` weiter unten lässt alles durch — ein einzelner
+        // Serverfehler zeigte im abgesicherten Modus genau das, was er
+        // verbergen soll. (Bis Phase 1 begründete das der Vault.)
         //
         // Die Prüfung steht hier und nicht an der Aufrufstelle, weil ganz am
         // Ende von engine.js ein `setTimeout(..., 500)` noch einmal
@@ -208,7 +205,6 @@ function filterAndSort(scrollToTop = false) {
                 // Use pre-calculated values (set in engine.js:loadVideoData)
                 const name = v._fileNameLower || "";
                 const codec = v._codecLower || "unknown";
-                const isHidden = v.hidden || false;
                 const folder = v._folder || "";
                 const videoTags = v.tags || [];
 
@@ -217,8 +213,6 @@ function filterAndSort(scrollToTop = false) {
                 if (safeMode && isSensitive(v)) return false;
 
                 // Workspace filter
-                if (workspaceMode === 'lobby' && isHidden) return false;
-                if (workspaceMode === 'vault' && !isHidden) return false;
                 if (workspaceMode === 'favorites' && !v.favorite) return false;
 
                 // Status filter
@@ -400,7 +394,7 @@ function _updateQuickStats(stats, workspaceMode) {
 // --- EXPORTS ---
 /**
  * Ersetzt das Raster durch einen Hinweis, statt eine Bibliothek zu zeigen,
- * deren Vault-Zustand unbekannt ist. Gleiche Machart wie der Fehlerzweig der
+ * für die der abgesicherte Modus nicht greifen kann. Gleiche Machart wie der Fehlerzweig der
  * Verzeichnisliste im Einrichtungs-Assistenten.
  */
 function renderLibraryUnavailable() {
@@ -409,7 +403,7 @@ function renderLibraryUnavailable() {
     grid.innerHTML = '<div class="col-span-full text-center py-16 text-danger">'
         + '<div class="font-medium">Deine Nutzerdaten konnten nicht geladen werden.</div>'
         + '<div class="text-sm text-text-muted mt-2">Die Bibliothek wird nicht angezeigt, '
-        + 'weil sonst auch Einträge aus dem Vault sichtbar wären.</div>'
+        + 'weil der abgesicherte Modus ohne sie nicht greifen kann.</div>'
         + '<button onclick="location.reload()" class="underline mt-4">Neu laden</button>'
         + '</div>';
 }

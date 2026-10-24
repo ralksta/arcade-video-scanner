@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arcade Scanner Login</title>
+    <title>Arcade Scanner – Anmelden</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -35,6 +35,9 @@
             justify-content: center;
             min-height: 100vh;
             margin: 0;
+            /* Rand auf schmalen Bildschirmen — die Karte lag sonst an der Kante */
+            padding: 16px;
+            box-sizing: border-box;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -45,6 +48,7 @@
             border-radius: 10px;
             width: 100%;
             max-width: 320px;
+            box-sizing: border-box;
         }
 
         .wordmark {
@@ -162,18 +166,18 @@
             <span class="wordmark-dot"></span>
             <h1>Arcade Scanner</h1>
         </div>
-        <p class="subtitle">Sign in to your library.</p>
+        <p class="subtitle">Bei deiner Mediathek anmelden.</p>
 
         <form id="loginForm">
-            <input type="text" id="username" placeholder="Username" required autocomplete="username">
-            <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+            <input type="text" id="username" placeholder="Benutzername" required autocomplete="username">
+            <input type="password" id="password" placeholder="Passwort" required autocomplete="current-password">
             <div class="remember-row">
                 <input type="checkbox" id="rememberMe" checked>
-                <label for="rememberMe">Remember me (30 days)</label>
+                <label for="rememberMe">Angemeldet bleiben (30 Tage)</label>
             </div>
-            <button type="submit">Sign in</button>
+            <button type="submit">Anmelden</button>
         </form>
-        <div id="errorMsg" class="error">Invalid credentials</div>
+        <div id="errorMsg" class="error">Benutzername oder Passwort falsch</div>
     </div>
 
     <script>
@@ -197,13 +201,13 @@
                     const dest = params.get('redirect') || '/';
                     window.location.href = dest;
                 } else if (res.status === 429) {
-                    err.innerText = 'Too many attempts. Try again in 15 minutes.';
+                    err.innerText = 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.';
                     err.style.display = 'block';
                 } else {
                     err.style.display = 'block';
                 }
             } catch (e) {
-                err.innerText = "Connection error";
+                err.innerText = "Server nicht erreichbar";
                 err.style.display = 'block';
             }
         });

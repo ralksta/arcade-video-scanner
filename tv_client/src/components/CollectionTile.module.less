@@ -1,0 +1,71 @@
+@import './tokens.less';
+
+.tile {
+	flex-shrink: 0;
+	padding: 22px;
+	box-sizing: border-box;
+	outline: none;
+}
+
+.frame {
+	position: relative;
+	width: 100%;
+	padding-top: 56.25%;
+	border-radius: 20px;
+	overflow: hidden;
+	background: var(--tile-color, @accent);
+	box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.5);
+	transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+
+.image {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	opacity: 0.55;
+	filter: saturate(0.8);
+}
+
+// Farbe der Collection von links unten, Glanz von rechts oben — „Chrome“.
+.tint {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(200deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 35%),
+		linear-gradient(20deg, var(--tile-color, @accent) 8%, rgba(0, 0, 0, 0.35) 70%, rgba(0, 0, 0, 0.1) 100%);
+	mix-blend-mode: normal;
+}
+
+.text {
+	position: absolute;
+	left: 44px;
+	right: 44px;
+	bottom: 36px;
+	color: #fff;
+	text-shadow: 0 3px 14px rgba(0, 0, 0, 0.6);
+}
+
+.name {
+	font-size: 64px;
+	font-weight: 900;
+	line-height: 1.05;
+	letter-spacing: 1px;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.count {
+	margin-top: 10px;
+	font-size: 34px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.tile:focus .frame {
+	transform: scale(1.07);
+	box-shadow: @focus-ring, 0 0 80px var(--tile-color, @accent);
+}

@@ -112,7 +112,7 @@ function showToast(message, type = 'info', duration = 2800) {
     toast.className = `settings-toast toast-${type}`;
     toast.innerHTML = `
         <span class="material-icons" style="font-size:18px;flex-shrink:0" aria-hidden="true">${iconMap[type] || 'info'}</span>
-        <span style="flex:1;min-width:0;word-break:break-word">${message}</span>
+        <span style="flex:1;min-width:0;word-break:break-word">${escapeHtml(message)}</span>
         <button onclick="this.closest('.settings-toast')._dismiss()" aria-label="Meldung schließen" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;opacity:.6;display:flex;align-items:center">
             <span class="material-icons" style="font-size:16px" aria-hidden="true">close</span>
         </button>
@@ -171,6 +171,27 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 window.escapeHtml = escapeHtml;
+
+/**
+ * Ein Wert als JS-Argument in einem Inline-Handler (`onclick="f(${jsArg(x)})"`).
+ *
+ * Zwei Schichten, in dieser Reihenfolge: erst für JavaScript maskieren
+ * (JSON.stringify — Anführungszeichen, Backslash, Zeilenumbrüche), dann für
+ * das HTML-Attribut (escapeHtml). Der Browser löst die Entitäten auf, bevor
+ * er den Handler als JavaScript liest, und sieht ein gültiges Stringliteral.
+ *
+ * Vorher stand dort `'${pfad.replace(/'/g, "\\'")}'`: geschützt gegen
+ * Apostrophe, aber ein `"` im Dateinamen beendete das Attribut und hängte
+ * ein eigenes `onmouseover` an den Button; ein `\` am Ende legte den Handler
+ * lahm. `escapeHtml` allein reicht hier nicht (frontend-escaping.md), und
+ * `encodeURIComponent` lässt `'` stehen.
+ *
+ * Gibt den Wert **samt** Anführungszeichen zurück — nicht in '…' setzen.
+ */
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value)));
+}
+window.jsArg = jsArg;
 
 /**
  * URL-encode a file path, or return null if it cannot be encoded.

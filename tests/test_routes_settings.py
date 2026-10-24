@@ -7,6 +7,7 @@ one xfail documents a real security gap (see below) without fixing it blind.
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fake_user_store import make_fake_user_db
 
 from arcade_scanner.server.routes import settings
@@ -76,14 +77,15 @@ def run(handler, singletons=None, post=False):
     return handled, singletons
 
 
-def test_get_settings_anonymous_returns_global_dump():
-    # Characterization: GET /api/settings needs NO session — anonymous clients
-    # receive the global config dump (without per-user fields).
+def test_get_settings_rejects_anonymous_callers():
+    # Bis Nachtlauf 4 bekam eine anonyme Anfrage den globalen Dump:
+    # gespeicherte Ansichten, proxy_root, review_dir, ffmpeg-Pfade. Kein Client
+    # fragt vor der Anmeldung (test_anonymous_route_sweep.py).
     h = FakeHandler("/api/settings", user=None)
     handled, _ = run(h)
     assert handled is True
-    assert h.status == 200
-    assert h.body()["bitrate_threshold_kbps"] == 8000
+    assert h.error == 401
+    h.wfile.write.assert_not_called()
 
 
 def test_get_settings_merges_user_fields_for_session():
@@ -136,3 +138,108 @@ def test_post_settings_oversized_body_rejected():
     assert handled is True
     assert h.error == 413
     singletons[0].save.assert_not_called()
+
+
+# --- /api/restore: Sitzung und Admin ---
+#
+# Die Route hatte **gar keine** Prüfung. Am echten Server belegt: eine
+# anonyme Anfrage überschrieb proxy_root und review_dir. Unter den
+# Einstellungen steht auch ffprobe_path — das Programm, das der Scanner
+# ausführt. Derselbe Fehler war für POST /api/settings schon einmal behoben
+# worden (siehe dort); die Nachbar-Route hatte ihn behalten.
+#
+# Admin, nicht nur angemeldet: Restore ersetzt Einstellungen, die alle Konten
+# betreffen (UMSETZUNGSPLAN, Phase 5).
+
+def _restore(user, is_admin=False):
+    handler = FakeHandler("/api/restore", user=user,
+                          body={"proxy_root": "/tmp/angreifer"})
+    config = MagicMock()
+    config.save.return_value = True
+    account = MagicMock()
+    account.is_admin = is_admin
+    user_db = MagicMock()
+    user_db.get_user.return_value = account if user else None
+    with patch.object(settings, "_get_singletons",
+                      return_value=(config, user_db, MagicMock(), 10_000)):
+        settings.handle_post(handler)
+    return handler, config
+
+
+def test_restore_rejects_anonymous_callers():
+    handler, config = _restore(user=None)
+    assert handler.error == 401
+    config.save.assert_not_called()
+
+
+def test_restore_rejects_non_admins():
+    handler, config = _restore(user="kim", is_admin=False)
+    assert handler.error == 403
+    config.save.assert_not_called()
+
+
+def test_restore_works_for_admins():
+    handler, config = _restore(user="boss", is_admin=True)
+    assert handler.error is None
+    config.save.assert_called_once_with({"proxy_root": "/tmp/angreifer"})
+
+
+# --- Globale Einstellungen nur für Admins (Entscheidung 2026-10-02) ---
+#
+# POST /api/settings ließ jedes angemeldete Konto die *globalen* Schlüssel
+# schreiben — Scan-Schwellen, proxy_root, review_dir, ffprobe_path/ffmpeg_path,
+# also auch, welches Programm der Server ausführt. Nicht-Admins behalten ihre
+# eigenen Felder; globale werden verworfen und in der Antwort genannt. Ein 403
+# ginge nicht: Der Dialog schickt bei jedem Speichern alles mit.
+
+def _as(is_admin):
+    singletons = _singletons()
+    singletons[1].get_user.return_value.is_admin = is_admin
+    return singletons
+
+
+def test_a_non_admin_cannot_write_global_keys():
+    h = FakeHandler("/api/settings", user="kim", body={
+        "ffprobe_path": "/tmp/boese",
+        "proxy_root": "/tmp/x",
+        "min_size_mb": 1,
+        "scan_targets": ["/media/kim"],
+    })
+    singletons = _as(is_admin=False)
+    run(h, singletons, post=True)
+
+    config, user_db = singletons[0], singletons[1]
+    saved = config.save.call_args[0][0] if config.save.called else {}
+    assert "ffprobe_path" not in saved and "proxy_root" not in saved and "min_size_mb" not in saved
+    assert user_db.get_user.return_value.data.scan_targets == ["/media/kim"], (
+        "Die eigenen Felder müssen trotzdem gespeichert werden"
+    )
+    body = h.body()
+    assert body["success"] is True
+    assert body["ignored"] == ["ffprobe_path", "min_size_mb", "proxy_root"]
+
+
+def test_a_non_admin_saves_views_as_their_own():
+    """Seit Phase 2 nutzereigen — weder global noch als „ignoriert" gemeldet."""
+    h = FakeHandler("/api/settings", user="kim", body={"saved_views": [{"name": "Urlaub"}]})
+    singletons = _as(is_admin=False)
+    run(h, singletons, post=True)
+    config, user_db = singletons[0], singletons[1]
+    assert "saved_views" not in config.save.call_args[0][0]
+    assert user_db.get_user.return_value.data.saved_views == [{"name": "Urlaub"}]
+    assert h.body()["ignored"] == []
+
+
+def test_an_admin_writes_global_keys():
+    h = FakeHandler("/api/settings", user="boss", body={"proxy_root": "/srv/p", "min_size_mb": 5})
+    singletons = _as(is_admin=True)
+    run(h, singletons, post=True)
+    singletons[0].save.assert_called_once_with({"proxy_root": "/srv/p", "min_size_mb": 5})
+    assert h.body()["ignored"] == []
+
+
+@pytest.mark.parametrize("is_admin", [True, False])
+def test_get_settings_reports_the_admin_flag(is_admin):
+    h = FakeHandler("/api/settings")
+    run(h, _as(is_admin=is_admin))
+    assert h.body()["is_admin"] is is_admin

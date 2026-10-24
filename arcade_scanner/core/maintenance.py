@@ -59,7 +59,7 @@ def data_dir_looks_sane() -> bool:
     return True
 
 def purge_media():
-    """Löscht alle Vorschaubilder, mit Sicherheitsprüfungen.
+    """Löscht alle Vorschaubilder und TV-Standbilder, mit Sicherheitsprüfungen.
 
     Der frühere Docstring nannte „thumbnail and preview directories". Ein
     Vorschau-Verzeichnis kennt der Code nicht.
@@ -74,15 +74,17 @@ def purge_media():
     # Code aber nirgends; `arcade_data/previews` ist ein leerer Überrest einer
     # früheren Fassung. Der doppelte Eintrag liess dieselbe Schleife zweimal
     # laufen und die Beschreibung falsch aussehen.
+    # Vorschaubilder und die grossen Standbilder für den TV
+    # (video_processor.create_poster) liegen im selben Verzeichnis.
     targets = [
-        (config.thumb_dir, "thumb_", ".jpg"),
+        (config.thumb_dir, ("thumb_", "poster_"), ".jpg"),
     ]
 
-    for folder, prefix, ext in targets:
+    for folder, prefixes, ext in targets:
         if os.path.exists(folder):
             for filename in os.listdir(folder):
                 file_path = os.path.join(folder, filename)
-                if is_safe_to_delete(file_path, folder, prefix, ext):
+                if any(is_safe_to_delete(file_path, folder, prefix, ext) for prefix in prefixes):
                     try:
                         os.remove(file_path)
                     except Exception as e:
@@ -102,7 +104,10 @@ def purge_thumbnails():
         count = 0
         for filename in os.listdir(config.thumb_dir):
             file_path = os.path.join(config.thumb_dir, filename)
-            if is_safe_to_delete(file_path, config.thumb_dir, "thumb_", ".jpg"):
+            # Die grossen Standbilder (poster_…) hängen am selben Bild —
+            # wer die Vorschaubilder neu will, will sie auch neu.
+            if (is_safe_to_delete(file_path, config.thumb_dir, "thumb_", ".jpg")
+                    or is_safe_to_delete(file_path, config.thumb_dir, "poster_", ".jpg")):
                 try:
                     os.remove(file_path)
                     count += 1

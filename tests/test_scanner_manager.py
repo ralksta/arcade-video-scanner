@@ -284,7 +284,7 @@ class TestCacheValidation:
     def test_user_state_survives_a_reprobe(self):
         manager = ScannerManager()
         cached = make_cached("/media/a.mp4", mtime=1000, favorite=True,
-                             hidden=True, tags=["keep"], imported_at=1600000000)
+                             tags=["keep"], imported_at=1600000000)
         db = FakeDB([cached])
         scanner = FakeScanner([("/media/a.mp4", True)])
 
@@ -292,7 +292,6 @@ class TestCacheValidation:
 
         stored = db.upserted[0]
         assert stored.favorite is True
-        assert stored.vaulted is True
         assert stored.tags == ["keep"]
         assert stored.imported_at == 1600000000
 
@@ -516,7 +515,7 @@ class TestOrphanPruning:
 
         Discovery streams paths, so a stop event means most of the library was
         never seen. Treating those unseen files as deleted would drop their rows
-        — and with them the favorites, tags and vault flags the scan is supposed
+        — and with them the favorites and tags the scan is supposed
         to preserve.
         """
         manager = ScannerManager()

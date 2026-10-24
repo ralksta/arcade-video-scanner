@@ -1,5 +1,11 @@
 # iOS-Client: Zustand und was zur Reparatur fehlt
 
+> **Zurückgezogen am 2026-10-02** (ENTSCHEIDUNGEN.md, Punkt 1): `ios_client/` ist
+> aus dem Arbeitsbaum entfernt, weil der Client seit `8c6008a` nicht mehr
+> funktionierte und sich ohne Mac und Xcode nicht prüfen ließ. Der letzte Stand
+> liegt in der Historie: `git checkout dec7163 -- ios_client`. Dieses Dokument
+> bleibt, weil es beschreibt, was eine Rückholung reparieren müsste.
+
 **Stand: 2026-08-17. Der iOS-Client funktioniert gegen den aktuellen Server nicht.**
 
 Gefunden im Nachtlauf beim Abgleich der Clients gegen die Server-Routen.

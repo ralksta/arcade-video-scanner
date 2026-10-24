@@ -1,7 +1,7 @@
 """
 Erkennt Dateien, die zwischen zwei Scans **umgezogen** sind.
 
-Der Nutzerzustand — Favorit, Vault, Tags — hängt in diesem Projekt am Pfad.
+Der Nutzerzustand — Favorit, Tags — hängt in diesem Projekt am Pfad.
 Wer eine Datei im Dateimanager umbenennt oder in einen anderen Ordner schiebt,
 sieht für die Bibliothek deshalb aus wie zwei Vorgänge: Eine Datei ist weg,
 eine neue ist da. Der Aufräumschritt nach dem Scan löscht daraufhin die alte

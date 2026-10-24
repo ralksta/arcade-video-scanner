@@ -31,7 +31,6 @@ class VideoEntry(BaseModel):
 
     # User-defined attributes
     favorite: bool = Field(False, description="Is marked as favorite")
-    vaulted: bool = Field(False, alias="hidden", description="Is moved to vault/hidden")
     tags: list[str] = Field(default_factory=list, description="User defined tags")
     thumb: str = Field("", description="Thumbnail filename")
 

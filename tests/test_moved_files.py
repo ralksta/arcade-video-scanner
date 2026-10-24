@@ -9,7 +9,7 @@ am Pfad. Wer im Dateimanager `urlaub.mp4` in `urlaub-2019.mp4` umbenennt oder
 in einen anderen Ordner schiebt, erzeugt aus Sicht der Bibliothek zwei
 Vorgänge: eine verschwundene Datei und eine neue. Der Aufräumschritt nach dem
 Scan löscht daraufhin die alte Zeile — und der Kommentar an genau dieser
-Stelle sagt selbst, worum es geht: „user state — favorites, tags, vault flags —
+Stelle sagt selbst, worum es geht: „user state — favorites, tags —
 that no rescan can restore".
 
 Das trifft den Alltag härter als es klingt. Ordnung in einer Mediathek zu
@@ -177,10 +177,9 @@ def store(tmp_path):
         yield s
 
 
-def give(store, username, favorites=(), vaulted=(), tags=None):
+def give(store, username, favorites=(), tags=None):
     user = store.get_user(username)
     user.data.favorites = list(favorites)
-    user.data.vaulted = list(vaulted)
     user.data.tags = dict(tags or {})
     store.add_user(user)
 
@@ -194,18 +193,6 @@ def test_a_favorite_follows_the_file(store):
     assert "/media/neu.mp4" in favoriten
     assert "/media/alt.mp4" not in favoriten
     assert "/media/anderes.mp4" in favoriten
-
-
-def test_the_vault_mark_follows_the_file(store):
-    """
-    Die folgenreichste der drei: Bliebe sie liegen, wäre eine weggelegte Datei
-    nach dem Umbenennen plötzlich wieder für alle sichtbar.
-    """
-    give(store, "ralf", vaulted=["/media/alt.mp4"])
-
-    store.remap_paths_in_user_data({"/media/alt.mp4": "/media/neu.mp4"})
-
-    assert store.get_user("ralf").data.vaulted == ["/media/neu.mp4"]
 
 
 def test_tags_follow_the_file(store):

@@ -1,0 +1,19 @@
+// Gemeinsame Designwerte der TV-App („Chrome“ im Stil von Netflix/HBO).
+// Nur Variablen — erzeugt selbst kein CSS. Maße in 4K-Pixeln.
+
+// Markenfarbe aus dem Web-Theme (arcade_scanner/templates/theme.py: accent),
+// als Verlauf ins Violette — wie HBO sein Lila einsetzt.
+@accent: #c4179f;
+@accent-2: #7b2ff7;
+@brand-gradient: linear-gradient(100deg, #ff3fb4 0%, @accent 45%, @accent-2 100%);
+
+@bg: #0b0b0f;
+@surface: #1b1b22;
+@text: #f2f2f2;
+@text-dim: rgba(255, 255, 255, 0.62);
+
+@nav-height: 200px;
+@gutter: 120px;
+
+@focus-ring: 0 0 0 6px #fff;
+@focus-glow: 0 0 70px rgba(196, 23, 159, 0.55);

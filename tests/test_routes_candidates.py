@@ -48,9 +48,8 @@ class FakeDB:
 
 
 class FakeUserDB:
-    def __init__(self, vaulted=()):
+    def __init__(self):
         u = MagicMock()
-        u.data.vaulted = list(vaulted)
         self._u = u
 
     def get_user(self, name):
@@ -97,12 +96,10 @@ def test_returns_ranked_results():
     assert [r["file_path"] for r in body["results"]] == ["/lib/big.mp4", "/lib/small.mp4"]
 
 
-def test_excludes_active_queue_and_vaulted():
+def test_excludes_active_queue():
     h = FakeHandler("/api/candidates")
-    db = FakeDB([_entry("/lib/q.mp4"), _entry("/lib/v.mp4"), _entry("/lib/ok.mp4")],
-                active={"/lib/q.mp4"})
-    udb = FakeUserDB(vaulted=["/lib/v.mp4"])
-    run(h, db=db, user_db=udb)
+    db = FakeDB([_entry("/lib/q.mp4"), _entry("/lib/ok.mp4")], active={"/lib/q.mp4"})
+    run(h, db=db)
     assert [r["file_path"] for r in h.body()["results"]] == ["/lib/ok.mp4"]
 
 

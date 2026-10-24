@@ -9,6 +9,8 @@
 // abfragen und speichern, wie es der iOS-Client mit seinem serverUrl-Feld tut.
 // Bis dahin ist sie wenigstens an einer Stelle änderbar.
 
+import {getItem} from './safeStorage';
+
 const DEFAULT_SERVER_URL = 'http://192.168.2.183:8000';
 
 const STORAGE_KEY = 'arcade.serverUrl';
@@ -40,11 +42,36 @@ export const getServerUrl = () => {
 export const serverUrl = (path) => `${getServerUrl()}${path}`;
 
 /**
- * URL eines Vorschaubilds.
+ * URL eines Vorschaubilds — mit Sitzungs-Token.
+ *
+ * Seit UMSETZUNGSPLAN Phase 6 verlangt /thumbnails eine Sitzung. Ein <img>
+ * kann keinen Authorization-Header setzen, und der Fernseher hat kein
+ * Server-Cookie; das Token geht deshalb als Query-Parameter mit, genauso wie
+ * bei /stream (App.js). Der Server maskiert es im Log.
  *
  * @param {string} thumb - Dateiname aus dem Feld `thumb` der API
  * @returns {string}
  */
-export const thumbnailUrl = (thumb) => serverUrl(`/thumbnails/${thumb || ''}`);
+export const thumbnailUrl = (thumb) => {
+	const token = getItem('arcade_session_token', '');
+	const query = token ? `?token=${encodeURIComponent(token)}` : '';
+	return serverUrl(`/thumbnails/${encodeURIComponent(thumb || '')}${query}`);
+};
+
+/**
+ * URL des großen Standbilds (bis 1280×720) für Titelbild und Detailansicht.
+ *
+ * Die Vorschaubilder sind 480×270 — auf dem halben Fernseher verwaschen. Der
+ * Server erzeugt das Standbild beim ersten Abruf (GET /poster). Token wie bei
+ * thumbnailUrl().
+ *
+ * @param {string} path - FilePath des Eintrags
+ * @returns {string}
+ */
+export const posterUrl = (path) => {
+	const token = getItem('arcade_session_token', '');
+	const auth = token ? `&token=${encodeURIComponent(token)}` : '';
+	return serverUrl(`/poster?path=${encodeURIComponent(path || '')}${auth}`);
+};
 
 export {DEFAULT_SERVER_URL, STORAGE_KEY};
