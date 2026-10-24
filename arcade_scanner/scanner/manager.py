@@ -14,6 +14,25 @@ from .media_probe import MediaProbe
 from .video_inspector import VideoInspector
 
 
+def _scan_flags(user_db: Any) -> Tuple[bool, bool]:
+    """(scan_images, scan_raw) — an, wenn *irgendein* Konto den Schalter hat.
+
+    Die Bibliothek ist geteilt; sobald ein Konto Fotos oder RAW-Dateien sehen
+    will, muss der Walker sie liefern. Die Auswahl pro Konto passiert danach
+    in den API-Routen über die Scan-Ziele.
+    """
+    scan_images = False
+    scan_raw = False
+    for user in user_db.get_all_users():
+        if getattr(user.data, "scan_images", False):
+            scan_images = True
+        if getattr(user.data, "scan_raw", False):
+            scan_raw = True
+        if scan_images and scan_raw:
+            break
+    return scan_images, scan_raw
+
+
 def _apply_detected_moves(existing_entries, orphans, newcomers) -> dict:
     """Trägt Favoriten, Tags und das Aufnahmedatum auf den neuen Pfad um.
 
@@ -140,19 +159,19 @@ class ScannerManager:
         self.sem_image = asyncio.Semaphore(config.settings.max_concurrent_image_scans)
         try:
             from ..database.user_store import user_db
-            scan_images = False
-            for u in user_db.get_all_users():
-                if getattr(u.data, 'scan_images', False):
-                    scan_images = True
-                    break
+            scan_images, scan_raw = _scan_flags(user_db)
             fs_scanner.allow_images = scan_images
+            fs_scanner.allow_raw = scan_raw
             if scan_images:
                 print("📸 Image scanning enabled (Fast Lane Active)")
+            if scan_raw:
+                print("📷 RAW scanning enabled (Fast Lane Active)")
         except Exception as e:
             # Ohne Meldung sähe der Nutzer nur, dass seine Bilder nicht
             # auftauchen, obwohl die Option gesetzt ist — und hätte keinen
             # Anhaltspunkt, woran es liegt.
-            print(f"⚠️ Bild-Scan-Einstellung nicht lesbar ({e!r}) — Bilder werden übersprungen")
+            print(f"⚠️ Bild-/RAW-Scan-Einstellung nicht lesbar ({e!r}) — "
+                  "Bilder/RAW werden übersprungen")
 
         # 1. Load Cache
         db.load()

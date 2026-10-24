@@ -7,6 +7,7 @@ import time
 from typing import AsyncIterator, List, Optional, Set, Tuple
 
 from ..config import config
+from ..core import media_extensions
 
 
 class AsyncFileSystem:
@@ -16,10 +17,12 @@ class AsyncFileSystem:
     """
 
     VIDEO_EXTENSIONS = frozenset({'.mp4', '.mkv', '.avi', '.mov', '.m4v', '.wmv', '.flv', '.webm', '.ts'})
-    IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.heic', '.avif'})
+    IMAGE_EXTENSIONS = media_extensions.STANDARD_IMAGE_EXTENSIONS
+    RAW_EXTENSIONS = media_extensions.RAW_EXTENSIONS
 
     def __init__(self):
         self.allow_images = False # Toggled by ScannerManager based on user settings
+        self.allow_raw = False    # eigener Schalter: nur Rohformate
         self._last_scan_time = 0.0
         # Wann der laufende Durchlauf *begonnen* hat. Siehe save_last_scan_time().
         self._scan_started_at = 0.0
@@ -323,13 +326,15 @@ class AsyncFileSystem:
             return True
         if self.allow_images and ext in self.IMAGE_EXTENSIONS:
             return True
+        if self.allow_raw and ext in self.RAW_EXTENSIONS:
+            return True
         return False
 
     def _is_valid_size(self, path: str) -> bool:
         ext = os.path.splitext(path)[1].lower()
 
-        # Images use KB threshold (configurable, e.g., 500 KB)
-        if ext in self.IMAGE_EXTENSIONS:
+        # Images use KB threshold (configurable, e.g., 500 KB); RAW likewise.
+        if ext in self.IMAGE_EXTENSIONS or ext in self.RAW_EXTENSIONS:
             try:
                 return os.path.getsize(path) >= config.settings.min_image_size_kb * 1024
             except OSError:
