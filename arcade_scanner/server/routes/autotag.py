@@ -104,20 +104,20 @@ def handle_post(handler) -> bool:
 
         if action == "toggle":
             rule_id = str(body.get("id") or "")
-            outcome = {"rule": None}
+            toggle_outcome = {"rule": None}
 
             def flip(usr):
                 for r in usr.data.auto_tag_rules:
                     if r.get("id") == rule_id:
                         r["enabled"] = bool(body.get("enabled"))
-                        outcome["rule"] = r
+                        toggle_outcome["rule"] = r
                         break
 
             user_db.update_user(user_name, flip)
-            if outcome["rule"] is None:
+            if toggle_outcome["rule"] is None:
                 handler.send_error(404, "Rule not found")
                 return True
-            send_json(handler, {"success": True, "rule": outcome["rule"]})
+            send_json(handler, {"success": True, "rule": toggle_outcome["rule"]})
             return True
 
         handler.send_error(400, "Unknown action")
