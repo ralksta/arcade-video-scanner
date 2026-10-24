@@ -20,13 +20,17 @@ Zwei Folgen, und die zweite ist die unangenehme:
    alten, und nirgends steht, warum. (Bis Phase 1 traf es auch die
    Vault-Marke — dann war die neue Datei sofort versteckt.)
 
-Aufgeräumt wird jetzt bei **ausdrücklichen** Löschungen über die
-Duplikat-Routen. Bewusst **nicht** beim Aufräumen verwaister Einträge nach
-einem Scan: Der Code dort warnt selbst, dass diese Angaben „no rescan can
-restore" — ein Scan, der sich irrt (nicht eingehängtes Laufwerk, abgebrochene
-Suche), würde sie sonst mitnehmen. Die Schutzbedingungen dort sind gut, aber
-sie sind eine Vermutung über die Wirklichkeit; eine ausdrückliche Löschung ist
-keine.
+Aufgeräumt wird jetzt beim **endgültigen** Löschen: ausdrückliche Löschungen
+landen zuerst im Papierkorb, und erst wenn die Aufbewahrungsfrist abläuft oder
+der Nutzer den Korb leert, verschwinden Favoriten, Tags und die Buchführung
+des Auto-Taggers mit. Während der 30 Tage bleibt der Zustand erhalten — sonst
+käme eine zurückgeholte Datei ohne ihre Favoriten und Tags zurück.
+
+Bewusst **nicht** beim Aufräumen verwaister Einträge nach einem Scan: Der Code
+dort warnt selbst, dass diese Angaben „no rescan can restore" — ein Scan, der
+sich irrt (nicht eingehängtes Laufwerk, abgebrochene Suche), würde sie sonst
+mitnehmen. Die Schutzbedingungen dort sind gut, aber sie sind eine Vermutung
+über die Wirklichkeit; eine ausdrückliche Löschung ist keine.
 """
 import binascii
 import os
@@ -152,7 +156,13 @@ def test_several_paths_at_once(store):
 
 # --- Wo es aufgerufen wird, und wo bewusst nicht ---
 
-def test_both_deleting_routes_clean_up():
+def test_both_deleting_routes_keep_user_state_during_the_retention_period():
+    """Favoriten und Tags dürfen beim Verschieben in den Papierkorb noch weg.
+
+    Sonst käme eine zurückgeholte Datei ohne sie zurück — und genau das
+    Zurückholen ist der Zweck des Papierkorbs. Aufgeräumt wird erst beim
+    endgültigen Löschen (siehe Test unten).
+    """
     from pathlib import Path
 
     source = (
@@ -161,7 +171,9 @@ def test_both_deleting_routes_clean_up():
 
     for route in ("/api/duplicates/delete", "/api/bulk_delete"):
         block = source.split(f'if path == "{route}":', 1)[1].split("send_response(200)", 1)[0]
-        assert "_purge_user_state(deleted)" in block, f"{route} räumt nicht auf"
+        assert "move_to_trash(" in block, f"{route} legt nicht in den Papierkorb"
+        assert "purge_paths_from_user_data" not in block, f"{route} räumt zu früh auf"
+        assert "forget_auto_tag_paths" not in block, f"{route} räumt zu früh auf"
 
 
 def test_the_scan_orphan_cleanup_deliberately_does_not():
@@ -252,20 +264,29 @@ def test_forgetting_nothing_is_harmless(media):
     assert media.get_auto_tag_applied("ralf", "regel-1") == {"/media/a.mp4"}
 
 
-def test_the_delete_routes_do_both_steps():
+def test_permanent_purge_does_both_steps():
     """
     Die eine Hälfte ohne die andere ist schlechter als keine von beiden --
-    deshalb wird hier geprüft, dass beide Aufrufe beieinander stehen.
+    deshalb wird hier geprüft, dass beide Aufrufe beieinander stehen und der
+    endgültige Löschweg sie auch benutzt.
     """
     from pathlib import Path
 
-    source = (
-        Path(__file__).parent.parent / "arcade_scanner" / "server" / "routes" / "duplicates.py"
-    ).read_text(encoding="utf-8")
-    block = source.split("def _purge_user_state", 1)[1].split("\ndef ", 1)[0]
+    root = Path(__file__).parent.parent
+    trash_module = (root / "arcade_scanner" / "core" / "trash.py").read_text(encoding="utf-8")
+    block = trash_module.split("def forget_user_state", 1)[1].split("\ndef ", 1)[0]
 
     assert "purge_paths_from_user_data" in block
     assert "forget_auto_tag_paths" in block, (
         "Tags werden aufgeräumt, der Auto-Tag-Vermerk nicht — die Datei bliebe "
         "danach dauerhaft ungetaggt"
     )
+
+    # Und der Aufräum-Hook hängt wirklich am endgültigen Löschen, nicht am
+    # Verschieben in den Korb.
+    routes_trash = (
+        root / "arcade_scanner" / "server" / "routes" / "trash.py"
+    ).read_text(encoding="utf-8")
+    assert "on_purge=trash_core.forget_user_state" in routes_trash
+    main_py = (root / "arcade_scanner" / "main.py").read_text(encoding="utf-8")
+    assert "on_purge=forget_user_state" in main_py

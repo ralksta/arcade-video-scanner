@@ -1,6 +1,7 @@
 import json
 import os
 
+from arcade_scanner.core import trash as trash_core
 from arcade_scanner.server.response_helpers import send_json
 
 
@@ -16,29 +17,14 @@ def _get_deps():
     )
     return _dup_mgr, db, user_db, MAX_REQUEST_SIZE, background_duplicate_scan, clear_duplicate_cache, is_path_allowed
 
-def _purge_user_state(paths) -> None:
-    """Favoriten und Tags gelöschter Dateien mit entfernen.
+def _trash_roots(scope):
+    """Scan-Ziele, in denen der Papierkorb-Ordner angelegt werden darf.
 
-    `db.remove()` löscht nur die Zeile in `media`; der Nutzerzustand hängt am
-    Pfad und blieb liegen. Entsteht später dieselbe Pfadangabe erneut — beim
-    Optimieren wird aus `film.mkv` wieder `film.mp4` —, erbt die neue Datei
-    stillschweigend den alten Zustand, ohne erkennbaren Grund.
+    Für Admins ist `scope` None; dann zählen alle Ziele. Der Papierkorb liegt
+    im obersten passenden Ziel, damit das Verschieben ein Rename bleibt.
     """
-    _, db, user_db, _, _, _, _ = _get_deps()
-    try:
-        removed = user_db.purge_paths_from_user_data(paths)
-        # Muss mit: Der Auto-Tagger vergibt jeden Tag nur einmal je Pfad.
-        # Bliebe seine Buchführung stehen, während die Tags verschwinden,
-        # bekäme eine später unter demselben Pfad entstehende Datei nie wieder
-        # einen Tag.
-        forgotten = db.forget_auto_tag_paths(paths)
-        if removed or forgotten:
-            print(f"🧹 {removed} verwaiste Favoriten/Tags-Einträge entfernt, "
-                  f"{forgotten} Auto-Tag-Vermerke vergessen")
-    except Exception as e:
-        # Die Dateien sind zu diesem Zeitpunkt schon weg — ein Fehler beim
-        # Aufräumen darf die Antwort nicht in einen Fehler verwandeln.
-        print(f"⚠️ Nutzerzustand konnte nicht aufgeräumt werden: {e}")
+    from arcade_scanner.config import config
+    return config.active_scan_targets if scope is None else scope
 
 
 def _deletable_scope(user_name: str):
@@ -171,6 +157,7 @@ def handle_post(handler) -> bool:
                 return True
 
             scope = _deletable_scope(user_name)
+            roots = _trash_roots(scope)
 
             deleted = []
             failed = []
@@ -184,11 +171,19 @@ def handle_post(handler) -> bool:
                         continue
                     if os.path.exists(abs_path):
                         size_mb = os.path.getsize(abs_path) / (1024 * 1024)
-                        os.remove(abs_path)
+                        entry = db.get(abs_path)
+                        snapshot = entry.model_dump(by_alias=True) if entry else None
+                        trash_core.move_to_trash(
+                            abs_path,
+                            deleted_by=user_name,
+                            roots=roots,
+                            media_entry=snapshot,
+                            reason="duplicate",
+                        )
                         db.remove(abs_path)
                         deleted.append(abs_path)
                         total_freed_mb += size_mb
-                        print(f"🗑️ Deleted duplicate: {os.path.basename(abs_path)} ({size_mb:.1f} MB)")
+                        print(f"🗑️ In den Papierkorb: {os.path.basename(abs_path)} ({size_mb:.1f} MB)")
                     else:
                         failed.append({"path": p, "error": "File not found"})
                 except Exception as e:
@@ -196,7 +191,6 @@ def handle_post(handler) -> bool:
 
             if deleted:
                 db.save()
-                _purge_user_state(deleted)
 
             response = {
                 "success": True,
@@ -237,6 +231,7 @@ def handle_post(handler) -> bool:
                 return True
 
             scope = _deletable_scope(user_name)
+            roots = _trash_roots(scope)
 
             deleted = []
             failed = []
@@ -248,10 +243,18 @@ def handle_post(handler) -> bool:
                         failed.append({"path": p, "error": "Path not allowed"})
                         continue
                     if os.path.exists(abs_path):
-                        os.remove(abs_path)
+                        entry = db.get(abs_path)
+                        snapshot = entry.model_dump(by_alias=True) if entry else None
+                        trash_core.move_to_trash(
+                            abs_path,
+                            deleted_by=user_name,
+                            roots=roots,
+                            media_entry=snapshot,
+                            reason="bulk",
+                        )
                         db.remove(abs_path)
                         deleted.append(abs_path)
-                        print(f"🗑️ Bulk Deleted: {os.path.basename(abs_path)}")
+                        print(f"🗑️ In den Papierkorb: {os.path.basename(abs_path)}")
                     else:
                         db.remove(abs_path)
                         failed.append({"path": p, "error": "File not found"})
@@ -260,7 +263,6 @@ def handle_post(handler) -> bool:
 
             if deleted:
                 db.save()
-                _purge_user_state(deleted)
             response = {"success": True, "deleted": deleted, "failed": failed}
             handler.send_response(200)
             handler.send_header("Content-Type", "application/json")

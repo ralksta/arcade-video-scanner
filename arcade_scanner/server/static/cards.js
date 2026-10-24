@@ -120,7 +120,7 @@ async function triggerBatchDelete() {
     const selected = document.querySelectorAll('.video-card-container input[type="checkbox"]:checked');
     if (selected.length === 0) return;
 
-    if (!confirm(`Are you sure you want to PERMANENTLY delete these ${selected.length} files from disk? This cannot be undone.`)) {
+    if (!confirm(`Move these ${selected.length} file(s) to the trash? They can be restored in Settings → Storage for 30 days.`)) {
         return;
     }
 
@@ -136,7 +136,7 @@ async function triggerBatchDelete() {
         const result = await response.json();
 
         if (result.success) {
-            showToast(`Successfully deleted ${result.deleted.length} files`, 'success');
+            showToast(`${result.deleted.length} file(s) moved to the trash`, 'success');
 
             // Update local data
             window.ALL_VIDEOS = window.ALL_VIDEOS.filter(v => !result.deleted.includes(v.FilePath));

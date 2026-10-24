@@ -71,6 +71,7 @@ SCRIPT_MODULES = [
     "shortcuts.js",
     "empty_state.js",
     "export_view.js",
+    "trash_ui.js",
     "a11y.js",
 ]
 

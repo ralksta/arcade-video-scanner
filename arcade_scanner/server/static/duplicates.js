@@ -366,7 +366,7 @@ async function deleteDuplicate(groupIdx, fileIdx) {
     const path = file.path;
     const filename = path.split(/[\\/]/).pop();
 
-    if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) {
+    if (!confirm(`Move "${filename}" to the trash?\n\nRestorable in Settings → Storage for 30 days.`)) {
         return;
     }
 
@@ -517,11 +517,11 @@ async function deleteAllDuplicates() {
 
     // Confirmation dialog with details
     const confirmation = confirm(
-        `DELETE ALL DUPLICATES\n\n` +
-        `This will permanently delete ${filesToDelete.length} file(s) across ${duplicateData.groups.length} groups.\n\n` +
-        `Space to be freed: ${totalSavingsMb.toFixed(1)} MB\n\n` +
+        `MOVE ALL DUPLICATES TO TRASH\n\n` +
+        `This will move ${filesToDelete.length} file(s) across ${duplicateData.groups.length} groups to the trash.\n\n` +
+        `Space freed after emptying the trash: ${totalSavingsMb.toFixed(1)} MB\n\n` +
         `The best quality file in each group will be kept.\n\n` +
-        `This action CANNOT be undone. Continue?`
+        `Restorable in Settings → Storage for 30 days. Continue?`
     );
 
     if (!confirmation) {
@@ -549,12 +549,12 @@ async function deleteAllDuplicates() {
             // Handle any failed deletions
             if (result.failed && result.failed.length > 0) {
                 showToast(
-                    `${result.deleted.length} Dateien gelöscht (${result.freed_mb.toFixed(1)} MB frei) — `
-                    + `${result.failed.length} konnten nicht gelöscht werden`,
+                    `${result.deleted.length} Dateien in den Papierkorb (${result.freed_mb.toFixed(1)} MB) — `
+                    + `${result.failed.length} konnten nicht verschoben werden`,
                     'warning', 6000
                 );
             } else {
-                showToast(`${result.deleted.length} Dateien gelöscht, ${result.freed_mb.toFixed(1)} MB frei`, 'success');
+                showToast(`${result.deleted.length} Dateien in den Papierkorb (${result.freed_mb.toFixed(1)} MB). Wiederherstellen unter Einstellungen → Storage.`, 'success');
             }
 
             // Refresh the view
@@ -877,7 +877,7 @@ async function keepDuplicateFile(side) {
     }
 
     const fileNames = filesToDelete.map(f => f.path.split(/[\\/]/).pop()).join(', ');
-    if (!confirm(`Delete ${filesToDelete.length} file(s)?\n\n${fileNames}\n\nThis cannot be undone.`)) {
+    if (!confirm(`Move ${filesToDelete.length} file(s) to the trash?\n\n${fileNames}\n\nRestorable in Settings → Storage for 30 days.`)) {
         return;
     }
 

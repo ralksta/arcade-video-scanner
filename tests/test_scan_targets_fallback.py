@@ -159,3 +159,10 @@ def test_exclusions_of_all_users_apply_to_everyone(user_db):
 
 def test_the_default_exclusions_are_always_included(user_db):
     assert set(config.default_exclusions) <= set(config.active_exclude_paths)
+
+
+def test_the_trash_directory_is_always_excluded(user_db):
+    """Der Papierkorb liegt im Scan-Baum, damit Verschieben ein Rename bleibt."""
+    from arcade_scanner.config import TRASH_DIRNAME
+
+    assert TRASH_DIRNAME in config.active_exclude_paths

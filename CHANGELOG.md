@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Papierkorb.** Ausdrückliche Löschungen aus Duplikaten und der
+  Mehrfachauswahl sind nicht mehr endgültig. Die Datei wandert in einen
+  versteckten Ordner `.arcade-trash` im obersten passenden Scan-Ziel (gleiche
+  Platte, also Verschieben statt Kopieren) und bleibt **30 Tage**
+  wiederherstellbar. Zurückholen und endgültig Leeren stehen in den
+  Einstellungen unter *Storage*. Favoriten, Tags und Wiedergabefortschritt
+  bleiben während der Frist erhalten; abgelaufene Einträge räumt der Server
+  beim Start und beim Öffnen des Papierkorbs auf. Der Ordner wird vom Scan
+  automatisch ausgeschlossen.
+
 ### Changed
 - **Schau-Modus statt Werkstatt.** Karten in Bibliothek und Favoriten zeigen
   nur noch Bild, Titel, Laufzeit und Fortschritt. Status, Codec, Größe,

@@ -47,6 +47,12 @@ REPORT_FILE = os.path.join(HIDDEN_DATA_DIR, "index.html")
 SETTINGS_FILE = os.path.join(HIDDEN_DATA_DIR, "settings.json")
 DUPLICATES_CACHE_FILE = os.path.join(HIDDEN_DATA_DIR, "duplicates_cache.json")
 REVIEW_DIR = os.path.join(HIDDEN_DATA_DIR, "review")
+
+# Papierkorb: Gelöschte Dateien liegen unterhalb des jeweiligen Scan-Ziels in
+# einem Ordner dieses Namens (gleiche Platte, Verschieben = Rename). Siehe
+# core/trash.py. Der Name wird vom Scanner ausgeschlossen.
+TRASH_DIRNAME = ".arcade-trash"
+TRASH_RETENTION_DAYS = 30
 STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # Security Constants
@@ -414,6 +420,11 @@ class ConfigManager:
         Returns unique exclude paths from ALL users + defaults.
         """
         excludes = set(self.default_exclusions) # Start with defaults!
+
+        # Der Papierkorb liegt absichtlich im Scan-Baum (um ein Rename statt
+        # einer Kopie zu bekommen) und muss darum wieder herausfallen. Als
+        # nackter Name, nicht als Pfad: Es gibt einen pro Scan-Ziel.
+        excludes.add(TRASH_DIRNAME)
 
         # The proxy tree mirrors originals that are already in the library.
         # Excluding it here (instead of relying on the user to configure it)

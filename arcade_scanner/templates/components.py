@@ -2005,6 +2005,32 @@ SETTINGS_MODAL_COMPONENT = """
                             </div>
                             <p class="text-[12px] text-text-muted" id="statEmbeddingHint">Wird geladen …</p>
                         </div>
+
+                        <!-- PAPIERKORB -->
+                        <div>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">restore_from_trash</span>
+                                Papierkorb
+                            </h3>
+                            <p class="text-[12px] text-text-muted mt-1">
+                                Gelöschte Dateien bleiben 30 Tage hier und lassen sich zurückholen.
+                            </p>
+                        </div>
+
+                        <div class="bg-surface p-4 rounded-xl border border-ink/5 space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="text-text-main font-medium text-sm" id="trashSummary">Papierkorb wird geladen …</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">Danach werden sie endgültig gelöscht.</div>
+                                </div>
+                                <button type="button" onclick="window.emptyTrash()"
+                                        class="shrink-0 px-3 py-2 rounded-lg text-xs font-medium border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors">
+                                    Leeren
+                                </button>
+                            </div>
+                            <p class="text-[12px] text-text-muted hidden" id="trashEmptyHint">Der Papierkorb ist leer.</p>
+                            <ul id="trashList" class="divide-y divide-ink/5 max-h-72 overflow-y-auto"></ul>
+                        </div>
                     </section>
                     </section>
                 </div>
