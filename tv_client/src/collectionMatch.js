@@ -59,6 +59,128 @@ function matchesDateFilter (video, dateFilter, nowSeconds) {
 	return true;
 }
 
+// Suchsprache — dieselbe Regel wie static/search_query.js und
+// core/criteria_eval.py: Begriffe sind UND-verknüpft, -Wort schließt aus,
+// Pfade (mit / oder \) gelten auf Ordnergrenze, Umlaute werden gefaltet.
+function foldSearchText (value) {
+	return String(value == null ? '' : value)
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[̀-ͯ]/g, '')
+		.replace(/ß/g, 'ss');
+}
+
+function parseSearchQuery (text) {
+	const raw = String(text == null ? '' : text);
+	const terms = [];
+	let i = 0;
+
+	while (i < raw.length) {
+		while (i < raw.length && /\s/.test(raw[i])) i++;
+		if (i >= raw.length) break;
+
+		let negated = false;
+		if (raw[i] === '-') {
+			negated = true;
+			i++;
+		}
+
+		let value = '';
+		if (raw[i] === '"') {
+			i++;
+			while (i < raw.length) {
+				const ch = raw[i];
+				if (ch === '\\' && (raw[i + 1] === '"' || raw[i + 1] === '\\')) {
+					value += raw[i + 1];
+					i += 2;
+					continue;
+				}
+				if (ch === '"') {
+					i++;
+					break;
+				}
+				value += ch;
+				i++;
+			}
+		} else {
+			const start = i;
+			while (i < raw.length && !/\s/.test(raw[i])) i++;
+			value = raw.slice(start, i);
+		}
+
+		if (!value) continue;
+
+		// "#tag" — ein einzelnes "#" bleibt ein normaler Suchbegriff.
+		let isTag = value.charAt(0) === '#';
+		let searchValue = isTag ? value.slice(1) : value;
+		if (isTag && !searchValue) {
+			isTag = false;
+			searchValue = value;
+		}
+
+		terms.push({
+			value: searchValue,
+			folded: foldSearchText(searchValue),
+			negated: negated,
+			isTag: isTag,
+			isPath: !isTag && (searchValue.indexOf('/') !== -1 || searchValue.indexOf('\\') !== -1)
+		});
+	}
+
+	return {raw: raw, terms: terms, noTerms: terms.length === 0};
+}
+
+function foldedPathMatches (foldedFile, foldedPrefix) {
+	const file = foldedFile.replace(/\\/g, '/');
+	let prefix = foldedPrefix.replace(/\\/g, '/');
+	while (prefix.length > 1 && prefix.endsWith('/')) prefix = prefix.slice(0, -1);
+	if (!prefix || prefix === '/') return true;
+
+	let from = 0;
+	while (from <= file.length) {
+		const idx = file.indexOf(prefix, from);
+		if (idx === -1) return false;
+		const beforeOk = idx === 0 || file[idx - 1] === '/';
+		const after = idx + prefix.length;
+		const afterOk = after === file.length || file[after] === '/';
+		if (beforeOk && afterOk) return true;
+		from = idx + 1;
+	}
+	return false;
+}
+
+function searchMatches (filePath, text, tags) {
+	const parsed = parseSearchQuery(text);
+	const foldedPath = foldSearchText(filePath);
+	const foldedName = foldSearchText(filePath.replace(/\\/g, '/').split('/').pop() || '');
+	const foldedTags = (Array.isArray(tags) ? tags : []).map(foldSearchText);
+
+	if (parsed.noTerms) {
+		if (!parsed.raw) return true;
+		const literal = foldSearchText(parsed.raw);
+		return foldedPath.indexOf(literal) !== -1 || foldedName.indexOf(literal) !== -1;
+	}
+
+	for (let i = 0; i < parsed.terms.length; i++) {
+		const term = parsed.terms[i];
+		let hit;
+		if (term.isTag) {
+			hit = foldedTags.indexOf(term.folded) !== -1;
+		} else if (term.isPath) {
+			hit = foldedPathMatches(foldedPath, term.folded);
+		} else {
+			hit = foldedName.indexOf(term.folded) !== -1 || foldedPath.indexOf(term.folded) !== -1;
+		}
+
+		if (term.negated) {
+			if (hit) return false;
+		} else if (!hit) {
+			return false;
+		}
+	}
+	return true;
+}
+
 /**
  * Passt `video` (Eintrag aus /api/videos, mit favorite/tags aus den
  * Nutzerdaten) auf die Kriterien einer Smart Collection?
@@ -150,12 +272,7 @@ function matchesCollectionCriteria (video, criteria) {
 	}
 
 	// --- Suche ---
-	if (criteria.search) {
-		const q = criteria.search.toLowerCase();
-		const path = video.FilePath || '';
-		const filename = (path.split(/[\\/]/).pop() || '').toLowerCase();
-		if (!filename.includes(q) && !path.toLowerCase().includes(q)) return false;
-	}
+	if (criteria.search && !searchMatches(video.FilePath || '', criteria.search, videoTags)) return false;
 
 	return true;
 }

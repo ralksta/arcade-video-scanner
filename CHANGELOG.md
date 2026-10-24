@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Suchbegriffe mit mehr Funktionen.** Die Suchfelder in der Filterleiste
+  und im Collection-Dialog schlagen beim Tippen bekannte Ordner vor —
+  inklusive Elternpfaden wie `/media_ralf/OD`, mit Anzahl der Dateien im
+  Unterbaum. Mit `#` werden Tags vorgeschlagen; der Verlauf zeigt die zuletzt
+  benutzten Ordner und Begriffe (pro Konto gespeichert). Im Collection-Dialog
+  werden gewählte Ordner und Tags als Chips unter dem Feld angezeigt: Klick
+  schaltet zwischen ein- und ausschließen um, das X entfernt den Filter.
+  Gespeichert wird weiterhin ein einziger Suchtext.
+- Die Suche versteht mehrere Begriffe (alle müssen passen), Ausschlüsse
+  (`-wort`), Anführungszeichen für Phrasen und `#tag` für Tags. Pfade mit `/`
+  gelten auf Ordnergrenze: `/media_ralf/OD` trifft nicht mehr
+  `/media_ralf/ODX`. Groß-/Kleinschreibung, Umlaute und ß sind egal. Dieselbe
+  Regel gilt in Filterleiste, Treemap, Auto-Tag-Regeln und auf dem Fernseher;
+  Collections mit gespeichertem Suchbegriff verhalten sich überall gleich.
 - **Papierkorb.** Ausdrückliche Löschungen aus Duplikaten und der
   Mehrfachauswahl sind nicht mehr endgültig. Die Datei wandert in einen
   versteckten Ordner `.arcade-trash` im obersten passenden Scan-Ziel (gleiche

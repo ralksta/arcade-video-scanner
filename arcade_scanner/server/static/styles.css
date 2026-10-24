@@ -3322,3 +3322,148 @@ body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="dupl
     height: 100%;
     background: var(--ds-accent);
 }
+
+/* === SUCHVORSCHLÄGE (Collection-Dialog) ===
+   Die Liste hängt direkt unter dem Suchfeld und zeigt Ordnername, vollen
+   Pfad und die Anzahl der Dateien im Unterbaum. `.hidden` (Tailwind) bleibt
+   die einzige Sichtbarkeitsregel — hier steht bewusst kein `display`, damit
+   die Reihenfolge der Stylesheets keine Rolle spielt. */
+.search-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 60;
+    max-height: 16rem;
+    overflow-y: auto;
+    border: 1px solid var(--ds-hairline);
+    border-radius: 8px;
+    background: var(--ds-bg);
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
+}
+
+/* Nahe am unteren Fensterrand nach oben aufklappen. */
+.search-suggestions.drop-up {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
+.search-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    cursor: pointer;
+    color: var(--ds-text);
+}
+
+.search-suggestion + .search-suggestion {
+    border-top: 1px solid var(--ds-hairline);
+}
+
+.search-suggestion:hover,
+.search-suggestion.active {
+    background: var(--ds-fill);
+}
+
+.search-suggestion-icon {
+    font-size: 18px;
+    color: var(--ds-text-muted);
+    flex: 0 0 auto;
+}
+
+.search-suggestion-text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.search-suggestion-label,
+.search-suggestion-path {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search-suggestion-label {
+    font-size: 13px;
+    line-height: 17px;
+}
+
+.search-suggestion-path {
+    font-family: var(--ds-font-mono);
+    font-size: 10px;
+    line-height: 14px;
+    color: var(--ds-text-muted);
+}
+
+.search-suggestion-count {
+    flex: 0 0 auto;
+    font-family: var(--ds-font-mono);
+    font-size: 10px;
+    color: var(--ds-text-muted);
+}
+
+/* Gewählte Ordner/Tags unter dem Collection-Suchfeld. Klick auf den Chip
+   schaltet zwischen ein- und ausschließen um; das X entfernt ihn. */
+.search-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.search-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 3px 2px 8px;
+    border: 1px solid var(--ds-hairline);
+    border-radius: 999px;
+    background: var(--ds-fill-soft);
+    color: var(--ds-text);
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.search-chip.negated {
+    border-color: rgb(var(--ds-danger-rgb) / 0.5);
+    color: var(--ds-danger);
+}
+
+.search-chip.negated .search-chip-label {
+    text-decoration: line-through;
+}
+
+.search-chip-label,
+.search-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.search-chip-icon {
+    font-size: 14px;
+}
+
+.search-chip-remove {
+    padding: 0 2px;
+    opacity: 0.6;
+}
+
+.search-chip-remove:hover {
+    opacity: 1;
+}
+
+.search-chip-remove .material-icons {
+    font-size: 14px;
+}
+
+.search-suggestion-clear {
+    color: var(--ds-text-muted);
+}

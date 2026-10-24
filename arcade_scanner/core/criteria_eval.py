@@ -9,6 +9,7 @@ behaviour here, change collections.js identically or that test fails.
 from __future__ import annotations
 
 import time
+import unicodedata
 from typing import Any, Optional
 
 _RELATIVE_SECONDS = {
@@ -26,6 +27,127 @@ def _num(video: dict, *keys: str) -> float:
         if val:
             return float(val)
     return 0.0
+
+
+def _fold_search_text(value: Any) -> str:
+    """Kleinschreibung + Umlaute/ß — wie foldSearchText() in search_query.js."""
+    text = unicodedata.normalize("NFD", str(value or "").lower())
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return text.replace("ß", "ss")
+
+
+def _parse_search_query(text: Any) -> tuple[list[tuple[str, bool, bool, bool]], bool]:
+    """Zerlegt den Suchtext in (Wert, ausgeschlossen, ist_pfad, ist_tag)."""
+    raw = str(text or "")
+    terms: list[tuple[str, bool, bool, bool]] = []
+    i = 0
+    n = len(raw)
+
+    while i < n:
+        while i < n and raw[i].isspace():
+            i += 1
+        if i >= n:
+            break
+
+        negated = False
+        if raw[i] == "-":
+            negated = True
+            i += 1
+
+        value_chars: list[str] = []
+        if i < n and raw[i] == '"':
+            i += 1
+            while i < n:
+                ch = raw[i]
+                if ch == "\\" and i + 1 < n and raw[i + 1] in ('"', "\\"):
+                    value_chars.append(raw[i + 1])
+                    i += 2
+                    continue
+                if ch == '"':
+                    i += 1
+                    break
+                value_chars.append(ch)
+                i += 1
+        else:
+            start = i
+            while i < n and not raw[i].isspace():
+                i += 1
+            value_chars.append(raw[start:i])
+
+        value = "".join(value_chars)
+        if not value:
+            continue
+
+        # "#tag" — ein einzelnes "#" bleibt ein normaler Suchbegriff.
+        is_tag = value.startswith("#")
+        search_value = value[1:] if is_tag else value
+        if is_tag and not search_value:
+            is_tag = False
+            search_value = value
+
+        terms.append((
+            search_value,
+            negated,
+            (not is_tag) and ("/" in search_value or "\\" in search_value),
+            is_tag,
+        ))
+
+    return terms, len(terms) == 0
+
+
+def _folded_path_matches(folded_file: str, folded_prefix: str) -> bool:
+    """Präfix-Vergleich auf Ordnergrenzen (wie foldedPathMatches in JS)."""
+    file = folded_file.replace("\\", "/")
+    prefix = folded_prefix.replace("\\", "/")
+    while len(prefix) > 1 and prefix.endswith("/"):
+        prefix = prefix[:-1]
+    if not prefix or prefix == "/":
+        return True
+
+    start = 0
+    while start <= len(file):
+        idx = file.find(prefix, start)
+        if idx == -1:
+            return False
+        before_ok = idx == 0 or file[idx - 1] == "/"
+        after = idx + len(prefix)
+        after_ok = after == len(file) or file[after] == "/"
+        if before_ok and after_ok:
+            return True
+        start = idx + 1
+    return False
+
+
+def _search_matches(file_path: str, search: Any, tags: Optional[list] = None) -> bool:
+    """Dieselbe Suchsprache wie static/search_query.js."""
+    terms, no_terms = _parse_search_query(search)
+    folded_path = _fold_search_text(file_path)
+    folded_name = _fold_search_text(file_path.replace("\\", "/").rsplit("/", 1)[-1])
+    folded_tags = {_fold_search_text(tag) for tag in (tags or [])}
+
+    if no_terms:
+        raw = str(search or "")
+        if not raw:
+            return True
+        # Nur Leerraum/„-": alte Teilstring-Regel (siehe search_query.js).
+        literal = _fold_search_text(raw)
+        return literal in folded_path or literal in folded_name
+
+    for value, negated, is_path, is_tag in terms:
+        folded = _fold_search_text(value)
+        if is_tag:
+            hit = folded in folded_tags
+        elif is_path:
+            hit = _folded_path_matches(folded_path, folded)
+        else:
+            hit = folded in folded_name or folded in folded_path
+
+        if negated:
+            if hit:
+                return False
+        elif not hit:
+            return False
+    return True
 
 
 def resolution_category(video: dict) -> str:
@@ -243,10 +365,7 @@ def video_matches(video: dict, criteria: Optional[dict], now: Optional[int] = No
             return False
 
     search = criteria.get("search")
-    if search:
-        search_lower = str(search).lower()
-        filename = file_path.replace("\\", "/").rsplit("/", 1)[-1].lower()
-        if search_lower not in filename and search_lower not in file_path.lower():
-            return False
+    if search and not _search_matches(file_path, search, video_tags):
+        return False
 
     return True

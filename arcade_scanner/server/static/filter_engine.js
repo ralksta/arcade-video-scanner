@@ -136,6 +136,13 @@ function filterAndSort(scrollToTop = false) {
             return;
         }
 
+        // Einmal parsen, dann für jedes Video nur noch vergleichen.
+        // (Die alte Regel war ein Teilstring-Vergleich; search_query.js
+        // versteht zusätzlich mehrere Begriffe, Ausschlüsse und Pfade.)
+        const matchesSearch = (typeof window.createSearchMatcher === 'function')
+            ? window.createSearchMatcher(searchTerm)
+            : null;
+
         let vCount = 0; let tSize = 0;
 
         const stats = {
@@ -234,11 +241,16 @@ function filterAndSort(scrollToTop = false) {
                     }
                 }
 
-                // Search filter (O(1) search on filename first)
+                // Search filter
                 if (searchTerm) {
-                    const searchLower = searchTerm.toLowerCase();
-                    if (!name.includes(searchLower) && !v.FilePath.toLowerCase().includes(searchLower)) {
-                        return false;
+                    if (matchesSearch) {
+                        if (!matchesSearch(v)) return false;
+                    } else {
+                        // Fallback, falls search_query.js nicht geladen wurde.
+                        const searchLower = searchTerm.toLowerCase();
+                        if (!name.includes(searchLower) && !v.FilePath.toLowerCase().includes(searchLower)) {
+                            return false;
+                        }
                     }
                 }
 

@@ -1220,9 +1220,18 @@ COLLECTION_MODAL_COMPONENT = """
                             <!-- Search Term -->
                             <div>
                                 <label for="collectionSearch" class="text-xs text-gray-400 mb-1.5 block">Search Term</label>
-                                <input type="text" id="collectionSearch" placeholder="Filter by filename..."
-                                       class="w-full bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                                       oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');">
+                                <div class="relative">
+                                    <input type="text" id="collectionSearch" placeholder="Dateiname oder Ordner, z. B. /media_ralf/OD"
+                                           class="w-full bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                           oninput="onCollectionSearchInput()">
+                                    <div id="collectionSearchSuggestions" class="search-suggestions hidden" role="listbox"
+                                         aria-label="Suchvorschläge"></div>
+                                </div>
+                                <div id="collectionSearchChips" class="search-chips hidden" aria-label="Gewählte Filter"></div>
+                                <p class="mt-1.5 text-[10px] leading-relaxed text-gray-500">
+                                    Mehrere Begriffe müssen alle passen · <code>-Wort</code> schließt aus ·
+                                    <code>#tag</code> sucht Tags · Ordnerpfade gelten für den ganzen Unterbaum
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -2230,6 +2239,8 @@ FILTER_BAR_COMPONENT = """
         <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]" aria-hidden="true">search</span>
         <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Suchen …" aria-label="Bibliothek durchsuchen"
                class="w-full bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] rounded-ds-sm pl-10 pr-4 py-2 text-[13px] text-text-main placeholder-text-muted focus:outline-none focus:border-accent transition-colors">
+        <div id="mobileSearchSuggestions" class="search-suggestions hidden" role="listbox"
+             aria-label="Suchvorschläge"></div>
     </div>
 
     <!-- Filter Controls -->

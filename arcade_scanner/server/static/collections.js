@@ -33,11 +33,14 @@ function openCollectionModal(editId = null) {
 
     try {
         editingCollectionId = editId;
+        ensureCollectionSearchSuggestions();
 
         // Reset form — null-safe with optional chaining
         const _el = (id) => document.getElementById(id);
         if (_el('collectionName')) _el('collectionName').value = '';
         if (_el('collectionSearch')) _el('collectionSearch').value = '';
+        collectionSearchChips = [];
+        renderCollectionSearchChips();
         if (_el('collectionDateFilter')) _el('collectionDateFilter').value = 'all';
         if (_el('collectionMinSize')) _el('collectionMinSize').value = '';
         if (_el('collectionMaxSize')) _el('collectionMaxSize').value = '';
@@ -311,7 +314,7 @@ function saveCollection() {
 
     const icon = _el('selectedCollectionIcon')?.innerText || 'folder_special';
     const color = _el('collectionColor')?.value || '#64FFDA';
-    const search = (_el('collectionSearch')?.value || '').trim();
+    const search = getCollectionSearchText();
 
     const dateVal = _el('collectionDateFilter')?.value || 'all';
     const sizeMin = _el('collectionMinSize')?.value || '';
@@ -512,6 +515,22 @@ function matchesDateFilter(video, dateFilter) {
  * @param {Object} criteria - Collection criteria
  * @returns {boolean} Whether video matches all criteria
  */
+/**
+ * Suchbegriff einer Collection auswerten — dieselbe Regel wie die Filterleiste.
+ *
+ * Die Fallback-Zeile hält den Dialog funktionsfähig, falls search_query.js
+ * einmal nicht geladen wurde (ältere Harnesses, halb ausgeliefertes Update).
+ */
+function collectionSearchMatches(video, text) {
+    if (typeof window.matchesSearchQuery === 'function') {
+        return window.matchesSearchQuery(video, text);
+    }
+    const q = String(text || '').toLowerCase();
+    const path = String(video.FilePath || '');
+    const name = (path.split(/[\\/]/).pop() || '').toLowerCase();
+    return name.includes(q) || path.toLowerCase().includes(q);
+}
+
 function evaluateCollectionMatch(video, criteria) {
     if (!criteria) return true;
 
@@ -614,12 +633,8 @@ function evaluateCollectionMatch(video, criteria) {
     }
 
     // --- SEARCH ---
-    if (criteria.search) {
-        const searchLower = criteria.search.toLowerCase();
-        const filename = video.FilePath?.split(/[\\/]/).pop()?.toLowerCase() || '';
-        if (!filename.includes(searchLower) && !video.FilePath?.toLowerCase()?.includes(searchLower)) {
-            return false;
-        }
+    if (criteria.search && !collectionSearchMatches(video, criteria.search)) {
+        return false;
     }
 
     return true;
@@ -786,8 +801,8 @@ function updateCollectionPreviewCount() {
 
     const tempCriteria = JSON.parse(JSON.stringify(collectionCriteriaNew));
 
-    const searchInput = document.getElementById('collectionSearch');
-    if (searchInput) tempCriteria.search = searchInput.value.trim();
+    // Chips + freier Text ergeben zusammen den gespeicherten Suchbegriff.
+    tempCriteria.search = getCollectionSearchText();
 
     const dateInput = document.getElementById('collectionDateFilter');
     if (dateInput) {
@@ -887,8 +902,9 @@ function syncSmartCollectionUI() {
         btn.classList.toggle('active', btnValue === collectionCriteriaNew.favorites);
     });
 
-    const searchInput = document.getElementById('collectionSearch');
-    if (searchInput) searchInput.value = collectionCriteriaNew.search || '';
+    // Ordner und Tags werden als Chips dargestellt, freie Begriffe bleiben
+    // im Feld. Gespeichert wird weiterhin ein einziger Suchtext.
+    setCollectionSearchFromText(collectionCriteriaNew.search || '');
 
     document.querySelectorAll('.filter-chip').forEach(chip => {
         chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
@@ -917,7 +933,6 @@ function getCollectionCount(collection) {
 
     // Legacy compatibility
     return window.ALL_VIDEOS.filter(v => {
-        const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
         const status = v.Status;
         const codec = v.codec || 'unknown';
         const videoTags = v.tags || [];
@@ -939,11 +954,8 @@ function getCollectionCount(collection) {
             if (!hasMatchingTag) return false;
         }
 
-        if (collection.criteria.search) {
-            const searchLower = collection.criteria.search.toLowerCase();
-            if (!name.includes(searchLower) && !v.FilePath.toLowerCase().includes(searchLower)) {
-                return false;
-            }
+        if (collection.criteria.search && !collectionSearchMatches(v, collection.criteria.search)) {
+            return false;
         }
 
         return true;
@@ -1135,7 +1147,195 @@ function applyCollection(collectionId) {
     showToast(`Applied collection: ${collection.name}`, 'info');
 }
 
+// --- SUCHCHIPS IM COLLECTION-DIALOG ---
+//
+// Ordner und Tags werden als Chips dargestellt statt als langer Text im Feld.
+// Der Feldinhalt bleibt für freie Begriffe; gespeichert wird weiterhin ein
+// einziger Suchtext (criteria.search) — Chips werden dafür zusammengesetzt
+// und beim Bearbeiten wieder zerlegt. Damit bleiben alte Collections sowie
+// die Auswertung auf Server und Fernseher unverändert.
+
+let collectionSearchChips = [];
+
+function collectionChipToken(chip) {
+    const quote = chip.type === 'tag'
+        ? (window.quoteTagTerm || function (value) { return '#' + value; })
+        : (window.quoteSearchTerm || function (value) { return value; });
+    return (chip.negated ? '-' : '') + quote(chip.value);
+}
+
+/** Gespeicherter Suchtext = Chips + freie Begriffe im Feld. */
+function getCollectionSearchText() {
+    const input = document.getElementById('collectionSearch');
+    const free = input ? input.value.trim() : '';
+    const tokens = collectionSearchChips.map(collectionChipToken);
+    if (free) tokens.push(free);
+    return tokens.join(' ');
+}
+
+/**
+ * Zerlegt einen gespeicherten Suchtext wieder in Chips und freien Text.
+ * Wird beim Öffnen einer bestehenden Collection aufgerufen.
+ */
+function setCollectionSearchFromText(text) {
+    collectionSearchChips = [];
+    const free = [];
+
+    if (typeof window.parseSearchQuery === 'function') {
+        window.parseSearchQuery(text || '').terms.forEach((term) => {
+            if (term.isPath) {
+                collectionSearchChips.push({type: 'folder', value: term.value, negated: term.negated});
+            } else if (term.isTag) {
+                collectionSearchChips.push({type: 'tag', value: term.value, negated: term.negated});
+            } else {
+                const quote = window.quoteSearchTerm || function (value) { return value; };
+                free.push((term.negated ? '-' : '') + quote(term.value));
+            }
+        });
+    } else {
+        free.push(String(text || '').trim());
+    }
+
+    const input = document.getElementById('collectionSearch');
+    if (input) input.value = free.filter(Boolean).join(' ');
+    renderCollectionSearchChips();
+}
+
+function renderCollectionSearchChips() {
+    const box = document.getElementById('collectionSearchChips');
+    if (!box) return;
+
+    box.textContent = '';
+    if (!collectionSearchChips.length) {
+        box.classList.add('hidden');
+        return;
+    }
+    box.classList.remove('hidden');
+
+    collectionSearchChips.forEach((chip, index) => {
+        const wrap = document.createElement('span');
+        wrap.className = 'search-chip' + (chip.negated ? ' negated' : '');
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'search-chip-label';
+        toggle.title = chip.negated
+            ? 'Einschließen statt ausschließen'
+            : 'Ausschließen statt einschließen';
+        toggle.setAttribute('aria-pressed', chip.negated ? 'true' : 'false');
+
+        const icon = document.createElement('span');
+        icon.className = 'material-icons search-chip-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = chip.type === 'tag' ? 'label' : 'folder';
+
+        const label = document.createElement('span');
+        const segments = String(chip.value).split(/[\\/]/).filter(Boolean);
+        label.textContent = chip.type === 'tag'
+            ? '#' + chip.value
+            : (segments.length ? segments[segments.length - 1] : chip.value);
+
+        toggle.appendChild(icon);
+        toggle.appendChild(label);
+        toggle.addEventListener('click', () => {
+            collectionSearchChips[index].negated = !collectionSearchChips[index].negated;
+            renderCollectionSearchChips();
+            updateCollectionPreviewCount();
+        });
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'search-chip-remove';
+        remove.setAttribute('aria-label', 'Filter entfernen');
+
+        const close = document.createElement('span');
+        close.className = 'material-icons';
+        close.setAttribute('aria-hidden', 'true');
+        close.textContent = 'close';
+
+        remove.appendChild(close);
+        remove.addEventListener('click', () => {
+            collectionSearchChips.splice(index, 1);
+            renderCollectionSearchChips();
+            updateCollectionPreviewCount();
+            updateFilterSectionBadge('metadata');
+        });
+
+        wrap.appendChild(toggle);
+        wrap.appendChild(remove);
+        box.appendChild(wrap);
+    });
+}
+
+function addCollectionSearchChip(type, value, negated) {
+    const exists = collectionSearchChips.some((chip) => chip.type === type && chip.value === value);
+    if (exists) return false;
+    collectionSearchChips.push({type: type, value: value, negated: !!negated});
+    renderCollectionSearchChips();
+    return true;
+}
+
+/**
+ * Auswahl aus der Vorschlagsliste: Ordner/Tags werden Chips, ein
+ * Verlaufseintrag wird wieder in Chips und freien Text zerlegt.
+ */
+function handleCollectionSearchSuggestion(item, token) {
+    if (!item) return false;
+
+    if (item.type === 'history') {
+        setCollectionSearchFromText(item.value);
+        updateCollectionPreviewCount();
+        updateFilterSectionBadge('metadata');
+        return true;
+    }
+
+    if (item.type !== 'folder' && item.type !== 'tag') return false;
+
+    const input = document.getElementById('collectionSearch');
+    addCollectionSearchChip(item.type, item.value, token.negated);
+    if (input) {
+        // Der getippte Begriff (z. B. „/med" oder „#ur") verschwindet; der
+        // Chip steht dafür unter dem Feld.
+        input.value = input.value.slice(0, token.start) + input.value.slice(token.end);
+        const pos = Math.min(token.start, input.value.length);
+        input.focus();
+        if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+    }
+    updateCollectionPreviewCount();
+    updateFilterSectionBadge('metadata');
+    return true;
+}
+
+function onCollectionSearchInput() {
+    updateCollectionPreviewCount();
+    updateFilterSectionBadge('metadata');
+}
+
+function ensureCollectionSearchSuggestions() {
+    if (typeof window.bindSearchSuggestions !== 'function') return;
+    window.bindSearchSuggestions({
+        inputId: 'collectionSearch',
+        boxId: 'collectionSearchSuggestions',
+        onSelect: handleCollectionSearchSuggestion,
+        afterChange: onCollectionSearchInput
+    });
+}
+
 // --- EXPORTS ---
+window.ensureCollectionSearchSuggestions = ensureCollectionSearchSuggestions;
+window.onCollectionSearchInput = onCollectionSearchInput;
+window.handleCollectionSearchSuggestion = handleCollectionSearchSuggestion;
+window.setCollectionSearchFromText = setCollectionSearchFromText;
+window.getCollectionSearchText = getCollectionSearchText;
+window.getCollectionSearchChips = function () {
+    return collectionSearchChips.map((chip) => ({
+        type: chip.type,
+        value: chip.value,
+        negated: chip.negated
+    }));
+};
+window.addCollectionSearchChip = addCollectionSearchChip;
+window.renderCollectionSearchChips = renderCollectionSearchChips;
 window.openCollectionModal = openCollectionModal;
 window.closeCollectionModal = closeCollectionModal;
 window.saveCollection = saveCollection;

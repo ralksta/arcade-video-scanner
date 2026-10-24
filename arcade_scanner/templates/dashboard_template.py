@@ -46,6 +46,10 @@ SCRIPT_MODULES = [
     "formatters.js",
     "api.js",
     "utils.js",
+    # Suchsprache (Begriffe, Pfade, Ausschlüsse) — filter_engine.js und
+    # collections.js werten sie aus, deshalb vor beiden laden.
+    "search_query.js",
+    "search_suggestions.js",
     "treemap_layout.js",
     "treemap.js",
     "settings.js",
