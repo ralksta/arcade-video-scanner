@@ -14,6 +14,12 @@
 //   /media/ralf/OD  → Pfadsuche auf Ordnergrenze (trifft nicht /media/ralf/ODX)
 //   #urlaub         → Tag-Suche; "#Lady Sinister" für Tags mit Leerzeichen
 //
+// Mehrere Pfade sind ODER-verknüpft: „/a /b" findet alles unter /a *oder* /b.
+// Das entspricht dem, was man beim Anklicken mehrerer Ordner-Chips erwartet;
+// Zeigen mehrere Pfade auf denselben Unterbaum, wäre UND immer leer.
+// Begriffe, Tags und Pfade zusammen bleiben UND:
+//   "/a /b" web  → (unter /a oder /b) und enthält „web"
+//
 // Groß-/Kleinschreibung und deutsche Umlaute sind egal: „Müller" findet auch
 // „muller", „Straße" auch „strasse".
 
@@ -189,11 +195,17 @@
             };
         }
 
+        // Positive Pfade sind eine ODER-Gruppe (siehe Kopfkommentar).
+        const hasPositivePath = parsed.terms.some(function (term) {
+            return term.isPath && !term.negated;
+        });
+
         return function (video) {
             const path = foldedFilePath(video);
             const name = foldedFileName(video);
 
             const tags = Array.isArray(video.tags) ? video.tags : [];
+            let pathHit = !hasPositivePath;
 
             for (let i = 0; i < parsed.terms.length; i++) {
                 const term = parsed.terms[i];
@@ -210,11 +222,13 @@
 
                 if (term.negated) {
                     if (hit) return false;
+                } else if (term.isPath) {
+                    if (hit) pathHit = true;
                 } else if (!hit) {
                     return false;
                 }
             }
-            return true;
+            return pathHit;
         };
     }
 

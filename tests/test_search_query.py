@@ -59,6 +59,13 @@ def test_minus_excludes(result):
     assert result["excluded"] is False
 
 
+def test_multiple_folder_paths_are_ored(result):
+    assert result["orPaths"] is True
+    assert result["orPathsMiss"] is False
+    # Ein zusätzlicher Begriff bleibt UND — er muss im Treffer enthalten sein.
+    assert result["orPathsWithKeyword"] is True
+
+
 def test_suggestions_count_the_whole_subtree(result):
     by_path = {item["path"]: item["count"] for item in result["suggestionsOd"]}
     assert by_path["/media/ralf/OD"] == 3

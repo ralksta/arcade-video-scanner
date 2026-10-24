@@ -41,6 +41,16 @@ def test_chips_and_free_text_are_composed_back_into_one_query(result):
     assert result["mixed"]["composed"] == '/media/ralf/OD "#Lady Sinister" web -trailer'
 
 
+def test_multiple_folder_chips_stay_separate_and_are_ored(result):
+    multiple = result["multiplePaths"]
+    assert multiple["chips"] == [
+        {"type": "folder", "value": "/media/a", "negated": False},
+        {"type": "folder", "value": "/media/b", "negated": False},
+    ]
+    # Ohne Leerzeichen im Pfad sind keine Anführungszeichen nötig.
+    assert multiple["composed"] == "/media/a /media/b"
+
+
 def test_plain_keywords_do_not_create_chips(result):
     assert result["freeOnly"] == {
         "input": "web -trailer",

@@ -1219,10 +1219,12 @@ function renderCollectionSearchChips() {
         const toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.className = 'search-chip-label';
-        toggle.title = chip.negated
-            ? 'Einschließen statt ausschließen'
-            : 'Ausschließen statt einschließen';
+        toggle.title = chip.negated ? 'Einschließen' : 'Ausschließen';
         toggle.setAttribute('aria-pressed', chip.negated ? 'true' : 'false');
+        toggle.setAttribute(
+            'aria-label',
+            (chip.negated ? 'Einschließen: ' : 'Ausschließen: ') + chip.value
+        );
 
         const icon = document.createElement('span');
         icon.className = 'material-icons search-chip-icon';
@@ -1231,12 +1233,22 @@ function renderCollectionSearchChips() {
 
         const label = document.createElement('span');
         const segments = String(chip.value).split(/[\\/]/).filter(Boolean);
+        // Die letzten zwei Segmente unterscheiden die fünf web-Ordner
+        // („Miss Blossom/web" statt fünfmal „web"). Der ganze Pfad steht im
+        // Tooltip und im aria-label.
         label.textContent = chip.type === 'tag'
             ? '#' + chip.value
-            : (segments.length ? segments[segments.length - 1] : chip.value);
+            : (segments.slice(-2).join('/') || chip.value);
+        label.title = chip.value;
+
+        const action = document.createElement('span');
+        action.className = 'material-icons search-chip-action';
+        action.setAttribute('aria-hidden', 'true');
+        action.textContent = chip.negated ? 'check' : 'block';
 
         toggle.appendChild(icon);
         toggle.appendChild(label);
+        toggle.appendChild(action);
         toggle.addEventListener('click', () => {
             collectionSearchChips[index].negated = !collectionSearchChips[index].negated;
             renderCollectionSearchChips();
@@ -1246,7 +1258,7 @@ function renderCollectionSearchChips() {
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'search-chip-remove';
-        remove.setAttribute('aria-label', 'Filter entfernen');
+        remove.setAttribute('aria-label', 'Filter entfernen: ' + chip.value);
 
         const close = document.createElement('span');
         close.className = 'material-icons';

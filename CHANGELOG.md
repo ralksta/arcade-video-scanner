@@ -10,11 +10,16 @@ All notable changes to this project will be documented in this file.
   inklusive Elternpfaden wie `/media_ralf/OD`, mit Anzahl der Dateien im
   Unterbaum. Mit `#` werden Tags vorgeschlagen; der Verlauf zeigt die zuletzt
   benutzten Ordner und Begriffe (pro Konto gespeichert). Im Collection-Dialog
-  werden gewählte Ordner und Tags als Chips unter dem Feld angezeigt: Klick
-  schaltet zwischen ein- und ausschließen um, das X entfernt den Filter.
+  werden gewählte Ordner und Tags als Chips unter dem Feld angezeigt. Jede
+  Vorschlagszeile hat rechts einen **Minus-Knopf** zum Ausschließen; in den
+  Chips schaltet ein Symbol zwischen ein- und ausschließen um, das X entfernt
+  den Filter. Chips zeigen die letzten zwei Pfadsegmente (etwa
+  „Miss Blossom/web"), damit mehrere `web`-Ordner unterscheidbar bleiben.
   Gespeichert wird weiterhin ein einziger Suchtext.
 - Die Suche versteht mehrere Begriffe (alle müssen passen), Ausschlüsse
-  (`-wort`), Anführungszeichen für Phrasen und `#tag` für Tags. Pfade mit `/`
+  (`-wort`), Anführungszeichen für Phrasen und `#tag` für Tags. Mehrere
+  **Pfade** sind dagegen ODER-verknüpft: „/a /b" findet alles unter `/a` oder
+  `/b` — das entspricht dem Anklicken mehrerer Ordner-Chips. Pfade mit `/`
   gelten auf Ordnergrenze: `/media_ralf/OD` trifft nicht mehr
   `/media_ralf/ODX`. Groß-/Kleinschreibung, Umlaute und ß sind egal. Dieselbe
   Regel gilt in Filterleiste, Treemap, Auto-Tag-Regeln und auf dem Fernseher;

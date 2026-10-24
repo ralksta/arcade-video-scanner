@@ -126,7 +126,7 @@
         return item.path || '';
     }
 
-    function buildItem(item, index, idPrefix) {
+    function buildItem(item, index, idPrefix, onExclude) {
         const row = document.createElement('div');
         row.className = 'search-suggestion' + (item.type === 'clear-history' ? ' search-suggestion-clear' : '');
         // Die ID muss pro Feld eindeutig sein: Filterleiste und Dialog können
@@ -163,6 +163,31 @@
             count.className = 'search-suggestion-count';
             count.textContent = String(item.count);
             row.appendChild(count);
+        }
+
+        // Sichtbarer Weg zum Ausschließen: Ein Klick auf die Zeile schließt
+        // ein, der Minus-Knopf schließt aus. Vorher musste man erst einen
+        // Chip anlegen und ihn dann anklicken — das war nicht auffindbar.
+        if ((item.type === 'folder' || item.type === 'tag') && typeof onExclude === 'function') {
+            const exclude = document.createElement('button');
+            exclude.type = 'button';
+            exclude.className = 'search-suggestion-action';
+            exclude.title = 'Ausschließen';
+            exclude.setAttribute('aria-label', (item.label || item.value) + ' ausschließen');
+
+            const icon = document.createElement('span');
+            icon.className = 'material-icons';
+            icon.setAttribute('aria-hidden', 'true');
+            icon.textContent = 'remove_circle_outline';
+
+            exclude.appendChild(icon);
+            exclude.addEventListener('mousedown', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                onExclude(index);
+            });
+
+            row.appendChild(exclude);
         }
 
         return row;
@@ -241,7 +266,7 @@
             }
         }
 
-        function select(index) {
+        function select(index, forceNegated) {
             const item = state.items[index];
             if (!item) return;
 
@@ -253,6 +278,7 @@
             }
 
             const token = currentToken(input);
+            if (forceNegated) token.negated = true;
             let handled = false;
             if (typeof options.onSelect === 'function') {
                 handled = options.onSelect(item, token) === true;
@@ -304,7 +330,9 @@
             }
 
             items.forEach(function (item, index) {
-                box.appendChild(buildItem(item, index, options.boxId));
+                box.appendChild(buildItem(item, index, options.boxId, function (i) {
+                    select(i, true);
+                }));
             });
 
             box.classList.remove('hidden');
@@ -377,7 +405,8 @@
             } else if (event.key === 'Enter' || event.key === 'Tab') {
                 if (state.index >= 0) {
                     event.preventDefault();
-                    select(state.index);
+                    // Shift+Enter = ausschließen, ohne den Minus-Knopf zu treffen.
+                    select(state.index, event.key === 'Enter' && event.shiftKey);
                 } else if (event.key === 'Enter') {
                     // Nichts markiert: die getippte Suche selbst merken.
                     const query = input.value.trim();

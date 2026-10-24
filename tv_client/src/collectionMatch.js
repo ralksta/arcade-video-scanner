@@ -161,6 +161,10 @@ function searchMatches (filePath, text, tags) {
 		return foldedPath.indexOf(literal) !== -1 || foldedName.indexOf(literal) !== -1;
 	}
 
+	// Positive Pfade sind eine ODER-Gruppe (wie im Browser).
+	const hasPositivePath = parsed.terms.some(t => t.isPath && !t.negated);
+	let pathHit = !hasPositivePath;
+
 	for (let i = 0; i < parsed.terms.length; i++) {
 		const term = parsed.terms[i];
 		let hit;
@@ -174,11 +178,13 @@ function searchMatches (filePath, text, tags) {
 
 		if (term.negated) {
 			if (hit) return false;
+		} else if (term.isPath) {
+			if (hit) pathHit = true;
 		} else if (!hit) {
 			return false;
 		}
 	}
-	return true;
+	return pathHit;
 }
 
 /**

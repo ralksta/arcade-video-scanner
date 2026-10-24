@@ -3467,3 +3467,42 @@ body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="dupl
 .search-suggestion-clear {
     color: var(--ds-text-muted);
 }
+
+/* Minus-Knopf rechts in der Vorschlagszeile: schließt den Ordner/Tag aus,
+   ohne ihn erst als Chip anzulegen und dann umzuschalten. */
+.search-suggestion-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    margin-left: 2px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ds-text-muted);
+    cursor: pointer;
+}
+
+.search-suggestion-action:hover,
+.search-suggestion-action:focus-visible {
+    background: var(--ds-fill);
+    color: var(--ds-danger);
+}
+
+.search-suggestion-action .material-icons {
+    font-size: 18px;
+}
+
+/* Symbol im Chip: block = ausschließen, check = wieder einschließen. */
+.search-chip-action {
+    margin-left: 2px;
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+.search-chip-label:hover .search-chip-action {
+    opacity: 1;
+}

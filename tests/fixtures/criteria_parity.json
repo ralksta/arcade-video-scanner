@@ -664,6 +664,69 @@
    "expected": false
   },
   {
+   "name": "two folder paths are ORed",
+   "video": {
+    "FilePath": "/media/a/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" \"/media/b\""
+   },
+   "expected": true
+  },
+  {
+   "name": "folder OR does not swallow a required keyword",
+   "video": {
+    "FilePath": "/media/a/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" missing"
+   },
+   "expected": false
+  },
+  {
+   "name": "excluded subfolder wins over included parent",
+   "video": {
+    "FilePath": "/media/a/sub/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" -\"/media/a/sub\""
+   },
+   "expected": false
+  },
+  {
    "name": "search folds umlauts",
    "video": {
     "FilePath": "/media/Müller/clip.mp4",

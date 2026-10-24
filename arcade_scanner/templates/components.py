@@ -1229,8 +1229,9 @@ COLLECTION_MODAL_COMPONENT = """
                                 </div>
                                 <div id="collectionSearchChips" class="search-chips hidden" aria-label="Gewählte Filter"></div>
                                 <p class="mt-1.5 text-[10px] leading-relaxed text-gray-500">
-                                    Mehrere Begriffe müssen alle passen · <code>-Wort</code> schließt aus ·
-                                    <code>#tag</code> sucht Tags · Ordnerpfade gelten für den ganzen Unterbaum
+                                    Vorschlag anklicken = einschließen, <code>−</code> rechts = ausschließen ·
+                                    mehrere Ordner gelten als <em>oder</em> · <code>#tag</code> sucht Tags ·
+                                    Chips: Symbol schaltet um, <code>×</code> entfernt
                                 </p>
                             </div>
                         </div>

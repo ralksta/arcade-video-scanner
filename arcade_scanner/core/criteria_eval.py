@@ -133,6 +133,10 @@ def _search_matches(file_path: str, search: Any, tags: Optional[list] = None) ->
         literal = _fold_search_text(raw)
         return literal in folded_path or literal in folded_name
 
+    # Positive Pfade sind eine ODER-Gruppe: „/a /b" = unter /a oder /b.
+    has_positive_path = any((not negated) and is_path for _, negated, is_path, _ in terms)
+    path_hit = not has_positive_path
+
     for value, negated, is_path, is_tag in terms:
         folded = _fold_search_text(value)
         if is_tag:
@@ -145,9 +149,12 @@ def _search_matches(file_path: str, search: Any, tags: Optional[list] = None) ->
         if negated:
             if hit:
                 return False
+        elif is_path:
+            if hit:
+                path_hit = True
         elif not hit:
             return False
-    return True
+    return path_hit
 
 
 def resolution_category(video: dict) -> str:

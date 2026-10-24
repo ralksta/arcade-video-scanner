@@ -99,6 +99,13 @@ const freeOnly = {
     composed: getText()
 };
 
+setFromText('"/media/a" "/media/b"');
+const multiplePaths = {
+    input: input.value,
+    chips: getChips(),
+    composed: getText()
+};
+
 setFromText('');
 const empty = {
     input: input.value,
@@ -106,4 +113,4 @@ const empty = {
     composed: getText()
 };
 
-process.stdout.write(JSON.stringify({mixed, freeOnly, empty}));
+process.stdout.write(JSON.stringify({mixed, freeOnly, multiplePaths, empty}));
