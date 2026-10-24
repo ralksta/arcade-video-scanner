@@ -4,7 +4,367 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Endpunkt-Vertrag zwischen Server und Clients**: Ein Test liest die
+  API-Pfade aus dem Quelltext von TV-, iOS- und webOS-Client und prüft sie
+  gegen die Routen des Servers. Solche Brüche fallen sonst niemandem auf — die
+  Clients leben in eigenen Sprachen, kein Import bricht, und wer den Server
+  entwickelt, startet keinen iOS-Simulator. Bekannte Brüche stehen als `xfail`
+  mit Begründung in `KNOWN_BROKEN`.
+
+- **Wächter für die Laufzeit-Abhängigkeiten**: `CLAUDE.md` sagt zu, dass der
+  Server reine Standardbibliothek ist und nur pydantic, pydantic-settings,
+  Pillow und imagehash braucht. Geprüft hatte das niemand — ein `import
+  requests` in einer Route fällt beim Entwickeln nicht auf und schlägt erst bei
+  der nächsten frischen Installation zu. Neue Tests prüfen jeden Import im
+  Paket: nicht deklarierte Bibliotheken auf Modul-Ebene, Web-Frameworks
+  überhaupt, und optionale Extras (torch, open_clip) außerhalb einer Funktion.
+  Der Bestand hielt die Zusage vollständig ein; hier wird also kein Fehler
+  behoben, sondern ein Zustand festgehalten.
+
+- **Export der aktuellen Ansicht** (CSV und M3U): Über die Command-Palette
+  (`Ctrl`/`⌘`+`K` → „Ansicht als …") wird genau das ausgegeben, was gerade zu
+  sehen ist — dieselbe Liste, dieselbe Reihenfolge, inklusive aller aktiven
+  Filter. CSV mit Pfad, Größe, Dauer, Codec, Bitrate, Auflösung, Status,
+  Favorit und Tags (RFC 4180 maskiert, BOM für Excel); M3U mit lokalen
+  Dateipfaden für Player, die dieselbe Freigabe eingebunden haben. Ein
+  Werkzeug zum Filtern und Auswerten, dessen Ergebnisse in der Oberfläche
+  gefangen bleiben, ist nur die halbe Miete. Neu: `static/export_view.js`.
+
+- **Index-Status in den Speicher-Einstellungen**: Neuer Endpunkt
+  `/api/similar/status` (Session-pflichtig) meldet, wie viele Medien im
+  Ähnlichkeits-Index liegen, wie hoch die Abdeckung ist und mit welchem Modell
+  indiziert wurde; die Einstellungen zeigen das als Balken mit Klartext-Hinweis.
+  Ohne diese Auskunft ließ sich nicht unterscheiden, ob es zu einem Medium keine
+  ähnlichen gibt oder ob schlicht kein Index existiert — die Leiste im Cinema
+  sieht in beiden Fällen gleich leer aus.
+
+- **„Ähnliche Medien"-Leiste im Cinema** (Embedding-Fundament, Teil 2): Taste `S`
+  oder der Rail-Button blendet über der Transportleiste verwandte Aufnahmen ein,
+  mit Vorschaubild und Übereinstimmung in Prozent; ein Klick springt direkt
+  dorthin und die Leiste zeigt sofort die Nachbarn des neuen Mediums. Ohne
+  Indexlauf erklärt die Leiste, dass erst `scripts/media_indexer.py` laufen muss,
+  statt einen Fehler zu zeigen — bei frischer Installation ist das der Normalfall.
+  Treffer außerhalb der eigenen Scan-Ziele werden ausgefiltert (`/api/similar`
+  filtert den Vault, kennt aber die Pfad-Ziele nicht), und beim schnellen
+  Blättern verworfene Antworten überschreiben die Leiste nicht mehr.
+  Neu: `static/similar.js`.
+
+- **Tastaturkürzel-Overlay (`?`)**: Das Dashboard hatte eine ganze Reihe
+  Tastenkürzel (Cinema: `←`/`→`, `Space`, `F`, `V`, `I`, `G`, `O` plus Tag-Shortcuts;
+  Duplikat-Prüfung: `1`/`2`/`S`/`A`; Command-Palette: `Ctrl`/`⌘`+`K`) — dokumentiert
+  war davon nichts. `?` öffnet jetzt überall eine Übersicht, ein Tastatur-Button in
+  der Filter-Bar tut dasselbe für die Maus. Neu dazu: `/` fokussiert die Suche und
+  `1`–`4` schalten zwischen Grid-, Listen-, Treemap- und Ordner-Ansicht um. Die
+  globalen Kürzel halten sich zurück, während der Nutzer tippt oder Cinema bzw. die
+  Duplikat-Prüfung offen ist. Neu: `static/shortcuts.js`.
+
+- **Eine Sorte Rückmeldung statt zwei**: Das Dashboard nutzte 30 blockierende
+  `alert()`-Dialoge neben 34 Toasts — dieselbe Art Information, einmal als
+  Systemdialog mitten im Bild, einmal als Einblendung unten rechts. Alle
+  `alert()`-Aufrufe sind jetzt Toasts mit passendem Typ (Fehler, Warnung,
+  Erfolg, Info); `confirm()` bleibt, weil es einen Rückgabewert liefert. Dabei
+  aufgefallen: Toasts lagen auf `z-index: 10000`, das Optimizer- (10050) und das
+  GIF-Panel (10100) darüber — und beide sitzen `bottom-4`, also genau dort, wo
+  die Toasts erscheinen. Meldungen aus dem Optimizer waren damit unsichtbar.
+
+- **Ansichten auf dem Handy erreichbar**: Die Umschaltung zwischen Grid, Liste,
+  Treemap und Ordner-Browser steckte in einem `hidden md:flex`-Container — auf
+  einem Telefon gab es damit keinen Weg zu drei der vier Ansichten. Die Umschalter
+  sind jetzt auf jeder Breite da; nur der Größen-Slider bleibt Desktop-only, weil
+  er auf Touch kaum präzise treffbar ist. Ebenso: gespeicherte Ansichten waren auf
+  dem Handy unerreichbar und nahmen auf dem Desktop auch dann Platz weg, wenn gar
+  keine gespeichert waren — ihre Sichtbarkeit hängt jetzt am Inhalt.
+  Damit entfällt der Grund für die frühere Umgehung, die den Ordner-Browser über
+  einen eigenen Bottom-Nav-Eintrag erreichbar machte und dafür **Vault** aus der
+  Bottom-Nav nahm (siehe „Mobile-Navigation" unter *Changed*). Ob Vault dort
+  zurückkehren soll, bleibt eine Design-Entscheidung und wurde nicht angefasst.
+
+- **Ansichts-Chips mit Apostroph im Namen**: Der Name wurde in einen
+  `onclick`-Handler interpoliert; eine Ansicht namens `Ralf's Urlaub` zerlegte
+  damit den Handler und machte den Chip unklickbar. Die Chips werden jetzt als
+  DOM-Knoten gebaut, ohne String-Interpolation.
+
+- **Barrierefreiheit**: 14 Icon-Buttons (Schließen-Kreuze, Zahlen-Stepper in den
+  Einstellungen, Tag löschen, Favorit auf der Karte) hatten keinen zugänglichen
+  Namen und wurden nur als „Schaltfläche" angesagt — sie tragen jetzt
+  `aria-label`. 262 Material-Icons-Spans sind `aria-hidden`, weil ein
+  Screenreader sonst den Ligatur-Namen vorliest („star_border", „more_vert").
+  Neu: `static/a11y.js` sperrt den Tastaturfokus in offene Dialoge ein (Tab und
+  Shift+Tab laufen im Dialog um) und gibt ihn beim Schließen an das Element
+  zurück, von dem aus geöffnet wurde. Vorher tabbte man aus dem offenen Dialog
+  in die Seite dahinter.
+
+- **Sichtbare Fehler statt stiller Divergenz**: 19 von 63 `fetch`-Aufrufen im
+  Frontend hatten keinerlei Fehlerpfad. Die schlimmsten davon aktualisierten die
+  Oberfläche optimistisch und feuerten den Server-Aufruf danach ab — war der
+  Server weg, zeigte das Dashboard einen Zustand an, den der Server nie gesehen
+  hatte, sichtbar erst beim nächsten Reload. Neu: `apiWrite()` in `api.js` prüft
+  den Status, meldet den Fehler und rollt die optimistische Änderung zurück
+  (Vault, Favorit, Batch-Vault, Batch-Favorit, Tag anlegen). Ebenfalls behoben:
+  „Batch-Optimierung gestartet" erschien auch dann, wenn der Auftrag nie ankam;
+  der Einrichtungs-Assistent blieb bei einem Serverfehler dauerhaft leer;
+  Views/Collections galten als gespeichert, obwohl der Aufruf scheiterte. Ein
+  Test hält alle `fetch`-Aufrufe künftig auf einem Fehlerpfad.
+
+- **Leer-Zustand im Grid**: 0 Treffer hießen bisher: weiße Fläche, keine
+  Erklärung, kein Weg zurück. Jetzt erklärt das Grid, *warum* nichts da ist —
+  leere Bibliothek (mit Link in die Einstellungen und zum Scan), zu enge Suche
+  (mit „Suche löschen"), zu enge Filter (mit „Filter zurücksetzen"), oder ein
+  noch leerer Vault/Favoriten/Review-Workspace samt Hinweis, wie man dort etwas
+  hineinbekommt. Neu: `static/empty_state.js`.
+
+- **Proxy Streaming**: Every video may have a smaller copy in its own directory
+  tree, which is excluded from scans. `/stream` decides per request which file to
+  serve — the original on the LAN, the proxy over Tailscale (CGNAT
+  `100.64.0.0/10` and `fd7a:115c:a1e0::/48`), falling back to the original when no
+  proxy exists. The library still shows exactly one entry per video, and originals
+  are never modified. Controlled through `proxy_streaming` / `proxy_root` in the
+  Settings UI; `?proxy=0` and `?proxy=1` override the automatic choice, and the
+  response carries `X-Arcade-Variant`. New: `core/proxy_resolver.py`,
+  `core/master_detect.py` (identifies raw camera material by folder, keyword,
+  camera filename scheme and device name, so proxies are built from edits rather
+  than from source footage) and `scripts/generate_proxies.py` (creates the proxies
+  on a remote NVENC machine, reading originals only).
+
+### Performance
+- **Fünf ungenutzte Indizes auf `media` entfernt.** Die Tabelle trug acht
+  Indizes, angelegt für „common filter/sort queries" — gefiltert und sortiert
+  wird aber im Frontend: der Server liefert über `/api/videos` alle Zeilen aus,
+  und kein SQL im Projekt verwendet `status`, `codec`, `size_mb`, `favorite`
+  oder `vaulted` in einem WHERE oder ORDER BY. Per `EXPLAIN QUERY PLAN` gegen
+  die reale Bibliothek geprüft: kein Plan hat sie je angefasst, bezahlt wurden
+  sie bei jedem Upsert. Gemessen: 2000 Upserts in 16 ms statt 47 ms, Datei
+  3,48 MB statt 5,58 MB. Bestehende Datenbanken werden beim Öffnen migriert.
+  Die drei verbliebenen Indizes (`idx_mtime`, `idx_media_type`, `idx_thumb`)
+  sind jeweils einer konkreten Abfrage zugeordnet und per Test daran gepinnt.
+- **Browser-Cache für statische Assets wieder wirksam.** Die 28 Script- und
+  Link-Tags trugen `?v={int(time.time())}` — für jede Datei denselben Wert, neu
+  bei jeder Neugenerierung des HTML-Reports (nach jedem Scan, jeder
+  Einstellungsänderung, jedem Encode-Upload). Eine neue URL ist im Browser-Cache
+  kein 304, sondern ein voller Fehltreffer: 588 KB (122 KB gzip) wurden erneut
+  übertragen, obwohl sich nichts geändert hatte — der `no-cache`-Header des
+  Servers, der sonst billige 304er liefert, lief dabei ins Leere. Die Version
+  kommt jetzt aus der mtime der jeweiligen Datei, eine URL ändert sich also nur
+  noch, wenn sich genau diese Datei ändert.
+- **`/api/videos`: ~105 ms CPU pro Request eingespart.** Gemessen an der echten
+  Bibliothek (8788 Einträge): der Endpunkt serialisierte bei *jedem* Request
+  4,95 MB JSON neu (~40 ms) und komprimierte sie neu (~54 ms), dazu ~10 ms
+  Pfadfilterung — obwohl sich zwischen zwei Requests meist nichts ändert, und
+  obwohl drei Clients (Browser, TV, iOS) denselben Posten unabhängig zahlen.
+  Fertige Bodies liegen jetzt roh *und* gzip-komprimiert im Speicher, geschlüsselt
+  nach Scan-Zielen und Admin-Flag; ein Treffer kostet noch einen Dict-Zugriff.
+  Der Cache hängt am Medien-Cache und verfällt mit ihm — auch bei den beiden
+  Aufrufern, die direkt invalidieren (Fotos löschen, Encode-Upload).
+
+### Security
+- **Dateinamen führten Code aus.** `createVideoCard()` setzte den Dateinamen
+  unmaskiert per `innerHTML` — als Text *und* im `title`-Attribut. Ein Video
+  namens `<img src=x onerror=…>.mp4` führte damit beim Aufbau des Grids Code in
+  der Sitzung des angemeldeten Nutzers aus. Bei einer Bibliothek aus
+  heruntergeladenen Dateien ist das kein konstruierter Fall: der Name kommt von
+  außen, und Anzeigen genügt — angeklickt werden muss nichts. Behoben für die
+  Grid-Karte (läuft für jede Datei) und die Vergleichskarte der Review-Ansicht.
+  **Nicht abgeschlossen:** eine Erhebung fand 87 weitere Interpolationen von
+  Namens-, Pfad- und Tag-Feldern ohne sichtbare Maskierung, ein erheblicher Teil
+  davon Fehlalarme. Welche echt sind, lässt sich nur einzeln beurteilen; Stand,
+  Priorisierung und empfohlenes Vorgehen stehen in
+  `dev-docs/frontend-escaping.md`.
+
+- **`/api/discard_optimized` löschte beliebige Dateien.** Der Endpunkt ist
+  sitzungspflichtig, nahm den Pfad aber ungeprüft aus dem Request. Der
+  Standard-Zweig lautete `if os.path.exists(abs_path): os.remove(abs_path)` und
+  lief für *jeden* Pfad — auch ohne zugehörigen Datenbank-Eintrag. Ein
+  angemeldeter Nutzer konnte damit jede Datei entfernen, die der Serverprozess
+  schreiben darf, weit außerhalb der Bibliothek; in einer
+  Mehrbenutzer-Installation genügt dafür ein gewöhnliches Konto.
+  `/api/keep_optimized` hatte dieselbe Klasse mit `shutil.move` auf zwei
+  ungeprüften Pfaden. Beide gehen jetzt über `sanitize_path()` gegen die aktiven
+  Scan-Ziele plus das Review-Verzeichnis (das außerhalb der Bibliothek liegt und
+  erlaubt bleiben muss). Die Tests wurden gegen den alten Stand geprüft: dort
+  schlagen sie fehl, weil die Datei außerhalb der Bibliothek tatsächlich
+  verschwindet.
+
+- **`/api/debug/dump` war unauthentifiziert erreichbar.** Die Route gab den
+  kompletten Systemzustand ohne jede Prüfung heraus: aktive Scan-Pfade und
+  Ausschlüsse, **sämtliche Benutzernamen mit Admin-Flag und ihren Scan-Zielen**,
+  Beispielzeilen aus der Datenbank mit echten Dateipfaden sowie den Inhalt der
+  Mount-Verzeichnisse. Wer den Port erreichte — im LAN oder über Tailscale —
+  bekam damit Benutzerliste und Bibliotheksstruktur, ohne angemeldet zu sein.
+  Jetzt admin-pflichtig, weil der Inhalt alle Nutzer betrifft und nicht nur den
+  anfragenden. Ein globales Auth-Gate gibt es im Server nicht — jede Route prüft
+  selbst, und genau deshalb konnte diese es vergessen. Ein neuer Test geht alle
+  GET-Routen durch und verlangt entweder eine Prüfung oder einen begründeten
+  Eintrag in der Ausnahmeliste; er fand dabei gleich eine zweite Route:
+- **`/api/cache-stats` war ebenfalls offen.** Weniger brisant (Größe des
+  Thumbnail-Ordners), aber es verriet die ungefähre Größe der Bibliothek und
+  lief bei jedem Aufruf rekursiv über den gesamten Ordner. Jetzt
+  sitzungspflichtig.
+
+- **Sitzungs-Token landeten im Zugriffslog, sobald man die Diagnose einschaltet.**
+  `<video>`-Tags können keinen `Authorization`-Header senden, deshalb nimmt
+  `/stream` den Token als Query-Parameter entgegen — es ist derselbe Token wie
+  im Cookie, also voller Kontozugriff. Die Log-Zeilen dazu wurden bisher nur
+  unterdrückt, solange `verbose_scanning` **aus** war. Wer die Option
+  einschaltete, schrieb ab dem Moment bei jedem Videoabruf ein gültiges
+  Zugangs-Token mit — also genau dann, wenn man Logs typischerweise
+  weiterreicht, um Hilfe zu bekommen. Der Token wird jetzt unabhängig von jeder
+  Einstellung maskiert; Pfad und Statuscode bleiben lesbar.
+
+### Fixed
+- **TV-Client: Server-Adresse war an neun Stellen fest verdrahtet.**
+  `http://192.168.2.183:8000` stand in `MainPanel.js`, `LoginPanel.js` und
+  `App.js` — der Client funktionierte damit nur in genau einem Netz mit genau
+  dieser IP. Vergibt der Router eine andere, laden weder Bibliothek noch
+  Vorschaubilder noch Videos, und die Ursache steht an neun Stellen statt an
+  einer. Jetzt in `tv_client/src/serverConfig.js` zusammengefasst, mit
+  Unterstützung für einen gespeicherten Wert; die Abfrage im Login-Bildschirm
+  ist der nächste Schritt und dort vermerkt.
+- **TV-Client: Auflösung fehlte still im Kachel-Label.** Gelesen wurde
+  `v.resolution`, ein Feld, das die API nicht liefert — der Wert war immer leer.
+  Wird jetzt wie im Browser aus `Width`/`Height` abgeleitet.
+
+- **TV-Client: Smart Collections filterten nach dem falschen Feld.** Der
+  Matcher las `v.status`, die API liefert das Feld aber als `Status`. Der Wert
+  war damit immer `undefined` — `optimized` traf nie, `pending` traf immer.
+  Dieselbe Sammlung zeigte auf dem Fernseher nichts oder alles, im Browser das
+  Richtige. Drei weitere Abweichungen mitbehoben: Codec-Vergleich war exakt
+  statt per Teilstring (verfehlt Werte wie „hevc (Main 10)"), `favorites: false`
+  (Favoriten ausschließen) wurde ignoriert, und Vault-Videos landeten in
+  Sammlungen, die der Browser ausschließt. Ein Differenztest wertet ab jetzt
+  dieselben Fixtures durch Browser- *und* TV-Matcher aus; für Dimensionen, die
+  die TV-Oberfläche nicht anbietet, wird geprüft, dass der TV-Client nie
+  strenger filtert als der Browser.
+
+- **Dokumentiert: der iOS-Client funktioniert seit `8c6008a` nicht mehr.** Der
+  Commit „complete removal of VR Gallery and DeoVR integration" entfernte
+  `/api/deovr/library` und `/api/deovr/collection/<id>` — der iOS-Client ruft
+  beide bis heute auf und bekommt auf jede Bibliotheksabfrage einen 404. Dazu
+  schickt er keinerlei Sitzung mit, stammt also noch aus der Zeit vor der
+  Mehrbenutzer-Umstellung. Beschreibung samt Reparaturweg in
+  `dev-docs/ios-client-status.md`; nicht behoben, weil sich Swift-Code hier
+  weder übersetzen noch testen lässt.
+
+- **GIF-Auftragszustände wuchsen unbegrenzt.** `GIF_JOBS` war ein nacktes
+  Modul-Dict: jeder Export schrieb hinein, entfernt wurde nie etwas. Auf einem
+  Server, der monatelang durchläuft, sammeln sich dort Dateinamen und Pfade
+  sämtlicher je erzeugter GIFs an — kein dramatisches Leck, aber eines, das
+  nie aufhört. Ersetzt durch eine Registry mit Lock (Worker-Threads schreiben,
+  Request-Threads lesen), 200 Einträgen Obergrenze und einer Stunde
+  Aufbewahrung, was den Poll-und-Download-Zyklus eines Clients weit überdauert.
+
+- **`/api/debug/dump` griff an der Thread-Sicherung vorbei auf die Datenbank.**
+  Die Route las über `db._conn.execute(...)` direkt auf der geteilten
+  Verbindung — ohne `_write_lock`. Genau davor warnt der Kommentar im Store:
+  Pythons sqlite3 hält einen Statement-Cache pro Verbindung, zwei Threads mit
+  derselben SQL teilen sich ein vorbereitetes Statement und konsumieren
+  gegenseitig ihre Zeilen; nichts wirft, das Ergebnis ist einfach falsch.
+  Zweiter Fehler in derselben Zeile: ohne `_ensure_connection()` ist `_conn` vor
+  dem ersten Zugriff `None`, die Route lief dann in einen AttributeError. Beides
+  behoben über die neue Store-Methode `get_sample_rows()`; ein Test hält den
+  Rest des Projekts von `._conn` fern.
+
+- **GIF-Export: `speed=0` ließ den Auftrag an einer Division durch null
+  scheitern.** Die Zahlen aus dem Request-Body kamen ungeprüft durch; im Worker
+  steht `1/speed` hinter dem Guard `if speed != 1.0`, der für 0 wahr ist. Der
+  Auftrag endete als „error" mit der Meldung „division by zero" — nicht
+  abgestürzt, aber für den Nutzer nicht handhabbar. `fps`, `quality`, `loop`
+  und `speed` werden jetzt an der Grenze geprüft und mit einer Meldung
+  abgewiesen, die den Parameter, den Wert und den erlaubten Bereich nennt.
+  Abgedeckt sind auch `NaN` und `Infinity`, die eine naive Bereichsprüfung
+  passieren (NaN vergleicht sich mit allem als False).
+
+- **Auto-Tagging lief nach dem Scan stillschweigend nicht mehr.** Der Hook war
+  mit `except ImportError: pass` abgesichert und dem Kommentar „landet mit
+  PR #34; bis dahin fehlt das Modul". Der PR ist längst gelandet — seither
+  verschluckte der Guard jeden echten Importfehler *innerhalb* von
+  `auto_tagger`, ohne eine Zeile Ausgabe. Fehler beim Tagging lassen den Scan
+  weiterhin nicht scheitern (die Bibliothek ist zu dem Zeitpunkt schon
+  aktualisiert), werden jetzt aber gemeldet. Ebenfalls hörbar gemacht: eine
+  nicht ermittelbare Solldauer schaltete die Laufzeitprüfung hochgeladener
+  Encodes lautlos ab, und eine nicht lesbare Bild-Scan-Einstellung übersprang
+  Bilder ohne Hinweis. Der Resource-Watchdog meldet jetzt einmal, wenn
+  `os.getloadavg()` auf dem System fehlt, statt in jeder Schleife zu schweigen.
+
+- **Veraltete Proxys wurden stillschweigend ausgeliefert.** Die Auflösung prüfte
+  nur, *ob* ein Proxy existiert. Wird ein Original nachbearbeitet — neuer
+  Schnitt, andere Tonspur — blieb der alte Proxy liegen und lief unterwegs
+  weiter: man sah eine Fassung, die es so nicht mehr gibt, ohne jeden Hinweis.
+  `resolve_stream_path()` vergleicht jetzt die Änderungszeiten und fällt bei
+  einem veralteten Proxy auf das Original zurück, auch bei erzwungenem
+  `?proxy=1` — Korrektheit vor Bandbreite. Zwei Sekunden Toleranz gegen
+  FAT-Rundung und rsync/SMB-Versatz. `scripts/generate_proxies.py` übersprang
+  jeden vorhandenen Proxy und hätte einen veralteten nie erneuert; es erzeugt
+  ihn jetzt neu. Damit ist der offene Roadmap-Punkt „automatische Aktualisierung,
+  wenn sich ein Original ändert" abgedeckt.
+
+- **Ordnerpfade fremder Bibliotheken im gemeinsamen HTML-Dump.** `index.html`
+  wird einmal erzeugt und an jeden Nutzer ausgeliefert — enthielt aber
+  `window.FOLDERS_DATA` mit der Ordner-Aggregation der *gesamten* Bibliothek,
+  also auch den Verzeichnissen anderer Nutzer, samt vollem Pfad im
+  `title`-Attribut der Ordner-Seitenleiste. `/api/videos` filtert sauber nach
+  Scan-Zielen, der Dump umging das. Der Ordner-Baum wird jetzt clientseitig aus
+  `ALL_VIDEOS` aufgebaut (`buildFoldersData()`), das bereits pro Nutzer
+  gefiltert ist. Gefunden durch einen neuen Test, der prüft, dass aus einem
+  Dump mit einem Eintrag `/geheim/privat/urlaub_2019.mp4` nichts davon in der
+  Seite landet.
+
+- **Die Test-Suite schrieb ins echte Datenverzeichnis.** `ReportDebouncer.schedule()`
+  startet einen `threading.Timer`, der eine Sekunde später auf einem Daemon-Thread
+  `_media_cache.get()` aufruft. Zu dem Zeitpunkt ist der `config`-Patch des
+  auslösenden Tests längst abgeräumt, der Timer greift also auf das echte
+  `db`-Singleton zu: er öffnete `arcade_data/media_library.db` samt aller
+  Schema-Migrationen und überschrieb `arcade_data/index.html` — bei jedem vollen
+  `pytest`-Lauf. Ein einzelner Testlauf reproduziert das nicht zuverlässig, weil
+  der Prozess meist endet, bevor die Sekunde um ist; deshalb blieb es unbemerkt.
+  Eine autouse-Fixture in `tests/conftest.py` neutralisiert den Debouncer jetzt
+  und protokolliert die Aufrufe stattdessen, damit Tests weiterhin prüfen können,
+  *dass* eine Route den Report anstößt.
+
+- **Ordner-Browser: echte Hierarchie statt flacher Liste**. `getSubfoldersAt(null)`
+  hielt jeden Pfad für eine oberste Ebene, zu dem es keinen *anderen Ordner mit
+  Dateien* als Präfix gab. Da Mount-Verzeichnisse wie `/media_ralf` selbst keine
+  Dateien enthalten, landete jeder tiefe Blattordner auf der Startebene — bei einer
+  Bibliothek mit 8776 Dateien 153 flache Einträge statt 3 Mounts. Root- und
+  Kind-Ebene laufen jetzt über denselben Code und leiten die nächste Ebene aus den
+  Pfadsegmenten ab, so dass auch Zwischenordner ohne eigene Dateien eine Ebene
+  bilden (`/media_ralf` → `OD`/`korea`/`Reface` → …). Breadcrumbs und die
+  Zurück-Navigation folgen derselben Logik und springen keine Ebene mehr über.
+- **Browser-Zurück im Ordner-Browser**: Es liefen zwei konkurrierende
+  Popstate-Handler (`addEventListener('popstate')` und `window.onpopstate`); der
+  zweite überschrieb den gerade wiederhergestellten State. Der zweite Handler
+  entfällt, und `loadFromURL()` setzt den Ordnerpfad jetzt aktiv zurück, wenn die
+  URL keinen `folderPath` enthält — vorher blieb beim Zurücknavigieren der alte
+  Pfad stehen.
+
+- **Light-Mode-Kontraste**: Die Views trugen noch flächendeckend Hardcodes aus
+  der dark-only Zeit (`text-white`, `text-gray-400/500/600`, `bg-white/10`,
+  `bg-black/40`, `rgba(255,255,255,…)` in `styles.css`), die im hellen Design
+  weiß auf weiß bzw. ~2:1 landeten — am deutlichsten in den Settings. Diese
+  Utilities zeigen jetzt auf mode-aware Tokens: neue Tailwind-Farbe `ink`
+  (Vordergrund als Flächen-/Linienquelle) statt `*-white/N`, die Graustufen
+  200–900 auf die semantische Textskala, und die semantischen Farben (HEVC,
+  AV1, Bitrate, Optimized, Danger, Info) haben eigene Light-Werte mit ≥4.5:1
+  auf Weiß. Gefüllte Buttons/Badges beziehen ihre Textfarbe aus `--ds-on-*`
+  (automatisch schwarz/weiß nach Luminanz), Badges auf Thumbnails behalten über
+  `--ds-*-media-rgb` den hellen Ton plus dunklen Scrim. `--ds-text-muted` im
+  Dark-Mode von `#6b6b76` auf `#7e7e8a` angehoben (3.4:1 → 4.5:1). Der alte
+  Block aus `!important`-Overrides in `styles.css` ist damit entfallen.
+- `do_HEAD` split the stream path with `split("path=")`, so any appended query
+  parameter ended up inside the filename. Now uses `parse_qs` like `do_GET`.
+
 ### Changed
+- **Mobile-Navigation**: Neuer Eintrag **Ordner** in der Bottom-Nav, der direkt in
+  den Ordner-Browser springt — der war auf dem Handy bisher gar nicht erreichbar
+  (die View-Toggles sind `hidden md:flex`, nur per Deep-Link zugänglich). Dafür ist
+  **Vault** aus der Bottom-Nav entfernt; der Workspace bleibt über `/vault` und den
+  Desktop erreichbar.
+- **Ordnerliste auf schmalen Viewports**: unterhalb von 768px kompakte Zeilen
+  (56px-Thumbnail, Name, Anzahl + Größe, Chevron, ≥64px Tap-Ziel) statt der
+  bildschirmfüllenden Karten mit 2×2-Mosaik — damit sind mehrere Ordner gleichzeitig
+  sichtbar und Durchklicken fühlt sich wie ein Dateimanager an. Beim Wechsel über den
+  Breakpoint (Rotation) wird neu gerendert; die Breadcrumb-Leiste scrollt horizontal
+  und springt ans Ende des Pfads.
 - **Einheitliches Design System**: Die drei Themes (Arcade/Professional/Candy)
   sind durch *ein* dark-first Theme mit genau einem Brand-Accent (Magenta
   `#c4179f`) ersetzt. Semantische Farben (HEVC-Türkis, AV1-Violett,
@@ -37,6 +397,45 @@ All notable changes to this project will be documented in this file.
   Verzeichnislisten und 38×22-Toggle-Switches.
 
 ### Fixed
+- **Kein Scroll-Sprung mehr nach dem Löschen im Grid.** Jedes Neurendern des
+  Grids (Löschen, Favorit, Tag-Änderung, Filter) fiel auf einen einzigen
+  40er-Batch zurück; die Seite schrumpfte und der Browser sprang nach oben.
+  `renderUI()` baut jetzt so viele Batches wieder auf, wie vorher sichtbar
+  waren, und stellt die Scroll-Position wieder her — außer bei explizitem
+  `scrollToTop` (z. B. Workspace-Wechsel).
+- **Remote-Encoding (Mac-Worker) wieder zuverlässig.** Der Worker meldet sich
+  jetzt selbst neu an, wenn die Session abläuft — bisher lief er nach jedem
+  Server-Neustart endlos in `401`, weil Sessions nur im RAM liegen und
+  `_login()` einmalig beim Start aufgerufen wurde. Ohne `--user`/`--password`
+  bricht er mit klarer Meldung ab, statt still nichts zu tun; die veralteten
+  Beispiele ohne Credentials in Doku und Settings-Hinweis sind korrigiert.
+- Download und Upload eines Jobs suchten die Job-ID in den *neuesten* 100
+  Einträgen, während der Worker den *ältesten* Job bekommt — ab 100 Jobs in der
+  Queue schlug der Download deshalb zuverlässig mit 404 fehl. Beide Endpunkte
+  nutzen jetzt einen direkten Lookup per ID.
+- Queue-Endpunkte lieferten Dateipfade mit kaputtem Encoding (Surrogates)
+  escaped zurück, sodass Down-/Upload die Datei nicht fanden.
+- Abgestürzte Worker hinterließen Jobs dauerhaft auf `downloading`/`encoding`;
+  dieselbe Datei ließ sich danach nie wieder einreihen. Jobs ohne Heartbeat
+  werden nach 15 Minuten neu eingereiht (nach 3 Versuchen `failed`).
+- Ein Abbruch durch den Nutzer konnte von einer verspäteten Statusmeldung des
+  Workers wieder überschrieben werden; `saved_bytes` wurde bei jedem
+  Zwischenstatus auf 0 zurückgesetzt.
+- Nach einem abgebrochenen Lauf konnte der Worker eine alte `_opt.mp4` aus dem
+  Arbeitsverzeichnis als Erfolg hochladen — jeder Job bekommt jetzt ein eigenes
+  Verzeichnis, und der „Datei liegt zufällig da"-Fallback ist entfernt.
+- Der Upload las die komplette Datei in den RAM (mehrere GB pro Job) und wurde
+  serverseitig weder auf Größe noch auf Vollständigkeit geprüft: eine
+  abgebrochene Verbindung galt als fertiger Encode. Jetzt Streaming-Upload,
+  Größenlimit und Integritätsprüfung (ffprobe-Dauer + strikter Decode) vor dem
+  atomaren Replace.
+- Im Standard-Modus (Review Mode aus) legte der Upload nur eine `_opt.mp4`
+  neben das Original, ersetzte nichts und erzeugte keinen Datenbankeintrag.
+  Die optimierte Datei tritt jetzt atomar an die Stelle des Originals und
+  übernimmt dessen Metadaten.
+- Unerreichbare Kopien der Queue-Routen in `api_handler.py` entfernt — sie
+  hatten keine Auth-Prüfung und wären bei einer Änderung der
+  Dispatch-Reihenfolge scharf geworden.
 - Duplicate-Checker und Settings-Dialog lagen mit `z-index` unter der
   Sidebar (`z-100`) und wurden von ihr überlappt.
 - Reste der alten Palette, die per Inline-Style bzw. hartkodiertem Hex an den
@@ -46,6 +445,14 @@ All notable changes to this project will be documented in this file.
   Hover der Folder-Cards, das HEVC-Label im Treemap und der Batch-Warnhinweis.
 
 ### Added
+- **Fortschrittsanzeige für Remote-Encodes.** Die Remote-Queue in den
+  Einstellungen zeigt jetzt Fortschrittsbalken, aktuelle Phase, Restzeit und
+  den Worker-Namen; der Poll-Takt geht auf 2 s, solange Jobs laufen, und auf
+  10 s im Leerlauf. Der Worker sendet dafür alle 10 s einen Heartbeat an das
+  neue `POST /api/queue/progress`, gespeist aus dem neuen optionalen
+  `progress_callback` von `process_file()`. Die Prozentangabe gilt pro
+  Encode-Pass — die Qualitätssuche startet den Balken mehrfach neu, deshalb
+  steht die Phase daneben.
 - **Duplikat-Scan findet re-encodete Videos**: Der bisherige Video-Pass gruppiert
   nach gerundeter Größe + Dauer + Auflösung. Eine transkodierte Kopie (H.264 →
   HEVC, 1080p → 720p, anderer CRF) teilt keinen dieser Werte und landete damit

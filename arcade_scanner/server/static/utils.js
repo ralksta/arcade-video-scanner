@@ -100,10 +100,10 @@ function showToast(message, type = 'info', duration = 2800) {
     const toast = document.createElement('div');
     toast.className = `settings-toast toast-${type}`;
     toast.innerHTML = `
-        <span class="material-icons" style="font-size:18px;flex-shrink:0">${iconMap[type] || 'info'}</span>
+        <span class="material-icons" style="font-size:18px;flex-shrink:0" aria-hidden="true">${iconMap[type] || 'info'}</span>
         <span style="flex:1;min-width:0;word-break:break-word">${message}</span>
-        <button onclick="this.closest('.settings-toast')._dismiss()" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;opacity:.6;display:flex;align-items:center">
-            <span class="material-icons" style="font-size:16px">close</span>
+        <button onclick="this.closest('.settings-toast')._dismiss()" aria-label="Meldung schließen" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;opacity:.6;display:flex;align-items:center">
+            <span class="material-icons" style="font-size:16px" aria-hidden="true">close</span>
         </button>
         <div class="toast-progress" style="position:absolute;bottom:0;left:0;height:2px;background:currentColor;opacity:.4;width:100%;transform-origin:left;animation:toast-shrink ${duration}ms linear forwards"></div>
     `;

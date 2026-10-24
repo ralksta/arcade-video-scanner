@@ -388,7 +388,7 @@ function updateTreemapLegend() {
             const folder = lastIdx >= 0 ? path.substring(0, lastIdx) : 'Root';
             return folder === treemapCurrentFolder;
         }).length;
-        titleEl.innerHTML = `<span class="material-icons text-sm align-middle">folder</span> ${shortName} <span style="opacity:0.6; font-size:0.85em;">(${count} Videos)</span>`;
+        titleEl.innerHTML = `<span class="material-icons text-sm align-middle" aria-hidden="true">folder</span> ${shortName} <span style="opacity:0.6; font-size:0.85em;">(${count} Videos)</span>`;
         hintEl.textContent = 'Klicken zum Abspielen';
         if (backBtn) backBtn.style.display = 'inline-flex';
     }
@@ -449,7 +449,7 @@ function setupTreemapInteraction() {
                     ? `${(block.size / 1024).toFixed(1)} GB`
                     : `${block.size.toFixed(0)} MB`;
                 tooltip.innerHTML = `
-                    <strong><span class="material-icons text-sm align-middle">folder</span> ${block.shortName}</strong>
+                    <strong><span class="material-icons text-sm align-middle" aria-hidden="true">folder</span> ${block.shortName}</strong>
                     Videos: ${block.count}<br>
                     Größe: ${sizeText}<br>
                     HIGH: ${block.highCount} • SRC: ${block.sourceCount} • OK: ${block.okCount}

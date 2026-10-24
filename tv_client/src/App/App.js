@@ -1,4 +1,5 @@
 import React, {useState, useCallback, useEffect, useRef} from 'react';
+import {serverUrl} from '../serverConfig';
 import ThemeDecorator from '@enact/limestone/ThemeDecorator';
 import Panels, {Panel} from '@enact/limestone/Panels';
 import VideoPlayer, {Video} from '@enact/limestone/VideoPlayer';
@@ -77,7 +78,7 @@ const App = (props) => {
 							autoCloseTimeout={3000}
 						>
 							<Video>
-								<source src={`http://192.168.2.183:8000/stream?path=${encodeURIComponent(activeVideo.FilePath)}&token=${encodeURIComponent(sessionToken || '')}`} />
+								<source src={serverUrl(`/stream?path=${encodeURIComponent(activeVideo.FilePath)}&token=${encodeURIComponent(sessionToken || '')}`)} />
 							</Video>
 						</VideoPlayer>
 					)}

@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import {serverUrl, thumbnailUrl} from '../serverConfig';
 import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import TabLayout, {Tab} from '@enact/limestone/TabLayout';
@@ -33,29 +34,54 @@ const sortVideos = (list, sortKey) => {
 	}
 };
 
+// Muss dieselben Verdikte liefern wie evaluateCollectionMatch() im
+// Browser-Client (arcade_scanner/server/static/collections.js) und wie der
+// Python-Port in arcade_scanner/core/criteria_eval.py. Ein Differenztest
+// (tests/test_tv_collection_parity.py) hält die drei gegeneinander.
+//
+// Bewusst NICHT unterstützt, weil die TV-Oberfläche diese Dimensionen nicht
+// anbietet: media_type, format, resolution, orientation, Größen- und
+// Dauergrenzen. Sammlungen, die darauf beruhen, zeigen auf dem Fernseher mehr
+// Treffer als im Browser — dokumentiert statt still abweichend.
 const matchesCollectionCriteria = (v, criteria) => {
 	if (!criteria) return true;
 	const inc = criteria.include || {};
 	const exc = criteria.exclude || {};
 
+	// Die API liefert das Feld als `Status` mit großem S. Hier stand `v.status`:
+	// immer undefined, womit 'optimized' nie und 'pending' immer traf — auf dem
+	// Fernseher zeigte dieselbe Sammlung also nichts oder alles.
+	const status = v.Status || '';
+	const codec = (v.codec || '').toLowerCase();
+
+	// Vault-Videos gehören in keine Sammlung — gleiche Regel wie im Browser.
+	// Der TV-Client filtert sie zwar beim Laden schon heraus, aber die Regel
+	// gehört in den Matcher: sonst hängt die Korrektheit daran, dass jeder
+	// künftige Aufrufer daran denkt.
+	if (v.hidden) return false;
+
 	// Status
 	if (inc.status && inc.status.length) {
 		const match = inc.status.some(s => {
-			if (s === 'optimized') return v.status === 'optimized';
-			if (s === 'pending')   return !v.status || v.status === 'pending';
-			if (s === 'favorite')  return v.favorite;
-			if (s === 'hidden')    return v.hidden;
-			return v.status === s;
+			// Gleiche Sonderregel wie im Browser: '_opt' im Dateinamen.
+			if (s === 'optimized_files') return (v.FilePath || '').includes('_opt');
+			return status === s;
 		});
 		if (!match) return false;
 	}
+	if (exc.status && exc.status.length) {
+		if (exc.status.some(s => status.toLowerCase().includes(s.toLowerCase()) || status === s)) {
+			return false;
+		}
+	}
 
-	// Codec
+	// Codec — Teilstring wie im Browser: die API liefert auch Werte wie
+	// "hevc (Main 10)", ein exakter Vergleich verfehlt die.
 	if (inc.codec && inc.codec.length) {
-		if (!inc.codec.includes(v.codec?.toLowerCase())) return false;
+		if (!inc.codec.some(c => codec.includes(c.toLowerCase()))) return false;
 	}
 	if (exc.codec && exc.codec.length) {
-		if (exc.codec.includes(v.codec?.toLowerCase())) return false;
+		if (exc.codec.some(c => codec.includes(c.toLowerCase()))) return false;
 	}
 
 	// Tags
@@ -78,10 +104,27 @@ const matchesCollectionCriteria = (v, criteria) => {
 		if (!v.FilePath.toLowerCase().includes(q)) return false;
 	}
 
-	// Favorites
-	if (criteria.favorites === true && !v.favorite) return false;
+	// Favorites — der Browser kennt beide Richtungen: true = nur Favoriten,
+	// false = Favoriten ausschließen. Letzteres fehlte hier.
+	const wantOnlyFavorites = criteria.favorites === true || criteria.favorites === 'true';
+	const wantExcludeFavorites = criteria.favorites === false || criteria.favorites === 'false';
+	if (wantOnlyFavorites && !v.favorite) return false;
+	if (wantExcludeFavorites && v.favorite) return false;
 
 	return true;
+};
+
+// Die API liefert Width und Height, kein Feld `resolution` — hier stand
+// `v.resolution || ''`, also immer ein leerer String: die Auflösung fehlte im
+// Label, ohne dass etwas kaputt aussah. Schwellwerte wie getVideoResolution()
+// im Browser-Client.
+const resolutionLabel = (v) => {
+	const maxDim = Math.max(v.Width || 0, v.Height || 0);
+	if (maxDim >= 3840) return '4K';
+	if (maxDim >= 1920) return '1080p';
+	if (maxDim >= 1280) return '720p';
+	if (maxDim > 0) return 'SD';
+	return '';
 };
 
 const formatSize = (mb) => {
@@ -120,7 +163,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		}
 
 		// Videos abrufen
-		const videosPromise = fetch('http://192.168.2.183:8000/api/videos', { headers })
+		const videosPromise = fetch(serverUrl('/api/videos'), { headers })
 			.then(res => {
 				if (res.status === 401) {
 					localStorage.removeItem('arcade_session_token');
@@ -140,7 +183,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 			});
 
 		// User-Daten für Smart Collections und Favoriten abrufen
-		const userDataPromise = fetch('http://192.168.2.183:8000/api/user/data', { headers })
+		const userDataPromise = fetch(serverUrl('/api/user/data'), { headers })
 			.then(res => {
 				if (res.ok) return res.json();
 				return null;
@@ -248,7 +291,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		const isImage = v.media_type === 'image';
 		const sizeStr = formatSize(v.Size_MB);
 		const durationStr = formatDuration(v.Duration_Sec);
-		const resStr = v.resolution || '';
+		const resStr = resolutionLabel(v);
 
 		const labelText = [
 			sizeStr,
@@ -259,7 +302,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 		return (
 			<ImageItem
 				{...itemProps}
-				src={`http://192.168.2.183:8000/thumbnails/${v.thumb}`}
+				src={thumbnailUrl(v.thumb)}
 				label={labelText}
 				onClick={() => onSelectVideo(v)}
 				wideImage={!isImage}
@@ -325,7 +368,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 										{favorites.slice(0, 6).map(v => (
 											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
 												<ImageItem
-													src={`http://192.168.2.183:8000/thumbnails/${v.thumb}`}
+													src={thumbnailUrl(v.thumb)}
 													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
 													onClick={() => onSelectVideo(v)}
 													wideImage
@@ -351,7 +394,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 										{recommendations.map(v => (
 											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
 												<ImageItem
-													src={`http://192.168.2.183:8000/thumbnails/${v.thumb}`}
+													src={thumbnailUrl(v.thumb)}
 													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
 													onClick={() => onSelectVideo(v)}
 													wideImage
@@ -372,7 +415,7 @@ const MainPanel = ({onSelectVideo, onAuthFailed, ...props}) => {
 										{recent.slice(0, 6).map(v => (
 											<div key={v.FilePath} style={{width: ri.scale(280) + 'px', flexShrink: 0}}>
 												<ImageItem
-													src={`http://192.168.2.183:8000/thumbnails/${v.thumb}`}
+													src={thumbnailUrl(v.thumb)}
 													label={v.Size_MB ? `${v.Size_MB.toFixed(1)} MB` : ''}
 													onClick={() => onSelectVideo(v)}
 													wideImage

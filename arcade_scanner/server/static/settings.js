@@ -48,6 +48,12 @@ async function openSettings() {
         const precomputeThumbsCheckbox = document.getElementById('settingsPrecomputeThumbs');
         if (precomputeThumbsCheckbox) precomputeThumbsCheckbox.checked = data.precompute_thumbnails !== false;
 
+        const proxyStreamingCheckbox = document.getElementById('settingsProxyStreaming');
+        if (proxyStreamingCheckbox) proxyStreamingCheckbox.checked = data.proxy_streaming !== false;
+
+        const proxyRootInput = document.getElementById('settingsProxyRoot');
+        if (proxyRootInput) proxyRootInput.value = data.proxy_root || '';
+
         const verboseScanningCheckbox = document.getElementById('settingsVerboseScanning');
         if (verboseScanningCheckbox) verboseScanningCheckbox.checked = data.verbose_scanning === true;
 
@@ -85,6 +91,46 @@ async function openSettings() {
         document.getElementById('statTotal').textContent = `${stats.total_mb} MB`;
     } catch (e) {
         console.error('Failed to load settings:', e);
+    }
+
+    loadEmbeddingStatus();
+}
+
+/**
+ * Abdeckung des Ähnlichkeits-Index anzeigen.
+ *
+ * Ohne diese Auskunft ist von außen nicht zu unterscheiden, ob es zu einem
+ * Medium keine ähnlichen gibt oder ob schlicht kein Index existiert — die
+ * Leiste im Cinema sieht in beiden Fällen gleich leer aus.
+ */
+async function loadEmbeddingStatus() {
+    const value = document.getElementById('statEmbeddingCoverage');
+    const bar = document.getElementById('statEmbeddingBar');
+    const hint = document.getElementById('statEmbeddingHint');
+    if (!value || !bar || !hint) return;
+
+    try {
+        const response = await fetch('/api/similar/status');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        value.textContent = `${data.indexed.toLocaleString('de-DE')} / ${data.total.toLocaleString('de-DE')}`;
+        bar.style.width = `${data.coverage}%`;
+
+        if (data.indexed === 0) {
+            hint.textContent = 'Kein Index vorhanden — mit scripts/media_indexer.py anlegen.';
+        } else if (data.indexed < data.total) {
+            const missing = data.total - data.indexed;
+            hint.textContent = `${data.coverage}% abgedeckt, ${missing.toLocaleString('de-DE')} Medien fehlen noch`
+                + (data.models.length ? ` · Modell: ${data.models.join(', ')}` : '');
+        } else {
+            hint.textContent = 'Vollständig indiziert'
+                + (data.models.length ? ` · Modell: ${data.models.join(', ')}` : '');
+        }
+    } catch (e) {
+        console.error('Index-Status nicht abrufbar:', e);
+        value.textContent = '—';
+        hint.textContent = 'Status konnte nicht geladen werden.';
     }
 }
 
@@ -141,6 +187,8 @@ async function saveSettings() {
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
         encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
         precompute_thumbnails: document.getElementById('settingsPrecomputeThumbs')?.checked ?? true,
+        proxy_streaming: document.getElementById('settingsProxyStreaming')?.checked ?? true,
+        proxy_root: (document.getElementById('settingsProxyRoot')?.value ?? '').trim(),
         verbose_scanning: document.getElementById('settingsVerboseScanning')?.checked || false
     };
 
@@ -436,7 +484,7 @@ function markSettingsSaved() {
     const indicator = document.querySelector('.save-indicator');
     if (indicator) {
         indicator.className = 'save-indicator saved';
-        indicator.innerHTML = '<span class="material-icons">check_circle</span><span>All changes saved</span>';
+        indicator.innerHTML = '<span class="material-icons" aria-hidden="true">check_circle</span><span>All changes saved</span>';
     }
 }
 
@@ -547,7 +595,7 @@ function rescanLibrary() {
     const stopBtn = document.getElementById('stopScanBtn');
     const originalContent = btn.innerHTML;
 
-    btn.innerHTML = '<span class="material-icons spin">sync</span>';
+    btn.innerHTML = '<span class="material-icons spin" aria-hidden="true">sync</span>';
     btn.style.pointerEvents = 'none';
     if (stopBtn) stopBtn.classList.remove('hidden');
 
@@ -616,15 +664,32 @@ function renderSavedViews() {
 
     const views = window.userSettings?.saved_views || [];
 
+    // Der Container war fest `hidden md:flex` verdrahtet: auf dem Desktop nahm er
+    // auch ohne gespeicherte Ansichten Platz weg, auf dem Handy war er gar nicht
+    // erreichbar. Sichtbarkeit hängt jetzt am Inhalt, nicht an der Bildschirmbreite.
+    container.classList.toggle('hidden', views.length === 0);
+    container.classList.toggle('flex', views.length > 0);
+
     views.forEach(view => {
         const chip = document.createElement('button');
-        chip.className = 'view-chip';
-        // highlight if currently active? (complex to strict match, skip for now)
+        chip.className = 'view-chip flex-shrink-0';
 
-        chip.innerHTML = `
-            <span onclick="loadView('${view.id}')">${view.name}</span>
-            <span class="material-icons chip-delete" onclick="deleteView('${view.id}', event)">close</span>
-        `;
+        // Ansichtsnamen sind frei eingegeben. Ein Apostroph im Namen zerlegte den
+        // interpolierten onclick-Handler und machte den Chip unklickbar — und
+        // escapeHtml hilft hier nicht: der HTML-Parser macht aus &#39; wieder ein
+        // Apostroph, bevor der JS-Parser die Zeile sieht. Also gar nicht erst
+        // interpolieren, sondern Knoten bauen und Listener anhängen.
+        const label = document.createElement('span');
+        label.textContent = view.name;
+        label.addEventListener('click', () => loadView(view.id));
+
+        const remove = document.createElement('span');
+        remove.className = 'material-icons chip-delete';
+        remove.setAttribute('aria-hidden', 'true');
+        remove.textContent = 'close';
+        remove.addEventListener('click', (event) => deleteView(view.id, event));
+
+        chip.append(label, remove);
         container.appendChild(chip);
     });
 }
@@ -708,15 +773,13 @@ function deleteView(id, event) {
  * Used for background saves (views, collections, etc.)
  */
 function saveSettingsWithoutReload() {
-    fetch(`/api/settings`, {
+    // Speichert Views/Collections im Hintergrund. Schlägt das fehl, ist die
+    // Ansicht nur scheinbar gespeichert — deshalb hier eine sichtbare Meldung.
+    apiWrite(`/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(window.userSettings)
-    }).then(r => r.json()).then(data => {
-        if (data.success) {
-            // Views saved
-        }
-    });
+    }, { action: 'Einstellungen speichern' });
 }
 
 // ============================================================================
@@ -875,6 +938,9 @@ window.importSettings = importSettings;
 
 // --- REMOTE QUEUE STATUS ---
 let _queuePollInterval = null;
+let _queuePollMs = 0;
+
+const QUEUE_ACTIVE_STATES = ['pending', 'downloading', 'encoding', 'uploading'];
 
 async function loadQueueStatus() {
     try {
@@ -885,9 +951,12 @@ async function loadQueueStatus() {
         if (!tbody) return;
 
         if (!jobs.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-600">No jobs yet</td></tr>';
+            _retuneQueuePolling(false);
             return;
         }
+
+        _retuneQueuePolling(jobs.some(j => QUEUE_ACTIVE_STATES.includes(j.status)));
 
         const statusBadge = (s) => {
             const map = {
@@ -899,7 +968,7 @@ async function loadQueueStatus() {
                 failed: 'bg-red-500/20 text-red-300',
                 cancelled: 'bg-gray-500/20 text-gray-300'
             };
-            return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-white/10 text-gray-400'}">${s}</span>`;
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || 'bg-ink/10 text-gray-400'}">${s}</span>`;
         };
 
         const timeAgo = (ts) => {
@@ -910,13 +979,40 @@ async function loadQueueStatus() {
             return `${Math.floor(diff / 3600)}h ago`;
         };
 
+        const eta = (secs) => {
+            if (!secs || secs <= 0) return '';
+            if (secs < 60) return ` · ${secs}s left`;
+            if (secs < 3600) return ` · ${Math.round(secs / 60)}m left`;
+            return ` · ${(secs / 3600).toFixed(1)}h left`;
+        };
+
+        // Percentages are per encode pass — the quality search restarts the bar
+        // several times, which is what the phase label explains.
+        const progressCell = (j) => {
+            if (!QUEUE_ACTIVE_STATES.includes(j.status)) {
+                return j.saved_bytes > 0
+                    ? `<span class="text-xs text-green-400">−${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB</span>`
+                    : '<span class="text-xs text-gray-600">—</span>';
+            }
+            const pct = Math.max(0, Math.min(100, Number(j.progress_pct) || 0));
+            const phase = j.phase || j.status;
+            return `<div class="min-w-[120px]">
+                        <div class="h-1.5 rounded-full bg-ink/10 overflow-hidden">
+                            <div class="h-full bg-accent transition-all" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="text-[10px] text-gray-500 mt-1 truncate">${escapeHtml(phase)} ${Math.round(pct)}%${eta(j.eta_seconds)}</div>
+                    </div>`;
+        };
+
         tbody.innerHTML = jobs.map(j => `
-            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+            <tr class="border-b border-ink/5 hover:bg-ink/5 transition-colors">
                 <td class="px-4 py-3">${statusBadge(j.status)}</td>
-                <td class="px-4 py-3 text-white text-xs font-mono truncate max-w-[200px]" title="${j.file_path}">${j.file_path.split(/[\\/]/).pop()}</td>
+                <td class="px-4 py-3 text-text-main text-xs font-mono truncate max-w-[200px]" title="${escapeHtml(j.file_path)}">${escapeHtml(j.file_path.split(/[\\/]/).pop())}</td>
+                <td class="px-4 py-3">${progressCell(j)}</td>
+                <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">${escapeHtml(j.worker_id || '—')}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">${timeAgo(j.created_at)}</td>
-                <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">${j.result_message || (j.saved_bytes > 0 ? `Saved ${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB` : '—')}</td>
-                <td class="px-4 py-3 text-right">${['pending', 'downloading', 'encoding'].includes(j.status) ? `<button onclick="cancelQueueJob(${j.id})" class="text-xs text-red-400 hover:text-red-300 transition-colors">Cancel</button>` : ''}</td>
+                <td class="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">${escapeHtml(j.result_message || (j.saved_bytes > 0 ? `Saved ${(j.saved_bytes / (1024 * 1024)).toFixed(1)}MB` : '—'))}</td>
+                <td class="px-4 py-3 text-right">${QUEUE_ACTIVE_STATES.includes(j.status) ? `<button onclick="cancelQueueJob(${j.id})" class="text-xs text-red-400 hover:text-red-300 transition-colors">Cancel</button>` : ''}</td>
             </tr>
         `).join('');
     } catch (e) {
@@ -937,16 +1033,29 @@ async function cancelQueueJob(jobId) {
     }
 }
 
+// Fast enough to watch a progress bar move, slow enough to stay quiet when
+// nothing is running.
+function _retuneQueuePolling(hasActiveJobs) {
+    if (!_queuePollInterval) return;
+    const wanted = hasActiveJobs ? 2000 : 10000;
+    if (wanted === _queuePollMs) return;
+    clearInterval(_queuePollInterval);
+    _queuePollMs = wanted;
+    _queuePollInterval = setInterval(loadQueueStatus, wanted);
+}
+
 // Start polling when queue section is visible
 function startQueuePolling() {
     if (_queuePollInterval) return;
+    _queuePollMs = 2000;
+    _queuePollInterval = setInterval(loadQueueStatus, _queuePollMs);
     loadQueueStatus();
-    _queuePollInterval = setInterval(loadQueueStatus, 5000);
 }
 
 function stopQueuePolling() {
     if (_queuePollInterval) clearInterval(_queuePollInterval);
     _queuePollInterval = null;
+    _queuePollMs = 0;
 }
 
 // Hook into settings nav to start/stop polling
@@ -1032,4 +1141,4 @@ function selectEncodingPreset(value) {
     if (hidden) hidden.value = value;
 }
 window.selectEncodingPreset = selectEncodingPreset;
-
+window.loadEmbeddingStatus = loadEmbeddingStatus;

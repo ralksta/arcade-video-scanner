@@ -94,8 +94,9 @@ function setWorkspaceMode(mode, preserveCollection = false) {
         }
         updateURL();
     } catch (e) {
-        alert("Error in setWorkspaceMode: " + e.message + "\\n" + e.stack);
-        console.error(e);
+        // Der Stacktrace gehört in die Konsole, nicht in einen Blocker-Dialog.
+        console.error('setWorkspaceMode:', e);
+        showToast(`Ansicht konnte nicht gewechselt werden: ${e.message}`, 'error');
     }
 }
 
@@ -120,7 +121,7 @@ function toggleLayout() {
 
     // Update button icon to show what's next
     const btn = document.getElementById('toggleView');
-    if (btn) btn.innerHTML = `<span class="material-icons">${icons[nextMode]}</span>`;
+    if (btn) btn.innerHTML = `<span class="material-icons" aria-hidden="true">${icons[nextMode]}</span>`;
 }
 
 /**
@@ -155,6 +156,10 @@ function updateGridScale(value) {
  */
 function setLayout(layout, skipURLUpdate = false) {
     currentLayout = layout;
+
+    // Treemap und Ordner-Browser rendern nicht über renderUI() — der Leer-Zustand
+    // muss trotzdem verschwinden, wenn wir aus dem Grid dorthin wechseln.
+    if (typeof updateEmptyState === 'function') updateEmptyState();
 
     const grid = document.getElementById('videoGrid');
     const treemap = document.getElementById('treemapContainer');
@@ -393,6 +398,11 @@ function loadFromURL() {
     if (params.get('folderPath')) {
         folderBrowserState.currentPath = decodeURIComponent(params.get('folderPath'));
         folderBrowserPath = folderBrowserState.currentPath;
+    } else {
+        // Kein folderPath in der URL = Wurzelebene. Ohne dieses Reset bleibt beim
+        // Zurück-Navigieren der alte Pfad stehen.
+        folderBrowserState.currentPath = null;
+        folderBrowserPath = null;
     }
 
     // Check deep links

@@ -1,13 +1,13 @@
+import gzip
 import http.server
 import json
 import mimetypes
 import os
-import socket
+import re
 import ssl
 import threading
 import time
 from http.cookies import SimpleCookie
-from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from arcade_scanner.config import (
@@ -15,6 +15,11 @@ from arcade_scanner.config import (
     DUPLICATES_CACHE_FILE,
     MAX_REQUEST_SIZE,  # noqa: F401 — re-exported for routes/* lazy imports
     config,
+)
+from arcade_scanner.core.proxy_resolver import (
+    client_ip_from_handler,
+    parse_override,
+    resolve_stream_path,
 )
 from arcade_scanner.database import db, user_db
 from arcade_scanner.security import (
@@ -26,10 +31,24 @@ from arcade_scanner.security import (
 from arcade_scanner.server.response_helpers import (
     send_bytes,
     send_json,
+    send_json_precompressed,
     send_not_modified_if_unchanged,
 )
 from arcade_scanner.server.streaming_util import serve_file_range
 from arcade_scanner.templates.dashboard_template import generate_html_report
+
+_TOKEN_QUERY_RE = re.compile(r"([?&]token=)[^&\s\"]+")
+
+
+def _redact_tokens(value):
+    """Ersetzt den Wert eines ``token``-Query-Parameters durch REDACTED.
+
+    Greift auf jedem Argument, das in die Zugriffszeile wandert. Nicht-Strings
+    bleiben unverändert, damit die Formatierung nicht bricht.
+    """
+    if not isinstance(value, str):
+        return value
+    return _TOKEN_QUERY_RE.sub(r"\1REDACTED", value)
 
 
 class _MediaCache:
@@ -45,6 +64,19 @@ class _MediaCache:
         self._lock = threading.Lock()
         self._data: list | None = None
         self._timestamp: float = 0.0
+        # Caches, die aus diesen Daten abgeleitet sind und darum gemeinsam
+        # verfallen müssen.
+        self._dependents: list = []
+
+    def register_dependent(self, cache) -> None:
+        """Meldet einen abgeleiteten Cache an, der mit-invalidiert wird.
+
+        Zwei Aufrufer (routes/settings.py, routes/queue.py) rufen
+        ``invalidate()`` direkt auf, nicht über ``db.register_on_change``.
+        Ohne diese Kopplung müsste jede solche Stelle jeden abgeleiteten Cache
+        einzeln kennen — und die nächste neue Stelle vergäße ihn.
+        """
+        self._dependents.append(cache)
 
     def get(self) -> list:
         """Gibt gecachte Resultate zurück (max. TTL alt) oder liest frisch aus DB."""
@@ -64,9 +96,55 @@ class _MediaCache:
         with self._lock:
             self._data = None
             self._timestamp = 0.0
+        # Außerhalb des eigenen Locks, damit sich die Locks nicht verschränken.
+        for dependent in self._dependents:
+            dependent.invalidate()
+
+
+class _VideosResponseCache:
+    """Fertig serialisierte (und gzip-komprimierte) ``/api/videos``-Antworten.
+
+    ``_MediaCache`` spart den Full-Table-Scan, aber JSON-Serialisierung und
+    gzip liefen bisher bei *jedem* Request neu — bei 8788 Einträgen gemessene
+    ~40 ms für ``json.dumps`` und ~54 ms für ``gzip.compress(level=6)`` auf
+    einem 4,95-MB-Body. Das ist der teuerste Einzelposten des Endpunkts, und
+    die drei Clients (Browser, TV, iOS) zahlen ihn unabhängig voneinander.
+
+    Der Body hängt ausschließlich vom Scan-Target-Satz des Nutzers und seinem
+    Admin-Flag ab (die Filterung ist reine Pfad-Präfix-Prüfung, sie verändert
+    keine Einträge). Deshalb reicht genau das als Schlüssel; Nutzer mit
+    gleichen Targets teilen sich einen Eintrag.
+    """
+
+    # Deckel gegen unbegrenztes Wachstum bei vielen unterschiedlichen
+    # Target-Sätzen. Realistisch sind es eine Handvoll.
+    MAX_ENTRIES = 8
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._entries: dict[tuple, tuple[bytes, bytes]] = {}
+
+    def get(self, key: tuple) -> tuple[bytes, bytes] | None:
+        """Liefert ``(raw, gzipped)`` oder None."""
+        with self._lock:
+            return self._entries.get(key)
+
+    def put(self, key: tuple, raw: bytes, gzipped: bytes) -> None:
+        with self._lock:
+            if len(self._entries) >= self.MAX_ENTRIES:
+                # Ältesten Eintrag verwerfen (dict behält Einfügereihenfolge).
+                self._entries.pop(next(iter(self._entries)))
+            self._entries[key] = (raw, gzipped)
+
+    def invalidate(self) -> None:
+        """Muss nach jeder Schreiboperation auf der Medien-Tabelle laufen."""
+        with self._lock:
+            self._entries.clear()
 
 
 _media_cache = _MediaCache()
+_videos_response_cache = _VideosResponseCache()
+_media_cache.register_dependent(_videos_response_cache)
 db.register_on_change(_media_cache.invalidate)
 
 
@@ -309,7 +387,19 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, format, *args):
-        """Override to suppress noisy requests (static files, thumbnails, polling)."""
+        """Override to suppress noisy requests (static files, thumbnails, polling).
+
+        Maskiert außerdem Sitzungs-Token in der Anfrage-URL. ``<video>``-Tags
+        können keinen Authorization-Header senden, deshalb akzeptiert
+        ``/stream`` den Token als Query-Parameter — es ist derselbe Token wie im
+        Cookie, also voller Kontozugriff, 30 Tage gültig.
+
+        Diese Zeilen wurden bisher nur dann unterdrückt, wenn
+        ``verbose_scanning`` ausgeschaltet war. Wer die Diagnose einschaltet,
+        schrieb damit ab sofort bei jedem Videoabruf ein gültiges Zugangs-Token
+        ins Log — eine harmlos klingende Option mit unerwarteter Folge. Maskiert
+        wird jetzt immer; der Pfad bleibt sichtbar, der Diagnosewert also auch.
+        """
         try:
             path = getattr(self, 'path', None)
 
@@ -327,7 +417,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             # Never let logging crash the request
             pass
 
-        super().log_message(format, *args)
+        super().log_message(format, *(_redact_tokens(a) for a in args))
 
     def get_current_user(self):
         """Returns the username from the session cookie, Authorization header, query parameter, or None."""
@@ -658,7 +748,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         self.send_error(403, error_msg)
                         return
 
-                    serve_file_range(self, file_path, method="GET")
+                    # Proxy selection AFTER the whitelist check: what gets
+                    # validated is always the original path. The proxy path is
+                    # derived from it and never comes from the request.
+                    serve_path, variant = resolve_stream_path(
+                        file_path,
+                        client_ip=client_ip_from_handler(self),
+                        override=parse_override(params.get("proxy", [None])[0]),
+                    )
+                    serve_file_range(self, serve_path, method="GET",
+                                     extra_headers={"X-Arcade-Variant": variant})
                 except SecurityError as e:
                     print(f"🚨 Security violation in stream: {e}")
                     self.send_error(403, "Forbidden")
@@ -668,6 +767,14 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
 
             elif self.path == "/api/cache-stats":
+                # Sitzungspflichtig: Der Wert erscheint nur im Einstellungs-Panel
+                # angemeldeter Nutzer. Ungeschützt verriet er die ungefähre Größe
+                # der Bibliothek und lief bei jedem Aufruf rekursiv über den
+                # gesamten Thumbnail-Ordner — beides ohne Not.
+                if not self.get_current_user():
+                    self.send_error(401, "Unauthorized")
+                    return
+
                 # Calculate cache sizes
                 def get_dir_size(path):
                     total = 0
@@ -719,6 +826,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Filter videos
                 user_targets = [os.path.abspath(t) for t in u.data.scan_targets if t]
+
+                # Der Body hängt nur an Targets + Admin-Flag. Liegt er fertig
+                # serialisiert und komprimiert vor, sparen wir uns json.dumps
+                # und gzip komplett (zusammen ~90 ms bei 8788 Einträgen).
+                cache_key = (tuple(user_targets), bool(u.is_admin))
+                cached = _videos_response_cache.get(cache_key)
+                if cached is not None:
+                    send_json_precompressed(self, cached[0], cached[1])
+                    return
+
                 print(f"🔍 API Debug: User '{user_name}' targets: {user_targets}")
 
                 filtered_videos = []
@@ -745,10 +862,33 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     else:
                          print(f"✅ API Success: Found {len(filtered_videos)} videos for '{user_name}' (matched {match_count} via paths).")
 
-                # send_json gzips the (potentially multi-MB) library dump
-                send_json(self, filtered_videos)
+                # Einmal serialisieren und komprimieren, dann für alle weiteren
+                # Requests mit gleichem Target-Satz wiederverwenden.
+                raw = json.dumps(filtered_videos, default=str).encode("utf-8")
+                gzipped = gzip.compress(raw, compresslevel=6)
+                _videos_response_cache.put(cache_key, raw, gzipped)
+                send_json_precompressed(self, raw, gzipped)
 
             elif self.path == "/api/debug/dump":
+                # Diese Route gab den kompletten Systemzustand ohne jede Prüfung
+                # heraus: Scan-Pfade, sämtliche Benutzernamen samt Admin-Flag
+                # und Scan-Zielen, echte Dateipfade aus der Bibliothek und die
+                # Inhalte der Mount-Verzeichnisse. Wer den Port erreichte —
+                # im LAN oder über Tailscale — bekam damit die Struktur der
+                # Bibliothek und die Benutzerliste, ohne angemeldet zu sein.
+                #
+                # Admin-pflichtig statt nur angemeldet: der Inhalt betrifft alle
+                # Nutzer, nicht nur den anfragenden.
+                debug_user = self.get_current_user()
+                if not debug_user:
+                    self.send_error(401, "Unauthorized")
+                    return
+
+                debug_account = user_db.get_user(debug_user)
+                if not debug_account or not debug_account.is_admin:
+                    self.send_error(403, "Forbidden")
+                    return
+
                 # GET: Return full system state for debugging
                 debug_info = {
                     "config": {
@@ -772,13 +912,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                     })
 
                 # DB Samples (Top 20)
-                cursor = db._conn.execute("SELECT file_path, status, media_type FROM media LIMIT 20")
-                for row in cursor:
-                    debug_info["db_stats"]["samples"].append({
-                        "path": row[0],
-                        "status": row[1],
-                        "type": row[2]
-                    })
+                debug_info["db_stats"]["samples"] = db.get_sample_rows(20)
 
                 # Mount Check
                 mount_status = {}
@@ -826,79 +960,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                 send_json(self, {"tags": tags})
 
-            # Unreachable block removed
-
-
-            # ================================================================
-            # DUPLICATE DETECTION API
-            # ================================================================
-            elif self.path.startswith("/api/queue/next"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    worker_id = params.get("worker_id", [socket.gethostname()])[0]
-                    job = db.get_next_pending(worker_id=worker_id)
-                    if job:
-                        send_json(self, job)
-                    else:
-                        self.send_response(204)
-                        self.end_headers()
-                except Exception as e:
-                    print(f"❌ Error in queue/next: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/queue/check?"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    job_id = int(params.get("job_id", [0])[0])
-                    cancelled = db.is_job_cancelled(job_id) if job_id else False
-                    send_json(self, {"cancelled": cancelled})
-                except Exception as e:
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/queue/download?"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    job_id = int(params.get("job_id", [0])[0])
-                    if not job_id:
-                        self.send_error(400, "Missing job_id")
-                        return
-
-                    # Look up job to get file path
-                    jobs = db.get_queue_status(limit=100)
-                    job = next((j for j in jobs if j["id"] == job_id), None)
-                    if not job:
-                        self.send_error(404, "Job not found")
-                        return
-
-                    file_path = job["file_path"]
-                    if not os.path.exists(file_path):
-                        db.update_job_status(job_id, "failed", result_message="Source file not found")
-                        self.send_error(404, "Source file not found")
-                        return
-
-                    file_size = os.path.getsize(file_path)
-                    filename = os.path.basename(file_path)
-                    mime, _ = mimetypes.guess_type(file_path)
-
-                    self.send_response(200)
-                    self.send_header("Content-Type", mime or "application/octet-stream")
-                    self.send_header("Content-Length", str(file_size))
-                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-                    self.send_header("X-Original-Path", file_path)
-                    self.end_headers()
-
-                    # Stream in 8KB chunks
-                    with open(file_path, 'rb') as f:
-                        while True:
-                            chunk = f.read(8192)
-                            if not chunk:
-                                break
-                            self.wfile.write(chunk)
-
-                    print(f"📤 Queue download: {filename} ({file_size / (1024*1024):.1f} MB) for job {job_id}")
-                except Exception as e:
-                    print(f"❌ Error in queue/download: {e}")
-                    self.send_error(500, str(e))
+            # NOTE: the /api/queue/* endpoints live in routes/queue.py and are
+            # dispatched at the top of do_GET/do_POST — never add copies here.
 
             else:
                 # 404 for anything else
@@ -909,14 +972,29 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
         try:
             if self.path.startswith("/stream?path="):
-                file_path = unquote(self.path.split("path=")[1])
+                # parse_qs instead of split("path="): otherwise any further
+                # query parameter ends up inside the file path.
+                params = parse_qs(urlparse(self.path).query)
+                file_path = params.get("path", [None])[0]
+
+                if not file_path:
+                    self.send_error(400, "Missing path parameter")
+                    return
 
                 # Security: Validate path
                 if not is_path_allowed(file_path):
                     self.send_error(403, "Forbidden")
                     return
 
-                serve_file_range(self, file_path, method="HEAD")
+                # Must reach the same decision as do_GET — otherwise HEAD
+                # reports the original's size while GET serves the proxy.
+                serve_path, variant = resolve_stream_path(
+                    file_path,
+                    client_ip=client_ip_from_handler(self),
+                    override=parse_override(params.get("proxy", [None])[0]),
+                )
+                serve_file_range(self, serve_path, method="HEAD",
+                                 extra_headers={"X-Arcade-Variant": variant})
 
             else:
                 self.send_error(405)
@@ -1033,113 +1111,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 handle_post_remove_photos(self)
                 return
 
-            # ================================================================
-            # DUPLICATE DETECTION - DELETE FILES
-            # ================================================================
-            # ================================================================
-            # GIF EXPORT
-            # ================================================================
-            elif self.path == "/api/queue/cancel":
-                try:
-                    content_len = int(self.headers.get('Content-Length', 0))
-                    post_body = self.rfile.read(content_len)
-                    data = json.loads(post_body)
-                    job_id = int(data.get("job_id", 0))
-
-                    if db.cancel_job(job_id):
-                        print(f"🗑️ Cancelled queue job {job_id}")
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": True}).encode())
-                    else:
-                        self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
-                        self.end_headers()
-                        self.wfile.write(json.dumps({"success": False, "error": "Job not cancellable"}).encode())
-                except Exception as e:
-                    print(f"❌ Error in queue/cancel: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path.startswith("/api/queue/upload?"):
-                try:
-                    params = parse_qs(urlparse(self.path).query)
-                    job_id = int(params.get("job_id", [0])[0])
-                    if not job_id:
-                        self.send_error(400, "Missing job_id")
-                        return
-
-                    # Look up job
-                    jobs = db.get_queue_status(limit=100)
-                    job = next((j for j in jobs if j["id"] == job_id), None)
-                    if not job:
-                        self.send_error(404, "Job not found")
-                        return
-
-                    original_path = job["file_path"]
-                    orig_stem = Path(original_path).stem
-                    orig_dir = os.path.dirname(original_path)
-                    opt_path = os.path.join(orig_dir, f"{orig_stem}_opt.mp4")
-
-                    content_len = int(self.headers.get('Content-Length', 0))
-
-                    # Stream upload to disk in chunks
-                    with open(opt_path, 'wb') as out:
-                        remaining = content_len
-                        while remaining > 0:
-                            chunk_size = min(8192, remaining)
-                            chunk = self.rfile.read(chunk_size)
-                            if not chunk:
-                                break
-                            out.write(chunk)
-                            remaining -= len(chunk)
-
-                    opt_size = os.path.getsize(opt_path)
-                    orig_size = os.path.getsize(original_path) if os.path.exists(original_path) else 0
-                    saved = orig_size - opt_size
-
-                    db.update_job_status(job_id, "done", saved_bytes=saved,
-                                        result_message=f"Optimized: {opt_size/(1024*1024):.1f}MB (saved {saved/(1024*1024):.1f}MB)")
-
-                    print(f"✅ Upload received for job {job_id}: {os.path.basename(opt_path)} ({opt_size/(1024*1024):.1f} MB, saved {saved/(1024*1024):.1f} MB)")
-
-                    # Trigger report regeneration
-                    try:
-                        current_port = self.server.server_address[1]
-                        report_debouncer.schedule(current_port)
-                    except Exception as e:
-                        print(f"⚠️ Report scheduling after upload failed: {e}")
-
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True, "opt_path": opt_path, "saved_bytes": saved}).encode())
-
-                except Exception as e:
-                    print(f"❌ Error in queue/upload: {e}")
-                    self.send_error(500, str(e))
-
-            elif self.path == "/api/queue/complete":
-                try:
-                    content_len = int(self.headers.get('Content-Length', 0))
-                    post_body = self.rfile.read(content_len)
-                    data = json.loads(post_body)
-
-                    job_id = int(data.get("job_id", 0))
-                    status = data.get("status", "done")
-                    message = data.get("message", "")
-                    saved_bytes = int(data.get("saved_bytes", 0))
-
-                    db.update_job_status(job_id, status, result_message=message, saved_bytes=saved_bytes)
-                    print(f"📋 Job {job_id} completed: {status} — {message}")
-
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"success": True}).encode())
-                except Exception as e:
-                    print(f"❌ Error in queue/complete: {e}")
-                    self.send_error(500, str(e))
+            # NOTE: the /api/queue/* endpoints live in routes/queue.py and are
+            # dispatched at the top of do_POST — never add copies here.
 
             else:
                 self.send_error(404)

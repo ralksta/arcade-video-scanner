@@ -98,6 +98,11 @@ def test_encoding_queue_handles_surrogates(store):
     except UnicodeEncodeError as e:
         pytest.fail(f"get_next_pending failed with UnicodeEncodeError: {e}")
 
+    # 3. Lookups by id feed /api/queue/download and /api/queue/upload —
+    #    an escaped path there means os.path.exists() misses the file.
+    assert store.get_job(job_id)["file_path"] == surrogate_path
+    assert store.get_queue_status()[0]["file_path"] == surrogate_path
+
 def test_thumbnail_hashing_handles_surrogates():
     from arcade_scanner.core.video_processor import create_thumbnail
 

@@ -48,7 +48,7 @@ function renderAutoTagRules() {
                 return;
             }
             list.innerHTML = rules.map(r => `
-                <div id="atrule-${r.id}" class="flex items-center gap-3 p-2 rounded-lg bg-black/5 dark:bg-white/5">
+                <div id="atrule-${r.id}" class="flex items-center gap-3 p-2 rounded-lg bg-black/5 dark:bg-ink/5">
                     <input type="checkbox" ${r.enabled ? 'checked' : ''}
                            onchange="toggleAutoTagRule('${r.id}', this.checked)">
                     <div class="min-w-0 flex-1">
@@ -63,19 +63,19 @@ function renderAutoTagRules() {
 }
 
 function toggleAutoTagRule(id, enabled) {
-    fetch('/api/autotag/rules', {
+    apiWrite('/api/autotag/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'toggle', id: id, enabled: enabled })
-    }).then(() => renderAutoTagRules());
+    }, { action: 'Regel umschalten' }).then(() => renderAutoTagRules());
 }
 
 function deleteAutoTagRule(id) {
-    fetch('/api/autotag/rules', {
+    apiWrite('/api/autotag/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete', id: id })
-    }).then(() => renderAutoTagRules());
+    }, { action: 'Regel löschen' }).then(() => renderAutoTagRules());
 }
 
 function runAutoTagRules() {

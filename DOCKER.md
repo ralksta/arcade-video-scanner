@@ -61,6 +61,7 @@ docker run -d \
 | `/media` | Media library | ✅ Yes | Mount your video/image folders here (read-only recommended) |
 | `/config` | Persistent data | ✅ Yes | Databases, settings, user data |
 | `/cache` | Thumbnails/previews | ⚠️ Recommended | Can be regenerated but slow |
+| `/proxies` | Proxy files for remote streaming | ⚪ Optional | Must be writable. Only needed when `proxy_root` is set — see [Proxy Streaming](dev-docs/proxy-streaming.md) |
 
 **Example with multiple media directories:**
 ```yaml

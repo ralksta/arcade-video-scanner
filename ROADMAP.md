@@ -16,7 +16,12 @@ This document outlines planned features and improvements for the Arcade Media Sc
 - [x] Database migration from JSON to SQLite for better performance with large libraries
 
 ### 🟢 User Experience
-- [ ] Customizable grid layout (card size, columns)
+- [x] **Customizable grid layout (card size, columns)** (bereits umgesetzt, hier
+      nur nachgetragen) — Slider in der Filter-Bar (`gridScaleSlider`) setzt
+      `--grid-min-width`; die Spaltenzahl ergibt sich daraus über
+      `repeat(auto-fill, minmax(...))`. Einstellung überlebt den Reload
+      (`localStorage`). Auf dem Handy bewusst ausgeblendet — ein Slider ist auf
+      Touch kaum präzise treffbar.
 - [x] **Stop a running scan from the UI.** (2026-08-08) `/api/scan/stop` +
       `/api/scan/status` Endpoints, Stop-Button neben dem Rescan-Button;
       `/api/rescan` läuft dafür jetzt als Hintergrund-Thread (202 + Polling
@@ -27,11 +32,22 @@ This document outlines planned features and improvements for the Arcade Media Sc
 
 ## Completed Features
 
+### ✅ Proxy Streaming — the library on the road (2026-08-16)
+- **Per-request switching**: `/stream` serves the original on the LAN and a smaller proxy over Tailscale; without a proxy always the original. `?proxy=0/1` overrides, `X-Arcade-Variant` reports the choice.
+- **One entry per video**: the proxy tree lives outside the library and is excluded from the scan paths automatically — no duplicates, originals stay untouched.
+- **Raw material detection**: `core/master_detect.py` tells camera source files from edited versions using folders, keywords, camera filename schemes and device names.
+- **Generator**: `scripts/generate_proxies.py` encodes on a remote NVENC machine, reads originals only and is resumable.
+- **Automatische Aktualisierung erledigt** (2026-08-16): veraltete Proxys werden
+  über den mtime-Vergleich erkannt, der Server fällt auf das Original zurück und
+  `generate_proxies.py` erzeugt sie neu.
+- Open: a `--local` mode for a GPU in the same machine.
+
 ### ✅ Embedding Foundation — Ähnlichkeit Teil 1 (2026-08-08)
 - **Vektor-Speicher**: `embedding_meta`/`frame_embeddings` in SQLite, float32-Blobs, L2-normalisiert.
 - **GPU-Indexer**: eigenständiges Skript mit optionalen ML-Deps (`[indexer]`), inkrementell.
 - **`/api/similar`**: Brute-Force-kNN serverseitig ohne neue Runtime-Dependencies.
-- Geplant als Teil 2–4: „Ähnliche Videos"-Leiste im Cinema, Themen-Clustering, semantische Textsuche.
+- **Teil 2 erledigt** (2026-08-16): „Ähnliche Videos"-Leiste im Cinema (`static/similar.js`, Taste `S`).
+- Geplant als Teil 3–4: Themen-Clustering, semantische Textsuche.
 
 ### ✅ Auto-Tagging Rules (2026-08-08)
 - **Regel-Engine**: Smart-Collection-Query + Ziel-Tag, läuft serverseitig nach jedem Scan.

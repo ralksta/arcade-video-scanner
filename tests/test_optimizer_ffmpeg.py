@@ -128,3 +128,35 @@ class TestProbeExtraction:
         from video_optimizer import extract_probe_clip
         probe = extract_probe_clip(tmp_path / "nope.mp4", [1.0], segment_sec=4.0, work_dir=tmp_path)
         assert probe is None
+
+
+class TestProgressCallback:
+    """scripts/mac_worker.py passes a callback so it can report encode
+    progress upstream; the local CLI passes none."""
+
+    def test_process_file_accepts_a_progress_callback(self):
+        import inspect
+
+        from video_optimizer import process_file
+        params = inspect.signature(process_file).parameters
+        assert params["progress_callback"].default is None
+        # Positional callers (mac_worker, main) must keep working.
+        assert list(params).index("progress_callback") == len(params) - 1
+
+    def test_a_broken_callback_never_kills_the_encode(self):
+        from video_optimizer import _report_progress
+
+        def boom(*_args):
+            raise RuntimeError("callback exploded")
+
+        _report_progress(boom, 1.0, 2.0, "encode")  # must not raise
+
+    def test_no_callback_is_a_no_op(self):
+        from video_optimizer import _report_progress
+        _report_progress(None, 1.0, 2.0, "encode")
+
+    def test_the_callback_receives_position_duration_and_label(self):
+        from video_optimizer import _report_progress
+        seen = []
+        _report_progress(lambda *a: seen.append(a), 30, 60, "encode Q=60")
+        assert seen == [(30.0, 60.0, "encode Q=60")]

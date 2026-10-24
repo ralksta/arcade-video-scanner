@@ -42,15 +42,45 @@ class SimilarityCache:
 _cache = SimilarityCache()
 
 
+def _handle_status(handler) -> bool:
+    """GET /api/similar/status — Abdeckung des Ähnlichkeits-Index.
+
+    Die „Ähnliche Medien"-Leiste bleibt leer, solange der Indexer nicht gelaufen
+    ist. Ohne diese Auskunft lässt sich von außen nicht unterscheiden, ob es
+    keine ähnlichen Medien gibt oder schlicht keinen Index.
+    """
+    media_db, _ = _get_deps()
+    state = media_db.get_embedding_state()
+    total = media_db.count()
+    indexed = len(state)
+    models = sorted({model for _mtime, model in state.values()})
+
+    send_json(handler, {
+        "indexed": indexed,
+        "total": total,
+        "coverage": round(indexed / total * 100, 1) if total else 0.0,
+        "models": models,
+    })
+    return True
+
+
 def handle_get(handler) -> bool:
     parsed = urlparse(handler.path)
-    if parsed.path != "/api/similar":
+    if parsed.path not in ("/api/similar", "/api/similar/status"):
         return False
 
     user_name = handler.get_current_user()
     if not user_name:
         handler.send_error(401, "Unauthorized")
         return True
+
+    if parsed.path == "/api/similar/status":
+        try:
+            return _handle_status(handler)
+        except Exception as e:
+            print(f"❌ Error in /api/similar/status: {e}")
+            handler.send_error(500, str(e))
+            return True
 
     params = parse_qs(parsed.query)
     query_path = params.get("path", [None])[0]

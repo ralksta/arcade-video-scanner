@@ -163,11 +163,11 @@ function setOptVideo(mode) {
 function updateOptCodecUI() {
     document.querySelectorAll('[data-codec-btn]').forEach(btn => {
         const isActive = btn.dataset.codecBtn === currentOptCodec;
-        btn.classList.toggle('text-white',  isActive);
-        btn.classList.toggle('bg-white/10', isActive);
+        btn.classList.toggle('text-text-main',  isActive);
+        btn.classList.toggle('bg-ink/10', isActive);
         btn.classList.toggle('shadow-sm',   isActive);
         btn.classList.toggle('text-gray-400',   !isActive);
-        btn.classList.toggle('hover:text-white', !isActive);
+        btn.classList.toggle('hover:text-text-main', !isActive);
     });
     const desc = document.getElementById('optCodecDesc');
     if (desc) {
@@ -182,8 +182,8 @@ function updateOptVideoUI() {
     const copyBtn     = document.getElementById('optVideoCopy');
     if (!compressBtn || !copyBtn) return;
 
-    const active   = ['text-white', 'bg-white/10', 'shadow-sm'];
-    const inactive = ['text-gray-400', 'hover:text-white'];
+    const active   = ['text-text-main', 'bg-ink/10', 'shadow-sm'];
+    const inactive = ['text-gray-400', 'hover:text-text-main'];
 
     if (currentOptVideo === 'compress') {
         compressBtn.classList.add(...active);
@@ -208,8 +208,8 @@ function updateOptAudioUI() {
     const enhancedBtn = document.getElementById('optAudioEnhanced');
     const standardBtn = document.getElementById('optAudioStandard');
 
-    const active   = ['text-white', 'bg-white/10', 'shadow-sm'];
-    const inactive = ['text-gray-400', 'hover:text-white'];
+    const active   = ['text-text-main', 'bg-ink/10', 'shadow-sm'];
+    const inactive = ['text-gray-400', 'hover:text-text-main'];
 
     if (currentOptAudio === 'enhanced') {
         enhancedBtn.classList.add(...active);

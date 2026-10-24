@@ -8,6 +8,7 @@ Arcade Media Scanner is a self-hosted media inventory tool that turns your local
 - **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, file size, media type, and image formats.
 - **The Vault**: Mark videos as "Archived" to keep your main lobby clean while maintaining a record of all your media.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
+- **Proxy Streaming**: Serves a smaller copy to clients outside your LAN, so high-bitrate camera files stay watchable on the road — originals untouched, no duplicate library entries.
 
 ---
 
@@ -148,6 +149,40 @@ The tool includes a specialized cross-platform video optimizer (`scripts/video_o
 
 ---
 
+## 📡 Proxy Streaming
+
+Camera source files run at 60-600 Mbit/s. No mobile connection plays that, and a small
+server cannot transcode 4K on the fly. Proxy streaming pre-computes a smaller copy and
+serves it **only** to clients outside your LAN:
+
+- **Originals are never modified** — the generator reads them, nothing in the serving path writes.
+- **No duplicate entries**: the proxy directory is excluded from scans automatically.
+- **Invisible to clients**: browser, TV and iOS clients keep requesting the original path.
+- **Fail safe**: no proxy, feature off, or bad config → the original is served as before.
+
+Clients on `10/8`, `172.16/12`, `192.168/16` and loopback count as local; Tailscale
+(`100.64.0.0/10`) and any public address count as remote. Override per request with
+`?proxy=1` / `?proxy=0`; the response carries `X-Arcade-Variant: proxy|original`.
+
+Set `proxy_root` in the Settings UI to switch it on — leaving it empty disables the
+feature entirely. Generate the files on a machine with an NVIDIA GPU:
+
+```bash
+# Preview which files would get a proxy
+python3 scripts/generate_proxies.py --remote gpubox --dry-run
+
+# Scanner in Docker: map each mounted media directory to its host path
+python3 scripts/generate_proxies.py --remote gpubox --mount /media=/srv/media
+```
+
+Camera source files are detected and skipped automatically (folder names, keywords,
+and camera filename schemes like `IMG_1234` / `DSCF0480` / `L1000689`), so proxies are
+built from your edits rather than from raw footage.
+
+📖 **[Full Proxy Streaming Reference →](dev-docs/proxy-streaming.md)**
+
+---
+
 ## ⚙️ Configuration
 
 All settings can be configured through the **Settings UI** (gear icon) or by editing `arcade_data/settings.json`.
@@ -156,6 +191,7 @@ All settings can be configured through the **Settings UI** (gear icon) or by edi
 - **Scan targets**: Directories to scan.
 - **enable_optimizer**: Master toggle for optimization features (true/false).
 - **Custom exclusions**: Paths to skip.
+- **proxy_streaming** / **proxy_root**: Proxy streaming for remote clients. Empty `proxy_root` disables it.
 
 ### Default Exclusions
 | Platform | Excluded Directories |

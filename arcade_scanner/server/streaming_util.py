@@ -83,14 +83,21 @@ def _send_file_slice(handler, file_path, start, length):
             remaining -= len(data)
 
 
-def serve_file_range(handler, file_path, method="GET"):
+def serve_file_range(handler, file_path, method="GET", extra_headers=None):
     """
     Standard implementation of HTTP Range Requests (Status 206).
     Allows browsers to seek and buffer videos efficiently.
+
+    extra_headers: optional dict of additional response headers, sent on every
+    response variant (200/206/416) — used to expose which file was served.
     """
     if not os.path.exists(file_path):
         handler.send_error(404)
         return
+
+    def _send_extra():
+        for key, value in (extra_headers or {}).items():
+            handler.send_header(key, value)
 
     stat = os.stat(file_path)
     file_size = stat.st_size
@@ -104,6 +111,7 @@ def serve_file_range(handler, file_path, method="GET"):
         handler.send_response(416)
         handler.send_header("Content-Range", f"bytes */{file_size}")
         handler.send_header("Content-Length", "0")
+        _send_extra()
         handler.end_headers()
         return
 
@@ -119,6 +127,7 @@ def serve_file_range(handler, file_path, method="GET"):
         handler.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
         handler.send_header("Content-Length", str(length))
         handler.send_header("Last-Modified", handler.date_time_string(stat.st_mtime))
+        _send_extra()
         handler.end_headers()
 
         if method == "GET":
@@ -132,6 +141,7 @@ def serve_file_range(handler, file_path, method="GET"):
     handler.send_header("Content-Length", str(file_size))
     handler.send_header("Accept-Ranges", "bytes")
     handler.send_header("Last-Modified", handler.date_time_string(stat.st_mtime))
+    _send_extra()
     handler.end_headers()
     if method == "GET":
         _send_file_slice(handler, file_path, 0, file_size)

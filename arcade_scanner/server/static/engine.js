@@ -18,6 +18,10 @@ const BATCH_SIZE = 40;
  * @param {boolean} [scrollToTop=false] - If true, scrolls viewport to top
  */
 function renderUI(reset, scrollToTop = false) {
+    // Leer-Zustand zuerst: er hängt nur an filteredVideos/Layout und muss auch
+    // dann stimmen, wenn wir gleich in einen der Early-Returns laufen.
+    if (typeof updateEmptyState === 'function') updateEmptyState();
+
     // If in treemap mode, re-render treemap instead
     if (currentLayout === 'treemap') {
         renderTreemap();
@@ -39,16 +43,51 @@ function renderUI(reset, scrollToTop = false) {
     }
 
     if (reset) {
+        // A reset render drops back to a single batch, so the page collapses and
+        // the browser snaps to the top. Remember how far we were scrolled and how
+        // many batches were on screen, so we can rebuild the same view.
+        const prevRendered = renderedCount;
+        const prevScrollY = window.scrollY;
+
         grid.innerHTML = '';
         renderedCount = 0;
 
         // Only scroll to top when explicitly requested (e.g., workspace change)
-        // This prevents scroll-jumping when filtering/sorting
+        // This prevents scroll-jumping when filtering/sorting/deleting
         if (scrollToTop) {
             window.scrollTo({ top: 0, behavior: 'instant' });
+            renderNextBatch();
+            return;
         }
+
+        // Restore the previous amount of cards, then the scroll offset.
+        const target = Math.min(prevRendered, filteredVideos.length);
+        do {
+            renderNextBatch();
+        } while (renderedCount < target);
+
+        restoreScrollPosition(prevScrollY);
+        return;
     }
     renderNextBatch();
+}
+
+/**
+ * Restore a previously captured vertical scroll offset after a reset render.
+ * Runs twice (now + next frame) because card heights settle only after layout.
+ *
+ * @param {number} y - Scroll offset in pixels
+ */
+function restoreScrollPosition(y) {
+    if (!y) return;
+
+    const apply = () => {
+        const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo({ top: Math.min(y, maxY), behavior: 'instant' });
+    };
+
+    apply();
+    requestAnimationFrame(apply);
 }
 
 /**
@@ -124,32 +163,32 @@ function createComparisonCard(pair) {
             <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group" onclick="openCinema(this)" data-path="${orig.FilePath}">
                  <img src="/thumbnails/${orig.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                    <span class="material-icons text-white text-3xl drop-shadow-lg" aria-hidden="true">play_arrow</span>
                  </div>
                  <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-black/80 text-white font-mono font-bold backdrop-blur">${formatSizeCompact(orig.Size_MB)}</span>
             </div>
             
             <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
-                <span class="truncate font-medium text-gray-300" title="${orig.FilePath}">${orig.FilePath.split(/[\\\\/]/).pop()}</span>
+                <span class="truncate font-medium text-gray-300" title="${escapeHtml(orig.FilePath)}">${escapeHtml(orig.FilePath.split(/[\\\\/]/).pop())}</span>
                 <span>${orig.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
             ${window.IS_LOCAL_ACCESS ? `
-            <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
-                <span class="material-icons text-[12px]">folder_open</span> Reveal
+            <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${orig.FilePath.replace(/'/g, "\\'")}')">
+                <span class="material-icons text-[12px]" aria-hidden="true">folder_open</span> Reveal
             </button>
             ` : ''}
         </div>
 
         <!-- Stats Center -->
-        <div class="w-full md:w-32 flex flex-col items-center justify-center gap-1 border-y md:border-y-0 md:border-x border-white/5 py-4 md:py-0 bg-white/[0.02] rounded-lg md:bg-transparent">
+        <div class="w-full md:w-32 flex flex-col items-center justify-center gap-1 border-y md:border-y-0 md:border-x border-ink/5 py-4 md:py-0 bg-ink/[0.02] rounded-lg md:bg-transparent">
              <div class="text-2xl font-bold ${isSmaller ? 'text-green-400 drop-shadow-[0_0_8px_rgba(76,217,100,0.4)]' : 'text-red-500'} font-mono tracking-tighter">${diffPct.toFixed(1)}%</div>
              <div class="text-xs text-gray-500 font-mono mb-2">${diffMB.toFixed(1)} MB</div>
              
              <button class="ds-btn ds-btn-primary w-full mt-1" onclick="keepOptimized('${encodeURIComponent(orig.FilePath)}', '${encodeURIComponent(opt.FilePath)}')">
-                <span class="material-icons text-[14px]">check</span> KEEP
+                <span class="material-icons text-[14px]" aria-hidden="true">check</span> KEEP
              </button>
-             <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-white border border-white/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
-                <span class="material-icons text-[14px]">delete</span> DISCARD
+             <button class="w-full py-2 rounded-lg bg-[var(--ds-fill-soft)] text-gray-400 hover:bg-[var(--ds-fill)] hover:text-text-main border border-ink/5 text-xs font-bold transition-all flex items-center justify-center gap-1" onclick="discardOptimized('${encodeURIComponent(opt.FilePath)}')">
+                <span class="material-icons text-[14px]" aria-hidden="true">delete</span> DISCARD
              </button>
         </div>
 
@@ -163,18 +202,18 @@ function createComparisonCard(pair) {
              <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden cursor-pointer group border-[1.5px] border-accent" onclick="openCinema(this)" data-path="${opt.FilePath}">
                  <img src="/thumbnails/${opt.thumb}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy">
                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span class="material-icons text-white text-3xl drop-shadow-lg">play_arrow</span>
+                    <span class="material-icons text-white text-3xl drop-shadow-lg" aria-hidden="true">play_arrow</span>
                  </div>
                  <span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[10px] bg-arcade-cyan/20 text-arcade-cyan font-mono font-bold backdrop-blur border border-arcade-cyan/30">${formatSizeCompact(opt.Size_MB)}</span>
             </div>
             
             <div class="text-[10px] text-gray-400 font-mono flex justify-between px-1">
-                <span class="truncate font-medium text-gray-300" title="${opt.FilePath}">${opt.FilePath.split(/[\\\\/]/).pop()}</span>
+                <span class="truncate font-medium text-gray-300" title="${escapeHtml(opt.FilePath)}">${escapeHtml(opt.FilePath.split(/[\\\\/]/).pop())}</span>
                 <span>${opt.Bitrate_Mbps.toFixed(1)} Mb/s</span>
             </div>
              ${window.IS_LOCAL_ACCESS ? `
-             <button class="text-xs text-gray-500 hover:text-white flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
-                <span class="material-icons text-[12px]">folder_open</span> Reveal
+             <button class="text-xs text-gray-500 hover:text-text-main flex items-center gap-1 px-1 transition-colors" onclick="revealInFinder('${opt.FilePath.replace(/'/g, "\\'")}')">
+                <span class="material-icons text-[12px]" aria-hidden="true">folder_open</span> Reveal
             </button>
             ` : ''}
         </div>
@@ -208,14 +247,15 @@ function keepOptimized(orig, opt) {
         })
         .catch(err => {
             console.error('keepOptimized error:', err);
-            alert('Failed to keep optimized file: ' + err.message);
+            showToast('Optimierte Datei konnte nicht übernommen werden: ' + err.message, 'error');
         });
 }
 
 function discardOptimized(opt) {
     if (!confirm("Delete the optimized file?")) return;
-    fetch(`/api/discard_optimized?path=${opt}`)
-        .then(() => {
+    apiWrite(`/api/discard_optimized?path=${opt}`, {}, { action: 'Optimierte Datei verwerfen' })
+        .then(response => {
+            if (!response) return;
             const card = document.querySelector(`[data-path="${opt}"]`);
             if (card) {
                 card.style.opacity = '0';
@@ -246,7 +286,7 @@ function discardOptimized(opt) {
  * @returns {string} HTML für den Button
  */
 function _optimizeButton(v) {
-    const cls = 'w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center ' +
+    const cls = 'w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center ' +
                 'justify-center backdrop-blur text-white transition-all transform hover:scale-110';
 
     if (window.IS_DOCKER) {
@@ -254,7 +294,7 @@ function _optimizeButton(v) {
         // hier gibt es kein Encoding-Problem.
         return `
                  <button class="${cls}" title="Queue for Mac" onclick="event.stopPropagation(); queueForRemoteEncode('${v.FilePath.replace(/'/g, "\\'")}')">
-                    <span class="material-icons">cloud_upload</span>
+                    <span class="material-icons" aria-hidden="true">cloud_upload</span>
                  </button>`;
     }
 
@@ -263,12 +303,12 @@ function _optimizeButton(v) {
         return `
                  <button class="${cls} opacity-40 cursor-not-allowed" disabled
                          title="Optimieren nicht möglich: Der Dateiname enthält ungültige UTF-8-Bytes. Datei nach UTF-8 umbenennen.">
-                    <span class="material-icons">bolt</span>
+                    <span class="material-icons" aria-hidden="true">bolt</span>
                  </button>`;
     }
     return `
                  <button class="${cls}" title="Optimize" onclick="event.stopPropagation(); window.open('/compress?path=${enc}&audio=standard', 'h_frame')">
-                    <span class="material-icons">bolt</span>
+                    <span class="material-icons" aria-hidden="true">bolt</span>
                  </button>`;
 }
 
@@ -310,6 +350,13 @@ function createVideoCard(v) {
     const lastIdx = Math.max(v.FilePath.lastIndexOf('/'), v.FilePath.lastIndexOf('\\'));
     const dirName = lastIdx >= 0 ? v.FilePath.substring(0, lastIdx) : '';
 
+    // Dateinamen dürfen fast jedes Zeichen enthalten — auch spitze Klammern.
+    // Unmaskiert in innerHTML gesetzt, führt eine Datei namens
+    // `<img src=x onerror=...>.mp4` beim Aufbau des Grids Code aus, und zwar in
+    // der Sitzung des Nutzers. Bei einer Bibliothek aus heruntergeladenen
+    // Dateien ist das kein konstruierter Fall.
+    const safeFileName = escapeHtml(fileName);
+
     container.innerHTML = `
         <!-- Thumbnail (Card Media) -->
         <div class="card-media relative aspect-video bg-black overflow-hidden group cursor-pointer"
@@ -317,12 +364,14 @@ function createVideoCard(v) {
              
              <!-- Corner Checkbox -->
              <div class="absolute top-1.5 left-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                <input type="checkbox" class="w-4 h-4 rounded-[4px] border-white/30 bg-black/50 text-accent focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
+                <input type="checkbox" class="w-4 h-4 rounded-[4px] border-ink/30 bg-black/50 text-accent focus:ring-0 cursor-pointer" aria-label="Select" onclick="event.stopPropagation(); toggleSelection(this, event, '${v.FilePath.replace(/'/g, "\\'")}')">
              </div>
 
              <button class="favorite-btn absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-full bg-black/45 flex items-center justify-center transition-all ${v.favorite ? 'text-bitrate active' : 'text-white/70 opacity-0 group-hover:opacity-100'}"
-                onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))">
-                <span class="material-icons text-lg">${v.favorite ? 'star' : 'star_border'}</span>
+                onclick="event.stopPropagation(); toggleFavorite(this.closest('.video-card-container'))"
+                aria-label="${v.favorite ? 'Favorit entfernen' : 'Als Favorit markieren'}"
+                title="${v.favorite ? 'Favorit' : 'Add to Favorites'}">
+                <span class="material-icons text-lg" aria-hidden="true">${v.favorite ? 'star' : 'star_border'}</span>
              </button>
 
              <!-- Thumbnail with Skeleton Loader -->
@@ -339,15 +388,15 @@ function createVideoCard(v) {
              <!-- Quick Actions Overlay -->
              <div class="hidden md:flex absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-3">
                  ${window.IS_LOCAL_ACCESS ? `
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
-                    <span class="material-icons">folder_open</span>
+                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="Reveal" onclick="event.stopPropagation(); revealInFinder('${v.FilePath.replace(/'/g, "\\'")}')">
+                    <span class="material-icons" aria-hidden="true">folder_open</span>
                  </button>
                  ` : ''}
                  <button class="w-11 h-11 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] flex items-center justify-center backdrop-blur transition-colors" title="Play" onclick="event.stopPropagation(); openCinema(this.closest('.card-media'))">
-                    <span class="material-icons text-3xl">play_arrow</span>
+                    <span class="material-icons text-3xl" aria-hidden="true">play_arrow</span>
                  </button>
-                 <button class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
-                    <span class="material-icons">${v.hidden ? 'unarchive' : 'archive'}</span>
+                 <button class="w-10 h-10 rounded-full bg-ink/10 hover:bg-ink/20 flex items-center justify-center backdrop-blur text-white transition-all transform hover:scale-110" title="${v.hidden ? 'Restore' : 'Move to Vault'}" onclick="event.stopPropagation(); toggleHidden(this.closest('.video-card-container'))">
+                    <span class="material-icons" aria-hidden="true">${v.hidden ? 'unarchive' : 'archive'}</span>
                  </button>
                   ${(window.userSettings?.enable_optimizer !== false && window.ENABLE_OPTIMIZER !== false) ? _optimizeButton(v) : ''}
              </div>
@@ -371,8 +420,8 @@ function createVideoCard(v) {
 
         <!-- Content -->
         <div class="card-body px-[11px] py-2.5 flex flex-col gap-0.5">
-            <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${fileName}">${fileName}</h3>
-            <p class="text-[10.5px] text-text-muted truncate" title="${v.FilePath}">${dirName}</p>
+            <h3 class="text-[12.5px] font-medium text-text-main truncate" title="${safeFileName}">${safeFileName}</h3>
+            <p class="text-[10.5px] text-text-muted truncate" title="${escapeHtml(v.FilePath)}">${escapeHtml(dirName)}</p>
 
             ${renderVideoCardTags(v.tags || [])}
 
@@ -863,10 +912,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadAvailableTags();
     }
 
-    // Handle URL Back/Forward
-    window.onpopstate = (event) => {
-        loadFromURL();
-    };
+    // Back/Forward wird von genau EINEM Handler bedient — dem
+    // addEventListener('popstate', ...) weiter oben in dieser Datei. Ein zweiter
+    // Handler hier hat den wiederhergestellten State direkt wieder überschrieben.
 
     // --- CATEGORY MANAGEMENT FUNCTIONS ---
     function getAvailableCategories() {
@@ -912,14 +960,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             select.classList.add('hidden');
             input.classList.remove('hidden');
             input.focus();
-            btn.innerHTML = '<span class="material-icons text-sm">close</span>';
+            btn.innerHTML = '<span class="material-icons text-sm" aria-hidden="true">close</span>';
             btn.title = "Cancel";
         } else {
             // Hide input, show select
             select.classList.remove('hidden');
             input.classList.add('hidden');
             input.value = '';
-            btn.innerHTML = '<span class="material-icons text-sm">add</span>';
+            btn.innerHTML = '<span class="material-icons text-sm" aria-hidden="true">add</span>';
             btn.title = "Add new category";
         }
     }
@@ -990,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             setLayout('treemap');
             // Update toggle button icon
             const btn = document.getElementById('toggleView');
-            if (btn) btn.innerHTML = '<span class="material-icons">view_module</span>';
+            if (btn) btn.innerHTML = '<span class="material-icons" aria-hidden="true">view_module</span>';
         });
     }
 
@@ -1108,7 +1156,10 @@ function checkSetupRequired() {
             if (!data.setup_complete) {
                 showSetupWizard();
             }
-        });
+        })
+        // Reine Statusabfrage beim Start: schlägt sie fehl, bleibt es beim
+        // normalen Dashboard — kein Toast, aber auch keine stille Rejection.
+        .catch(err => console.error('Setup-Status nicht abrufbar:', err));
 }
 
 function showSetupWizard() {
@@ -1130,7 +1181,10 @@ function hideSetupWizard() {
 
 function loadSetupDirectories() {
     fetch('/api/setup/directories')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        })
         .then(data => {
             const listEl = document.getElementById('setupDirectoryList');
             if (!listEl) return;
@@ -1146,14 +1200,26 @@ function loadSetupDirectories() {
                 return `<div class="setup-dir-card" data-path="${dir.path}" onclick="toggleSetupDirectory('${dir.path}')">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <span class="material-icons text-arcade-cyan">${dir.is_root ? 'folder_open' : 'folder'}</span>
-                            <div><div class="text-white font-medium">${displayName}</div>
+                            <span class="material-icons text-arcade-cyan" aria-hidden="true">${dir.is_root ? 'folder_open' : 'folder'}</span>
+                            <div><div class="text-text-main font-medium">${displayName}</div>
                             <div class="text-xs text-gray-500">${sizeGB} GB • ${dir.file_count.toLocaleString()} files</div></div>
                         </div>
-                        <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan">check_circle</span></div>
+                        <div class="setup-dir-checkbox hidden"><span class="material-icons text-arcade-cyan" aria-hidden="true">check_circle</span></div>
                     </div>
                 </div>`;
             }).join('');
+        })
+        .catch(err => {
+            // Ohne diesen Zweig bleibt der Einrichtungs-Assistent bei einem
+            // Serverfehler dauerhaft leer — ohne jeden Hinweis.
+            console.error('Verzeichnisse nicht abrufbar:', err);
+            const listEl = document.getElementById('setupDirectoryList');
+            if (listEl) {
+                listEl.innerHTML = '<div class="text-center py-8 text-danger">'
+                    + 'Verzeichnisse konnten nicht geladen werden. '
+                    + '<button onclick="loadSetupDirectories()" class="underline">Erneut versuchen</button>'
+                    + '</div>';
+            }
         });
 }
 
@@ -1178,17 +1244,17 @@ function toggleSetupDirectory(path) {
 function completeSetup() {
     if (selectedSetupDirectories.length === 0) return;
 
-    fetch('/api/setup/complete', {
+    apiWrite('/api/setup/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             scan_targets: selectedSetupDirectories,
             scan_images: document.getElementById('setupScanImages')?.checked || false
         })
-    })
-        .then(res => res.json())
+    }, { action: 'Einrichtung abschließen' })
+        .then(res => (res ? res.json() : null))
         .then(data => {
-            if (data.success) {
+            if (data && data.success) {
                 hideSetupWizard();
                 location.reload();
             }
@@ -1196,12 +1262,12 @@ function completeSetup() {
 }
 
 function skipSetup() {
-    fetch('/api/setup/complete', {
+    apiWrite('/api/setup/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scan_targets: ['/media'], scan_images: false })
-    })
-        .then(() => location.reload());
+    }, { action: 'Einrichtung überspringen' })
+        .then(res => { if (res) location.reload(); });
 }
 
 // Duplicate Checker Fullscreen Mode has been moved to duplicates.js

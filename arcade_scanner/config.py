@@ -49,6 +49,9 @@ STATIC_DIR = os.path.join(PROJECT_ROOT, "arcade_scanner", "server", "static")
 
 # Security Constants
 MAX_REQUEST_SIZE = 1024 * 1024  # 1 MB limit for API requests
+# Encoded videos come back from the remote worker as one raw body, so they need
+# their own (much larger) ceiling — see routes/queue.py /api/queue/upload.
+MAX_UPLOAD_SIZE = 64 * 1024 * 1024 * 1024  # 64 GB
 ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.mpg', '.mpeg']
 ALLOWED_THUMBNAIL_PREFIX = "thumb_"
 
@@ -117,6 +120,10 @@ DEFAULT_SETTINGS_JSON = {
     "precompute_thumbnails": True,
     "_comment_review_dir": "Fixed location for review files. If empty, uses the default arcade_data/review.",
     "review_dir": "",
+    "_comment_proxy_streaming": "Serve a smaller proxy file instead of the original when streaming from outside the LAN.",
+    "proxy_streaming": True,
+    "_comment_proxy_root": "Absolute directory holding the proxy files (mirrors the original paths). Empty = feature off. Automatically excluded from scans.",
+    "proxy_root": "",
     "_comment_verbose_scanning": "Show individual file analysis logs during scan. If disabled, only shows progress summary.",
     "verbose_scanning": False,
     "_comment_concurrency": "Performance Limits for small servers.",
@@ -158,6 +165,8 @@ class AppSettings(BaseSettings):
     precompute_thumbnails: bool = Field(True)
     enable_review_mode: bool = Field(False)
     review_dir: str = Field("")
+    proxy_streaming: bool = Field(True)
+    proxy_root: str = Field("")
     verbose_scanning: bool = Field(False)
     max_concurrent_video_scans: int = Field(2)
     max_concurrent_image_scans: int = Field(5)
@@ -293,6 +302,12 @@ class ConfigManager:
         Returns unique exclude paths from ALL users + defaults.
         """
         excludes = set(self.default_exclusions) # Start with defaults!
+
+        # The proxy tree mirrors originals that are already in the library.
+        # Excluding it here (instead of relying on the user to configure it)
+        # is what keeps every video a single entry instead of a duplicate.
+        if self.settings.proxy_root:
+            excludes.add(self.settings.proxy_root)
 
         try:
             from arcade_scanner.database.user_store import user_db

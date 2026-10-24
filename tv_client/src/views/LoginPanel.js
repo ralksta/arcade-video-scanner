@@ -1,4 +1,5 @@
 import React, {useState, useCallback, useEffect} from 'react';
+import {serverUrl} from '../serverConfig';
 import PropTypes from 'prop-types';
 import {Panel, Header} from '@enact/limestone/Panels';
 import {InputField} from '@enact/limestone/Input';
@@ -32,7 +33,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 		setLoading(true);
 		setError('');
 
-		fetch('http://192.168.2.183:8000/api/login', {
+		fetch(serverUrl('/api/login'), {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -71,7 +72,7 @@ const LoginPanel = ({onLoginSuccess, ...props}) => {
 	useEffect(() => {
 		if (hasCredentials) {
 			// loading ist bereits auf true initialisiert
-			fetch('http://192.168.2.183:8000/api/login', {
+			fetch(serverUrl('/api/login'), {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

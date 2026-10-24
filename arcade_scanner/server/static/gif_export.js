@@ -102,13 +102,13 @@ function setGifPreset(preset) {
     ['360p', '480p', '720p', '1080p', 'Original'].forEach(p => {
         const el = document.getElementById(`gifPreset${p}`);
         if (el) {
-            el.classList.remove('bg-white/10', 'shadow-sm', 'text-white');
+            el.classList.remove('bg-ink/10', 'shadow-sm', 'text-text-main');
             el.classList.add('text-gray-400');
         }
     });
     const activeEl = document.getElementById(`gifPreset${preset}`);
     if (activeEl) {
-        activeEl.classList.add('bg-white/10', 'shadow-sm', 'text-white');
+        activeEl.classList.add('bg-ink/10', 'shadow-sm', 'text-text-main');
         activeEl.classList.remove('text-gray-400');
     }
     const descriptions = {
@@ -128,13 +128,13 @@ function setGifFps(fps) {
     [10, 15, 20, 25, 30].forEach(f => {
         const el = document.getElementById(`gifFps${f}`);
         if (el) {
-            el.classList.remove('bg-white/10', 'shadow-sm', 'text-white');
+            el.classList.remove('bg-ink/10', 'shadow-sm', 'text-text-main');
             el.classList.add('text-gray-400');
         }
     });
     const activeEl = document.getElementById(`gifFps${fps}`);
     if (activeEl) {
-        activeEl.classList.add('bg-white/10', 'shadow-sm', 'text-white');
+        activeEl.classList.add('bg-ink/10', 'shadow-sm', 'text-text-main');
         activeEl.classList.remove('text-gray-400');
     }
     updateGifEstimate();
@@ -149,13 +149,13 @@ function setGifLoop(loopVal) {
     loopOptions.forEach(v => {
         const el = document.getElementById(`gifLoop${v}`);
         if (el) {
-            el.classList.remove('bg-white/10', 'shadow-sm', 'text-white');
+            el.classList.remove('bg-ink/10', 'shadow-sm', 'text-text-main');
             el.classList.add('text-gray-400');
         }
     });
     const activeEl = document.getElementById(`gifLoop${loopVal}`);
     if (activeEl) {
-        activeEl.classList.add('bg-white/10', 'shadow-sm', 'text-white');
+        activeEl.classList.add('bg-ink/10', 'shadow-sm', 'text-text-main');
         activeEl.classList.remove('text-gray-400');
     }
 }
@@ -169,14 +169,14 @@ function setGifSpeed(speed) {
     speedOptions.forEach(v => {
         const el = document.getElementById(`gifSpeed${v.toString().replace('.', '_')}`);
         if (el) {
-            el.classList.remove('bg-white/10', 'shadow-sm', 'text-white');
+            el.classList.remove('bg-ink/10', 'shadow-sm', 'text-text-main');
             el.classList.add('text-gray-400');
         }
     });
     const key = speed.toString().replace('.', '_');
     const activeEl = document.getElementById(`gifSpeed${key}`);
     if (activeEl) {
-        activeEl.classList.add('bg-white/10', 'shadow-sm', 'text-white');
+        activeEl.classList.add('bg-ink/10', 'shadow-sm', 'text-text-main');
         activeEl.classList.remove('text-gray-400');
     }
     updateGifEstimate();

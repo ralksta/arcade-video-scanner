@@ -60,3 +60,6 @@ docker-compose.yml_back*
 
 # Local docker compose overrides (user-specific paths, never commit)
 docker-compose.override.yml
+
+# Gebaute webOS-Pakete (regenerierbar über `npm run pack` in tv_client/)
+*.ipk

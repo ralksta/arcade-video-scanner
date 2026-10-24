@@ -26,7 +26,8 @@ SURFACES = {
     "surface-2": ("#ffffff", "#1a1a24"),
     "border": ("#e2e2e6", "#2a2a35"),
     "text": ("#15151d", "#f2f2f5"),
-    "text-muted": ("#5c5c66", "#6b6b76"),
+    # Dark lag mit #6b6b76 bei 3.4:1 unter AA; #7e7e8a bringt 4.5:1.
+    "text-muted": ("#5c5c66", "#7e7e8a"),
     # Fliesstext sitzt zwischen text und text-muted
     "text-body": ("#3a3a44", "#c7c7cf"),
     # Eyebrow/Label-Grau
@@ -37,17 +38,26 @@ SURFACES = {
     "card": ("#ffffff", "#14141a"),
 }
 
-# Brand + Semantik. Identisch in Light und Dark — nur EIN Accent.
+# Brand. Identisch in Light und Dark — nur EIN Accent.
+# #c4179f liegt bei 5.8:1 auf Weiss und 5.0:1 auf #0b0b10, funktioniert also
+# in beiden Modi als Text- und als Flaechenfarbe.
 BRAND = {
     "accent": "#c4179f",
     "accent-hover": "#e34fc0",
-    "accent-tint": "#e879c6",
-    # Semantische Farben ausschliesslich fuer Badges/Readouts:
-    "hevc": "#22d3c7",
-    "av1": "#a78bfa",
-    "bitrate": "#f2b544",
-    "optimized": "#4ade80",
-    "danger": "#f36969",
+}
+
+# Semantische Farben (Badges/Readouts): (light, dark).
+# Die Dark-Werte sind die bisherigen; die Light-Werte sind so weit abgedunkelt,
+# dass sie auf #ffffff mindestens 4.5:1 erreichen — die alten Pastelltoene lagen
+# dort bei 1.8–2.9:1 und waren praktisch unlesbar.
+SEMANTIC = {
+    "accent-tint": ("#a41285", "#e879c6"),
+    "hevc": ("#0e7d76", "#22d3c7"),
+    "av1": ("#6d3fd6", "#a78bfa"),
+    "bitrate": ("#8a6100", "#f2b544"),
+    "optimized": ("#12803e", "#4ade80"),
+    "danger": ("#c0342f", "#f36969"),
+    "info": ("#1d4ed8", "#93c5fd"),
 }
 
 SPACING = [4, 8, 12, 16, 24, 32, 48]
@@ -55,6 +65,29 @@ RADII = {"xs": 4, "sm": 6, "md": 8, "lg": 10}
 
 FONT_SANS = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 FONT_MONO = "ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace"
+
+
+def _relative_luminance(hex_color: str) -> float:
+    h = hex_color.lstrip("#")
+    channels = []
+    for i in (0, 2, 4):
+        c = int(h[i:i + 2], 16) / 255
+        channels.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    r, g, b = channels
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _on_color(hex_color: str) -> str:
+    """Lesbare Textfarbe fuer eine gefuellte Flaeche (Buttons, Badges, Chips).
+
+    Fuellfarben wechseln zwischen Light und Dark (bitrate ist hell im Dark- und
+    dunkel im Light-Mode), also darf das Vordergrund-Schwarz/Weiss nicht fest
+    im CSS stehen.
+    """
+    lum = _relative_luminance(hex_color)
+    white_ratio = 1.05 / (lum + 0.05)
+    black_ratio = (lum + 0.05) / 0.05
+    return "#ffffff" if white_ratio >= black_ratio else "#15151d"
 
 
 def _rgb(hex_color: str) -> str:
@@ -125,6 +158,7 @@ class Theme:
             "bitrate": c("bitrate"),
             "optimized": c("optimized"),
             "danger": c("danger"),
+            "info": c("info"),
             # Legacy-Aliase — zeigen bewusst auf den EINEN Accent bzw. die
             # passende semantische Farbe, damit nicht migrierte Dateien
             # automatisch konform werden.
@@ -135,6 +169,44 @@ class Theme:
             "arcade-magenta": c("accent"),
             "arcade-pink": c("accent-hover"),
             "arcade-gold": c("bitrate"),
+            # "ink" = Vordergrundfarbe als Flaechen-/Linienquelle. Ersetzt die
+            # frueheren `*-white/N`-Utilities: im Dark-Mode weiss, im Light-Mode
+            # schwarz — so bleiben Hairlines und Soft-Fills in beiden Modi sichtbar.
+            "ink": c("text"),
+        }
+
+        # Legacy-Tailwind-Paletten: die hellen 200–400er Toene stammen aus der
+        # dark-only Zeit und liegen im Light-Mode bei ~2:1 auf Weiss. Sie zeigen
+        # deshalb auf die mode-aware semantischen Tokens. 500+ bleibt Tailwind,
+        # damit gefuellte Buttons/Tints (bg-purple-500/20 ...) unveraendert sind.
+        for family, token in (
+            ("red", "danger"),
+            ("green", "optimized"),
+            ("emerald", "optimized"),
+            ("amber", "bitrate"),
+            ("yellow", "bitrate"),
+            ("orange", "bitrate"),
+            ("cyan", "hevc"),
+            ("blue", "info"),
+        ):
+            colors[family] = {shade: c(token) for shade in ("200", "300", "400")}
+        # purple/pink tragen im Code bewusste Light-Mode-Styles auf 200/300 —
+        # dort nur den 400er-Ton umbiegen.
+        colors["purple"] = {"400": c("av1")}
+        colors["pink"] = {"400": c("accent-tint")}
+
+        # Legacy-Graustufen zeigen auf die semantische Textskala, damit
+        # `text-gray-400` & Co. im Light-Mode nicht auf Weiss verschwinden.
+        colors["gray"] = {
+            "100": c("text"),
+            "200": c("text"),
+            "300": c("text-body"),
+            "400": c("text-label"),
+            "500": c("text-muted"),
+            "600": c("text-muted"),
+            "700": c("text-muted"),
+            "800": c("text-muted"),
+            "900": c("text"),
         }
 
         config = {
@@ -179,6 +251,15 @@ def _var_block(mode_index: int) -> str:
     for token, value in BRAND.items():
         lines.append(f"    --ds-{token}: {value};")
         lines.append(f"    --ds-{token}-rgb: {_rgb(value)};")
+        lines.append(f"    --ds-on-{token}: {_on_color(value)};")
+    for token, pair in SEMANTIC.items():
+        value = pair[mode_index]
+        lines.append(f"    --ds-{token}: {value};")
+        lines.append(f"    --ds-{token}-rgb: {_rgb(value)};")
+        # -media-rgb bleibt in beiden Modi der helle Dark-Ton: Badges & Co.
+        # liegen auf Thumbnails, nicht auf der Theme-Flaeche.
+        lines.append(f"    --ds-{token}-media-rgb: {_rgb(pair[1])};")
+        lines.append(f"    --ds-on-{token}: {_on_color(value)};")
 
     bg, surface, border = (
         SURFACES["bg"][mode_index],
@@ -205,7 +286,7 @@ def _var_block(mode_index: int) -> str:
         f"    --arcade-magenta: {BRAND['accent']};",
         f"    --arcade-pink: {BRAND['accent-hover']};",
         f"    --arcade-cyan: {BRAND['accent']};",
-        f"    --arcade-gold: {BRAND['bitrate']};",
+        f"    --arcade-gold: {SEMANTIC['bitrate'][mode_index]};",
         f"    --arcade-purple: {SURFACES['surface-2'][mode_index]};",
         f"    --surface-glass: {surface};",
         f"    --surface-border: {border};",
@@ -266,16 +347,20 @@ html, body {{
     line-height: 1;
     letter-spacing: 0.02em;
     color: rgb(var(--ds-badge-rgb));
-    background: rgb(var(--ds-badge-rgb) / 0.17);
+    /* Badges liegen immer auf Thumbnails, nie auf einer Theme-Flaeche: der
+       dunkle Scrim bleibt darum auch im Light-Mode stehen. */
+    background-color: rgba(0,0,0,0.5);
+    background-image: linear-gradient(
+        rgb(var(--ds-badge-rgb) / 0.2), rgb(var(--ds-badge-rgb) / 0.2));
     border: 1px solid rgb(var(--ds-badge-rgb) / 0.35);
     backdrop-filter: blur(4px);
 }}
-.ds-badge-accent {{ --ds-badge-rgb: var(--ds-accent-tint-rgb); }}
-.ds-badge-hevc {{ --ds-badge-rgb: var(--ds-hevc-rgb); }}
-.ds-badge-av1 {{ --ds-badge-rgb: var(--ds-av1-rgb); }}
-.ds-badge-bitrate {{ --ds-badge-rgb: var(--ds-bitrate-rgb); }}
-.ds-badge-optimized {{ --ds-badge-rgb: var(--ds-optimized-rgb); }}
-.ds-badge-danger {{ --ds-badge-rgb: var(--ds-danger-rgb); }}
+.ds-badge-accent {{ --ds-badge-rgb: var(--ds-accent-tint-media-rgb); }}
+.ds-badge-hevc {{ --ds-badge-rgb: var(--ds-hevc-media-rgb); }}
+.ds-badge-av1 {{ --ds-badge-rgb: var(--ds-av1-media-rgb); }}
+.ds-badge-bitrate {{ --ds-badge-rgb: var(--ds-bitrate-media-rgb); }}
+.ds-badge-optimized {{ --ds-badge-rgb: var(--ds-optimized-media-rgb); }}
+.ds-badge-danger {{ --ds-badge-rgb: var(--ds-danger-media-rgb); }}
 .ds-badge-neutral {{
     color: #fff;
     background: rgba(0,0,0,0.6);
