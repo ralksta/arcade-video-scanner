@@ -1985,6 +1985,18 @@ SETTINGS_MODAL_COMPONENT = """
                             </label>
                         </div>
 
+                        <!-- RAW-FOTOS -->
+                        <div class="ds-settings-card flex items-center justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="text-text-main font-medium text-sm">RAW-Fotos</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Nur Rohformate (<span class="text-accent">.cr2, .raf, .dng</span> …) aufnehmen; JPG/PNG bleiben draußen</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settingsScanRAW" class="sr-only peer" onchange="markSettingsUnsaved()">
+                                <div class="ds-peer-switch"></div>
+                            </label>
+                        </div>
+
                         <!-- REMOVE PHOTOS CONFIRMATION MODAL -->
                         <div id="removePhotosModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
                             <div class="bg-[#1a1a2e] border border-ink/10 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">

@@ -61,6 +61,9 @@ async function openSettings() {
         const imageScanCheckbox = document.getElementById('settingsScanImages');
         if (imageScanCheckbox) imageScanCheckbox.checked = data.enable_image_scanning === true;
 
+        const rawScanCheckbox = document.getElementById('settingsScanRAW');
+        if (rawScanCheckbox) rawScanCheckbox.checked = data.enable_raw_scanning === true;
+
         // Encoding preset (fast / balanced / best)
         selectEncodingPreset(data.encoding_preset || 'balanced');
 
@@ -206,6 +209,7 @@ async function saveSettings() {
 
         enable_optimizer: document.getElementById('settingsOptimizer')?.checked ?? true,
         enable_image_scanning: document.getElementById('settingsScanImages')?.checked || false,
+        enable_raw_scanning: document.getElementById('settingsScanRAW')?.checked || false,
         encoding_preset: document.getElementById('settingsEncodingPreset')?.value || 'balanced',
         precompute_thumbnails: document.getElementById('settingsPrecomputeThumbs')?.checked ?? true,
         proxy_streaming: document.getElementById('settingsProxyStreaming')?.checked ?? true,
