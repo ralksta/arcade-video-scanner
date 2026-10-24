@@ -124,7 +124,7 @@ class Theme:
         "justify-between px-3 md:px-[22px] bg-header border-b border-line/60"
     )
     sidebar_container = (
-        "hidden md:flex flex-col w-[200px] fixed left-0 top-[52px] bottom-0 "
+        "hidden md:flex flex-col w-[var(--sidebar-width)] fixed left-0 top-[52px] bottom-0 "
         "bg-sidebar border-r border-line/60 px-3 py-4 gap-0.5 z-[100]"
     )
 

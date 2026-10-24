@@ -12,6 +12,10 @@
     --amber: var(--ds-bitrate, #f2b544);
     --bg: var(--ds-bg, #0b0b10);
 
+    /* Breite der festen Seitenleiste. Theme (Klasse) und Hauptbereich
+       (margin-left) lesen denselben Wert, damit sie nicht auseinanderlaufen. */
+    --sidebar-width: 260px;
+
     /* SURFACES */
     --glass: var(--ds-fill, rgb(var(--ds-text-rgb) / 0.06));
     --glass-hover: rgb(var(--ds-text-rgb) / 0.10);
@@ -3568,4 +3572,35 @@ body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="dupl
 .search-suggestion-bulk-btn:last-child {
     border-color: rgb(var(--ds-danger-rgb) / 0.4);
     color: var(--ds-danger);
+}
+
+/* === SEITENLEISTE ===
+   Der mittlere Bereich scrollt (viele Collections), „Einstellungen" bleibt
+   unten stehen. Die Breite kommt aus --sidebar-width, damit Theme-Klasse und
+   margin-left des Hauptbereichs zusammenpassen. */
+.sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ds-hairline-strong) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background: var(--ds-hairline-strong);
+    border-radius: 3px;
+}
+
+/* Collection-Namen: höchstens zwei Zeilen, der volle Name steht im Tooltip. */
+.collection-nav-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
 }

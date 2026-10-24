@@ -180,7 +180,7 @@ def generate_html_report(report_file, server_port=8000):
     {FOLDER_SIDEBAR_COMPONENT}
 
     <!-- Desktop: Main Content Area (offset by sidebar width) -->
-    <div class="flex-1 flex flex-col md:ml-[200px] min-h-screen bg-bg relative overflow-x-hidden max-w-full">
+    <div class="flex-1 flex flex-col md:ml-[var(--sidebar-width)] min-h-screen bg-bg relative overflow-x-hidden max-w-full">
         {header_html}
 
         {FILTER_BAR_COMPONENT}
