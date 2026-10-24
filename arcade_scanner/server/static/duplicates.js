@@ -366,7 +366,16 @@ async function deleteDuplicate(groupIdx, fileIdx) {
     const path = file.path;
     const filename = path.split(/[\\/]/).pop();
 
-    if (!confirm(`Delete "${filename}"?\n\nThis cannot be undone.`)) {
+    const confirmed = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: 'Datei in den Papierkorb?',
+            message: `"${filename}" wird in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.`,
+            confirmLabel: 'In den Papierkorb',
+            danger: true,
+            icon: 'delete_outline',
+        })
+        : confirm(`"${filename}" wird in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.`);
+    if (!confirmed) {
         return;
     }
 
@@ -516,13 +525,19 @@ async function deleteAllDuplicates() {
     }
 
     // Confirmation dialog with details
-    const confirmation = confirm(
-        `DELETE ALL DUPLICATES\n\n` +
-        `This will permanently delete ${filesToDelete.length} file(s) across ${duplicateData.groups.length} groups.\n\n` +
-        `Space to be freed: ${totalSavingsMb.toFixed(1)} MB\n\n` +
-        `The best quality file in each group will be kept.\n\n` +
-        `This action CANNOT be undone. Continue?`
-    );
+    const confirmation = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: 'Alle Duplikate in den Papierkorb?',
+            message: `${filesToDelete.length} Dateien aus ${duplicateData.groups.length} Gruppen werden in den Papierkorb verschoben. Du kannst sie 30 Tage lang unter Einstellungen → Storage wiederherstellen.`,
+            details: [
+                `Frei nach dem Leeren: ${totalSavingsMb.toFixed(1)} MB`,
+                'Die beste Datei jeder Gruppe bleibt erhalten.',
+            ],
+            confirmLabel: 'In den Papierkorb',
+            danger: true,
+            icon: 'delete_sweep',
+        })
+        : confirm(`Alle ${filesToDelete.length} Duplikate in den Papierkorb verschieben? Wiederherstellen unter Einstellungen → Storage, 30 Tage lang.`);
 
     if (!confirmation) {
         return;
@@ -549,12 +564,12 @@ async function deleteAllDuplicates() {
             // Handle any failed deletions
             if (result.failed && result.failed.length > 0) {
                 showToast(
-                    `${result.deleted.length} Dateien gelöscht (${result.freed_mb.toFixed(1)} MB frei) — `
-                    + `${result.failed.length} konnten nicht gelöscht werden`,
+                    `${result.deleted.length} Dateien in den Papierkorb (${result.freed_mb.toFixed(1)} MB) — `
+                    + `${result.failed.length} konnten nicht verschoben werden`,
                     'warning', 6000
                 );
             } else {
-                showToast(`${result.deleted.length} Dateien gelöscht, ${result.freed_mb.toFixed(1)} MB frei`, 'success');
+                showToast(`${result.deleted.length} Dateien in den Papierkorb (${result.freed_mb.toFixed(1)} MB). Wiederherstellen unter Einstellungen → Storage.`, 'success');
             }
 
             // Refresh the view
@@ -876,8 +891,20 @@ async function keepDuplicateFile(side) {
         return;
     }
 
-    const fileNames = filesToDelete.map(f => f.path.split(/[\\/]/).pop()).join(', ');
-    if (!confirm(`Delete ${filesToDelete.length} file(s)?\n\n${fileNames}\n\nThis cannot be undone.`)) {
+    const fileNames = filesToDelete.map(f => f.path.split(/[\\/]/).pop());
+    const details = fileNames.slice(0, 6);
+    if (fileNames.length > 6) details.push(`… und ${fileNames.length - 6} weitere`);
+    const confirmed = typeof showConfirmDialog === 'function'
+        ? await showConfirmDialog({
+            title: filesToDelete.length === 1 ? 'Andere Datei in den Papierkorb?' : 'Andere Dateien in den Papierkorb?',
+            message: `${filesToDelete.length} Datei(en) aus dieser Gruppe werden in den Papierkorb verschoben. Die gewählte Datei bleibt erhalten. Du kannst sie 30 Tage lang wiederherstellen.`,
+            details,
+            confirmLabel: 'In den Papierkorb',
+            danger: true,
+            icon: 'delete_outline',
+        })
+        : confirm(`Move ${filesToDelete.length} file(s) to the trash?\n\n${fileNames.join(', ')}\n\nRestorable in Settings → Storage for 30 days.`);
+    if (!confirmed) {
         return;
     }
 

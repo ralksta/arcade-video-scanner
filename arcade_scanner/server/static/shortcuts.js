@@ -74,7 +74,7 @@ function isModalActive() {
     const cinema = document.getElementById('cinemaModal');
     if (cinema && cinema.classList.contains('active')) return true;
     if (window.duplicateCheckerState && window.duplicateCheckerState.isActive) return true;
-    const blocking = ['settingsModal', 'tagManagerModal', 'collectionModal', 'hiddenPathModal'];
+    const blocking = ['settingsModal', 'tagManagerModal', 'collectionModal', 'hiddenPathModal', 'confirmDialog'];
     return blocking.some(id => {
         const el = document.getElementById(id);
         return el && el.classList.contains('active');

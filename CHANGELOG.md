@@ -4,7 +4,58 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-10-24
+
+### Added
+- **Suchbegriffe mit mehr Funktionen.** Die Suchfelder in der Filterleiste
+  und im Collection-Dialog schlagen beim Tippen bekannte Ordner vor —
+  inklusive Elternpfaden wie `/media_ralf/OD`, mit Anzahl der Dateien im
+  Unterbaum. Mit `#` werden Tags vorgeschlagen; der Verlauf zeigt die zuletzt
+  benutzten Ordner und Begriffe (pro Konto gespeichert). Im Collection-Dialog
+  werden gewählte Ordner und Tags als Chips unter dem Feld angezeigt. Jede
+  Vorschlagszeile hat rechts einen **Minus-Knopf** zum Ausschließen; in den
+  Chips schaltet ein Symbol zwischen ein- und ausschließen um, das X entfernt
+  den Filter. Chips zeigen die letzten zwei Pfadsegmente (etwa
+  „Miss Blossom/web"), damit mehrere `web`-Ordner unterscheidbar bleiben.
+  Unter der Liste stehen **„Alle N einschließen/ausschließen"** für die
+  obersten Treffer eines Begriffs — damit reicht für „ProSessions ohne
+  Web-Ordner" ein Klick. Gespeichert wird weiterhin ein einziger Suchtext.
+- Die Suche versteht mehrere Begriffe (alle müssen passen), Ausschlüsse
+  (`-wort`), Anführungszeichen für Phrasen und `#tag` für Tags. Mehrere
+  **Pfade** sind dagegen ODER-verknüpft: „/a /b" findet alles unter `/a` oder
+  `/b` — das entspricht dem Anklicken mehrerer Ordner-Chips. In Pfaden steht
+  `*` als Platzhalter für beliebig viele Zeichen (auch `/`), etwa
+  `-*/web*` für „alle Ordner, deren Name mit web beginnt". Pfade mit `/`
+  gelten auf Ordnergrenze: `/media_ralf/OD` trifft nicht mehr
+  `/media_ralf/ODX`. Groß-/Kleinschreibung, Umlaute und ß sind egal. Dieselbe
+  Regel gilt in Filterleiste, Treemap, Auto-Tag-Regeln und auf dem Fernseher;
+  Collections mit gespeichertem Suchbegriff verhalten sich überall gleich.
+- **Papierkorb.** Ausdrückliche Löschungen aus Duplikaten und der
+  Mehrfachauswahl sind nicht mehr endgültig. Die Datei wandert in einen
+  versteckten Ordner `.arcade-trash` im obersten passenden Scan-Ziel (gleiche
+  Platte, also Verschieben statt Kopieren) und bleibt **30 Tage**
+  wiederherstellbar. Zurückholen und endgültig Leeren stehen in den
+  Einstellungen unter *Storage*. Favoriten, Tags und Wiedergabefortschritt
+  bleiben während der Frist erhalten; abgelaufene Einträge räumt der Server
+  beim Start und beim Öffnen des Papierkorbs auf. Der Ordner wird vom Scan
+  automatisch ausgeschlossen.
+
 ### Changed
+- **Sortierung in beide Richtungen.** Das Auswahlfeld bietet jetzt Name A–Z
+  und Z–A, Bitrate und Größe jeweils von klein nach groß und von groß nach
+  klein sowie Laufzeit und Datum in beide Richtungen. Die bisherigen
+  Sortierwerte bleiben gültig, gespeicherte Ansichten brechen nicht.
+- **Kacheln zeigen Größe und Bitrate.** Eine leise Zeile unter dem Titel
+  nennt die Dateigröße und, bei Videos, die Bitrate. Die Länge bleibt das
+  Badge auf dem Vorschaubild; Pfad, Codec und Bitrate-Balken bleiben unter
+  „Details“.
+- **Collection-Dialog mit Platz.** Der Dialog ist jetzt breit (zwei Spalten
+  auf dem Desktop, volle Höhe) statt eines schmalen Fensters mit
+  zugeklappten Akkordeons. Der Suchbegriff steht oben und hat eine große
+  Vorschlagsliste; Vorschläge sind nach *Verlauf*, *Ordner* und *Tags*
+  gruppiert. Name, Kategorie und Darstellung liegen links, Eigenschaften
+  rechts, Inhalt & Metadaten darunter. Auf dem Handy bleibt alles in einer
+  scrollbaren Spalte.
 - **Schau-Modus statt Werkstatt.** Karten in Bibliothek und Favoriten zeigen
   nur noch Bild, Titel, Laufzeit und Fortschritt. Status, Codec, Größe,
   Bitrate, Pfad und die Optimieren-Knöpfe erscheinen in Review, Duplikaten
@@ -23,6 +74,10 @@ All notable changes to this project will be documented in this file.
   mehr nach Bitrate.
 
 ### Fixed (Oberfläche)
+- **Papierkorb-Rückfragen im Design.** Löschen und endgültiges Leeren fragen
+  nicht mehr mit dem Browser-Dialog, sondern mit einem gestylten Dialog.
+  Dateinamen stehen als Liste darin, „Abbrechen“ ist vorausgewählt, Escape
+  und ein Klick auf den Hintergrund schließen ihn.
 - In der Seitenleiste blieb der erste Eintrag hervorgehoben, egal welche
   Ansicht offen war.
 - Auf dem Handy lag das Sortier-Icon auf dem Text, und die Anmeldekarte
@@ -829,6 +884,18 @@ All notable changes to this project will be documented in this file.
 - **Browser Caching**: Thumbnails are cached for 7 days (`Cache-Control: public, max-age=604800`); static assets and the dashboard revalidate via `If-Modified-Since` and get cheap `304 Not Modified` answers instead of full re-downloads.
 - **Zero-Copy Streaming**: Video streaming uses kernel `sendfile()` (with automatic fallback for SSL and 1 MB chunks instead of 64 KB), plus support for suffix ranges (`bytes=-N`) and correct clamping of over-long ranges.
 - **Connection Hygiene**: Idle keep-alive connections time out after 60s; handler threads are daemonized so open connections never block shutdown.
+
+## [7.0.0] - 2026-03-17
+
+### Added
+- **AV1-Encoding (experimentell).** Optional zusätzlich zu HEVC, mit
+  Hardware-Unterstützung (`av1_videotoolbox` auf Apple M3/M4 und
+  `av1_nvenc` auf NVIDIA RTX 40xx) und automatischem Rückfall auf HEVC.
+  Die Codec-Wahl wird pro Auftrag in der Encoding-Queue gespeichert und ist
+  im Optimize-Panel umschaltbar.
+- **Smart SSIM Skip.** Die SSIM-Prüfung entfällt, wenn ein Durchlauf weniger
+  als 10 % Einsparung verspricht; der Optimierer geht direkt zum nächsten
+  Qualitätslevel.
 
 ## [6.8.0] - 2026-01-18
 

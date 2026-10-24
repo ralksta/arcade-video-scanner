@@ -915,118 +915,230 @@ TAG_MANAGER_MODAL_COMPONENT = """
 
 COLLECTION_MODAL_COMPONENT = """
 <!-- Collection Manager Modal -->
-<div id="collectionModal" class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-4">
-    <div class="bg-surface border border-ink/10 rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+<div id="collectionModal" class="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-surface border border-ink/10 rounded-2xl w-full max-w-6xl h-[92vh] max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
 
         <!-- Header -->
-        <div class="p-4 border-b border-ink/5 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-3">
+        <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-ink/5 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
                 <span class="material-icons text-arcade-cyan" aria-hidden="true">auto_awesome</span>
-                <h2 id="collectionModalTitle" class="font-semibold text-text-main">New Collection</h2>
+                <h2 id="collectionModalTitle" class="font-semibold text-text-main truncate">New Collection</h2>
                 <span class="text-xs text-gray-600 ml-2 hidden sm:inline">Press <kbd class="px-1 py-0.5 bg-ink/5 rounded text-[10px]">ESC</kbd> to close</span>
             </div>
-            <button onclick="closeCollectionModal()" class="text-gray-500 hover:text-text-main p-1 hover:bg-ink/5 rounded transition-colors" aria-label="Close dialog">
+            <button onclick="closeCollectionModal()" class="text-gray-500 hover:text-text-main p-1.5 hover:bg-ink/5 rounded-lg transition-colors" aria-label="Close dialog">
                 <span class="material-icons" aria-hidden="true">close</span>
             </button>
         </div>
 
-        <!-- Body -->
-        <div class="flex-1 overflow-y-auto p-4" style="max-height: calc(90vh - 180px);">
+        <!-- Body: links Suche und Metadaten, rechts die Eigenschaften -->
+        <div class="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
+            <div class="lg:h-full lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
 
-            <!-- Appearance Section (Always Visible) -->
-            <section class="mb-4">
-                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Appearance</h3>
-                <div class="flex gap-3">
-                    <input type="text" id="collectionName" placeholder="Collection name..."
-                           class="flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors">
+                <!-- Linke Spalte -->
+                <div class="min-w-0 p-4 sm:p-5 lg:p-6 space-y-5 border-b lg:border-b-0 lg:border-r border-ink/5 lg:min-h-0 lg:overflow-y-auto">
 
-                    <!-- Icon Picker -->
-                    <div class="relative">
-                        <button id="collectionIconBtn" onclick="toggleCollectionIconPicker()"
-                                class="w-10 h-10 rounded-lg border border-ink/10 flex items-center justify-center hover:border-arcade-cyan/30 hover:bg-ink/5 transition-colors bg-black/40"
-                                aria-label="Choose icon">
-                            <span class="material-icons text-arcade-cyan" id="selectedCollectionIcon" aria-hidden="true">folder_special</span>
-                        </button>
-                        <div id="collectionIconPicker" class="hidden absolute right-0 top-12 bg-[#1a1a24] border border-ink/10 rounded-lg p-2 shadow-xl z-10 grid grid-cols-5 gap-1 w-48">
-                            <button onclick="selectCollectionIcon('movie')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Movie icon"><span class="material-icons text-sm" aria-hidden="true">movie</span></button>
-                            <button onclick="selectCollectionIcon('photo_library')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Photo library icon"><span class="material-icons text-sm" aria-hidden="true">photo_library</span></button>
-                            <button onclick="selectCollectionIcon('folder_special')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Special folder icon"><span class="material-icons text-sm" aria-hidden="true">folder_special</span></button>
-                            <button onclick="selectCollectionIcon('star')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Star icon"><span class="material-icons text-sm" aria-hidden="true">star</span></button>
-                            <button onclick="selectCollectionIcon('favorite')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Favorite icon"><span class="material-icons text-sm" aria-hidden="true">favorite</span></button>
-                            <button onclick="selectCollectionIcon('bolt')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Bolt icon"><span class="material-icons text-sm" aria-hidden="true">bolt</span></button>
-                            <button onclick="selectCollectionIcon('whatshot')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Hot icon"><span class="material-icons text-sm" aria-hidden="true">whatshot</span></button>
-                            <button onclick="selectCollectionIcon('visibility')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Visibility icon"><span class="material-icons text-sm" aria-hidden="true">visibility</span></button>
-                            <button onclick="selectCollectionIcon('schedule')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Schedule icon"><span class="material-icons text-sm" aria-hidden="true">schedule</span></button>
-                            <button onclick="selectCollectionIcon('category')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Category icon"><span class="material-icons text-sm" aria-hidden="true">category</span></button>
+                    <!-- Name & Darstellung -->
+                    <section>
+                        <div class="flex items-end gap-2">
+                            <div class="flex-1 min-w-0">
+                                <label for="collectionName" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">Name</label>
+                                <input type="text" id="collectionName" placeholder="z. B. ProSessions – Web"
+                                       class="w-full bg-ink/5 border border-ink/10 rounded-lg px-3 py-2.5 text-base text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors">
+                            </div>
+
+                            <!-- Icon Picker -->
+                            <div class="relative">
+                                <button id="collectionIconBtn" onclick="toggleCollectionIconPicker()"
+                                        class="w-11 h-11 rounded-lg border border-ink/10 flex items-center justify-center hover:border-arcade-cyan/30 hover:bg-ink/5 transition-colors bg-black/40"
+                                        aria-label="Choose icon">
+                                    <span class="material-icons text-arcade-cyan" id="selectedCollectionIcon" aria-hidden="true">folder_special</span>
+                                </button>
+                                <div id="collectionIconPicker" class="hidden absolute right-0 top-12 bg-[#1a1a24] border border-ink/10 rounded-lg p-2 shadow-xl z-50 grid grid-cols-5 gap-1 w-56">
+                                    <button onclick="selectCollectionIcon('movie')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Movie icon"><span class="material-icons text-sm" aria-hidden="true">movie</span></button>
+                                    <button onclick="selectCollectionIcon('photo_library')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Photo library icon"><span class="material-icons text-sm" aria-hidden="true">photo_library</span></button>
+                                    <button onclick="selectCollectionIcon('folder_special')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Special folder icon"><span class="material-icons text-sm" aria-hidden="true">folder_special</span></button>
+                                    <button onclick="selectCollectionIcon('star')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Star icon"><span class="material-icons text-sm" aria-hidden="true">star</span></button>
+                                    <button onclick="selectCollectionIcon('favorite')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Favorite icon"><span class="material-icons text-sm" aria-hidden="true">favorite</span></button>
+                                    <button onclick="selectCollectionIcon('bolt')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Bolt icon"><span class="material-icons text-sm" aria-hidden="true">bolt</span></button>
+                                    <button onclick="selectCollectionIcon('whatshot')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Hot icon"><span class="material-icons text-sm" aria-hidden="true">whatshot</span></button>
+                                    <button onclick="selectCollectionIcon('visibility')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Visibility icon"><span class="material-icons text-sm" aria-hidden="true">visibility</span></button>
+                                    <button onclick="selectCollectionIcon('schedule')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Schedule icon"><span class="material-icons text-sm" aria-hidden="true">schedule</span></button>
+                                    <button onclick="selectCollectionIcon('category')" class="p-2 hover:bg-arcade-cyan/10 rounded transition-colors" aria-label="Category icon"><span class="material-icons text-sm" aria-hidden="true">category</span></button>
+                                </div>
+                            </div>
+
+                            <!-- Color Picker -->
+                            <div class="relative">
+                                <button id="collectionColorBtn" onclick="toggleCollectionColorPicker()"
+                                        class="w-11 h-11 rounded-lg border-2 border-ink/20 flex items-center justify-center hover:border-ink/40 hover:scale-105 transition-all shadow-lg"
+                                        style="background-color: #00ffd0;"
+                                        aria-label="Choose color">
+                                </button>
+                                <input type="hidden" id="collectionColor" value="#00ffd0">
+                                <div id="collectionColorPicker" class="hidden absolute right-0 top-12 bg-[#1a1a24] border border-ink/10 rounded-lg p-3 shadow-xl z-50 grid grid-cols-5 gap-2 w-64">
+                                    <button onclick="selectCollectionColor('#00ffd0')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #00ffd0;" aria-label="Cyan color"></button>
+                                    <button onclick="selectCollectionColor('#F4B342')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #F4B342;" aria-label="Orange color"></button>
+                                    <button onclick="selectCollectionColor('#DE1A58')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #DE1A58;" aria-label="Red color"></button>
+                                    <button onclick="selectCollectionColor('#8F0177')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #8F0177;" aria-label="Purple color"></button>
+                                    <button onclick="selectCollectionColor('#6366f1')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #6366f1;" aria-label="Indigo color"></button>
+                                    <button onclick="selectCollectionColor('#22c55e')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #22c55e;" aria-label="Green color"></button>
+                                    <button onclick="selectCollectionColor('#f97316')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #f97316;" aria-label="Bright orange color"></button>
+                                    <button onclick="selectCollectionColor('#06b6d4')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #06b6d4;" aria-label="Teal color"></button>
+                                    <button onclick="selectCollectionColor('#ec4899')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #ec4899;" aria-label="Pink color"></button>
+                                    <button onclick="selectCollectionColor('#a855f7')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #a855f7;" aria-label="Violet color"></button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Color Picker -->
-                    <div class="relative">
-                        <button id="collectionColorBtn" onclick="toggleCollectionColorPicker()"
-                                class="w-10 h-10 rounded-lg border-2 border-ink/20 flex items-center justify-center hover:border-ink/40 hover:scale-105 transition-all shadow-lg"
-                                style="background-color: #00ffd0;"
-                                aria-label="Choose color">
-                        </button>
-                        <input type="hidden" id="collectionColor" value="#00ffd0">
-                        <div id="collectionColorPicker" class="hidden absolute right-0 top-12 bg-[#1a1a24] border border-ink/10 rounded-lg p-3 shadow-xl z-50 grid grid-cols-5 gap-2 w-64">
-                            <button onclick="selectCollectionColor('#00ffd0')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #00ffd0;" aria-label="Cyan color"></button>
-                            <button onclick="selectCollectionColor('#F4B342')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #F4B342;" aria-label="Orange color"></button>
-                            <button onclick="selectCollectionColor('#DE1A58')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #DE1A58;" aria-label="Red color"></button>
-                            <button onclick="selectCollectionColor('#8F0177')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #8F0177;" aria-label="Purple color"></button>
-                            <button onclick="selectCollectionColor('#6366f1')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #6366f1;" aria-label="Indigo color"></button>
-                            <button onclick="selectCollectionColor('#22c55e')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #22c55e;" aria-label="Green color"></button>
-                            <button onclick="selectCollectionColor('#f97316')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #f97316;" aria-label="Bright orange color"></button>
-                            <button onclick="selectCollectionColor('#06b6d4')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #06b6d4;" aria-label="Teal color"></button>
-                            <button onclick="selectCollectionColor('#ec4899')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #ec4899;" aria-label="Pink color"></button>
-                            <button onclick="selectCollectionColor('#a855f7')" class="w-8 h-8 rounded-md hover:scale-110 transition-transform ring-2 ring-ink/20" style="background-color: #a855f7;" aria-label="Violet color"></button>
+                        <div class="mt-3">
+                            <label for="collectionCategory" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">Kategorie</label>
+                            <div class="flex gap-2">
+                                <select id="collectionCategory"
+                                        class="flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 text-sm text-text-main focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                        onchange="handleCategoryChange(this)">
+                                    <option value="">Uncategorized</option>
+                                    <!-- Populated by JS -->
+                                </select>
+                                <input type="text" id="newCategoryInput"
+                                       placeholder="Neue Kategorie …"
+                                       class="hidden flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                       aria-label="New category name">
+                                <button onclick="toggleNewCategoryInput()"
+                                        id="addCategoryBtn"
+                                        class="px-3 py-2 text-arcade-cyan hover:text-accent-hover border border-ink/10 rounded-lg hover:border-arcade-cyan/30 hover:bg-arcade-cyan/5 transition-colors"
+                                        title="Add new category"
+                                        aria-label="Add new category">
+                                    <span class="material-icons text-sm" aria-hidden="true">add</span>
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </section>
+
+                    <!-- Suchbegriff — der wichtigste Teil, deshalb oben und breit -->
+                    <section class="rounded-xl border border-ink/10 bg-ink/[0.03] p-4">
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="material-icons text-arcade-cyan text-[20px]" aria-hidden="true">manage_search</span>
+                                <h3 class="text-sm font-semibold text-text-main">Suchbegriff</h3>
+                                <span id="collectionSearchBadge" class="hidden px-2 py-0.5 rounded-full bg-arcade-cyan/20 text-arcade-cyan text-[11px] font-medium"></span>
+                            </div>
+                            <span class="text-[11px] text-gray-500 hidden sm:inline">Ordner, Tags oder freie Begriffe</span>
+                        </div>
+                        <div class="relative">
+                            <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[18px]" aria-hidden="true">search</span>
+                            <input type="text" id="collectionSearch" placeholder="Ordner suchen, z. B. ProSessions, web, #urlaub"
+                                   class="w-full bg-ink/5 border border-ink/10 rounded-lg pl-10 pr-3 py-2.5 text-[14px] text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                   oninput="onCollectionSearchInput()">
+                            <div id="collectionSearchSuggestions" class="search-suggestions hidden" role="listbox"
+                                 aria-label="Suchvorschläge"></div>
+                        </div>
+                        <div id="collectionSearchChips" class="search-chips hidden" aria-label="Gewählte Filter"></div>
+                        <p class="mt-2 text-[11px] leading-relaxed text-gray-500">
+                            Vorschlag anklicken = einschließen, <code>−</code> rechts = ausschließen ·
+                            mehrere Ordner gelten als <em>oder</em> ·
+                            <code>*</code> als Platzhalter (z. B. <code>-*/web*</code>) ·
+                            <code>#tag</code> sucht Tags · Chips: Symbol schaltet um, <code>×</code> entfernt
+                        </p>
+                    </section>
+
+                    <!-- Inhalt & Metadaten -->
+                    <section>
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="material-icons text-[18px] text-gray-400" aria-hidden="true">tune</span>
+                                <h3 class="text-sm font-semibold text-text-main">Inhalt &amp; Metadaten</h3>
+                                <span id="metadataBadge" class="hidden px-2 py-0.5 rounded-full bg-arcade-cyan/20 text-arcade-cyan text-[11px] font-medium"></span>
+                            </div>
+                        </div>
+                        <div id="metadataPanel" role="region">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                                <!-- Import Date -->
+                                <div>
+                                    <label for="collectionDateFilter" class="text-xs text-gray-400 mb-1.5 block">Importdatum</label>
+                                    <select id="collectionDateFilter" class="w-full bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 text-sm text-text-main focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors" onchange="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');">
+                                        <option value="all">Any Time</option>
+                                        <option value="1d">Last 24 Hours</option>
+                                        <option value="7d">Last 7 Days</option>
+                                        <option value="30d">Last 30 Days</option>
+                                        <option value="90d">Last 3 Months</option>
+                                        <option value="1y">Last Year</option>
+                                    </select>
+                                </div>
+
+                                <!-- Favorites -->
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1.5 block">Favoriten</label>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <button class="filter-chip" data-filter="favorites" data-value="true" onclick="setFavoritesFilter(true)" aria-pressed="false">Only Favorites</button>
+                                        <button class="filter-chip" data-filter="favorites" data-value="false" onclick="setFavoritesFilter(false)" aria-pressed="false">Exclude</button>
+                                        <button class="filter-chip active" data-filter="favorites" data-value="null" onclick="setFavoritesFilter(null)" aria-pressed="true">Any</button>
+                                    </div>
+                                </div>
+
+                                <!-- File Size -->
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1.5 block">Dateigröße (MB)</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" id="collectionMinSize" placeholder="Min"
+                                               class="flex-1 min-w-0 bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                               oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
+                                               aria-label="Minimum file size in megabytes">
+                                        <span class="text-gray-500 text-xs">-</span>
+                                        <input type="number" id="collectionMaxSize" placeholder="Max"
+                                               class="flex-1 min-w-0 bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                               oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
+                                               aria-label="Maximum file size in megabytes">
+                                    </div>
+                                </div>
+
+                                <!-- Duration (Runtime) -->
+                                <div>
+                                    <label class="text-xs text-gray-400 mb-1.5 block">Laufzeit (Sekunden)</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" id="collectionMinDuration" placeholder="Min"
+                                               class="flex-1 min-w-0 bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                               oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
+                                               aria-label="Minimum duration in seconds">
+                                        <span class="text-gray-500 text-xs">-</span>
+                                        <input type="number" id="collectionMaxDuration" placeholder="Max"
+                                               class="flex-1 min-w-0 bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
+                                               oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
+                                               aria-label="Maximum duration in seconds">
+                                    </div>
+                                </div>
+
+                                <!-- Tags (Tri-State) -->
+                                <div class="sm:col-span-2">
+                                    <div class="flex justify-between items-center mb-1.5">
+                                        <label class="text-xs text-gray-400">Tags</label>
+                                        <div class="flex items-center gap-1 text-[10px]">
+                                            <span class="text-gray-600">Match:</span>
+                                            <button id="tagLogicBtn" onclick="toggleTagLogic()" class="px-2 py-0.5 rounded bg-arcade-cyan/20 text-arcade-cyan font-medium hover:bg-arcade-cyan/30 transition-colors" aria-label="Toggle tag matching logic">ANY</button>
+                                        </div>
+                                    </div>
+                                    <div id="collectionTagsList" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                                        <span class="text-xs text-gray-600 italic">No tags created</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <!-- Category Selector -->
-                <div class="mt-3">
-                    <label for="collectionCategory" class="text-xs text-gray-400 mb-1.5 block">Category (for sidebar grouping)</label>
-                    <div class="flex gap-2">
-                        <select id="collectionCategory"
-                                class="flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                                onchange="handleCategoryChange(this)">
-                            <option value="">Uncategorized</option>
-                            <!-- Populated by JS -->
-                        </select>
-                        <input type="text" id="newCategoryInput"
-                               placeholder="New category..."
-                               class="hidden flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                               aria-label="New category name">
-                        <button onclick="toggleNewCategoryInput()"
-                                id="addCategoryBtn"
-                                class="px-3 py-1.5 text-arcade-cyan hover:text-accent-hover border border-ink/10 rounded-lg hover:border-arcade-cyan/30 hover:bg-arcade-cyan/5 transition-colors"
-                                title="Add new category"
-                                aria-label="Add new category">
-                            <span class="material-icons text-sm" aria-hidden="true">add</span>
-                        </button>
-                    </div>
-                </div>
-            </section>
+                <!-- Rechte Spalte -->
+                <div class="min-w-0 p-4 sm:p-5 lg:p-6 space-y-5 lg:min-h-0 lg:overflow-y-auto">
 
-            <!-- Filter Rules - Accordion Layout -->
-            <div class="space-y-2">
-
-                <!-- Properties Accordion -->
-                <div class="border border-ink/5 rounded-lg overflow-hidden">
-                    <button onclick="toggleFilterAccordion('properties')"
-                            class="w-full flex items-center justify-between p-3 bg-ink/5 hover:bg-ink/10 transition-colors group"
-                            aria-expanded="false"
-                            aria-controls="propertiesPanel">
-                        <div class="flex items-center gap-2">
-                            <span class="material-icons text-sm text-gray-400 group-hover:text-arcade-cyan transition-all duration-200" id="propertiesChevron" aria-hidden="true">expand_more</span>
-                            <span class="text-sm font-medium text-gray-300 group-hover:text-text-main transition-colors">Properties</span>
-                            <span class="text-xs text-gray-500">Media Type, Status, Format...</span>
+                    <!-- Properties -->
+                    <section>
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="material-icons text-[18px] text-gray-400" aria-hidden="true">filter_alt</span>
+                                <h3 class="text-sm font-semibold text-text-main">Eigenschaften</h3>
+                                <span id="propertiesBadge" class="hidden px-2 py-0.5 rounded-full bg-arcade-cyan/20 text-arcade-cyan text-[11px] font-medium"></span>
+                            </div>
                         </div>
-                        <span id="propertiesBadge" class="hidden px-2 py-0.5 rounded-full bg-arcade-cyan/20 text-arcade-cyan text-xs font-medium"></span>
-                    </button>
-                    <div id="propertiesPanel" class="hidden" role="region">
-                        <div class="p-3 space-y-3 bg-ink/[0.03]">
+                        <div id="propertiesPanel" role="region" class="space-y-4">
 
                             <!-- Media Type -->
                             <div>
@@ -1051,7 +1163,7 @@ COLLECTION_MODAL_COMPONENT = """
                                 </div>
                             </div>
 
-                            <!-- Advanced Technical Filters (Collapsible) -->
+                            <!-- Advanced Technical Filters -->
                             <details class="group/details">
                                 <summary class="cursor-pointer text-xs text-arcade-cyan hover:text-accent-hover flex items-center gap-1 py-1.5 list-none select-none">
                                     <span class="material-icons text-xs group-open/details:rotate-90 transition-transform" aria-hidden="true">chevron_right</span>
@@ -1101,7 +1213,6 @@ COLLECTION_MODAL_COMPONENT = """
                                     <div>
                                         <label class="text-xs text-gray-400 mb-1.5 block">Format</label>
 
-                                        <!-- Common formats -->
                                         <div class="flex flex-wrap gap-1.5 mb-2">
                                             <button class="filter-chip" data-filter="format" data-value="jpg" onclick="toggleSmartFilterChip(this)" aria-pressed="false">JPG</button>
                                             <button class="filter-chip" data-filter="format" data-value="png" onclick="toggleSmartFilterChip(this)" aria-pressed="false">PNG</button>
@@ -1111,7 +1222,6 @@ COLLECTION_MODAL_COMPONENT = """
                                             <button class="filter-chip" data-filter="format" data-value="avif" onclick="toggleSmartFilterChip(this)" aria-pressed="false">AVIF</button>
                                         </div>
 
-                                        <!-- RAW formats (nested collapse) -->
                                         <details class="group/raw">
                                             <summary class="cursor-pointer text-xs text-gray-400 hover:text-arcade-cyan flex items-center gap-1 py-1 list-none select-none">
                                                 <span class="material-icons text-xs group-open/raw:rotate-90 transition-transform" aria-hidden="true">chevron_right</span>
@@ -1129,111 +1239,15 @@ COLLECTION_MODAL_COMPONENT = """
                                 </div>
                             </details>
                         </div>
-                    </div>
+                    </section>
                 </div>
 
-                <!-- Content & Metadata Accordion -->
-                <div class="border border-ink/5 rounded-lg overflow-hidden">
-                    <button onclick="toggleFilterAccordion('metadata')"
-                            class="w-full flex items-center justify-between p-3 bg-ink/5 hover:bg-ink/10 transition-colors group"
-                            aria-expanded="false"
-                            aria-controls="metadataPanel">
-                        <div class="flex items-center gap-2">
-                            <span class="material-icons text-sm text-gray-400 group-hover:text-arcade-cyan transition-all duration-200" id="metadataChevron" aria-hidden="true">expand_more</span>
-                            <span class="text-sm font-medium text-gray-300 group-hover:text-text-main transition-colors">Content & Metadata</span>
-                            <span class="text-xs text-gray-500">Date, Size, Favorites, Tags...</span>
-                        </div>
-                        <span id="metadataBadge" class="hidden px-2 py-0.5 rounded-full bg-arcade-cyan/20 text-arcade-cyan text-xs font-medium"></span>
-                    </button>
-                    <div id="metadataPanel" class="hidden" role="region">
-                        <div class="p-3 space-y-3 bg-ink/[0.03]">
-
-                            <!-- Import Date -->
-                            <div>
-                                <label for="collectionDateFilter" class="text-xs text-gray-400 mb-1.5 block">Import Date</label>
-                                <select id="collectionDateFilter" class="w-full bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors" onchange="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');">
-                                    <option value="all">Any Time</option>
-                                    <option value="1d">Last 24 Hours</option>
-                                    <option value="7d">Last 7 Days</option>
-                                    <option value="30d">Last 30 Days</option>
-                                    <option value="90d">Last 3 Months</option>
-                                    <option value="1y">Last Year</option>
-                                </select>
-                            </div>
-
-                            <!-- File Size -->
-                            <div>
-                                <label class="text-xs text-gray-400 mb-1.5 block">File Size (MB)</label>
-                                <div class="flex items-center gap-2">
-                                    <input type="number" id="collectionMinSize" placeholder="Min"
-                                           class="flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                                           oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
-                                           aria-label="Minimum file size in megabytes">
-                                    <span class="text-gray-500 text-xs">-</span>
-                                    <input type="number" id="collectionMaxSize" placeholder="Max"
-                                           class="flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                                           oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
-                                           aria-label="Maximum file size in megabytes">
-                                </div>
-                            </div>
-
-                            <!-- Duration (Runtime) -->
-                            <div>
-                                <label class="text-xs text-gray-400 mb-1.5 block">Runtime (Seconds)</label>
-                                <div class="flex items-center gap-2">
-                                    <input type="number" id="collectionMinDuration" placeholder="Min"
-                                           class="flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                                           oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
-                                           aria-label="Minimum duration in seconds">
-                                    <span class="text-gray-500 text-xs">-</span>
-                                    <input type="number" id="collectionMaxDuration" placeholder="Max"
-                                           class="flex-1 bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                                           oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');"
-                                           aria-label="Maximum duration in seconds">
-                                </div>
-                            </div>
-
-                            <!-- Favorites -->
-                            <div>
-                                <label class="text-xs text-gray-400 mb-1.5 block">Favorites</label>
-                                <div class="flex gap-1.5">
-                                    <button class="filter-chip" data-filter="favorites" data-value="true" onclick="setFavoritesFilter(true)" aria-pressed="false">Only Favorites</button>
-                                    <button class="filter-chip" data-filter="favorites" data-value="false" onclick="setFavoritesFilter(false)" aria-pressed="false">Exclude</button>
-                                    <button class="filter-chip active" data-filter="favorites" data-value="null" onclick="setFavoritesFilter(null)" aria-pressed="true">Any</button>
-                                </div>
-                            </div>
-
-                            <!-- Tags (Tri-State) -->
-                            <div>
-                                <div class="flex justify-between items-center mb-1.5">
-                                    <label class="text-xs text-gray-400">Tags</label>
-                                    <div class="flex items-center gap-1 text-[10px]">
-                                        <span class="text-gray-600">Match:</span>
-                                        <button id="tagLogicBtn" onclick="toggleTagLogic()" class="px-2 py-0.5 rounded bg-arcade-cyan/20 text-arcade-cyan font-medium hover:bg-arcade-cyan/30 transition-colors" aria-label="Toggle tag matching logic">ANY</button>
-                                    </div>
-                                </div>
-                                <div id="collectionTagsList" class="flex flex-wrap gap-1.5 min-h-[28px]">
-                                    <span class="text-xs text-gray-600 italic">No tags created</span>
-                                </div>
-                            </div>
-
-                            <!-- Search Term -->
-                            <div>
-                                <label for="collectionSearch" class="text-xs text-gray-400 mb-1.5 block">Search Term</label>
-                                <input type="text" id="collectionSearch" placeholder="Filter by filename..."
-                                       class="w-full bg-ink/5 border border-ink/10 rounded-lg px-3 py-1.5 text-sm text-text-main placeholder:text-gray-600 focus:border-arcade-cyan/50 focus:outline-none focus:ring-1 focus:ring-arcade-cyan/20 transition-colors"
-                                       oninput="updateCollectionPreviewCount(); updateFilterSectionBadge('metadata');">
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
-
         </div>
 
         <!-- Footer with Count Badge -->
-        <div class="p-4 border-t border-ink/5 flex items-center justify-between shrink-0 bg-[#0a0a12]">
-            <div class="flex items-center gap-3">
+        <div class="px-4 sm:px-6 py-3 border-t border-ink/5 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-[#0a0a12]">
+            <div class="flex flex-wrap items-center gap-3">
                 <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-arcade-cyan/10 text-arcade-cyan text-sm font-medium">
                     <span class="material-icons text-sm" id="matchCountIcon" aria-hidden="true">movie</span>
                     <span id="matchCountNumber">0</span> <span id="matchCountLabel">items</span>
@@ -1249,7 +1263,7 @@ COLLECTION_MODAL_COMPONENT = """
                             title="Aktuelle Kriterien als Auto-Tag-Regel speichern">Als Regel</button>
                 </div>
             </div>
-            <div class="flex gap-3">
+            <div class="flex gap-2 sm:gap-3">
                 <button onclick="closeCollectionModal()" class="px-4 py-2 bg-ink/5 text-gray-400 font-medium rounded-lg hover:bg-ink/10 hover:text-text-main transition-colors">
                     Cancel
                 </button>
@@ -1401,6 +1415,48 @@ HIDDEN_PATH_MODAL_COMPONENT = """
     #hiddenPathModal.active > div { transform: scale(1); }
 </style>
 """
+
+CONFIRM_DIALOG_COMPONENT = """
+<!-- Gestylter Bestätigungsdialog (confirm_dialog.js) — Ersatz für window.confirm() -->
+<div id="confirmDialog" class="fixed inset-0 z-[200] hidden bg-black/70 backdrop-blur-sm items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle"
+     aria-describedby="confirmDialogMessage" aria-hidden="true">
+    <div class="w-full max-w-md max-h-[85vh] overflow-y-auto bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-lg shadow-2xl">
+        <div class="p-5 flex items-start gap-3.5">
+            <span id="confirmDialogIcon" class="material-icons text-2xl shrink-0" aria-hidden="true">delete_outline</span>
+            <div class="min-w-0 flex-1">
+                <h2 id="confirmDialogTitle" class="text-[16px] font-bold text-text-main leading-6">Bestätigen</h2>
+                <p id="confirmDialogMessage" class="text-[13px] text-text-muted leading-6 mt-1.5"></p>
+                <div id="confirmDialogDetails"
+                     class="hidden mt-3 max-h-40 overflow-y-auto rounded-ds-sm bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline)] px-3 py-2.5 text-[12px] text-body-text font-mono space-y-1"></div>
+            </div>
+        </div>
+        <div class="px-5 py-3 bg-[var(--ds-fill-soft)] border-t border-[var(--ds-hairline)] flex items-center justify-end gap-2">
+            <button type="button" id="confirmDialogCancel"
+                    class="px-4 py-2 rounded-ds-sm text-[13px] font-medium text-text-muted hover:text-text-main hover:bg-[var(--ds-fill)] transition-colors">
+                Abbrechen
+            </button>
+            <button type="button" id="confirmDialogOk"
+                    class="px-4 py-2 rounded-ds-sm text-[13px] font-bold text-white transition-colors">
+                Bestätigen
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    #confirmDialog.active { display: flex !important; }
+    #confirmDialog > div { transform: scale(0.97); transition: transform 0.15s ease-out; }
+    #confirmDialog.active > div { transform: scale(1); }
+    #confirmDialogIcon { color: var(--ds-accent); }
+    #confirmDialogIcon.is-danger { color: #ef4444; }
+    #confirmDialogOk { background: var(--ds-accent); }
+    #confirmDialogOk:hover { filter: brightness(1.08); }
+    #confirmDialogOk.is-danger { background: #ef4444; }
+    #confirmDialogOk.is-danger:hover { background: #dc2626; filter: none; }
+</style>
+"""
+
 
 SHORTCUTS_MODAL_COMPONENT = """
 <!-- Keyboard Shortcuts Help Overlay -->
@@ -2005,6 +2061,32 @@ SETTINGS_MODAL_COMPONENT = """
                             </div>
                             <p class="text-[12px] text-text-muted" id="statEmbeddingHint">Wird geladen …</p>
                         </div>
+
+                        <!-- PAPIERKORB -->
+                        <div>
+                            <h3 class="text-[16px] font-bold text-text-main flex items-center gap-2">
+                                <span class="material-icons text-lg text-accent" aria-hidden="true">restore_from_trash</span>
+                                Papierkorb
+                            </h3>
+                            <p class="text-[12px] text-text-muted mt-1">
+                                Gelöschte Dateien bleiben 30 Tage hier und lassen sich zurückholen.
+                            </p>
+                        </div>
+
+                        <div class="bg-surface p-4 rounded-xl border border-ink/5 space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="text-text-main font-medium text-sm" id="trashSummary">Papierkorb wird geladen …</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">Danach werden sie endgültig gelöscht.</div>
+                                </div>
+                                <button type="button" onclick="window.emptyTrash()"
+                                        class="shrink-0 px-3 py-2 rounded-lg text-xs font-medium border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors">
+                                    Leeren
+                                </button>
+                            </div>
+                            <p class="text-[12px] text-text-muted hidden" id="trashEmptyHint">Der Papierkorb ist leer.</p>
+                            <ul id="trashList" class="divide-y divide-ink/5 max-h-72 overflow-y-auto"></ul>
+                        </div>
                     </section>
                     </section>
                 </div>
@@ -2204,6 +2286,8 @@ FILTER_BAR_COMPONENT = """
         <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]" aria-hidden="true">search</span>
         <input type="text" id="mobileSearchInput" oninput="onSearchInput()" placeholder="Suchen …" aria-label="Bibliothek durchsuchen"
                class="w-full bg-[var(--ds-fill-soft)] border border-[var(--ds-hairline-strong)] rounded-ds-sm pl-10 pr-4 py-2 text-[13px] text-text-main placeholder-text-muted focus:outline-none focus:border-accent transition-colors">
+        <div id="mobileSearchSuggestions" class="search-suggestions hidden" role="listbox"
+             aria-label="Suchvorschläge"></div>
     </div>
 
     <!-- Filter Controls -->
@@ -2220,10 +2304,17 @@ FILTER_BAR_COMPONENT = """
             <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[16px] pointer-events-none" aria-hidden="true">sort</span>
             <select id="sortSelect" onchange="setSort(this.value)" class="ds-chip pl-9 pr-4 appearance-none min-w-[150px] whitespace-nowrap" aria-label="Sortierung">
                 <option value="date">Neueste zuerst</option>
-                <option value="runtime">Längste zuerst</option>
-                <option value="file_date">Nach Dateidatum</option>
-                <option value="bitrate">Nach Bitrate</option>
-                <option value="size">Nach Größe</option>
+                <option value="date_asc">Älteste zuerst</option>
+                <option value="name">Name A–Z</option>
+                <option value="name_desc">Name Z–A</option>
+                <option value="bitrate">Bitrate: hoch → niedrig</option>
+                <option value="bitrate_asc">Bitrate: niedrig → hoch</option>
+                <option value="size">Größe: groß → klein</option>
+                <option value="size_asc">Größe: klein → groß</option>
+                <option value="runtime">Laufzeit: lang → kurz</option>
+                <option value="runtime_asc">Laufzeit: kurz → lang</option>
+                <option value="file_date">Dateidatum: neu → alt</option>
+                <option value="file_date_asc">Dateidatum: alt → neu</option>
             </select>
         </div>
 

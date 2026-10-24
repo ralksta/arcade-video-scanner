@@ -173,30 +173,33 @@ def render_navigation(theme: BaseTheme) -> str:
 
     return f"""
 <nav class="{theme.sidebar_container}">
-    <div class="ds-eyebrow !text-[10px] px-2.5 mb-2">Mediathek</div>
+    <!-- Mittlerer Bereich scrollt; „Einstellungen" bleibt unten stehen. -->
+    <div class="sidebar-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 -mr-1">
+        <div class="ds-eyebrow !text-[10px] px-2.5 mb-2">Mediathek</div>
 
-    {nav_btn("m-home", "setWorkspaceMode('home')", "home", "Start", active=True)}
-    {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "video_library", "Bibliothek")}
-    {nav_btn("m-favorites", "setWorkspaceMode('favorites')", "star", "Favoriten")}
+        {nav_btn("m-home", "setWorkspaceMode('home')", "home", "Start", active=True)}
+        {nav_btn("m-lobby", "setWorkspaceMode('lobby')", "video_library", "Bibliothek")}
+        {nav_btn("m-favorites", "setWorkspaceMode('favorites')", "star", "Favoriten")}
 
-    <!-- Werkstatt: Aufräumen und Optimieren, getrennt vom Schauen -->
-    <div class="ds-eyebrow !text-[10px] px-2.5 mt-5 mb-2">Werkstatt</div>
-    {nav_btn("m-optimized", "setWorkspaceMode('optimized')", "offline_bolt", "Review")}
-    {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplikate")}
-    {nav_btn("m-candidates", "setWorkspaceMode('candidates')", "savings", "Kandidaten")}
+        <!-- Werkstatt: Aufräumen und Optimieren, getrennt vom Schauen -->
+        <div class="ds-eyebrow !text-[10px] px-2.5 mt-5 mb-2">Werkstatt</div>
+        {nav_btn("m-optimized", "setWorkspaceMode('optimized')", "offline_bolt", "Review")}
+        {nav_btn("m-duplicates", "setWorkspaceMode('duplicates')", "content_copy", "Duplikate")}
+        {nav_btn("m-candidates", "setWorkspaceMode('candidates')", "savings", "Kandidaten")}
 
-    <!-- Smart Collections Section -->
-    <div class="mt-6 pt-4 border-t border-line/60">
-        <div class="flex items-center justify-between px-2.5 mb-2">
-            <span class="ds-eyebrow !text-[10px]">Collections</span>
-            <button onclick="openCollectionModal()" class="text-text-muted hover:text-accent-tint transition-colors" title="Neue Collection" aria-label="Neue Collection">
-                <span class="material-icons text-[16px]" aria-hidden="true">add</span>
-            </button>
+        <!-- Smart Collections Section -->
+        <div class="mt-6 pt-4 border-t border-line/60">
+            <div class="flex items-center justify-between px-2.5 mb-2">
+                <span class="ds-eyebrow !text-[10px]">Collections</span>
+                <button onclick="openCollectionModal()" class="text-text-muted hover:text-accent-tint transition-colors" title="Neue Collection" aria-label="Neue Collection">
+                    <span class="material-icons text-[16px]" aria-hidden="true">add</span>
+                </button>
+            </div>
+            <div id="collectionsNav" class="space-y-0.5"></div>
         </div>
-        <div id="collectionsNav" class="space-y-0.5"></div>
     </div>
 
-    <div class="mt-auto pt-4 border-t border-line/60">
+    <div class="shrink-0 pt-4 border-t border-line/60">
         <button onclick="openSettings()" class="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-md text-[13px] text-label hover:bg-[var(--ds-fill-soft)] hover:text-text-main transition-colors">
             <span class="material-icons text-[19px] text-text-muted" aria-hidden="true">settings</span>
             <span>Einstellungen</span>

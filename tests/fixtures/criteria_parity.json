@@ -538,6 +538,447 @@
    "expected": true
   },
   {
+   "name": "search requires every term",
+   "video": {
+    "FilePath": "/media/GoPro/dive clip.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "gopro clip"
+   },
+   "expected": true
+  },
+  {
+   "name": "search fails when one term is missing",
+   "video": {
+    "FilePath": "/media/GoPro/dive clip.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "gopro missing"
+   },
+   "expected": false
+  },
+  {
+   "name": "search minus excludes",
+   "video": {
+    "FilePath": "/media/GoPro/dive.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "-dive"
+   },
+   "expected": false
+  },
+  {
+   "name": "search quoted phrase",
+   "video": {
+    "FilePath": "/media/GoPro/dive clip.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"dive clip\""
+   },
+   "expected": true
+  },
+  {
+   "name": "search path matches below folder",
+   "video": {
+    "FilePath": "/media/GoPro/dive.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "/media/GoPro"
+   },
+   "expected": true
+  },
+  {
+   "name": "search path respects folder boundary",
+   "video": {
+    "FilePath": "/media/GoProX/dive.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "/media/GoPro"
+   },
+   "expected": false
+  },
+  {
+   "name": "two folder paths are ORed",
+   "video": {
+    "FilePath": "/media/a/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" \"/media/b\""
+   },
+   "expected": true
+  },
+  {
+   "name": "folder OR does not swallow a required keyword",
+   "video": {
+    "FilePath": "/media/a/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" missing"
+   },
+   "expected": false
+  },
+  {
+   "name": "excluded subfolder wins over included parent",
+   "video": {
+    "FilePath": "/media/a/sub/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" -\"/media/a/sub\""
+   },
+   "expected": false
+  },
+  {
+   "name": "glob matches a web folder with underscore",
+   "video": {
+    "FilePath": "/media/a/ProSessions/Lena/web_videos/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "*/web*"
+   },
+   "expected": true
+  },
+  {
+   "name": "glob matches a web folder with subfolders",
+   "video": {
+    "FilePath": "/media/a/web/Fist/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "*/web*"
+   },
+   "expected": true
+  },
+  {
+   "name": "glob needs a slash before web",
+   "video": {
+    "FilePath": "/media/a/cobweb/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "*/web*"
+   },
+   "expected": false
+  },
+  {
+   "name": "negative glob excludes web folders",
+   "video": {
+    "FilePath": "/media/a/web/Fist/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" -\"*/web*\""
+   },
+   "expected": false
+  },
+  {
+   "name": "negative glob keeps non-web files",
+   "video": {
+    "FilePath": "/media/a/Lena/x.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "\"/media/a\" -\"*/web*\""
+   },
+   "expected": true
+  },
+  {
+   "name": "search folds umlauts",
+   "video": {
+    "FilePath": "/media/Müller/clip.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "muller"
+   },
+   "expected": true
+  },
+  {
+   "name": "search folds sharp s",
+   "video": {
+    "FilePath": "/media/Straße/clip.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "strasse"
+   },
+   "expected": true
+  },
+  {
+   "name": "whitespace-only search stays literal (no match)",
+   "video": {
+    "FilePath": "/lib/a.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "   "
+   },
+   "expected": false
+  },
+  {
+   "name": "single space still matches a filename with a space",
+   "video": {
+    "FilePath": "/media/mein film.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": " "
+   },
+   "expected": true
+  },
+  {
+   "name": "hash searches tags, not the filename",
+   "video": {
+    "FilePath": "/media/urlaub.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": ["Urlaub"],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "#urlaub"
+   },
+   "expected": true
+  },
+  {
+   "name": "hash tag needs a matching tag",
+   "video": {
+    "FilePath": "/media/urlaub.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": [],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "#urlaub"
+   },
+   "expected": false
+  },
+  {
+   "name": "minus before hash excludes the tag",
+   "video": {
+    "FilePath": "/media/urlaub.mp4",
+    "Size_MB": 100,
+    "Status": "OK",
+    "codec": "h264",
+    "tags": ["Urlaub"],
+    "favorite": false,
+    "Width": 1920,
+    "Height": 1080,
+    "Duration_Sec": 60,
+    "media_type": "video",
+    "imported_at": 1785996400,
+    "mtime": 1785996400
+   },
+   "criteria": {
+    "search": "-#urlaub"
+   },
+   "expected": false
+  },
+  {
    "name": "relative date 7d inside",
    "video": {
     "FilePath": "/lib/a.mp4",

@@ -80,22 +80,6 @@ def test_readme_headline_matches():
     )
 
 
-def test_changelog_has_no_entry_for_this_version_yet():
-    """
-    Festgehalten, nicht behoben: Zu 7.0.0 gibt es keinen CHANGELOG-Abschnitt,
-    obwohl die Version veröffentlicht wurde. Die zugehörigen Einträge zu
-    erfinden wäre schlimmer als die Lücke — hier steht nur, dass sie besteht.
-
-    Wird der Abschnitt nachgetragen, schlägt dieser Test fehl und gehört
-    entfernt.
-    """
-    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert f"## [{__version__}]" not in changelog, (
-        "Es gibt jetzt einen CHANGELOG-Abschnitt für diese Version — "
-        "diesen Test bitte löschen."
-    )
-
-
 @pytest.mark.parametrize("stale", ["4.9.0", "6.3", "6.7"])
 def test_the_old_numbers_are_gone_from_code_and_packaging(stale):
     """

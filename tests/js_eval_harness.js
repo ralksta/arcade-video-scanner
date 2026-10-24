@@ -12,7 +12,7 @@ const fixtures = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 // laden wie die Seite selbst; safe_storage.js zuerst, weil utils.js beim Laden
 // über window.safeStorage auf localStorage zugreift.
 const staticDir = path.join(__dirname, '..', 'arcade_scanner', 'server', 'static');
-const src = ['safe_storage.js', 'utils.js', 'collections.js']
+const src = ['safe_storage.js', 'utils.js', 'search_query.js', 'collections.js']
     .map((name) => fs.readFileSync(path.join(staticDir, name), 'utf8'))
     .join('\n');
 

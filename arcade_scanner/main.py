@@ -6,6 +6,7 @@ import webbrowser
 from arcade_scanner import __version__
 from arcade_scanner.config import config
 from arcade_scanner.core.maintenance import purge_broken_media, purge_media, purge_thumbnails
+from arcade_scanner.core.trash import forget_user_state, purge_expired
 from arcade_scanner.database import db, user_db
 from arcade_scanner.scanner import get_scanner_manager
 from arcade_scanner.server.web_server import start_server
@@ -64,6 +65,13 @@ def run_scanner(args_list=None):
         try:
             # Deferred from startup path — runs here so dashboard opens instantly
             purge_broken_media()
+
+            # Abgelaufene Papierkorb-Einträge endgültig entfernen. Im
+            # Hintergrund, weil das Dateien und Vorschaubilder löscht.
+            expired = purge_expired(on_purge=forget_user_state)
+            if expired["purged"]:
+                print(f"🗑️ Papierkorb: {expired['purged']} abgelaufene Datei(en) "
+                      f"({expired['freed'] / (1024 * 1024):.1f} MB) entfernt")
 
             mgr = get_scanner_manager()
             should_force = args.rebuild or args.rebuild_thumbs

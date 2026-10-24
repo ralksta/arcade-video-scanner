@@ -624,6 +624,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                 settings,
                 similar,
                 tags,
+                trash,
             )
             if queue.handle_get(self):
                 return
@@ -640,6 +641,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if similar.handle_get(self):
                 return
             if progress.handle_get(self):
+                return
+            if trash.handle_get(self):
                 return
             if files.handle_get(self):
                 return
@@ -1212,7 +1215,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         self._response_started = False
         try:
-            from .routes import autotag, duplicates, progress, queue, settings, tags
+            from .routes import autotag, duplicates, progress, queue, settings, tags, trash
             if queue.handle_post(self):
                 return
             if settings.handle_post(self):
@@ -1224,6 +1227,8 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
             if autotag.handle_post(self):
                 return
             if progress.handle_post(self):
+                return
+            if trash.handle_post(self):
                 return
         except Exception as e:
             print(f"Module route error POST: {e}")

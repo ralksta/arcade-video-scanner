@@ -56,6 +56,7 @@ def handle_get_settings(handler) -> None:
         if u:
             settings_dump["smart_collections"]    = u.data.smart_collections
             settings_dump["saved_views"]          = u.data.saved_views
+            settings_dump["search_history"]       = u.data.search_history
             settings_dump["scan_targets"]         = u.data.scan_targets
             settings_dump["exclude_paths"]        = u.data.exclude_paths
             settings_dump["available_tags"]       = u.data.available_tags
@@ -67,6 +68,7 @@ def handle_get_settings(handler) -> None:
         else:
             settings_dump["smart_collections"]     = []
             settings_dump["saved_views"]           = []
+            settings_dump["search_history"]        = []
             settings_dump["scan_targets"]          = []
             settings_dump["exclude_paths"]         = []
             settings_dump["available_tags"]        = []
@@ -156,6 +158,7 @@ def handle_post_settings(handler) -> None:
         # Pop user-specific fields before saving to global config
         user_collections        = new_settings.pop("smart_collections", None)
         user_views              = new_settings.pop("saved_views", None)
+        user_search_history     = new_settings.pop("search_history", None)
         user_targets            = new_settings.pop("scan_targets", None)
         user_excludes           = new_settings.pop("exclude_paths", None)
         user_tags               = new_settings.pop("available_tags", None)
@@ -189,6 +192,7 @@ def handle_post_settings(handler) -> None:
                 changes = {
                     "smart_collections": user_collections,
                     "saved_views": user_views,
+                    "search_history": user_search_history,
                     "scan_targets": user_targets,
                     "exclude_paths": user_excludes,
                     "available_tags": user_tags,

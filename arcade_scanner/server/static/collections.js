@@ -33,11 +33,14 @@ function openCollectionModal(editId = null) {
 
     try {
         editingCollectionId = editId;
+        ensureCollectionSearchSuggestions();
 
         // Reset form — null-safe with optional chaining
         const _el = (id) => document.getElementById(id);
         if (_el('collectionName')) _el('collectionName').value = '';
         if (_el('collectionSearch')) _el('collectionSearch').value = '';
+        collectionSearchChips = [];
+        renderCollectionSearchChips();
         if (_el('collectionDateFilter')) _el('collectionDateFilter').value = 'all';
         if (_el('collectionMinSize')) _el('collectionMinSize').value = '';
         if (_el('collectionMaxSize')) _el('collectionMaxSize').value = '';
@@ -119,22 +122,10 @@ function openCollectionModal(editId = null) {
         // Sync UI with new criteria
         syncSmartCollectionUI();
 
-        // Reset accordion sections to collapsed state
-        const propertiesPanel = document.getElementById('propertiesPanel');
-        const metadataPanel = document.getElementById('metadataPanel');
-        const propertiesChevron = document.getElementById('propertiesChevron');
-        const metadataChevron = document.getElementById('metadataChevron');
-
-        if (propertiesPanel) {
-            propertiesPanel.classList.add('hidden');
-            if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
-        }
-        if (metadataPanel) {
-            metadataPanel.classList.add('hidden');
-            if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
-        }
-
+        // Alle Bereiche sind sichtbar; die früheren Akkordeons gibt es nicht
+        // mehr. Damit ist auch kein eingeklappter Zustand zurückzusetzen.
         updateAllFilterBadges();
+        updateCollectionSearchBadge();
         modal.classList.add('active');
     } catch (err) {
         console.error('Critical failure in openCollectionModal:', err);
@@ -154,29 +145,11 @@ function closeCollectionModal() {
     document.getElementById('collectionColorPicker')?.classList.add('hidden');
 }
 
-// --- ACCORDION & BADGE FUNCTIONS ---
-
-/**
- * Toggle a filter accordion section open/closed
- * @param {string} sectionName - Section identifier (properties, metadata)
- */
-function toggleFilterAccordion(sectionName) {
-    const panel = document.getElementById(`${sectionName}Panel`);
-    const chevron = document.getElementById(`${sectionName}Chevron`);
-    const button = chevron?.closest('button');
-
-    if (!panel || !chevron) return;
-
-    if (panel.classList.contains('hidden')) {
-        panel.classList.remove('hidden');
-        chevron.style.transform = 'rotate(180deg)';
-        button?.setAttribute('aria-expanded', 'true');
-    } else {
-        panel.classList.add('hidden');
-        chevron.style.transform = 'rotate(0deg)';
-        button?.setAttribute('aria-expanded', 'false');
-    }
-}
+// --- BADGE FUNCTIONS ---
+//
+// Die früheren Akkordeons sind einem festen Zwei-Spalten-Layout gewichen;
+// Properties und Metadaten sind immer sichtbar. Die Badges zeigen weiterhin,
+// wie viele Filter in einem Bereich aktiv sind.
 
 /**
  * Update badge count for a filter section
@@ -199,9 +172,6 @@ function updateFilterSectionBadge(sectionName) {
         const maxSize = document.getElementById('collectionMaxSize');
         if ((minSize && minSize.value) || (maxSize && maxSize.value)) additionalFilters++;
 
-        const searchTerm = document.getElementById('collectionSearch');
-        if (searchTerm && searchTerm.value.trim()) additionalFilters++;
-
         const minDur = document.getElementById('collectionMinDuration');
         const maxDur = document.getElementById('collectionMaxDuration');
         if ((minDur && minDur.value) || (maxDur && maxDur.value)) additionalFilters++;
@@ -210,7 +180,26 @@ function updateFilterSectionBadge(sectionName) {
     const totalActive = activeFilters + additionalFilters;
 
     if (totalActive > 0) {
-        badge.textContent = `${totalActive} active`;
+        badge.textContent = `${totalActive} aktiv`;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+/**
+ * Suchbegriff-Badge: Chips und freier Text zählen als aktive Filter.
+ */
+function updateCollectionSearchBadge() {
+    const badge = document.getElementById('collectionSearchBadge');
+    if (!badge) return;
+
+    const input = document.getElementById('collectionSearch');
+    const hasText = !!(input && input.value.trim());
+    const count = collectionSearchChips.length + (hasText ? 1 : 0);
+
+    if (count > 0) {
+        badge.textContent = `${count} aktiv`;
         badge.classList.remove('hidden');
     } else {
         badge.classList.add('hidden');
@@ -311,7 +300,7 @@ function saveCollection() {
 
     const icon = _el('selectedCollectionIcon')?.innerText || 'folder_special';
     const color = _el('collectionColor')?.value || '#64FFDA';
-    const search = (_el('collectionSearch')?.value || '').trim();
+    const search = getCollectionSearchText();
 
     const dateVal = _el('collectionDateFilter')?.value || 'all';
     const sizeMin = _el('collectionMinSize')?.value || '';
@@ -512,6 +501,22 @@ function matchesDateFilter(video, dateFilter) {
  * @param {Object} criteria - Collection criteria
  * @returns {boolean} Whether video matches all criteria
  */
+/**
+ * Suchbegriff einer Collection auswerten — dieselbe Regel wie die Filterleiste.
+ *
+ * Die Fallback-Zeile hält den Dialog funktionsfähig, falls search_query.js
+ * einmal nicht geladen wurde (ältere Harnesses, halb ausgeliefertes Update).
+ */
+function collectionSearchMatches(video, text) {
+    if (typeof window.matchesSearchQuery === 'function') {
+        return window.matchesSearchQuery(video, text);
+    }
+    const q = String(text || '').toLowerCase();
+    const path = String(video.FilePath || '');
+    const name = (path.split(/[\\/]/).pop() || '').toLowerCase();
+    return name.includes(q) || path.toLowerCase().includes(q);
+}
+
 function evaluateCollectionMatch(video, criteria) {
     if (!criteria) return true;
 
@@ -614,12 +619,8 @@ function evaluateCollectionMatch(video, criteria) {
     }
 
     // --- SEARCH ---
-    if (criteria.search) {
-        const searchLower = criteria.search.toLowerCase();
-        const filename = video.FilePath?.split(/[\\/]/).pop()?.toLowerCase() || '';
-        if (!filename.includes(searchLower) && !video.FilePath?.toLowerCase()?.includes(searchLower)) {
-            return false;
-        }
+    if (criteria.search && !collectionSearchMatches(video, criteria.search)) {
+        return false;
     }
 
     return true;
@@ -786,8 +787,8 @@ function updateCollectionPreviewCount() {
 
     const tempCriteria = JSON.parse(JSON.stringify(collectionCriteriaNew));
 
-    const searchInput = document.getElementById('collectionSearch');
-    if (searchInput) tempCriteria.search = searchInput.value.trim();
+    // Chips + freier Text ergeben zusammen den gespeicherten Suchbegriff.
+    tempCriteria.search = getCollectionSearchText();
 
     const dateInput = document.getElementById('collectionDateFilter');
     if (dateInput) {
@@ -887,8 +888,9 @@ function syncSmartCollectionUI() {
         btn.classList.toggle('active', btnValue === collectionCriteriaNew.favorites);
     });
 
-    const searchInput = document.getElementById('collectionSearch');
-    if (searchInput) searchInput.value = collectionCriteriaNew.search || '';
+    // Ordner und Tags werden als Chips dargestellt, freie Begriffe bleiben
+    // im Feld. Gespeichert wird weiterhin ein einziger Suchtext.
+    setCollectionSearchFromText(collectionCriteriaNew.search || '');
 
     document.querySelectorAll('.filter-chip').forEach(chip => {
         chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
@@ -897,6 +899,7 @@ function syncSmartCollectionUI() {
     renderSmartCollectionTagsList();
     updateCollectionPreviewCount();
     updateAllFilterBadges();
+    updateCollectionSearchBadge();
 }
 
 // --- COLLECTION COUNT & RENDERING ---
@@ -917,7 +920,6 @@ function getCollectionCount(collection) {
 
     // Legacy compatibility
     return window.ALL_VIDEOS.filter(v => {
-        const name = v.FilePath.split(/[\\\\/]/).pop().toLowerCase();
         const status = v.Status;
         const codec = v.codec || 'unknown';
         const videoTags = v.tags || [];
@@ -939,11 +941,8 @@ function getCollectionCount(collection) {
             if (!hasMatchingTag) return false;
         }
 
-        if (collection.criteria.search) {
-            const searchLower = collection.criteria.search.toLowerCase();
-            if (!name.includes(searchLower) && !v.FilePath.toLowerCase().includes(searchLower)) {
-                return false;
-            }
+        if (collection.criteria.search && !collectionSearchMatches(v, collection.criteria.search)) {
+            return false;
         }
 
         return true;
@@ -1009,7 +1008,7 @@ function renderCollections() {
                         class="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-gray-300 transition-colors rounded hover:bg-ink/5">
                     <span class="material-icons text-[14px] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}"
                           id="cat-arrow-${safeKey}" aria-hidden="true">expand_more</span>
-                    <span class="flex-1 text-left">${category}</span>
+                    <span class="flex-1 min-w-0 text-left truncate" title="${escapeHtml(category)}">${escapeHtml(category)}</span>
                     <span class="text-gray-600 font-mono">${catCollections.length}</span>
                 </button>
                 <div id="cat-items-${safeKey}"
@@ -1035,9 +1034,10 @@ function renderCollectionItem(col) {
     return `
         <div class="collection-nav-item group flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full cursor-pointer ${isActive ? 'bg-arcade-cyan/25 text-arcade-cyan border border-arcade-cyan/50 shadow-lg shadow-arcade-cyan/10 font-bold' : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-ink/5 border border-transparent'}"
                 onclick="applyCollection('${col.id}')"
-                ondblclick="openCollectionModal('${col.id}')">
+                ondblclick="openCollectionModal('${col.id}')"
+                title="${escapeHtml(col.name)}">
             <span class="material-icons text-[18px]" style="color: ${escapeHtml(col.color)}" aria-hidden="true">${escapeHtml(col.icon)}</span>
-            <span class="flex-1 text-left truncate">${escapeHtml(col.name)}</span>
+            <span class="collection-nav-name flex-1 min-w-0 text-left leading-snug">${escapeHtml(col.name)}</span>
 
             <button onclick="event.stopPropagation(); openCollectionModal('${col.id}')"
                     class="${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-black dark:hover:text-white transition-opacity"
@@ -1135,14 +1135,244 @@ function applyCollection(collectionId) {
     showToast(`Applied collection: ${collection.name}`, 'info');
 }
 
+// --- SUCHCHIPS IM COLLECTION-DIALOG ---
+//
+// Ordner und Tags werden als Chips dargestellt statt als langer Text im Feld.
+// Der Feldinhalt bleibt für freie Begriffe; gespeichert wird weiterhin ein
+// einziger Suchtext (criteria.search) — Chips werden dafür zusammengesetzt
+// und beim Bearbeiten wieder zerlegt. Damit bleiben alte Collections sowie
+// die Auswertung auf Server und Fernseher unverändert.
+
+let collectionSearchChips = [];
+
+function collectionChipToken(chip) {
+    const quote = chip.type === 'tag'
+        ? (window.quoteTagTerm || function (value) { return '#' + value; })
+        : (window.quoteSearchTerm || function (value) { return value; });
+    return (chip.negated ? '-' : '') + quote(chip.value);
+}
+
+/** Gespeicherter Suchtext = Chips + freie Begriffe im Feld. */
+function getCollectionSearchText() {
+    const input = document.getElementById('collectionSearch');
+    const free = input ? input.value.trim() : '';
+    const tokens = collectionSearchChips.map(collectionChipToken);
+    if (free) tokens.push(free);
+    return tokens.join(' ');
+}
+
+/**
+ * Zerlegt einen gespeicherten Suchtext wieder in Chips und freien Text.
+ * Wird beim Öffnen einer bestehenden Collection aufgerufen.
+ */
+function setCollectionSearchFromText(text) {
+    collectionSearchChips = [];
+    const free = [];
+
+    if (typeof window.parseSearchQuery === 'function') {
+        window.parseSearchQuery(text || '').terms.forEach((term) => {
+            if (term.isPath) {
+                collectionSearchChips.push({type: 'folder', value: term.value, negated: term.negated});
+            } else if (term.isTag) {
+                collectionSearchChips.push({type: 'tag', value: term.value, negated: term.negated});
+            } else {
+                const quote = window.quoteSearchTerm || function (value) { return value; };
+                free.push((term.negated ? '-' : '') + quote(term.value));
+            }
+        });
+    } else {
+        free.push(String(text || '').trim());
+    }
+
+    const input = document.getElementById('collectionSearch');
+    if (input) input.value = free.filter(Boolean).join(' ');
+    renderCollectionSearchChips();
+}
+
+function renderCollectionSearchChips() {
+    const box = document.getElementById('collectionSearchChips');
+    if (!box) return;
+
+    box.textContent = '';
+    if (!collectionSearchChips.length) {
+        box.classList.add('hidden');
+        return;
+    }
+    box.classList.remove('hidden');
+
+    collectionSearchChips.forEach((chip, index) => {
+        const wrap = document.createElement('span');
+        wrap.className = 'search-chip' + (chip.negated ? ' negated' : '');
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'search-chip-label';
+        toggle.title = chip.negated ? 'Einschließen' : 'Ausschließen';
+        toggle.setAttribute('aria-pressed', chip.negated ? 'true' : 'false');
+        toggle.setAttribute(
+            'aria-label',
+            (chip.negated ? 'Einschließen: ' : 'Ausschließen: ') + chip.value
+        );
+
+        const icon = document.createElement('span');
+        icon.className = 'material-icons search-chip-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = chip.type === 'tag' ? 'label' : 'folder';
+
+        const label = document.createElement('span');
+        const segments = String(chip.value).split(/[\\/]/).filter(Boolean);
+        // Die letzten zwei Segmente unterscheiden die fünf web-Ordner
+        // („Miss Blossom/web" statt fünfmal „web"). Der ganze Pfad steht im
+        // Tooltip und im aria-label.
+        label.textContent = chip.type === 'tag'
+            ? '#' + chip.value
+            : (segments.slice(-2).join('/') || chip.value);
+        label.title = chip.value;
+
+        const action = document.createElement('span');
+        action.className = 'material-icons search-chip-action';
+        action.setAttribute('aria-hidden', 'true');
+        action.textContent = chip.negated ? 'check' : 'block';
+
+        toggle.appendChild(icon);
+        toggle.appendChild(label);
+        toggle.appendChild(action);
+        toggle.addEventListener('click', () => {
+            collectionSearchChips[index].negated = !collectionSearchChips[index].negated;
+            renderCollectionSearchChips();
+            updateCollectionPreviewCount();
+        });
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'search-chip-remove';
+        remove.setAttribute('aria-label', 'Filter entfernen: ' + chip.value);
+
+        const close = document.createElement('span');
+        close.className = 'material-icons';
+        close.setAttribute('aria-hidden', 'true');
+        close.textContent = 'close';
+
+        remove.appendChild(close);
+        remove.addEventListener('click', () => {
+            collectionSearchChips.splice(index, 1);
+            renderCollectionSearchChips();
+            updateCollectionPreviewCount();
+        });
+
+        wrap.appendChild(toggle);
+        wrap.appendChild(remove);
+        box.appendChild(wrap);
+    });
+
+    updateCollectionSearchBadge();
+}
+
+function addCollectionSearchChip(type, value, negated) {
+    const exists = collectionSearchChips.some((chip) => chip.type === type && chip.value === value);
+    if (exists) return false;
+    collectionSearchChips.push({type: type, value: value, negated: !!negated});
+    renderCollectionSearchChips();
+    return true;
+}
+
+/**
+ * Auswahl aus der Vorschlagsliste: Ordner/Tags werden Chips, ein
+ * Verlaufseintrag wird wieder in Chips und freien Text zerlegt.
+ */
+function handleCollectionSearchSuggestion(item, token) {
+    if (!item) return false;
+
+    if (item.type === 'history') {
+        setCollectionSearchFromText(item.value);
+        updateCollectionPreviewCount();
+        updateCollectionSearchBadge();
+        return true;
+    }
+
+    if (item.type !== 'folder' && item.type !== 'tag') return false;
+
+    const input = document.getElementById('collectionSearch');
+    addCollectionSearchChip(item.type, item.value, token.negated);
+    if (input) {
+        // Der getippte Begriff (z. B. „/med" oder „#ur") verschwindet; der
+        // Chip steht dafür unter dem Feld.
+        input.value = input.value.slice(0, token.start) + input.value.slice(token.end);
+        const pos = Math.min(token.start, input.value.length);
+        input.focus();
+        if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+    }
+    updateCollectionPreviewCount();
+    updateCollectionSearchBadge();
+    return true;
+}
+
+/**
+ * Sammel-Aktion aus der Vorschlagsliste: alle obersten Treffer eines
+ * Begriffs auf einmal einschließen oder ausschließen.
+ */
+function handleCollectionSearchBulk(items, mode, token) {
+    if (!Array.isArray(items) || !items.length) return false;
+
+    const input = document.getElementById('collectionSearch');
+    items.forEach((item) => {
+        if (item && item.type === 'folder') {
+            addCollectionSearchChip('folder', item.value, mode === 'exclude');
+        }
+    });
+
+    if (input) {
+        input.value = input.value.slice(0, token.start) + input.value.slice(token.end);
+        const pos = Math.min(token.start, input.value.length);
+        input.focus();
+        if (input.setSelectionRange) input.setSelectionRange(pos, pos);
+    }
+
+    renderCollectionSearchChips();
+    updateCollectionPreviewCount();
+    updateCollectionSearchBadge();
+    return true;
+}
+
+function onCollectionSearchInput() {
+    updateCollectionSearchBadge();
+    updateCollectionPreviewCount();
+}
+
+function ensureCollectionSearchSuggestions() {
+    if (typeof window.bindSearchSuggestions !== 'function') return;
+    window.bindSearchSuggestions({
+        inputId: 'collectionSearch',
+        boxId: 'collectionSearchSuggestions',
+        bulk: true,
+        onSelect: handleCollectionSearchSuggestion,
+        onBulk: handleCollectionSearchBulk,
+        afterChange: onCollectionSearchInput
+    });
+}
+
 // --- EXPORTS ---
+window.ensureCollectionSearchSuggestions = ensureCollectionSearchSuggestions;
+window.onCollectionSearchInput = onCollectionSearchInput;
+window.handleCollectionSearchSuggestion = handleCollectionSearchSuggestion;
+window.handleCollectionSearchBulk = handleCollectionSearchBulk;
+window.setCollectionSearchFromText = setCollectionSearchFromText;
+window.getCollectionSearchText = getCollectionSearchText;
+window.getCollectionSearchChips = function () {
+    return collectionSearchChips.map((chip) => ({
+        type: chip.type,
+        value: chip.value,
+        negated: chip.negated
+    }));
+};
+window.addCollectionSearchChip = addCollectionSearchChip;
+window.renderCollectionSearchChips = renderCollectionSearchChips;
 window.openCollectionModal = openCollectionModal;
 window.closeCollectionModal = closeCollectionModal;
 window.saveCollection = saveCollection;
 window.deleteCurrentCollection = deleteCurrentCollection;
 window.applyCollection = applyCollection;
 window.renderCollections = renderCollections;
-window.toggleFilterAccordion = toggleFilterAccordion;
 window.toggleCollectionIconPicker = toggleCollectionIconPicker;
 window.selectCollectionIcon = selectCollectionIcon;
 window.toggleCollectionColorPicker = toggleCollectionColorPicker;

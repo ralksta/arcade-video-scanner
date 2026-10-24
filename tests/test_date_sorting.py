@@ -143,7 +143,9 @@ def test_both_options_are_offered_and_named_apart():
     from arcade_scanner.templates.components import FILTER_BAR_COMPONENT
 
     assert '<option value="date">Neueste zuerst</option>' in FILTER_BAR_COMPONENT
-    assert '<option value="file_date">Nach Dateidatum</option>' in FILTER_BAR_COMPONENT
+    assert '<option value="date_asc">Älteste zuerst</option>' in FILTER_BAR_COMPONENT
+    assert '<option value="file_date">Dateidatum: neu → alt</option>' in FILTER_BAR_COMPONENT
+    assert '<option value="file_date_asc">Dateidatum: alt → neu</option>' in FILTER_BAR_COMPONENT
 
 
 def test_the_other_sortings_are_untouched():
@@ -154,3 +156,65 @@ def test_the_other_sortings_are_untouched():
 
     assert sort_by("size", videos)[0] == "/media/gross.mp4"
     assert sort_by("name", videos)[0] == "/media/gross.mp4"
+
+
+# --- Beide Richtungen -------------------------------------------------------
+
+def media(name, bitrate, size_mb, duration, imported_at, mtime):
+    return {
+        "FilePath": f"/media/{name}",
+        "Size_MB": size_mb,
+        "Bitrate_Mbps": bitrate,
+        "Duration_Sec": duration,
+        "Status": "OK",
+        "imported_at": imported_at,
+        "mtime": mtime,
+    }
+
+
+# Drei Dateien, in jeder Dimension verschieden — sonst prüft eine
+# Richtungsumkehr nichts.
+DREI = [
+    media("b_mitte.mp4", 5.0, 500.0, 300, 1_600_000_000, 1_500_000_000),
+    media("a_klein.mp4", 2.0, 100.0, 100, 1_500_000_000, 1_400_000_000),
+    media("c_gross.mp4", 9.0, 900.0, 900, 1_700_000_000, 1_600_000_000),
+]
+
+
+def test_every_pair_is_offered_in_both_directions():
+    from arcade_scanner.templates.components import FILTER_BAR_COMPONENT
+
+    for value in ("name", "name_desc", "bitrate", "bitrate_asc",
+                  "size", "size_asc", "runtime", "runtime_asc",
+                  "date", "date_asc", "file_date", "file_date_asc"):
+        assert f'<option value="{value}">' in FILTER_BAR_COMPONENT, value
+
+
+def test_the_reverse_key_really_reverses():
+    pairs = [
+        ("name", "name_desc"),
+        ("bitrate", "bitrate_asc"),
+        ("size", "size_asc"),
+        ("runtime", "runtime_asc"),
+        ("date", "date_asc"),
+        ("file_date", "file_date_asc"),
+    ]
+
+    for descending, ascending in pairs:
+        assert sort_by(descending, DREI) == list(reversed(sort_by(ascending, DREI))), \
+            f"{descending}/{ascending}"
+
+
+def test_the_ascending_direction_puts_the_smallest_first():
+    assert sort_by("name", DREI)[0] == "/media/a_klein.mp4"
+    assert sort_by("name_desc", DREI)[0] == "/media/c_gross.mp4"
+    assert sort_by("bitrate_asc", DREI)[0] == "/media/a_klein.mp4"
+    assert sort_by("bitrate", DREI)[0] == "/media/c_gross.mp4"
+    assert sort_by("size_asc", DREI)[0] == "/media/a_klein.mp4"
+    assert sort_by("size", DREI)[0] == "/media/c_gross.mp4"
+    assert sort_by("runtime_asc", DREI)[0] == "/media/a_klein.mp4"
+    assert sort_by("runtime", DREI)[0] == "/media/c_gross.mp4"
+    assert sort_by("date", DREI)[0] == "/media/c_gross.mp4"
+    assert sort_by("date_asc", DREI)[0] == "/media/a_klein.mp4"
+    assert sort_by("file_date", DREI)[0] == "/media/c_gross.mp4"
+    assert sort_by("file_date_asc", DREI)[0] == "/media/a_klein.mp4"

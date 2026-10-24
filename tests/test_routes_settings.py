@@ -97,6 +97,30 @@ def test_get_settings_merges_user_fields_for_session():
     assert h.body()["smart_collections"] == [{"id": "c1"}]
 
 
+def test_search_history_is_per_account():
+    """Der Verlauf gehört ins Nutzerkonto, nicht in localStorage.
+
+    Auf einem geteilten Browser sähe sonst das nächste Konto die Ordnernamen
+    des vorigen.
+    """
+    h = FakeHandler("/api/settings")
+    singletons = _singletons()
+    singletons[1].get_user.return_value.data.search_history = ["#urlaub", "/media/kim"]
+    handled, _ = run(h, singletons)
+    assert handled is True
+    assert h.body()["search_history"] == ["#urlaub", "/media/kim"]
+
+
+def test_post_settings_stores_search_history_in_the_user_record():
+    h = FakeHandler("/api/settings", user="kim", body={"search_history": ["#urlaub"]})
+    singletons = _as(is_admin=False)
+    run(h, singletons, post=True)
+    config, user_db = singletons[0], singletons[1]
+    assert "search_history" not in config.save.call_args[0][0]
+    assert user_db.get_user.return_value.data.search_history == ["#urlaub"]
+    assert h.body()["ignored"] == []
+
+
 def test_post_settings_anonymous_is_rejected():
     """Behoben. Der Mangel stand hier seit einem früheren Nachtlauf als xfail:
 

@@ -10,4 +10,4 @@
 # 7.0.0 ist der belegte Stand: Commit e8dc9a9 („bump version to 7.0.0") und
 # c22d11b („update README for v7.0.0"). Nur wurde die Nummer damals allein im
 # README gesetzt.
-__version__ = "7.0.0"
+__version__ = "7.1.0"

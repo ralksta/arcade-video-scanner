@@ -141,6 +141,9 @@ function renderFolderView(ctx, canvas, videos) {
 
     // Get search term from engine.js
     const searchTerm = window.searchTerm || '';
+    const matchesSearch = (searchTerm && typeof window.createSearchMatcher === 'function')
+        ? window.createSearchMatcher(searchTerm)
+        : null;
 
     // Render folder blocks
     blocks.forEach((block, idx) => {
@@ -200,7 +203,8 @@ function renderFolderView(ctx, canvas, videos) {
                 const vPath = v.FilePath;
                 const vLastIdx = Math.max(vPath.lastIndexOf('/'), vPath.lastIndexOf('\\'));
                 const vFolder = vLastIdx >= 0 ? vPath.substring(0, vLastIdx) : 'Root';
-                return vFolder === block.folder && v.FilePath.toLowerCase().includes(searchTerm.toLowerCase());
+                return vFolder === block.folder &&
+                    (matchesSearch ? matchesSearch(v) : v.FilePath.toLowerCase().includes(searchTerm.toLowerCase()));
             });
             if (hasMatch) {
                 ctx.save();
@@ -286,6 +290,9 @@ function renderFileView(ctx, canvas, folderPath, videos) {
 
     // Get search term from engine.js
     const searchTerm = window.searchTerm || '';
+    const matchesSearch = (searchTerm && typeof window.createSearchMatcher === 'function')
+        ? window.createSearchMatcher(searchTerm)
+        : null;
 
     // Render video tiles with gradients
     blocks.forEach(block => {
@@ -315,7 +322,9 @@ function renderFileView(ctx, canvas, folderPath, videos) {
         ctx.strokeRect(block.x, block.y, block.width, block.height);
 
         // Search highlight - glow effect for matching files
-        if (searchTerm && block.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+        if (searchTerm && (matchesSearch
+            ? matchesSearch(video)
+            : block.name.toLowerCase().includes(searchTerm.toLowerCase()))) {
             ctx.save();
             ctx.strokeStyle = '#00ffff';
             ctx.lineWidth = 3;

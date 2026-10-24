@@ -12,6 +12,10 @@
     --amber: var(--ds-bitrate, #f2b544);
     --bg: var(--ds-bg, #0b0b10);
 
+    /* Breite der festen Seitenleiste. Theme (Klasse) und Hauptbereich
+       (margin-left) lesen denselben Wert, damit sie nicht auseinanderlaufen. */
+    --sidebar-width: 260px;
+
     /* SURFACES */
     --glass: var(--ds-fill, rgb(var(--ds-text-rgb) / 0.06));
     --glass-hover: rgb(var(--ds-text-rgb) / 0.10);
@@ -3306,6 +3310,17 @@ body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="dupl
     display: none !important;
 }
 
+/* Kompakte Metazeile (Größe · Bitrate) auf der Kachel. Sie ist bewusst
+   immer sichtbar und ersetzt im Schau-Modus die ausführliche tech-only-Zeile.
+   Wo Details oder eine Werkstatt-Ansicht ohnehin Größe und Bitrate zeigen,
+   wird sie ausgeblendet, damit die Angaben nicht doppelt stehen. */
+body.show-tech .card-meta-line,
+body[data-workspace="optimized"] .card-meta-line,
+body[data-workspace="duplicates"] .card-meta-line,
+body[data-workspace="candidates"] .card-meta-line {
+    display: none !important;
+}
+
 /* Wiedergabefortschritt auf der Karte — wie auf der Startseite */
 .card-progress {
     position: absolute;
@@ -3321,4 +3336,282 @@ body:not(.show-tech):not([data-workspace="optimized"]):not([data-workspace="dupl
     display: block;
     height: 100%;
     background: var(--ds-accent);
+}
+
+/* === SUCHVORSCHLÄGE (Collection-Dialog) ===
+   Die Liste hängt direkt unter dem Suchfeld und zeigt Ordnername, vollen
+   Pfad und die Anzahl der Dateien im Unterbaum. `.hidden` (Tailwind) bleibt
+   die einzige Sichtbarkeitsregel — hier steht bewusst kein `display`, damit
+   die Reihenfolge der Stylesheets keine Rolle spielt. */
+.search-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 60;
+    max-height: min(22rem, 45vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    border: 1px solid var(--ds-hairline);
+    border-radius: 10px;
+    background: var(--ds-bg);
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
+}
+
+/* „Verlauf", „Ordner", „Tags" — gliedert die Liste, statt alles als eine
+   lange Reihe gleich aussehender Zeilen zu zeigen. */
+.search-suggestion-group {
+    padding: 10px 12px 4px;
+    border-top: 1px solid var(--ds-hairline);
+    background: var(--ds-bg);
+    color: var(--ds-text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.search-suggestion-group:first-child {
+    border-top: 0;
+}
+
+/* Auf schmalen Bildschirmen liegt das Suchfeld weiter unten; eine kürzere
+   Liste passt dort zwischen Feld und Fußzeile. */
+@media (max-width: 1023px) {
+    .search-suggestions {
+        max-height: min(18rem, 38vh);
+    }
+}
+
+/* Nahe am unteren Fensterrand nach oben aufklappen. */
+.search-suggestions.drop-up {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
+.search-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    cursor: pointer;
+    color: var(--ds-text);
+}
+
+.search-suggestion + .search-suggestion {
+    border-top: 1px solid var(--ds-hairline);
+}
+
+.search-suggestion:hover,
+.search-suggestion.active {
+    background: var(--ds-fill);
+}
+
+.search-suggestion-icon {
+    font-size: 18px;
+    color: var(--ds-text-muted);
+    flex: 0 0 auto;
+}
+
+.search-suggestion-text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.search-suggestion-label,
+.search-suggestion-path {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.search-suggestion-label {
+    font-size: 13px;
+    line-height: 17px;
+}
+
+.search-suggestion-path {
+    font-family: var(--ds-font-mono);
+    font-size: 11px;
+    line-height: 15px;
+    color: var(--ds-text-muted);
+}
+
+.search-suggestion-count {
+    flex: 0 0 auto;
+    font-family: var(--ds-font-mono);
+    font-size: 11px;
+    color: var(--ds-text-muted);
+}
+
+/* Gewählte Ordner/Tags unter dem Collection-Suchfeld. Klick auf den Chip
+   schaltet zwischen ein- und ausschließen um; das X entfernt ihn. */
+.search-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.search-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 3px 2px 8px;
+    border: 1px solid var(--ds-hairline);
+    border-radius: 999px;
+    background: var(--ds-fill-soft);
+    color: var(--ds-text);
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.search-chip.negated {
+    border-color: rgb(var(--ds-danger-rgb) / 0.5);
+    color: var(--ds-danger);
+}
+
+.search-chip.negated .search-chip-label {
+    text-decoration: line-through;
+}
+
+.search-chip-label,
+.search-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.search-chip-icon {
+    font-size: 14px;
+}
+
+.search-chip-remove {
+    padding: 0 2px;
+    opacity: 0.6;
+}
+
+.search-chip-remove:hover {
+    opacity: 1;
+}
+
+.search-chip-remove .material-icons {
+    font-size: 14px;
+}
+
+.search-suggestion-clear {
+    color: var(--ds-text-muted);
+}
+
+/* Minus-Knopf rechts in der Vorschlagszeile: schließt den Ordner/Tag aus,
+   ohne ihn erst als Chip anzulegen und dann umzuschalten. */
+.search-suggestion-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    margin-left: 2px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ds-text-muted);
+    cursor: pointer;
+}
+
+.search-suggestion-action:hover,
+.search-suggestion-action:focus-visible {
+    background: var(--ds-fill);
+    color: var(--ds-danger);
+}
+
+.search-suggestion-action .material-icons {
+    font-size: 18px;
+}
+
+/* Symbol im Chip: block = ausschließen, check = wieder einschließen. */
+.search-chip-action {
+    margin-left: 2px;
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+.search-chip-label:hover .search-chip-action {
+    opacity: 1;
+}
+
+/* Sammel-Aktion am Ende der Vorschlagsliste. Bleibt beim Scrollen sichtbar,
+   damit „Alle 5 ausschließen" nicht unten aus dem Blick rutscht. */
+.search-suggestion-bulk {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid var(--ds-hairline);
+    background: var(--ds-bg);
+}
+
+.search-suggestion-bulk-btn {
+    flex: 1 1 auto;
+    min-height: 32px;
+    padding: 6px 10px;
+    border: 1px solid var(--ds-hairline-strong);
+    border-radius: 7px;
+    background: var(--ds-fill-soft);
+    color: var(--ds-text);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.search-suggestion-bulk-btn:hover,
+.search-suggestion-bulk-btn:focus-visible {
+    background: var(--ds-fill);
+}
+
+.search-suggestion-bulk-btn:last-child {
+    border-color: rgb(var(--ds-danger-rgb) / 0.4);
+    color: var(--ds-danger);
+}
+
+/* === SEITENLEISTE ===
+   Der mittlere Bereich scrollt (viele Collections), „Einstellungen" bleibt
+   unten stehen. Die Breite kommt aus --sidebar-width, damit Theme-Klasse und
+   margin-left des Hauptbereichs zusammenpassen. */
+.sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ds-hairline-strong) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background: var(--ds-hairline-strong);
+    border-radius: 3px;
+}
+
+/* Collection-Namen: höchstens zwei Zeilen, der volle Name steht im Tooltip. */
+.collection-nav-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
 }
