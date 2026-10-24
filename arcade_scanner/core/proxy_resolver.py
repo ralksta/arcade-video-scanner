@@ -102,7 +102,7 @@ def is_remote_client(client_ip: str) -> bool:
         return True
 
     # Unwrap IPv4-mapped IPv6 addresses (::ffff:192.168.2.10).
-    if getattr(ip, "ipv4_mapped", None):
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
 
     if any(ip in net for net in _TAILSCALE_NETS):

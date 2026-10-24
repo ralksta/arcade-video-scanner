@@ -14,6 +14,7 @@ noch nicht migrierte Templates/JS-Dateien automatisch die neue Palette erben.
 """
 
 import json
+from typing import Any, Dict
 
 # ==============================================================================
 # TOKENS
@@ -149,7 +150,7 @@ class Theme:
         def c(token: str) -> str:
             return f"rgb(var(--ds-{token}-rgb) / <alpha-value>)"
 
-        colors = {
+        colors: Dict[str, Any] = {
             # Neue semantische Namen
             "bg": c("bg"),
             "surface": c("surface"),

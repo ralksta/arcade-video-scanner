@@ -109,7 +109,7 @@ class _GifJobRegistry:
             self._touched.pop(job_id, None)
 
         while len(self._jobs) > self.MAX_ENTRIES:
-            oldest = min(self._touched, key=self._touched.get)
+            oldest = min(self._touched, key=lambda job_id: self._touched[job_id])
             self._jobs.pop(oldest, None)
             self._touched.pop(oldest, None)
 

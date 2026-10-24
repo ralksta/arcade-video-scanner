@@ -3,7 +3,7 @@ import hashlib
 import os
 import threading
 import time
-from typing import Any, Callable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from ..config import config
 from ..database import db
@@ -34,8 +34,10 @@ def _apply_detected_moves(existing_entries, orphans, newcomers) -> dict:
         from ..database.user_store import user_db
         from .move_detect import detect_moves
 
-        gone = {p: existing_entries[p] for p in orphans if p in existing_entries}
-        arrived = {}
+        gone: Dict[str, object] = {
+            p: existing_entries[p] for p in orphans if p in existing_entries
+        }
+        arrived: Dict[str, object] = {}
         for path in newcomers:
             entry = db.get(path)
             if entry is not None:
@@ -55,8 +57,8 @@ def _apply_detected_moves(existing_entries, orphans, newcomers) -> dict:
             neuer_eintrag = db.get(neu)
             if neuer_eintrag is None or not altes_datum:
                 continue
-            if not (getattr(neuer_eintrag, "imported_at", 0) or 0) or \
-                    altes_datum < neuer_eintrag.imported_at:
+            neues_datum = getattr(neuer_eintrag, "imported_at", 0) or 0
+            if not neues_datum or altes_datum < neues_datum:
                 neuer_eintrag.imported_at = altes_datum
                 db.upsert(neuer_eintrag)
 

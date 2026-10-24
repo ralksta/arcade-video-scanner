@@ -460,7 +460,7 @@ def _handle_keep_optimized(handler) -> None:
                     except TargetCollision as e:
                         print(f"❌ Keeping optimized file aborted: {e}")
                         handler.send_error(409, str(e))
-                        return True
+                        return
 
                     if os.path.exists(orig_abs):
                         os.remove(orig_abs)
