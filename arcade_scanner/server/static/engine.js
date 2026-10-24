@@ -637,7 +637,7 @@ window.addEventListener('popstate', (event) => {
 // Smart Collections functionality has been extracted to collections.js
 // Functions available: openCollectionModal, closeCollectionModal, saveCollection,
 // deleteCurrentCollection, applyCollection, renderCollections, evaluateCollectionMatch,
-// getDefaultCollectionCriteria, toggleFilterAccordion, and related UI functions
+// getDefaultCollectionCriteria, and related UI functions
 
 
 // --- OPTIMIZATION PANEL ---

@@ -35,6 +35,13 @@ All notable changes to this project will be documented in this file.
   automatisch ausgeschlossen.
 
 ### Changed
+- **Collection-Dialog mit Platz.** Der Dialog ist jetzt breit (zwei Spalten
+  auf dem Desktop, volle Höhe) statt eines schmalen Fensters mit
+  zugeklappten Akkordeons. Der Suchbegriff steht oben und hat eine große
+  Vorschlagsliste; Vorschläge sind nach *Verlauf*, *Ordner* und *Tags*
+  gruppiert. Name, Kategorie und Darstellung liegen links, Eigenschaften
+  rechts, Inhalt & Metadaten darunter. Auf dem Handy bleibt alles in einer
+  scrollbaren Spalte.
 - **Schau-Modus statt Werkstatt.** Karten in Bibliothek und Favoriten zeigen
   nur noch Bild, Titel, Laufzeit und Fortschritt. Status, Codec, Größe,
   Bitrate, Pfad und die Optimieren-Knöpfe erscheinen in Review, Duplikaten

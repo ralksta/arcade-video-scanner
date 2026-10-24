@@ -113,6 +113,12 @@
 
     // --- Darstellung ------------------------------------------------------
 
+    function groupLabel(item) {
+        if (item.type === 'history' || item.type === 'clear-history') return 'Verlauf';
+        if (item.type === 'tag') return 'Tags';
+        return 'Ordner';
+    }
+
     function itemIcon(item) {
         if (item.type === 'history') return 'history';
         if (item.type === 'clear-history') return 'history_toggle_off';
@@ -329,7 +335,18 @@
                 return;
             }
 
+            let lastGroup = '';
             items.forEach(function (item, index) {
+                const group = groupLabel(item);
+                if (group !== lastGroup) {
+                    const header = document.createElement('div');
+                    header.className = 'search-suggestion-group';
+                    header.setAttribute('role', 'presentation');
+                    header.textContent = group;
+                    box.appendChild(header);
+                    lastGroup = group;
+                }
+
                 box.appendChild(buildItem(item, index, options.boxId, function (i) {
                     select(i, true);
                 }));

@@ -122,22 +122,10 @@ function openCollectionModal(editId = null) {
         // Sync UI with new criteria
         syncSmartCollectionUI();
 
-        // Reset accordion sections to collapsed state
-        const propertiesPanel = document.getElementById('propertiesPanel');
-        const metadataPanel = document.getElementById('metadataPanel');
-        const propertiesChevron = document.getElementById('propertiesChevron');
-        const metadataChevron = document.getElementById('metadataChevron');
-
-        if (propertiesPanel) {
-            propertiesPanel.classList.add('hidden');
-            if (propertiesChevron) propertiesChevron.style.transform = 'rotate(0deg)';
-        }
-        if (metadataPanel) {
-            metadataPanel.classList.add('hidden');
-            if (metadataChevron) metadataChevron.style.transform = 'rotate(0deg)';
-        }
-
+        // Alle Bereiche sind sichtbar; die früheren Akkordeons gibt es nicht
+        // mehr. Damit ist auch kein eingeklappter Zustand zurückzusetzen.
         updateAllFilterBadges();
+        updateCollectionSearchBadge();
         modal.classList.add('active');
     } catch (err) {
         console.error('Critical failure in openCollectionModal:', err);
@@ -157,29 +145,11 @@ function closeCollectionModal() {
     document.getElementById('collectionColorPicker')?.classList.add('hidden');
 }
 
-// --- ACCORDION & BADGE FUNCTIONS ---
-
-/**
- * Toggle a filter accordion section open/closed
- * @param {string} sectionName - Section identifier (properties, metadata)
- */
-function toggleFilterAccordion(sectionName) {
-    const panel = document.getElementById(`${sectionName}Panel`);
-    const chevron = document.getElementById(`${sectionName}Chevron`);
-    const button = chevron?.closest('button');
-
-    if (!panel || !chevron) return;
-
-    if (panel.classList.contains('hidden')) {
-        panel.classList.remove('hidden');
-        chevron.style.transform = 'rotate(180deg)';
-        button?.setAttribute('aria-expanded', 'true');
-    } else {
-        panel.classList.add('hidden');
-        chevron.style.transform = 'rotate(0deg)';
-        button?.setAttribute('aria-expanded', 'false');
-    }
-}
+// --- BADGE FUNCTIONS ---
+//
+// Die früheren Akkordeons sind einem festen Zwei-Spalten-Layout gewichen;
+// Properties und Metadaten sind immer sichtbar. Die Badges zeigen weiterhin,
+// wie viele Filter in einem Bereich aktiv sind.
 
 /**
  * Update badge count for a filter section
@@ -202,9 +172,6 @@ function updateFilterSectionBadge(sectionName) {
         const maxSize = document.getElementById('collectionMaxSize');
         if ((minSize && minSize.value) || (maxSize && maxSize.value)) additionalFilters++;
 
-        const searchTerm = document.getElementById('collectionSearch');
-        if (searchTerm && searchTerm.value.trim()) additionalFilters++;
-
         const minDur = document.getElementById('collectionMinDuration');
         const maxDur = document.getElementById('collectionMaxDuration');
         if ((minDur && minDur.value) || (maxDur && maxDur.value)) additionalFilters++;
@@ -213,7 +180,26 @@ function updateFilterSectionBadge(sectionName) {
     const totalActive = activeFilters + additionalFilters;
 
     if (totalActive > 0) {
-        badge.textContent = `${totalActive} active`;
+        badge.textContent = `${totalActive} aktiv`;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+/**
+ * Suchbegriff-Badge: Chips und freier Text zählen als aktive Filter.
+ */
+function updateCollectionSearchBadge() {
+    const badge = document.getElementById('collectionSearchBadge');
+    if (!badge) return;
+
+    const input = document.getElementById('collectionSearch');
+    const hasText = !!(input && input.value.trim());
+    const count = collectionSearchChips.length + (hasText ? 1 : 0);
+
+    if (count > 0) {
+        badge.textContent = `${count} aktiv`;
         badge.classList.remove('hidden');
     } else {
         badge.classList.add('hidden');
@@ -913,6 +899,7 @@ function syncSmartCollectionUI() {
     renderSmartCollectionTagsList();
     updateCollectionPreviewCount();
     updateAllFilterBadges();
+    updateCollectionSearchBadge();
 }
 
 // --- COLLECTION COUNT & RENDERING ---
@@ -1270,13 +1257,14 @@ function renderCollectionSearchChips() {
             collectionSearchChips.splice(index, 1);
             renderCollectionSearchChips();
             updateCollectionPreviewCount();
-            updateFilterSectionBadge('metadata');
         });
 
         wrap.appendChild(toggle);
         wrap.appendChild(remove);
         box.appendChild(wrap);
     });
+
+    updateCollectionSearchBadge();
 }
 
 function addCollectionSearchChip(type, value, negated) {
@@ -1297,7 +1285,7 @@ function handleCollectionSearchSuggestion(item, token) {
     if (item.type === 'history') {
         setCollectionSearchFromText(item.value);
         updateCollectionPreviewCount();
-        updateFilterSectionBadge('metadata');
+        updateCollectionSearchBadge();
         return true;
     }
 
@@ -1314,13 +1302,13 @@ function handleCollectionSearchSuggestion(item, token) {
         if (input.setSelectionRange) input.setSelectionRange(pos, pos);
     }
     updateCollectionPreviewCount();
-    updateFilterSectionBadge('metadata');
+    updateCollectionSearchBadge();
     return true;
 }
 
 function onCollectionSearchInput() {
+    updateCollectionSearchBadge();
     updateCollectionPreviewCount();
-    updateFilterSectionBadge('metadata');
 }
 
 function ensureCollectionSearchSuggestions() {
@@ -1354,7 +1342,6 @@ window.saveCollection = saveCollection;
 window.deleteCurrentCollection = deleteCurrentCollection;
 window.applyCollection = applyCollection;
 window.renderCollections = renderCollections;
-window.toggleFilterAccordion = toggleFilterAccordion;
 window.toggleCollectionIconPicker = toggleCollectionIconPicker;
 window.selectCollectionIcon = selectCollectionIcon;
 window.toggleCollectionColorPicker = toggleCollectionColorPicker;
