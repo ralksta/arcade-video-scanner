@@ -440,22 +440,20 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
     # angemeldete Seite in einen fremden Rahmen legen und der Nutzer auf
     # Schaltflaechen locken, die er nicht sieht.
     #
-    # Die CSP ist an dem ausgerichtet, was die Oberflaeche wirklich laedt:
-    # Tailwind vom CDN, Schriften von Google, sonst nichts. `unsafe-inline`
-    # bei den Skripten ist noetig, weil in den Seiten 57 `onclick`-Attribute
-    # stehen; es faellt weg, sobald die durch addEventListener ersetzt sind.
-    # Der Gewinn liegt trotzdem: Kein anderer Rechner kann Skripte
-    # beisteuern, `connect-src 'self'` laesst nichts nach draussen abfliessen,
-    # und `object-src 'none'` schliesst die alten Einbettungswege.
+    # Die CSP erlaubt ausschliesslich lokale Ressourcen ('self'): Tailwind und
+    # die Schriften (Inter, Material Icons) liegen statisch unter /static/.
+    # `unsafe-inline` bei den Skripten ist noetig, weil in den Seiten 57
+    # `onclick`-Attribute stehen; es faellt weg, sobald die durch
+    # addEventListener ersetzt sind. Kein fremder Server wird mehr kontaktiert.
     _SICHERHEIT = (
         ("X-Content-Type-Options", "nosniff"),
         ("X-Frame-Options", "DENY"),
         ("Referrer-Policy", "same-origin"),
         ("Content-Security-Policy", "; ".join((
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' data: https://fonts.gstatic.com",
+            "script-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline'",
+            "font-src 'self' data:",
             "img-src 'self' data: blob:",
             "media-src 'self' blob:",
             "connect-src 'self'",
@@ -569,17 +567,16 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
         return None
 
-    # LRU thumb filename → source file path (shared across handler instances, bounded size)
+    # LRU thumb filename → (source file path, duration_sec) (shared across handler instances, bounded size)
     _thumb_source_cache: dict = {}
     _THUMB_CACHE_MAX = 2000
 
-    def _resolve_thumb_source(self, thumb_filename: str):
-        """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path.
+    def _resolve_thumb_info(self, thumb_filename: str) -> tuple[str | None, float | None]:
+        """Reverse-lookup: given 'thumb_<hash>.jpg', find (source_path, duration_sec).
 
-        Strategy:
-        1. Check in-memory LRU cache (fast path)
-        2. On miss: do a full cache warm from DB (first call) or a targeted scan for new entries
-        3. On persistent miss: scan full DB once more (catches entries added after server start)
+        Die Dauer steht bereits aus dem Scan in SQLite. Wer sie hier mitnimmt
+        und an ``create_thumbnail`` weiterreicht, spart sich bei jedem
+        On-Demand-Vorschaubild einen zusätzlichen ``ffprobe``-Subprozess.
         """
         from collections import OrderedDict
 
@@ -592,23 +589,33 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
         # Fast path: LRU hit
         if thumb_filename in cache:
-            path = cache[thumb_filename]
+            cached_val = cache[thumb_filename]
+            if isinstance(cached_val, tuple):
+                path, duration = cached_val
+            else:
+                path, duration = cached_val, None
             if os.path.exists(path):
                 cache.move_to_end(thumb_filename)
-                return path
+                return path, duration
             else:
                 del cache[thumb_filename]
 
         # Targeted lookup: Query DB by thumb name (O(1) indexed)
         entry = db.get_by_thumb(thumb_filename)
         if entry:
-            cache[thumb_filename] = entry.file_path
+            duration = entry.duration_sec if getattr(entry, "duration_sec", 0) else None
+            cache[thumb_filename] = (entry.file_path, duration)
             # Evict oldest entries when over capacity
             while len(cache) > FinderHandler._THUMB_CACHE_MAX:
                 cache.popitem(last=False)
-            return entry.file_path
+            return entry.file_path, duration
 
-        return None
+        return None, None
+
+    def _resolve_thumb_source(self, thumb_filename: str):
+        """Reverse-lookup: given 'thumb_<hash>.jpg', find the source media file path."""
+        path, _ = self._resolve_thumb_info(thumb_filename)
+        return path
 
 
     def do_GET(self):
@@ -764,10 +771,10 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
 
                     # Lazy generation: if thumb doesn't exist on disk, generate on-demand
                     if not (os.path.exists(file_path) and os.path.isfile(file_path)):
-                        source_path = self._resolve_thumb_source(filename)
+                        source_path, duration = self._resolve_thumb_info(filename)
                         if source_path:
                             from arcade_scanner.core.video_processor import create_thumbnail
-                            create_thumbnail(source_path)
+                            create_thumbnail(source_path, duration=duration)
 
                     if os.path.exists(file_path) and os.path.isfile(file_path):
                         fs = os.stat(file_path)
@@ -869,8 +876,24 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         fs = os.stat(file_path)
                         # no-cache = cache but revalidate: browsers get cheap
                         # 304s over the kept-alive connection, never stale JS.
+                        # Versionierte Assets (?v=<mtime> aus asset_url) und
+                        # lokale Schriften ändern unter derselben URL niemals
+                        # ihren Inhalt -> immutable spart alle 29 Revalidierungs-
+                        # Requests beim Seiten-Reload.
                         if send_not_modified_if_unchanged(self, fs.st_mtime):
                             return
+
+                        query_params = parse_qs(urlparse(self.path).query)
+                        v_param = query_params.get("v", [""])[0]
+                        is_immutable = (
+                            (v_param not in ("", "0"))
+                            or lower.endswith((".woff2", ".woff", ".ttf"))
+                        )
+                        static_cache_control = (
+                            "public, max-age=31536000, immutable"
+                            if is_immutable
+                            else "no-cache"
+                        )
 
                         with open(file_path, 'rb') as f:
                             body = f.read()
@@ -879,7 +902,7 @@ class FinderHandler(http.server.SimpleHTTPRequestHandler):
                         )
                         send_bytes(
                             self, body, content_type,
-                            cache_control="no-cache",
+                            cache_control=static_cache_control,
                             last_modified=fs.st_mtime,
                             compress=is_text,
                         )

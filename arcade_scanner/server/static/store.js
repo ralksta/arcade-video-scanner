@@ -142,4 +142,38 @@ window.folderBrowserPath = null;
 window.currentFolder = 'all';
 window.filteredVideos = [];
 
+// O(1) Pfad-Index über ALL_VIDEOS. Ersetzt lineare .find()-Läufe über 9000+
+// Einträge (z.B. bei jedem mouseover im Grid). Baut sich automatisch neu auf,
+// sobald ALL_VIDEOS ausgetauscht oder in der Länge verändert wird.
+let _cachedVideosRef = null;
+let _cachedVideosLen = -1;
+let _videosByPath = new Map();
+
+window.rebuildVideoIndex = function () {
+    const arr = window.ALL_VIDEOS;
+    _videosByPath = new Map();
+    if (Array.isArray(arr)) {
+        for (let i = 0; i < arr.length; i++) {
+            const v = arr[i];
+            if (v && v.FilePath) _videosByPath.set(v.FilePath, v);
+        }
+        _cachedVideosRef = arr;
+        _cachedVideosLen = arr.length;
+    } else {
+        _cachedVideosRef = null;
+        _cachedVideosLen = -1;
+    }
+    return _videosByPath;
+};
+
+window.getVideoByPath = function (path) {
+    if (!path) return undefined;
+    const arr = window.ALL_VIDEOS;
+    if (!Array.isArray(arr)) return undefined;
+    if (arr !== _cachedVideosRef || arr.length !== _cachedVideosLen) {
+        window.rebuildVideoIndex();
+    }
+    return _videosByPath.get(path);
+};
+
 console.log("🚀 Arcade Scanner State Manager Initialized");

@@ -102,3 +102,30 @@ class TestGetVideoMetadata:
     def test_file_not_found_returns_empty_dict(self, tmp_path):
         result = get_video_metadata(str(tmp_path / "nonexistent.mp4"))
         assert isinstance(result, dict)
+
+
+class TestLazyThumbDurationForwarding:
+    """_resolve_thumb_info gibt (file_path, duration_sec) weiter, damit
+    create_thumbnail keinen zweiten ffprobe-Aufruf starten muss."""
+
+    def test_resolve_thumb_info_returns_path_and_duration(self, tmp_path):
+        from arcade_scanner.models.video_entry import VideoEntry
+        from arcade_scanner.server.api_handler import FinderHandler
+
+        video_file = tmp_path / "clip.mp4"
+        video_file.write_bytes(b"fake")
+        entry = VideoEntry(
+            file_path=str(video_file),
+            size_mb=10.0,
+            bitrate_mbps=5.0,
+            duration_sec=120.0,
+            thumb="thumb_test123.jpg",
+        )
+        FinderHandler._thumb_source_cache.clear()
+        h = FinderHandler.__new__(FinderHandler)
+        with patch("arcade_scanner.server.api_handler.db.get_by_thumb", return_value=entry):
+            path, duration = h._resolve_thumb_info("thumb_test123.jpg")
+            assert path == str(video_file)
+            assert duration == 120.0
+            # Zweiter Aufruf bedient sich aus dem LRU-Cache ohne DB-Abfrage
+            assert h._resolve_thumb_source("thumb_test123.jpg") == str(video_file)

@@ -232,6 +232,8 @@ function createComparisonCard(pair) {
 
     // Store data for interactions
     container.setAttribute('data-path', orig.FilePath); // Proxy original
+    container.setAttribute('data-compare-original', orig.FilePath);
+    container.setAttribute('data-compare-optimized', opt.FilePath);
     return container;
 }
 
@@ -478,8 +480,10 @@ function createVideoCard(v) {
         const path = card.getAttribute('data-path');
         if (!path) return;
 
-        // Skip images
-        const video = window.ALL_VIDEOS?.find(v => v.FilePath === path);
+        // Skip images (O(1) Map-Lookup statt linearem Array-Scan bei jeder Mausbewegung)
+        const video = typeof window.getVideoByPath === 'function'
+            ? window.getVideoByPath(path)
+            : window.ALL_VIDEOS?.find(v => v.FilePath === path);
         if (!video || video.media_type === 'image') return;
 
         clearTimeout(_hoverTimer);
@@ -492,12 +496,15 @@ function createVideoCard(v) {
 
             const previewVid = document.createElement('video');
             previewVid.className = 'hover-preview-video';
-            previewVid.src    = `/stream?path=${encodeURIComponent(path)}`;
+            const dur = Number(video.Duration_Sec) || 0;
+            const seekSec = dur > 5 ? Math.min(30, Math.floor(dur * 0.1)) : 0;
+            const fragment = seekSec > 0 ? `#t=${seekSec}` : '';
+            previewVid.src    = `/stream?path=${encodeURIComponent(path)}${fragment}`;
             previewVid.muted  = true;
             previewVid.loop   = true;
             previewVid.autoplay = true;
             previewVid.playsInline = true;
-            previewVid.preload = 'auto';
+            previewVid.preload = 'metadata';
             previewVid.style.cssText = `
                 position:absolute;inset:0;width:100%;height:100%;
                 object-fit:cover;z-index:5;opacity:0;
@@ -1102,6 +1109,7 @@ async function loadVideoData() {
             });
 
             window.ALL_VIDEOS = data;
+            if (typeof window.rebuildVideoIndex === 'function') window.rebuildVideoIndex();
             console.log(`✅ Loaded ${window.ALL_VIDEOS.length} videos from API (Pre-processed)`);
             updateHeaderStats();
         } else {

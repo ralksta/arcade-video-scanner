@@ -293,9 +293,15 @@ CINEMA_MODAL_COMPONENT = """
             <h2 id="cinemaTitle" class="text-[13px] font-semibold text-white truncate">Movie Player</h2>
             <div id="cinemaMeta" class="text-[11px] font-mono text-white/55 truncate mt-0.5"></div>
         </div>
-        <button class="pointer-events-auto text-white/80 hover:text-white transition-colors flex-shrink-0" onclick="closeCinema()" title="Close [Esc]">
-            <span class="material-icons text-[22px]" aria-hidden="true">close</span>
-        </button>
+        <div class="flex items-center gap-3 pointer-events-auto flex-shrink-0">
+            <button id="cinemaCompareBtn" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/[0.18] hover:bg-accent text-accent-tint hover:text-white border border-accent/[0.45] text-[11px] font-mono font-semibold transition-colors" onclick="toggleCinemaCompareVersion()" title="Original / Optimiert umschalten [Tab]">
+                <span class="material-icons text-[14px]" aria-hidden="true">compare</span>
+                <span id="cinemaCompareLabel">A/B: Original</span>
+            </button>
+            <button class="text-white/80 hover:text-white transition-colors" onclick="closeCinema()" title="Close [Esc]">
+                <span class="material-icons text-[22px]" aria-hidden="true">close</span>
+            </button>
+        </div>
     </div>
 
     <div id="cinemaInfoPanel" class="absolute top-20 right-[92px] w-80 bg-surface border border-[var(--ds-hairline-strong)] rounded-ds-md p-4 transform translate-x-[140%] transition-transform duration-300 z-40 text-sm text-body-text">

@@ -35,6 +35,7 @@ from arcade_scanner.templates.ui_components import (
 # store.js definiert die Globals, auf die engine.js beim Laden zugreift, und
 # filter_engine.js muss vor cards.js stehen. Tests pinnen beides.
 STYLESHEETS = [
+    "tailwind.css",
     "styles.css",
     "timeline_scrubber.css",
 ]

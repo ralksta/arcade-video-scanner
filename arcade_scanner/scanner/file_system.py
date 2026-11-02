@@ -249,63 +249,76 @@ class AsyncFileSystem:
                 except concurrent.futures.TimeoutError:
                     continue  # Queue still full — re-check cancel, then keep waiting.
 
-        def sync_walk():
+        def walk_dir(root: str) -> bool:
+            if cancel.is_set():
+                return False
+            abs_root = os.path.abspath(root)
+
+            # 1. Skip root if it matches any exclusion (O(n_excludes))
+            if self._matches_name_or_suffix(abs_root) or any(
+                abs_root == ex or abs_root.startswith(ex + os.sep)
+                for ex in exclude_abs
+            ):
+                return True
+
+            # 2. Incremental scan: skip dirs unchanged since last scan
+            dir_changed = True
+            if self._last_scan_time > 0:
+                try:
+                    if os.stat(root).st_mtime < self._last_scan_time:
+                        dir_changed = False
+                        self._skipped_dirs += 1
+                except OSError:
+                    pass  # Can't stat → assume changed
+
+            subdirs: List[str] = []
             try:
-                for root, dirs, files in os.walk(root_dir):
-                    if cancel.is_set():
-                        return
-                    abs_root = os.path.abspath(root)
-
-                    # 1. Skip root if it matches any exclusion (O(n_excludes))
-                    if self._matches_name_or_suffix(abs_root) or any(
-                            abs_root == ex or abs_root.startswith(ex + os.sep)
-                            for ex in exclude_abs):
-                        dirs.clear()  # Don't descend into excluded subtrees
-                        continue
-
-                    # 2. Prune excluded subdirs in-place
-                    dirs[:] = [
-                        d for d in dirs
-                        if os.path.abspath(os.path.join(root, d)) not in exclude_abs
-                        and d not in self.exclude_names
-                    ]
-
-                    # 3. Incremental scan: skip dirs unchanged since last scan
-                    dir_changed = True
-                    if self._last_scan_time > 0:
+                with os.scandir(root) as it:
+                    for entry in it:
+                        if cancel.is_set():
+                            return False
                         try:
-                            if os.stat(root).st_mtime < self._last_scan_time:
-                                dir_changed = False
-                                self._skipped_dirs += 1
+                            if entry.is_dir(follow_symlinks=False):
+                                d_name = entry.name
+                                sub_path = entry.path
+                                if (
+                                    os.path.abspath(sub_path) not in exclude_abs
+                                    and d_name not in self.exclude_names
+                                ):
+                                    subdirs.append(sub_path)
+                                continue
+                            if entry.is_dir(follow_symlinks=True):
+                                continue
                         except OSError:
-                            pass  # Can't stat → assume changed
-
-                    for file in files:
-                        if not self._is_video(file):
                             continue
-                        full_path = os.path.join(root, file)
+
+                        if not self._is_video(entry.name):
+                            continue
+
+                        full_path = entry.path
+                        try:
+                            size_bytes = entry.stat().st_size
+                        except OSError:
+                            size_bytes = None
 
                         # Unter der Mindestgröße: gemeldet wird sie trotzdem,
                         # nur mit einem Vermerk.
-                        #
-                        # Vorher stand hier `continue`, und zwar nur für
-                        # geänderte Verzeichnisse. Damit war eine
-                        # herausgefilterte Datei für den Aufräumschritt nicht
-                        # von einer gelöschten zu unterscheiden — er entfernte
-                        # ihren Eintrag samt Vorschaubild. In unveränderten
-                        # Verzeichnissen griff der Filter gar nicht, dort
-                        # blieben die Einträge stehen.
-                        #
-                        # Ergebnis war ein schleichender Verlust ohne
-                        # erkennbaren Auslöser: An dieser Bibliothek
-                        # verschwanden 515 Einträge, weil in drei Ordnern
-                        # etwas gelöscht wurde — die Dateien selbst lagen
-                        # unverändert auf der Platte.
-                        too_small = not self._is_valid_size(full_path)
+                        too_small = not self._is_valid_size(full_path, size_bytes=size_bytes)
 
                         # Blocking put provides natural backpressure on the bounded queue
                         if not put_blocking((full_path, dir_changed, too_small)):
-                            return
+                            return False
+            except OSError:
+                return True
+
+            for sub_path in subdirs:
+                if not walk_dir(sub_path):
+                    return False
+            return True
+
+        def sync_walk():
+            try:
+                walk_dir(root_dir)
             except Exception as e:
                 print(f"❌ Error walking {root_dir}: {e}")
 
@@ -330,13 +343,14 @@ class AsyncFileSystem:
             return True
         return False
 
-    def _is_valid_size(self, path: str) -> bool:
+    def _is_valid_size(self, path: str, size_bytes: Optional[int] = None) -> bool:
         ext = os.path.splitext(path)[1].lower()
 
         # Images use KB threshold (configurable, e.g., 500 KB); RAW likewise.
         if ext in self.IMAGE_EXTENSIONS or ext in self.RAW_EXTENSIONS:
             try:
-                return os.path.getsize(path) >= config.settings.min_image_size_kb * 1024
+                sz = size_bytes if size_bytes is not None else os.path.getsize(path)
+                return sz >= config.settings.min_image_size_kb * 1024
             except OSError:
                 return False
 
@@ -346,7 +360,8 @@ class AsyncFileSystem:
             return True
 
         try:
-            return os.path.getsize(path) >= self.min_size_bytes
+            sz = size_bytes if size_bytes is not None else os.path.getsize(path)
+            return sz >= self.min_size_bytes
         except OSError:
             return False
 

@@ -1,6 +1,7 @@
 import mimetypes
 import os
 import re
+from urllib.parse import quote
 
 # 1 MB chunks: fewer syscalls / wfile.write round-trips than the old 64 KB
 # when the kernel sendfile fast path is unavailable (e.g. SSL sockets on
@@ -164,6 +165,22 @@ def serve_file_range(handler, file_path, method="GET", extra_headers=None):
     mime_type, _ = mimetypes.guess_type(file_path)
     if not mime_type:
         mime_type = "video/mp4"
+
+    # Optionales Nginx Zero-Copy-Offloading via X-Accel-Redirect:
+    # Wenn Nginx den Header `X-Accel-Support: 1` mitschickt, übernimmt Python
+    # nur Auth-, Pfad- und Proxy-Auflösung und gibt den Pfad per internem
+    # Redirect an Nginx zurück. Der Python-Worker-Thread ist nach < 1 ms wieder
+    # frei, während Nginx Range-Requests und sendfile() direkt bedient.
+    req_headers = getattr(handler, "headers", None)
+    if req_headers is not None and req_headers.get("X-Accel-Support") == "1":
+        accel_path = "/_internal_media/" + quote(os.path.abspath(file_path).lstrip("/"), safe="/")
+        handler.send_response(200)
+        handler.send_header("Content-type", mime_type)
+        handler.send_header("X-Accel-Redirect", accel_path)
+        handler.send_header("Content-Length", "0")
+        _send_extra()
+        handler.end_headers()
+        return
 
     etag = _entity_tag(stat)
 

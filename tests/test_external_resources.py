@@ -22,8 +22,6 @@ und die Behebung fällt auf, wenn sie kommt.
 import re
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).parent.parent
 
 MARKUP_SOURCES = [
@@ -34,12 +32,8 @@ MARKUP_SOURCES = [
     ROOT / "arcade_scanner" / "server" / "static" / "settings_redesign.html",
 ]
 
-# Bekannte Fremdquellen, Stand 2026-08-17.
-KNOWN_EXTERNAL_HOSTS = {
-    "cdn.tailwindcss.com": "Tailwind JIT — liefert ausführbares JavaScript",
-    "fonts.googleapis.com": "Google Fonts CSS (Inter, Material Icons)",
-    "fonts.gstatic.com": "Google Fonts Schriftdateien",
-}
+# Seit 2026-11-02 sind alle Schriften und Tailwind lokalisiert — keine Fremdquellen mehr erlaubt.
+KNOWN_EXTERNAL_HOSTS: dict[str, str] = {}
 
 HOST_RE = re.compile(r"https?://([a-zA-Z0-9.-]+)")
 
@@ -54,8 +48,8 @@ def _external_hosts(path: Path) -> set[str]:
 
 def test_no_unexpected_external_hosts():
     """
-    Der eigentliche Zweck: Es sollen keine weiteren Fremdserver dazukommen,
-    ohne dass jemand darüber nachdenkt.
+    Der eigentliche Zweck: Es dürfen keinerlei Fremdserver aus dem Markup
+    oder den Templates kontaktiert werden.
     """
     found = set()
     for path in MARKUP_SOURCES:
@@ -63,52 +57,41 @@ def test_no_unexpected_external_hosts():
 
     unexpected = found - set(KNOWN_EXTERNAL_HOSTS)
     assert not unexpected, (
-        f"Neue Fremdquelle im Dashboard: {sorted(unexpected)}. "
-        "Wenn das gewollt ist, in KNOWN_EXTERNAL_HOSTS eintragen und "
-        "dev-docs/external-resources.md ergänzen."
+        f"Fremdquelle im Dashboard gefunden: {sorted(unexpected)}. "
+        "Alle Schriften und Stylesheets müssen lokal unter /static/ liegen."
     )
 
 
-@pytest.mark.parametrize("host,reason", sorted(KNOWN_EXTERNAL_HOSTS.items()))
-def test_known_hosts_are_still_used(host, reason):
+def test_the_login_page_contacts_no_external_hosts():
     """
-    Gegenprobe: Verschwindet eine der Quellen, ist das ein Fortschritt — dann
-    gehört sie aus der Liste und die Doku aktualisiert.
-    """
-    found = set()
-    for path in MARKUP_SOURCES:
-        found |= _external_hosts(path)
-
-    assert host in found, (
-        f"{host} wird nicht mehr geladen ({reason}) — schön! "
-        "Bitte aus KNOWN_EXTERNAL_HOSTS entfernen und "
-        "dev-docs/external-resources.md aktualisieren."
-    )
-
-
-def test_the_login_page_also_contacts_them():
-    """
-    Wichtig für die Einordnung: Es passiert schon *vor* der Anmeldung, also
-    auch für jeden, der die Seite nur aufruft.
+    Auch vor der Anmeldung darf die Login-Seite keinen Fremdserver kontaktieren.
     """
     hosts = _external_hosts(ROOT / "arcade_scanner" / "server" / "static" / "login.html")
-    assert hosts, "Anmeldeseite lädt nichts mehr extern — Doku aktualisieren"
+    assert not hosts, f"Anmeldeseite lädt externe Ressourcen: {sorted(hosts)}"
 
 
-def test_no_local_replacement_exists_yet():
+def test_local_fonts_and_tailwind_exist():
     """
-    Zustandsbeschreibung: Solange nichts lokal liegt, ist die Abhängigkeit echt
-    und nicht nur ein Fallback.
+    Lokale Schriften (woff2) und vorkompiliertes Tailwind-CSS liegen in static/
+    bereit und sind in styles.css bzw. dashboard_template.py verdrahtet.
     """
     static = ROOT / "arcade_scanner" / "server" / "static"
-    local_assets = list(static.glob("*.woff*")) + list(static.rglob("fonts/*"))
-    tailwind_css = [p for p in static.glob("*.css") if "tailwind" in p.name.lower()]
+    for font_name in ("inter-latin.woff2", "inter-latin-ext.woff2", "material-icons.woff2"):
+        font_file = static / "fonts" / font_name
+        assert font_file.is_file() and font_file.stat().st_size > 10_000, (
+            f"Lokale Schrift fehlt oder ist leer: {font_file}"
+        )
 
-    assert not local_assets and not tailwind_css, (
-        "Es liegen jetzt lokale Schriften oder eine Tailwind-CSS vor — "
-        "dann sollten die CDN-Verweise verschwinden. Siehe "
-        "dev-docs/external-resources.md."
+    tailwind_css = static / "tailwind.css"
+    assert tailwind_css.is_file() and tailwind_css.stat().st_size > 20_000, (
+        "Vorkompiliertes static/tailwind.css fehlt oder ist unvollständig"
     )
+    css_text = tailwind_css.read_text(encoding="utf-8")
+    # Stichprobe zentraler Design-System-Utilities aus theme.py
+    for expected_selector in (".bg-arcade-bg", ".text-text-main", ".bg-card", ".text-arcade-cyan"):
+        assert expected_selector in css_text, (
+            f"{expected_selector} fehlt in static/tailwind.css"
+        )
 
 
 def test_the_tradeoff_is_documented():
@@ -116,22 +99,18 @@ def test_the_tradeoff_is_documented():
     assert doc.is_file()
 
     text = doc.read_text(encoding="utf-8")
-    assert "cdn.tailwindcss.com" in text
-    assert "no build step" in text, "Der Konflikt mit der Architekturentscheidung fehlt"
-    assert "Entscheidungsvorlage" in text
+    assert "static/tailwind.css" in text
+    assert "no build step" in text
 
 
-def test_readme_claim_is_qualified():
+def test_readme_claim_matches_local_reality():
     """
-    Die Zusage „100% locally" stand ohne Einschränkung da. Sie muss entweder
-    zutreffen oder benennen, was ausgenommen ist.
+    Die Zusage „100% locally" im README stimmt jetzt ohne CDN-Ausnahme.
     """
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     privacy_line = next(
         (ln for ln in readme.splitlines() if "Privacy-First" in ln), ""
     )
     assert privacy_line, "Privacy-Zusage nicht mehr im README gefunden"
-    assert "CDN" in privacy_line or "cdn" in privacy_line, (
-        "Die Zusage nennt die CDN-Ausnahme nicht — entweder die Abhängigkeit "
-        "beseitigen oder die Aussage präzisieren."
-    )
+    assert "100% locally" in privacy_line
+    assert "cdn.tailwindcss.com" not in privacy_line

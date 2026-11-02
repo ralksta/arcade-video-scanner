@@ -71,12 +71,14 @@ def test_auch_auf_fehlerantworten():
 
 def test_csp_deckt_ab_was_die_oberflaeche_wirklich_laedt():
     csp = _kopfzeilen()["content-security-policy"][0]
-    # Tailwind vom CDN und die Google-Schriften stehen in index.html bzw.
-    # login.html. Fehlt eins davon in der Richtlinie, bleibt die Oberflaeche
-    # ungestaltet -- das ist der teure Fehler bei einer CSP.
-    assert "https://cdn.tailwindcss.com" in csp
-    assert "https://fonts.googleapis.com" in csp
-    assert "https://fonts.gstatic.com" in csp
+    # Tailwind und die Schriften liegen jetzt lokal unter /static/ — kein
+    # fremder Host mehr in der CSP!
+    assert "https://cdn.tailwindcss.com" not in csp
+    assert "https://fonts.googleapis.com" not in csp
+    assert "https://fonts.gstatic.com" not in csp
+    assert "script-src 'self' 'unsafe-inline'" in csp
+    assert "style-src 'self' 'unsafe-inline'" in csp
+    assert "font-src 'self' data:" in csp
     # 57 onclick-Attribute in den Seiten: ohne das steht die Oberflaeche still.
     assert "'unsafe-inline'" in csp
 

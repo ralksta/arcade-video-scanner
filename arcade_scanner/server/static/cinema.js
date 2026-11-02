@@ -14,6 +14,7 @@
 let currentCinemaPath = null;
 let currentCinemaVideo = null;
 let cinemaPlaylist = null; // Overrides filteredVideos if set (e.g. for folder view)
+let cinemaComparePair = null; // { originalPath, optimizedPath } when opened from a Review comparison card
 
 /**
  * Set the playlist for cinema navigation
@@ -43,6 +44,18 @@ function openCinema(container) {
     }
 
     if (!path) return;
+
+    // Detect if opened from a Review comparison card (Original vs. Optimized)
+    const compEl = (container.hasAttribute && container.hasAttribute('data-compare-original'))
+        ? container
+        : (typeof container.closest === 'function' ? container.closest('.comparison-card') : null);
+    if (compEl) {
+        const origPath = compEl.getAttribute('data-compare-original');
+        const optPath = compEl.getAttribute('data-compare-optimized');
+        cinemaComparePair = (origPath && optPath) ? { originalPath: origPath, optimizedPath: optPath } : null;
+    } else {
+        cinemaComparePair = null;
+    }
 
     // Wird aus dem laufenden Player heraus ein anderes Medium geöffnet (Leiste
     // „Ähnliche"), gehört die Position noch dem bisherigen.
@@ -137,6 +150,7 @@ function openCinema(container) {
     // Update UI components
     initCinemaErrorReporting();
     initCinemaTransport();
+    updateCinemaCompareUI();
     updateCinemaMeta();
     updateCinemaTransport();
     updateCinemaButtons();
@@ -265,6 +279,8 @@ function closeCinema() {
 
     currentCinemaPath = null;
     currentCinemaVideo = null;
+    cinemaComparePair = null;
+    updateCinemaCompareUI();
 
     // „Weiterschauen" auf der Startseite zeigt sonst den Stand von vorher.
     if (typeof workspaceMode !== 'undefined' && workspaceMode === 'home'
@@ -592,6 +608,10 @@ function cinemaKeyHandler(e) {
             toggleCinemaSimilar();
         }
 
+    } else if (e.key === 'Tab' && cinemaComparePair) {
+        e.preventDefault();
+        toggleCinemaCompareVersion();
+
     } else if (key === 'i') {
         // Info panel toggle
         e.preventDefault();
@@ -656,6 +676,83 @@ function cinemaLocate() {
 }
 
 // --- UI UPDATE FUNCTIONS ---
+
+/**
+ * Update the A/B comparison badge in Cinema mode when viewing a Review pair
+ */
+function updateCinemaCompareUI() {
+    const btn = document.getElementById('cinemaCompareBtn');
+    const label = document.getElementById('cinemaCompareLabel');
+    if (!btn) return;
+
+    if (!cinemaComparePair || !currentCinemaPath) {
+        btn.classList.add('hidden');
+        btn.classList.remove('flex');
+        return;
+    }
+
+    const isOpt = currentCinemaPath === cinemaComparePair.optimizedPath;
+    if (label) {
+        label.textContent = isOpt ? 'A/B: Optimiert' : 'A/B: Original';
+    }
+    btn.classList.remove('hidden');
+    btn.classList.add('flex');
+}
+
+/**
+ * Synchronously switch between Original and Optimized version at the exact same timestamp
+ */
+function toggleCinemaCompareVersion() {
+    if (!cinemaComparePair || !currentCinemaPath) return;
+
+    const video = document.getElementById('cinemaVideo');
+    const nextPath = currentCinemaPath === cinemaComparePair.originalPath
+        ? cinemaComparePair.optimizedPath
+        : cinemaComparePair.originalPath;
+    const isNextOpt = nextPath === cinemaComparePair.optimizedPath;
+    const savedTime = (video && isFinite(video.currentTime)) ? video.currentTime : 0;
+    const wasPaused = video ? video.paused : false;
+
+    currentCinemaPath = nextPath;
+    currentCinemaVideo = typeof window.getVideoByPath === 'function'
+        ? window.getVideoByPath(nextPath)
+        : window.ALL_VIDEOS.find(v => v.FilePath === nextPath);
+
+    const fileName = nextPath.split(/[\\\/]/).pop();
+    const titleEl = document.getElementById('cinemaTitle');
+    if (titleEl) {
+        titleEl.innerText = typeof mediaTitle === 'function' ? mediaTitle(nextPath) : fileName;
+        titleEl.title = fileName;
+    }
+
+    if (video && !video.classList.contains('hidden')) {
+        const targetPath = nextPath;
+        video.addEventListener('loadedmetadata', () => {
+            if (currentCinemaPath !== targetPath) return;
+            if (savedTime > 0 && isFinite(video.duration)) {
+                video.currentTime = Math.min(savedTime, Math.max(0, video.duration - 0.1));
+            }
+            if (wasPaused) {
+                video.pause();
+            } else {
+                video.play().catch(() => {});
+            }
+        }, { once: true });
+        video.src = `/stream?path=` + encodeURIComponent(nextPath);
+        video.load();
+    }
+
+    updateCinemaCompareUI();
+    updateCinemaMeta();
+    updateCinemaTransport();
+    updateCinemaButtons();
+    updateCinemaInfo();
+    updateCinemaTags();
+
+    const v = currentCinemaVideo;
+    const detail = v ? ` (${v.codec || '?'} · ${(v.Bitrate_Mbps || 0).toFixed(1)} Mbps)` : '';
+    showCinemaToast((isNextOpt ? 'Optimiert' : 'Original') + detail + ' · [Tab]');
+}
 
 /**
  * Update cinema action button states (favorite indicator)
@@ -936,6 +1033,7 @@ window.toggleCinemaTagPanel = toggleCinemaTagPanel;
 window.toggleCinemaTag    = toggleCinemaTag;
 window.updateCinemaTags   = updateCinemaTags;
 window.setCinemaPlaylist  = setCinemaPlaylist;
+window.toggleCinemaCompareVersion = toggleCinemaCompareVersion;
 
 // Expose state for other modules that need it (e.g., optimizer panel)
 // Using defineProperty to create live bindings

@@ -137,3 +137,33 @@ def test_generated_html_versions_every_asset(tmp_path):
         if not match[1]
     ]
     assert not unversioned, f"Assets ohne Version im HTML: {sorted({m[0] for m in unversioned})}"
+
+
+def test_versioned_static_request_gets_immutable_cache_control():
+    """Versionierte Assets (?v=<mtime>) bekommen Cache-Control: immutable."""
+    import io
+
+    from arcade_scanner.server.api_handler import FinderHandler
+
+    class FakeHeaders(dict):
+        def get(self, key, default=None):
+            return super().get(key, default)
+
+    def _request_static(path: str) -> str:
+        h = FinderHandler.__new__(FinderHandler)
+        h.request_version = "HTTP/1.1"
+        h.requestline = f"GET {path} HTTP/1.1"
+        h.client_address = ("127.0.0.1", 12345)
+        h.command = "GET"
+        h.path = path
+        h.headers = FakeHeaders()
+        h.wfile = io.BytesIO()
+        h.close_connection = False
+        h.do_GET()
+        return h.wfile.getvalue().decode("latin-1", errors="ignore")
+
+    versioned_resp = _request_static(asset_url("engine.js"))
+    assert "Cache-Control: public, max-age=31536000, immutable" in versioned_resp
+
+    unversioned_resp = _request_static("/static/engine.js")
+    assert "Cache-Control: no-cache" in unversioned_resp

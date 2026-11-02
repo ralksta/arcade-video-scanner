@@ -459,3 +459,17 @@ class TestIfRange:
         serve_file_range(h, str(video_file))
 
         assert h.status == 206
+
+
+class TestXAccelRedirect:
+    def test_x_accel_support_header_returns_internal_redirect_without_body(self, video_file):
+        h = FakeHandler()
+        h.headers["X-Accel-Support"] = "1"
+        serve_file_range(h, str(video_file), extra_headers={"X-Arcade-Variant": "original"})
+
+        assert h.status == 200
+        assert h.sent_headers["content-length"] == "0"
+        assert h.sent_headers["x-arcade-variant"] == "original"
+        assert h.sent_headers["x-accel-redirect"].startswith("/_internal_media/")
+        assert h.wfile.getvalue() == b""
+

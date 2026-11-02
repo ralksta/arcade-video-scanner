@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import subprocess
+import threading
 import uuid
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -12,6 +13,25 @@ from arcade_scanner.config import config
 from . import media_extensions
 
 logger = logging.getLogger(__name__)
+
+# Begrenzt gleichzeitige On-Demand-Thumbnail-Prozesse (verhindert CPU-Sturm
+# beim ersten Öffnen eines Ordners mit vielen neuen Kacheln) und dedupliziert
+# parallele Anfragen auf dasselbe Vorschaubild.
+THUMB_RENDER_SEMAPHORE = threading.BoundedSemaphore(4)
+_thumb_locks_guard = threading.Lock()
+_thumb_inflight_locks: Dict[str, threading.Lock] = {}
+
+
+def _get_thumb_lock(thumb_name: str) -> threading.Lock:
+    with _thumb_locks_guard:
+        lock = _thumb_inflight_locks.get(thumb_name)
+        if lock is None:
+            # Begrenze das Dict gegen unbegrenztes Wachstum über lange Laufzeiten
+            if len(_thumb_inflight_locks) > 2048:
+                _thumb_inflight_locks.clear()
+            lock = threading.Lock()
+            _thumb_inflight_locks[thumb_name] = lock
+        return lock
 
 # Dieselbe Toleranz wie bei den Proxys: FAT rundet mtimes auf zwei Sekunden,
 # rsync und SMB verschieben sie um Sekundenbruchteile. Ohne sie gälte ein
@@ -216,27 +236,37 @@ def create_thumbnail(video_path: str, duration: Optional[float] = None) -> str:
     if not _thumbnail_needs_rebuild(thumb_path, video_path):
         return thumb_name
 
-    # Erst daneben schreiben, dann an die Stelle setzen. ffmpeg schrieb
-    # direkt in die ausgelieferte Datei: Beim Neuerzeugen kürzte `-y` sie
-    # sofort, und ein Request in diesem Moment bekam ein halbes JPEG — mit
-    # `max-age=604800`, also eine Woche lang im Browser. Scheiterte der
-    # Neuaufbau, war das alte, intakte Bild obendrein verloren.
-    #
-    # Der Name beginnt mit einem Punkt: Die Auslieferung verlangt `thumb_…`
-    # und die Aufräumroutinen ebenso, eine Zwischendatei ist für beide
-    # unsichtbar. Er endet auf `.jpg`, weil ffmpeg daran das Format erkennt.
-    tmp_path = os.path.join(config.thumb_dir, f".tmp-{uuid.uuid4().hex[:8]}-{thumb_name}")
-    try:
-        if not _render_thumbnail(video_path, tmp_path, duration):
-            return ""
-        os.replace(tmp_path, thumb_path)
-        return thumb_name
-    finally:
-        try:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        except OSError as e:
-            logger.debug("Could not remove thumbnail temp file %s: %s", tmp_path, e)
+    # Pro-Thumbnail-Sperre: Fragen Browser und TV (oder zwei Kacheln) dasselbe
+    # fehlende Bild gleichzeitig an, wartet der zweite Request kurz und findet
+    # danach das fertige Bild vor, statt ein zweites ffmpeg zu starten.
+    with _get_thumb_lock(thumb_name):
+        if not _thumbnail_needs_rebuild(thumb_path, video_path):
+            return thumb_name
+
+        # Globales Semaphore bremst den „Thundering Herd" beim Scrollen durch
+        # frisch gescannte Ordner auf maximal 4 parallele ffmpeg-Aufrufe.
+        with THUMB_RENDER_SEMAPHORE:
+            # Erst daneben schreiben, dann an die Stelle setzen. ffmpeg schrieb
+            # direkt in die ausgelieferte Datei: Beim Neuerzeugen kürzte `-y` sie
+            # sofort, und ein Request in diesem Moment bekam ein halbes JPEG — mit
+            # `max-age=604800`, also eine Woche lang im Browser. Scheiterte der
+            # Neuaufbau, war das alte, intakte Bild obendrein verloren.
+            #
+            # Der Name beginnt mit einem Punkt: Die Auslieferung verlangt `thumb_…`
+            # und die Aufräumroutinen ebenso, eine Zwischendatei ist für beide
+            # unsichtbar. Er endet auf `.jpg`, weil ffmpeg daran das Format erkennt.
+            tmp_path = os.path.join(config.thumb_dir, f".tmp-{uuid.uuid4().hex[:8]}-{thumb_name}")
+            try:
+                if not _render_thumbnail(video_path, tmp_path, duration):
+                    return ""
+                os.replace(tmp_path, thumb_path)
+                return thumb_name
+            finally:
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except OSError as e:
+                    logger.debug("Could not remove thumbnail temp file %s: %s", tmp_path, e)
 
 
 POSTER_PREFIX = "poster_"

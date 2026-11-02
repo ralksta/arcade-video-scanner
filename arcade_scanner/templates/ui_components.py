@@ -13,18 +13,8 @@ def render_base_layout(theme: BaseTheme, content: str, scripts: str) -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Arcade Scanner</title>
 
-    <!-- Fonts: Inter (UI) + Material Icons. Daten laufen im System-Mono-Stack. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <!-- Design Tokens -->
+    <!-- Design Tokens (Schriften und Tailwind werden lokal aus /static/ geladen) -->
     {render_theme_css()}
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    {theme.render_tailwind_config()}
 
     <style>
         .scrollbar-hide::-webkit-scrollbar {{ display: none; }}

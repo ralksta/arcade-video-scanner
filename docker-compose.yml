@@ -14,8 +14,7 @@ services:
       # - /Users/username/Movies:/media:ro
       # - /Volumes/ExternalDrive/Videos:/media:ro
       - ${HOME}/Downloads:/media:ro # Change this to your media path!
-      # Mount source code for development (Live Updates)
-      - .:/app
+      # For live-reload during development, mount .:/app in docker-compose.override.yml
       # Persistent configuration and database
       - ./arcade_data:/config
       # Persistent thumbnails and cache
@@ -32,12 +31,12 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.75'
+          cpus: '4.0'
           memory: 2048M
         reservations:
           memory: 256M
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()" ]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health').read()" ]
       interval: 30s
       timeout: 10s
       retries: 3

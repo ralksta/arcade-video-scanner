@@ -46,9 +46,9 @@ ENV PYTHONUNBUFFERED=1 \
     CONFIG_DIR=/config \
     CACHE_DIR=/cache
 
-# Health check
+# Health check (nutzt den dedizierten /api/health Endpunkt inkl. SQLite-Prüfung)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health').read()" || exit 1
 
 # Switch to non-root user
 USER appuser

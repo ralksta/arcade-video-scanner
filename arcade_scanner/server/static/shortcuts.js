@@ -33,6 +33,7 @@ const SHORTCUT_SECTIONS = [
             { keys: ['S'], label: 'Ähnliche Medien' },
             { keys: ['G'], label: 'GIF-Export' },
             { keys: ['O'], label: 'Optimizer' },
+            { keys: ['Tab'], label: 'Original / Optimiert umschalten (im Review-Vergleich)' },
             { keys: ['A', '…', 'Z'], label: 'Übrige Buchstaben: konfigurierte Tag-Shortcuts' },
             { keys: ['Esc'], label: 'Cinema schließen' },
         ],

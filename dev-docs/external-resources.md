@@ -1,7 +1,21 @@
-# Das Dashboard lädt Ressourcen von Fremdservern
+# Das Dashboard läuft zu 100 % lokal (keine Fremdserver mehr)
 
-**Stand: 2026-08-17**, gefunden im Nachtlauf beim Abgleich der
-README-Zusagen mit dem Code. **Nicht behoben — siehe „Warum nicht heute Nacht".**
+**Stand: 2026-11-02** — die früheren Abhängigkeiten von `cdn.tailwindcss.com`
+und Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`) wurden vollständig
+durch lokale Dateien unter `arcade_scanner/server/static/` abgelöst:
+
+- `static/tailwind.css` — vorkompiliertes Tailwind-Stylesheet (aus `templates/theme.py`
+  und allen Klassen in `templates/` und `static/`).
+- `static/fonts/inter-latin.woff2`, `static/fonts/inter-latin-ext.woff2` und
+  `static/fonts/material-icons.woff2` — lokal eingebunden per `@font-face` in
+  `static/styles.css` und `static/login.html`.
+
+Die `Content-Security-Policy` in `FinderHandler._SICHERHEIT` (`api_handler.py`)
+erlaubt ausschließlich `'self'`.
+
+---
+
+## Historischer Hintergrund (Stand 2026-08-17, vor der Behebung)
 
 ## Der Widerspruch
 
