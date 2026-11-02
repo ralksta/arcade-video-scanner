@@ -1,17 +1,41 @@
-# Arcade Media Scanner 7.2.0
+# Arcade Media Scanner 7.3.0
 
 Arcade Media Scanner is a self-hosted media inventory tool that turns your local video and image library into a searchable, visual dashboard. It is specifically built for users with massive media collections (e.g., recorded gameplay, arcade collections, photo archives) who need to regain disk space without losing track of their files.
 
 ### Core Features:
 - **Visual Analysis**: Instantly see which videos are "High Bitrate" (candidates for compression) vs. "Optimized".
-- **Privacy-First**: Your media never leaves your computer — the scan, the database, the fonts, CSS, and the web dashboard run 100% locally with zero external CDN requests. Details in [`dev-docs/external-resources.md`](dev-docs/external-resources.md).
+- **Privacy-First & 100% Air-Gapped**: Your media never leaves your computer — the scan, the database, the fonts, CSS, and the web dashboard run 100% locally with zero external CDN requests. Details in [`dev-docs/external-resources.md`](dev-docs/external-resources.md).
 - **Smart Filtering**: Filter by codec (H.264 vs HEVC), bitrate, file size, media type, and image formats.
 - **GPU-Powered Optimization**: Cross-platform hardware acceleration (NVIDIA, Apple VideoToolbox, Intel/AMD VAAPI) reduces file sizes by 50-80% with minimal quality loss.
 - **Proxy Streaming**: Serves a smaller copy to clients outside your LAN, so high-bitrate camera files stay watchable on the road — originals untouched, no duplicate library entries.
 
 ---
 
-## 🚀 Version 7.2.0 Highlights (New!)
+## 🚀 Version 7.3.0 Highlights (New!)
+
+### 🔒 100% Local, Air-Gapped & CDN-Free
+- **Offline Fonts & Styles**: Bundled local WOFF2 web fonts (Inter & Material Icons) and precompiled Tailwind CSS v3.4 replace all runtime Cloudflare / Google CDN calls.
+- **Strict Content-Security-Policy**: Enforces `'self'`-only resource loading across all dashboard views.
+
+### ⚡ Performance & Scalability Turbo
+- **Thundering-Herd Protection**: Thumbnail rendering is bounded to 4 parallel `ffmpeg` instances with per-file deduplication locks, preventing CPU spikes during fast scrolling.
+- **Zero-Probe Lazy Generation**: Lazy thumbnail generation resolves video duration directly from SQLite and cache, bypassing redundant `ffprobe` subprocesses.
+- **Immutable Asset Caching**: Versioned static assets and fonts are served with `Cache-Control: public, max-age=31536000, immutable`.
+- **Parallel WAL SQLite Reads**: Thread-local read-only database connections ensure API calls never stall during heavy background writes or scans.
+- **Single-Pass Scanner**: Recursive `os.scandir()` traversal reuses entry stats directly to eliminate duplicate filesystem syscalls.
+- **$O(1)$ Video Lookup**: In-memory video map replaces linear frontend scans, paired with lightweight metadata-only hover previews (`#t=10%`).
+
+### 🎬 Synchronized A/B Video Quality Comparison
+- **Seamless Cinema Review**: In the Review workspace, press `Tab` (or click the A/B toggle badge) inside Cinema mode to toggle between original and optimized versions at the exact same playback timestamp and play/pause state.
+
+### 🌐 Zero-Copy Streaming
+- **Nginx X-Accel-Redirect**: Optional zero-copy streaming header support offloads large media file transfers directly to Nginx sendfile.
+
+📖 **[Full CHANGELOG →](CHANGELOG.md)**
+
+---
+
+## 🚀 Version 7.2.0 Highlights
 
 ### 📷 RAW photos
 - **Separate switch.** "RAW-Fotos" enables CR2, CR3, NEF, ARW, DNG, RAF, ORF,

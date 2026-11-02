@@ -4,115 +4,80 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [7.3.0] - 2026-11-02
+
+### Added
+- **100% Local & Air-Gapped (Zero External CDN Calls):**
+  - Bundled local `.woff2` fonts (Inter & Material Icons) under `/static/fonts/` with `@font-face` definitions.
+  - Precompiled offline Tailwind CSS v3.4 replacing runtime Cloudflare CDN Play-JIT script.
+  - Hardened Content-Security-Policy (CSP) restricting `default-src`, `font-src`, `style-src`, and `script-src` to `'self'` only.
+- **Synchronized A/B Video Review Comparison in Cinema Mode:**
+  - When opening video pairs from the Review workspace comparison card, Cinema mode enables an A/B switch badge (`A/B: Original` vs `A/B: Optimized`) and `Tab` shortcut.
+  - Seamlessly toggles between the original and optimized video files at the exact same playback timestamp (`currentTime`) and play/pause state.
+- **Nginx Zero-Copy Streaming Support:**
+  - Added support for `X-Accel-Support: 1` header in `/stream` requests, returning `X-Accel-Redirect: /_internal_media/<path>` to offload file delivery directly to Nginx sendfile.
+- **Tailwind Build & Verification Helper:**
+  - Added `scripts/build_tailwind.py` to extract CSS tokens from templates and JavaScript to verify or rebuild `arcade_scanner/server/static/tailwind.css`.
+
+### Performance & Scalability
+- **Thundering-Herd Protection for Thumbnails:**
+  - Concurrency limited via `threading.BoundedSemaphore(4)` with per-thumbnail locks in `video_processor.py` to prevent duplicate or excessive ffmpeg renders during fast scrolling.
+- **Zero-Probe Lazy Thumbnail Generation:**
+  - On-demand thumbnail handler resolves video duration directly from SQLite and cache, bypassing redundant `ffprobe` subprocesses.
+- **Immutable Static Asset Caching:**
+  - Versioned static assets (`?v=<mtime>`) and local fonts return `Cache-Control: public, max-age=31536000, immutable`.
+- **Parallel WAL SQLite Reads:**
+  - Thread-local read-only SQLite connections (`PRAGMA query_only=ON`) allow concurrent queries to execute in WAL mode without blocking on write locks.
+- **Single-Pass Scanner Traversal:**
+  - Recursive `os.scandir()` walker in `file_system.py` directly reuses `DirEntry.stat()` size information, avoiding redundant `stat()` syscalls.
+- **$O(1)$ Video Lookups & Hover Previews:**
+  - In-memory `Map` lookup in `store.js` replaces linear array scans across `ALL_VIDEOS`.
+  - Hover preview loads metadata only (`preload="metadata"`) and seeks directly into duration (`#t=10%`, max 30s).
+- **CSS Content Visibility:**
+  - Added `content-visibility: auto` to grid video cards to reduce layout and rendering overhead on large libraries.
+
+### Changed
+- Docker healthcheck now verifies `http://localhost:8000/api/health` directly.
+- Nginx configuration updated with unbuffered streaming location (`proxy_buffering off;`) and security headers.
+
 ## [7.2.0] - 2026-10-24
 
 ### Added
-- **RAW-Fotos scannen.** Ein eigener Schalter „RAW-Fotos“ (unabhängig von
-  „Include Photos“) nimmt CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW,
-  RAW und RWL auf; JPG/PNG bleiben draußen. Metadaten und Vorschaubilder
-  kommen aus der eingebetteten JPEG-Vorschau, nur mit Pillow: TIFF-basiert
-  direkt, RAF über den Kopf bei Byte 84–91, sonst das größte eingebettete
-  JPEG. EXIF-Ausrichtung inklusive. Vorschaubilder 480×270, Poster 1280×720,
-  ohne ffmpeg. Die Endungslisten liegen jetzt in einer gemeinsamen Quelle
-  (`core/media_extensions.py`).
+- **RAW photo scanning.** Dedicated "RAW-Fotos" switch (independent of "Include Photos") enables scanning of CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW, RAW and RWL without including JPG/PNG. Metadata and preview extraction uses embedded JPEGs with Pillow (TIFF-based directly, RAF via header bytes 84–91, otherwise largest embedded JPEG) including EXIF orientation. Generates 480×270 thumbnails and 1280×720 posters without ffmpeg. Extension lists consolidated in `core/media_extensions.py`.
 
 ## [7.1.0] - 2026-10-24
 
 ### Added
-- **Suchbegriffe mit mehr Funktionen.** Die Suchfelder in der Filterleiste
-  und im Collection-Dialog schlagen beim Tippen bekannte Ordner vor —
-  inklusive Elternpfaden wie `/media_ralf/OD`, mit Anzahl der Dateien im
-  Unterbaum. Mit `#` werden Tags vorgeschlagen; der Verlauf zeigt die zuletzt
-  benutzten Ordner und Begriffe (pro Konto gespeichert). Im Collection-Dialog
-  werden gewählte Ordner und Tags als Chips unter dem Feld angezeigt. Jede
-  Vorschlagszeile hat rechts einen **Minus-Knopf** zum Ausschließen; in den
-  Chips schaltet ein Symbol zwischen ein- und ausschließen um, das X entfernt
-  den Filter. Chips zeigen die letzten zwei Pfadsegmente (etwa
-  „Miss Blossom/web"), damit mehrere `web`-Ordner unterscheidbar bleiben.
-  Unter der Liste stehen **„Alle N einschließen/ausschließen"** für die
-  obersten Treffer eines Begriffs — damit reicht für „ProSessions ohne
-  Web-Ordner" ein Klick. Gespeichert wird weiterhin ein einziger Suchtext.
-- Die Suche versteht mehrere Begriffe (alle müssen passen), Ausschlüsse
-  (`-wort`), Anführungszeichen für Phrasen und `#tag` für Tags. Mehrere
-  **Pfade** sind dagegen ODER-verknüpft: „/a /b" findet alles unter `/a` oder
-  `/b` — das entspricht dem Anklicken mehrerer Ordner-Chips. In Pfaden steht
-  `*` als Platzhalter für beliebig viele Zeichen (auch `/`), etwa
-  `-*/web*` für „alle Ordner, deren Name mit web beginnt". Pfade mit `/`
-  gelten auf Ordnergrenze: `/media_ralf/OD` trifft nicht mehr
-  `/media_ralf/ODX`. Groß-/Kleinschreibung, Umlaute und ß sind egal. Dieselbe
-  Regel gilt in Filterleiste, Treemap, Auto-Tag-Regeln und auf dem Fernseher;
-  Collections mit gespeichertem Suchbegriff verhalten sich überall gleich.
-- **Papierkorb.** Ausdrückliche Löschungen aus Duplikaten und der
-  Mehrfachauswahl sind nicht mehr endgültig. Die Datei wandert in einen
-  versteckten Ordner `.arcade-trash` im obersten passenden Scan-Ziel (gleiche
-  Platte, also Verschieben statt Kopieren) und bleibt **30 Tage**
-  wiederherstellbar. Zurückholen und endgültig Leeren stehen in den
-  Einstellungen unter *Storage*. Favoriten, Tags und Wiedergabefortschritt
-  bleiben während der Frist erhalten; abgelaufene Einträge räumt der Server
-  beim Start und beim Öffnen des Papierkorbs auf. Der Ordner wird vom Scan
-  automatisch ausgeschlossen.
+- **Enhanced search & suggestions.** Search fields in filter panel and collection dialog suggest known folders (including parent paths like `/media_ralf/OD` with item counts), `#tags`, and recent history per user. Collection chips support including/excluding folders with one-click actions.
+- **Search syntax.** Supports multiple AND terms, `-word` exclusions, `"quoted phrases"`, `#tags`, OR-linked paths, and wildcard `*` matching on folder boundaries.
+- **Trash bin with 30-day retention.** Explicit deletions move files to `.arcade-trash` on the matching scan target disk. Recover or permanently purge under Settings → Storage. Favorites, tags, and watch progress are retained during the retention window.
 
 ### Changed
-- **Sortierung in beide Richtungen.** Das Auswahlfeld bietet jetzt Name A–Z
-  und Z–A, Bitrate und Größe jeweils von klein nach groß und von groß nach
-  klein sowie Laufzeit und Datum in beide Richtungen. Die bisherigen
-  Sortierwerte bleiben gültig, gespeicherte Ansichten brechen nicht.
-- **Kacheln zeigen Größe und Bitrate.** Eine leise Zeile unter dem Titel
-  nennt die Dateigröße und, bei Videos, die Bitrate. Die Länge bleibt das
-  Badge auf dem Vorschaubild; Pfad, Codec und Bitrate-Balken bleiben unter
-  „Details“.
-- **Collection-Dialog mit Platz.** Der Dialog ist jetzt breit (zwei Spalten
-  auf dem Desktop, volle Höhe) statt eines schmalen Fensters mit
-  zugeklappten Akkordeons. Der Suchbegriff steht oben und hat eine große
-  Vorschlagsliste; Vorschläge sind nach *Verlauf*, *Ordner* und *Tags*
-  gruppiert. Name, Kategorie und Darstellung liegen links, Eigenschaften
-  rechts, Inhalt & Metadaten darunter. Auf dem Handy bleibt alles in einer
-  scrollbaren Spalte.
-- **Schau-Modus statt Werkstatt.** Karten in Bibliothek und Favoriten zeigen
-  nur noch Bild, Titel, Laufzeit und Fortschritt. Status, Codec, Größe,
-  Bitrate, Pfad und die Optimieren-Knöpfe erscheinen in Review, Duplikaten
-  und Kandidaten weiter wie gewohnt. Überall sonst blendet „Details“ in der
-  Filterleiste sie ein, und der Browser merkt sich die Wahl. Im Player
-  wandern „Ordner“, „GIF“ und „Optimieren“ ebenfalls dorthin; G und O
-  funktionieren weiter.
-- **Lesbare Titel.** Statt `VID_20251025_121813_115.mp4` steht
-  „25. Okt. 2025 · 12:18“, und Optimierer-Anhängsel wie `_opt` oder
-  `__h265` fallen weg. Das gilt für Karten, Startseite, Player und
-  TV-App. Der Dateiname bleibt im Tooltip.
-- Die Seitenleiste trennt **Mediathek** (Start, Bibliothek, Favoriten) und
-  **Werkstatt** (Review, Duplikate, Kandidaten). Navigation, Filterleiste,
-  Player und Anmeldung sind durchgehend deutsch.
-- Die Bibliothek ist standardmäßig nach „Neueste zuerst“ sortiert, nicht
-  mehr nach Bitrate.
+- **Bidirectional sorting.** Dropdown now provides A–Z / Z–A name sorting, ascending/descending bitrate and size, as well as duration and date in both directions.
+- **Grid cards show size and bitrate.** Quiet meta line beneath title displays file size and bitrate.
+- **Spacious collection dialog.** Two-column wide modal on desktop with search suggestions grouped by history, folders, and tags.
+- **Watch mode UI.** Clean watch cards in library and favorites show image, title, duration, and progress; technical details remain under Details toggle.
+- **Human-readable titles.** Formats date-based filenames into clean titles, removing optimizer suffixes (`_opt`, `__h265`).
+- **Sidebar sections.** Separates Mediathek (Home, Library, Favorites) and Workshop (Review, Duplicates, Candidates).
+- Default library sort set to newest first.
 
-### Fixed (Oberfläche)
-- **Papierkorb-Rückfragen im Design.** Löschen und endgültiges Leeren fragen
-  nicht mehr mit dem Browser-Dialog, sondern mit einem gestylten Dialog.
-  Dateinamen stehen als Liste darin, „Abbrechen“ ist vorausgewählt, Escape
-  und ein Klick auf den Hintergrund schließen ihn.
-- In der Seitenleiste blieb der erste Eintrag hervorgehoben, egal welche
-  Ansicht offen war.
-- Auf dem Handy lag das Sortier-Icon auf dem Text, und die Anmeldekarte
-  reichte bis an den Bildschirmrand.
-- Kontextmenü, Befehlspalette, Ordner-Leiste und Collection-Dialog hatten
-  noch Farben aus der alten Arcade-Optik und ignorierten den hellen Modus.
-- TV-Client: Fehlen die Nutzerdaten, zeigt er die Mediathek ohne Favoriten und
-  Tags und nennt den Grund im Untertitel. Bisher blieb das Raster leer, damit
-  der Vault nicht sichtbar wurde.
-- Tag-Kürzel: G, I, O und S sind beim Anlegen gesperrt, weil das Cinema sie
-  belegt; bisher ließen sie sich vergeben und griffen nie. V ist frei.
-- **Gespeicherte Ansichten gehören jetzt dem Konto** (ENTSCHEIDUNGEN.md,
-  Punkt 2). Bisher lagen sie in der globalen settings.json, und jedes Konto
-  sah Suchbegriffe und Ordner der anderen. Beim ersten Start gehen vorhandene
-  Ansichten einmalig an den Admin.
+### Fixed (UI)
+- Styled confirmation modal for trash and purge actions.
+- Fixed first item remaining highlighted in sidebar regardless of active view.
+- Improved mobile responsiveness for sort controls and login card.
+- Normalized color schemes across context menu, command palette, and folder bar.
+- TV client shows library gracefully when user data is missing.
+- Tag shortcuts: G, I, O, S reserved for player shortcuts.
+- Saved views scoped per user account.
 
 ### Security
-- **Vorschaubilder verlangen eine Anmeldung** (Phase 6). `/thumbnails` war
-  bewusst offen, weil der TV-Client kein Cookie hat. Jetzt hängt er sein Token
-  an, und die Route gilt ohne LAN-Ausnahme. Eine Ausnahme hätte an der
-  fälschbaren Client-Adresse gehangen. Der Rundum-Test für anonyme Zugriffe
-  prüft jetzt alle 56 Routen statt nur `/api/…`.
-- `POST /api/restore` überschrieb ohne Anmeldung die globalen Einstellungen
+- **Thumbnails require authentication.** `/thumbnails` now strictly requires session token/cookie without LAN bypass.
+- `POST /api/restore` now strictly requires admin session.
+- Brute-force rate limiting enforced atomically against concurrent attempts.
+- Enforced session checks on `GET /api/settings`, `/api/duplicates/status`, and `POST /api/tags`.
+- Safe argument escaping (`jsArg()`) for filenames in HTML click handlers.
+- Restricted global settings modifications to admin users only.
+- Restricted GIF exports to files within user's own scan directories.
   (darunter `ffprobe_path`). Jetzt sind Sitzung und Admin nötig.
 - Parallele Anmeldeversuche umgingen die Brute-Force-Sperre (40 statt 5).
 - `GET /api/settings`, `/api/duplicates/status` und `POST /api/tags`
